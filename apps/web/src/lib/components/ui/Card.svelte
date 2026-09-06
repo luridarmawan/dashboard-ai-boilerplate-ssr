@@ -3,17 +3,18 @@ import type { Snippet } from 'svelte';
 import { cn } from '$lib/utils';
 
 interface Props {
-  title?: string;
-  description?: string;
-  class?: string;
+  id?: string | undefined;
+  title?: string | undefined;
+  description?: string | undefined;
+  class?: string | undefined;
   children?: Snippet;
   footer?: Snippet;
   actions?: Snippet;
 }
-let { title, description, class: className, children, footer, actions }: Props = $props();
+let { id, title, description, class: className, children, footer, actions }: Props = $props();
 </script>
 
-<section class={cn('rounded-lg border bg-card text-card-foreground shadow-xs', className)}>
+<section {id} class={cn('rounded-lg border bg-card text-card-foreground shadow-xs', className)}>
   {#if title || actions}
     <header class="flex items-start justify-between gap-4 p-5 pb-0">
       <div>

@@ -31,6 +31,9 @@ export const ERROR_CODES = [
   'token_expired',
   'session_expired',
   'tenant_forbidden',
+  // configuration & modules (FR-E, G-8)
+  'demo_mode',
+  'module_disabled',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

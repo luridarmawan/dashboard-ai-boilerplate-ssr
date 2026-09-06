@@ -6,7 +6,7 @@ export const _layoutVariant = 'wide';
 
 const PRODUCTS = Array.from({ length: 57 }, (_, i) => ({
   id: `00000000-0000-7000-8000-${String(i + 1).padStart(12, '0')}`,
-  name:
+  name: `${
     [
       'Kopi Gayo',
       'Teh Melati',
@@ -16,7 +16,8 @@ const PRODUCTS = Array.from({ length: 57 }, (_, i) => ({
       'Kayu Manis',
       'Vanili',
       'Lada Hitam',
-    ][i % 8] + ` #${i + 1}`,
+    ][i % 8]
+  } #${i + 1}`,
   category: ['Minuman', 'Bumbu', 'Pemanis'][i % 3] ?? 'Minuman',
   price: 12000 + ((i * 3750) % 90000),
   stock: (i * 7) % 40,

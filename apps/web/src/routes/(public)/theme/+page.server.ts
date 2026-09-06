@@ -13,7 +13,11 @@ import type { Actions, PageServerLoad } from './$types';
  */
 export const load: PageServerLoad = async (event) => {
   const t = event.locals.theme;
-  const list = themes().filter((th) => !t.allowed || t.allowed.includes(th.id));
+  // L-14: themes of a module disabled for this tenant are not offered.
+  const enabled = event.locals.config.enabledModules;
+  const list = themes()
+    .filter((th) => !th.module || th.module === 'core' || enabled.has(th.module.toLowerCase()))
+    .filter((th) => !t.allowed || t.allowed.includes(th.id));
   const locale = event.locals.session?.user.locale === 'en' ? 'en' : 'id';
   const back = event.url.searchParams.get('back');
   return {

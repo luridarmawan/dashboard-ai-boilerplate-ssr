@@ -11,6 +11,7 @@
         "@core/db": "workspace:*",
         "@core/i18n": "workspace:*",
         "@core/module-kit": "workspace:*",
+        "@core/settings": "workspace:*",
         "@core/ui-theme": "workspace:*",
         "@types/bun": "^1.2.0",
         "typescript": "^5.9.0",
@@ -26,6 +27,7 @@
         "@core/db": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/runtime": "workspace:*",
+        "@core/settings": "workspace:*",
         "@elysiajs/openapi": "^1.4.0",
         "elysia": "^1.4.0",
       },
@@ -138,6 +140,16 @@
         "@core/module-kit": "workspace:*",
       },
     },
+    "packages/settings": {
+      "name": "@core/settings",
+      "version": "0.0.0",
+      "dependencies": {
+        "@core/config": "workspace:*",
+        "@core/db": "workspace:*",
+        "@core/module-kit": "workspace:*",
+        "@core/ui-theme": "workspace:*",
+      },
+    },
     "packages/ui-theme": {
       "name": "@core/ui-theme",
       "version": "0.0.0",
@@ -181,6 +193,8 @@
     "@core/module-kit": ["@core/module-kit@workspace:packages/module-kit"],
 
     "@core/runtime": ["@core/runtime@workspace:packages/runtime"],
+
+    "@core/settings": ["@core/settings@workspace:packages/settings"],
 
     "@core/ui-theme": ["@core/ui-theme@workspace:packages/ui-theme"],
 

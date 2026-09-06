@@ -81,5 +81,7 @@
   "lang.lead": "The language is decided on the server: profile preference, then cookie, then the browser header.",
   "lang.id": "Bahasa Indonesia",
   "lang.en": "English",
-  "nav.examples": "Patterns"
+  "nav.examples": "Patterns",
+  "nav.settings": "Settings",
+  "nav.modules": "Modules"
 }

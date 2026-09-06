@@ -56,6 +56,11 @@ const envSchema = z
     /** Upload storage root — a mapped volume in production (Q-9). Local adapter; S3 is optional later (Q-16). */
     UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
 
+    /** E-7: every write is refused with a clear message. Lives in .env because it must hold even when the database is read-only. */
+    DEMO_MODE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     /** Self-service registration (A-1). Off by default in production; on for development. */
     SIGNUP_ENABLED: z
       .enum(['true', 'false'])

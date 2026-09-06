@@ -26,6 +26,7 @@ import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { requirePermission, TENANT_HEADER, tenantContext } from '../plugins/tenancy.ts';
+import { settings } from '../services.ts';
 
 /**
  * Authentication (PRD FR-A). Cookie sessions, Argon2id, rate-limited login, verification and
@@ -86,7 +87,10 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
     '/register',
     async ({ body, set, request, requestId, cookie, server }) => {
       const e = env();
-      if (!e.SIGNUP_ENABLED) {
+      // Runtime configuration wins over the .env bootstrap value when an admin has set it (E-6).
+      const signup =
+        (await settings.get<boolean | null>(null, 'security.signup_enabled')) ?? e.SIGNUP_ENABLED;
+      if (!signup) {
         set.status = 403;
         return fail('signup_disabled', 'Pendaftaran mandiri dimatikan', requestId);
       }
@@ -138,7 +142,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         clientId: tenant?.id ?? null,
         ip: clientIp(request, server),
         userAgent: request.headers.get('user-agent'),
-        ttlSeconds: e.SESSION_TTL_HOURS * 3600,
+        ttlSeconds:
+          ((await settings.get<number | null>(null, 'security.session_hours')) ??
+            e.SESSION_TTL_HOURS) * 3600,
       });
       cookie[SESSION_COOKIE]?.set({
         value: session.token,
@@ -188,7 +194,10 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       const db = unsafeAcrossTenants();
       const email = body.email.trim().toLowerCase();
       const ip = clientIp(request, server) ?? 'unknown';
-      const rule = parseRateLimitRule(e.LOGIN_RATE_LIMIT);
+      const rule = parseRateLimitRule(
+        (await settings.get<string | null>(null, 'security.login_rate_limit')) ??
+          e.LOGIN_RATE_LIMIT,
+      );
 
       // Stricter than the general limit (A-2): per IP and per account, whichever trips first.
       const byIp = await consumeRateLimit(db, `login:ip:${ip}`, rule);
@@ -228,7 +237,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         clientId,
         ip,
         userAgent: request.headers.get('user-agent'),
-        ttlSeconds: e.SESSION_TTL_HOURS * 3600,
+        ttlSeconds:
+          ((await settings.get<number | null>(null, 'security.session_hours')) ??
+            e.SESSION_TTL_HOURS) * 3600,
       });
       await db
         .update(schema.users)

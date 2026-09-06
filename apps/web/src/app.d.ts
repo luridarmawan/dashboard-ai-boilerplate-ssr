@@ -1,4 +1,5 @@
 import type { LocaleResolution } from '@core/i18n';
+import type { PublicConfig } from '$lib/server/config';
 import type { Session } from '$lib/server/session';
 import type { ResolvedTheme } from '$lib/server/theme';
 
@@ -11,6 +12,8 @@ declare global {
       session: Session | null;
       /** Theme + mode for this request (L-12), resolved before render. */
       theme: ResolvedTheme;
+      /** Public runtime configuration + enabled modules of the active tenant (E-2, G-8). */
+      config: PublicConfig;
       /** Language for this request (K-2), resolved before render. */
       locale: LocaleResolution;
     }

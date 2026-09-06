@@ -51,6 +51,7 @@
     "@core/db": "workspace:*",
     "@core/i18n": "workspace:*",
     "@core/module-kit": "workspace:*",
+    "@core/settings": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@types/bun": "^1.2.0",
     "typescript": "^5.9.0"

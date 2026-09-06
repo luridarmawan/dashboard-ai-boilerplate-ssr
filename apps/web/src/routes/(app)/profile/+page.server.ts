@@ -9,6 +9,12 @@ export const load: PageServerLoad = async (event) => {
   const allowed = event.locals.theme.allowed;
   return {
     themes: themes()
+      .filter(
+        (t) =>
+          !t.module ||
+          t.module === 'core' ||
+          event.locals.config.enabledModules.has(t.module.toLowerCase()),
+      )
       .filter((t) => !allowed || allowed.includes(t.id))
       .map((t) => ({ id: t.id, name: t.name[locale] })),
   };

@@ -11,6 +11,9 @@ const t = useT();
 
 <div class="page">
   <h1>{t('auth.register.title')}</h1>
+  {#if data.signupEnabled === false}
+    <p class="error">Pendaftaran mandiri dimatikan oleh administrator.</p>
+  {:else}
   {#if form?.error}
     <p class="error">{form.error}{#if Array.isArray(form.details)} — {form.details.join(', ')}{/if}</p>
   {/if}
@@ -21,4 +24,5 @@ const t = useT();
     <label>{t('auth.login.password')} <input name="password" type="password" required minlength="12" autocomplete="new-password" /><span class="muted">{t('auth.register.password_hint')}</span></label>
     <div class="row"><button type="submit">{t('auth.register.submit')}</button><a href="/auth/login">{t('auth.register.have_account')}</a></div>
   </form>
+  {/if}
 </div>

@@ -136,7 +136,7 @@ export interface ThemeResolution {
  * error; the next step decides. Runs on the server before the first byte is sent.
  */
 export function resolveTheme(input: ThemeResolutionInput): ThemeResolution {
-  const allowed = input.allowed && input.allowed.length ? new Set(input.allowed) : null;
+  const allowed = input.allowed?.length ? new Set(input.allowed) : null;
   const ok = (id: string | null | undefined): ThemeManifest | null => {
     if (!id) return null;
     if (allowed && !allowed.has(id)) return null;

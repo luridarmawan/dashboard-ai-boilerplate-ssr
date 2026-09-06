@@ -10,6 +10,7 @@ export const load: PageServerLoad = async (event) => {
   const s = event.locals.session;
   const locale = event.locals.locale.locale;
   const allowed = moduleWidgets
+    .filter((w) => event.locals.config.enabledModules.has(w.module.toLowerCase()))
     .filter((w) => !w.permission || (s?.can(w.permission) ?? false))
     .sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
   return {

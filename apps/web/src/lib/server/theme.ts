@@ -1,14 +1,14 @@
-import { isMode, type Mode, resolveTheme, type ThemeResolution } from '@core/ui-theme';
+import { isMode, type Mode, resolveTheme, type ThemeResolution, themeById } from '@core/ui-theme';
 import type { RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { cfgList, cfgString, type PublicConfig } from './config.ts';
 
 /**
  * Theme and mode for ONE request (PRD L-4, L-10…L-12), decided on the server before render:
  *   theme: user preference → `dab_theme` cookie → tenant default → global default → `base`
  *   mode : `dab_mode` cookie → `system`
- * Tenant/global defaults and the allowlist come from runtime configuration in M3; until then the
- * global default and allowlist are read from env (`THEME_DEFAULT`, `THEMES_ALLOWED`) so the
- * chain is complete and testable today.
+ * Tenant/global defaults and the allowlist come from runtime configuration (`app.default_theme`,
+ * `app.allowed_themes`, per tenant with global fallback — E-2), never from .env (E-6). A theme
+ * contributed by a module that is disabled for the tenant is treated as absent (L-14).
  */
 export const THEME_COOKIE = 'dab_theme';
 export const MODE_COOKIE = 'dab_mode';
@@ -18,22 +18,22 @@ export interface ResolvedTheme extends ThemeResolution {
   readonly allowed: readonly string[] | null;
 }
 
-function allowedThemes(): readonly string[] | null {
-  const raw = env.THEMES_ALLOWED?.trim();
-  if (!raw) return null;
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-export function resolveRequestTheme(event: RequestEvent): ResolvedTheme {
-  const allowed = allowedThemes();
+export function resolveRequestTheme(event: RequestEvent, config: PublicConfig): ResolvedTheme {
+  const configured = cfgList(config, 'app.allowed_themes');
+  // Module themes follow their module's state for this tenant (L-14): drop disabled ones.
+  const usable = (id: string | null | undefined) => {
+    const th = themeById(id);
+    if (!th) return null;
+    if (th.module && th.module !== 'core' && !config.enabledModules.has(th.module.toLowerCase()))
+      return null;
+    return id ?? null;
+  };
+  const allowed = configured.length ? configured.filter((id) => usable(id)) : null;
   const resolution = resolveTheme({
-    user: event.locals.session?.user.theme ?? null,
-    cookie: event.cookies.get(THEME_COOKIE) ?? null,
-    tenantDefault: null, // app.default_theme per tenant — configuration lands in M3
-    globalDefault: env.THEME_DEFAULT ?? null,
+    user: usable(event.locals.session?.user.theme),
+    cookie: usable(event.cookies.get(THEME_COOKIE)),
+    tenantDefault: usable(cfgString(config, 'app.default_theme')), // tenant value or global fallback (E-2)
+    globalDefault: null,
     allowed,
   });
   const rawMode = event.cookies.get(MODE_COOKIE);

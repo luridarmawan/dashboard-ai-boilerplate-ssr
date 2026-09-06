@@ -1,12 +1,15 @@
 import type { TableDef } from '../src/descriptor.ts';
 import { apiTokens } from './api_tokens.def.ts';
 import { auditLog } from './audit_log.def.ts';
+import { cacheVersions } from './cache_versions.def.ts';
 import { clientUserMaps } from './client_user_maps.def.ts';
 import { clients } from './clients.def.ts';
+import { configurations } from './configurations.def.ts';
 import { emailVerificationTokens } from './email_verification_tokens.def.ts';
 import { groupPermissions } from './group_permissions.def.ts';
 import { groupUserMaps } from './group_user_maps.def.ts';
 import { groups } from './groups.def.ts';
+import { modules } from './modules.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
 import { rateLimits } from './rate_limits.def.ts';
 import { schedulerJobs } from './scheduler_jobs.def.ts';
@@ -34,4 +37,7 @@ export const tables: readonly TableDef[] = [
   auditLog,
   schedulerJobs,
   schedulerRuns,
+  configurations,
+  cacheVersions,
+  modules,
 ];

@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { cfgString } from '$lib/server/config';
 import {
   actionFailure,
   apiFor,
@@ -12,12 +13,13 @@ import type { Actions, PageServerLoad } from './$types';
 
 /** Login as a plain HTML form (A-2, A-3): works with JavaScript disabled; SSR renders the result. */
 export const load: PageServerLoad = async (event) => {
-  if (event.locals.session) redirect(303, safeNext(event.url.searchParams.get('next')));
-  return { csrf: csrfToken(event), next: safeNext(event.url.searchParams.get('next')) };
+  const home = cfgString(event.locals.config, 'app.home_route', '/dashboard');
+  if (event.locals.session) redirect(303, safeNext(event.url.searchParams.get('next'), home));
+  return { csrf: csrfToken(event), next: safeNext(event.url.searchParams.get('next'), home) };
 };
 
-function safeNext(next: string | null): string {
-  return next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+function safeNext(next: string | null, home = '/dashboard'): string {
+  return next?.startsWith('/') && !next.startsWith('//') ? next : home;
 }
 
 export const actions: Actions = {
@@ -41,6 +43,9 @@ export const actions: Actions = {
     const r = unwrap(res);
     if (!r.ok) return actionFailure(r.failure, values);
     forwardSetCookies(event, res.response);
-    redirect(303, safeNext(str(form, 'next')));
+    redirect(
+      303,
+      safeNext(str(form, 'next'), cfgString(event.locals.config, 'app.home_route', '/dashboard')),
+    );
   },
 };

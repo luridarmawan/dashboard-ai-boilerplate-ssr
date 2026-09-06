@@ -226,6 +226,24 @@ export const load: ServerLoad = async (event) => {
 
 **[Menyusul di M2]:** layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
 
+### `config.ts` — konfigurasi runtime (titik perluasan 6)
+
+Section konfigurasi modul muncul otomatis di halaman **Pengaturan**; formnya di-generate dari metadata ini (E-3). Nilai tersimpan di database per tenant dengan fallback global (E-2), dan setiap penyimpanan menaikkan versi cache sehingga semua instance melihatnya tanpa restart (E-5).
+
+```ts
+// config.ts
+import { defineConfig } from '@core/module-kit';
+export default defineConfig('Billing', [
+  { section: 'billing', title: { id: 'Penagihan', en: 'Billing' }, fields: [
+    { key: 'billing.tax_rate', type: 'number', title: { id: 'Pajak (%)', en: 'Tax (%)' }, default: 11, min: 0, max: 100 },
+    { key: 'billing.provider', type: 'select', title: { id: 'Penyedia', en: 'Provider' }, options: [{ value: 'xendit', label: { id: 'Xendit', en: 'Xendit' } }] },
+    { key: 'billing.api_key', type: 'secret', title: { id: 'Kunci API', en: 'API key' } },
+  ] },
+]);
+```
+
+Tipe: `string · text · number · boolean · select · secret · markdown · route · theme · locale · list`. `route` divalidasi terhadap registry route saat disimpan; `theme` terhadap registry tema; `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+
 ### `widgets.ts` — widget dasbor (titik perluasan 11)
 
 Kartu di halaman utama dasbor. Difilter izin dan dirender **di server** seperti menu (F-1, F-2): widget yang izinnya tidak dipenuhi tidak ikut terkirim ke browser, dan komponennya tidak diunduh. Penempatan lewat metadata (`order`, `size`), bukan lewat perubahan halaman core (G-19).

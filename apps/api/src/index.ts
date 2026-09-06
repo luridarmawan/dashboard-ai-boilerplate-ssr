@@ -1,6 +1,7 @@
 import { env } from '@core/config';
 import { app } from './app.ts';
 import { createRuntime } from './runtime.ts';
+import { setBus } from './services.ts';
 
 // Fail fast on a bad environment before the port is even opened (P-4).
 const e = env();
@@ -10,6 +11,7 @@ app.listen({ port: e.API_PORT, hostname: e.API_HOST });
 // Event bus + scheduler live for the life of the process; stop cleanly so a running job can
 // finish (or abort) before the port closes.
 const runtime = createRuntime();
+setBus(runtime.bus);
 await runtime.start();
 const shutdown = async (signal: string) => {
   console.log(

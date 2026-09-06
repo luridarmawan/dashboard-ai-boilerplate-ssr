@@ -71,8 +71,17 @@ export const CORE_MENU: readonly Entry[] = [
   },
 ];
 
-export function buildMenu(session: Session, pathname: string, locale: Locale = 'id'): MenuItem[] {
-  const all: Entry[] = [...CORE_MENU, ...moduleMenu];
+export function buildMenu(
+  session: Session,
+  pathname: string,
+  locale: Locale = 'id',
+  enabledModules?: ReadonlySet<string>,
+): MenuItem[] {
+  // G-8: entries of a module disabled for this tenant are not built at all.
+  const moduleEntries = moduleMenu.filter(
+    (e) => !enabledModules || enabledModules.has(e.id.split('.')[0] ?? ''),
+  );
+  const all: Entry[] = [...CORE_MENU, ...moduleEntries];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));
   const byId = new Map<string, MenuItem>();
   const toItem = (e: Entry): MenuItem => ({

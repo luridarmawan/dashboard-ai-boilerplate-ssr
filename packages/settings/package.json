@@ -1,0 +1,20 @@
+{
+  "name": "@core/settings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Runtime configuration: section registry, per-tenant resolution with global fallback, versioned cache, typed validation, secret masking (PRD FR-E)",
+  "exports": {
+    ".": "./src/index.ts",
+    "./routes": "./src/generated/routes.ts"
+  },
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@core/config": "workspace:*",
+    "@core/db": "workspace:*",
+    "@core/module-kit": "workspace:*",
+    "@core/ui-theme": "workspace:*"
+  }
+}

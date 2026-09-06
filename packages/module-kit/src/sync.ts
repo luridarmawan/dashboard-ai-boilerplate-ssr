@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type {
+  ConfigSectionDef,
   IconSetContribDef,
   LayoutContribDef,
   MenuEntryDef,
@@ -101,6 +102,7 @@ export interface SyncResult {
   readonly layoutsContrib: readonly (LayoutContribDef & { module: string; path: string })[];
   readonly iconSetsContrib: readonly (IconSetContribDef & { module: string; path: string })[];
   readonly themesContrib: readonly ThemeContrib[];
+  readonly configSections: readonly (ConfigSectionDef & { module: string })[];
 }
 
 /** A theme folder contributed by a module (extension point 14). */
@@ -189,6 +191,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   for (const l of I18N_LOCALES) i18n[l] = {};
   const i18nOwner = new Map<string, string>();
   let i18nKeys = 0;
+  const configSections: (ConfigSectionDef & { module: string })[] = [];
+  const configKeyOwner = new Map<string, string>();
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
   // Extension points 14–16 (§4.8, L-7, L-14): themes, layouts, icon sets from modules.
@@ -441,6 +445,41 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
         if (names.length)
           jobModules.push({ name: manifest.name, ns, file: 'jobs.ts', items: names });
+      }
+    }
+
+    // ---- config.ts (extension point 6, E-3/E-8) ----
+    const cfg = await loadDefault<readonly ConfigSectionDef[]>(
+      join(dir, 'config.ts'),
+      problems,
+      tag,
+    );
+    if (cfg) {
+      if (!Array.isArray(cfg))
+        problems.push(`${tag}: config.ts harus meng-export default array (pakai defineConfig)`);
+      else {
+        for (const section of cfg) {
+          if (section.section !== ns && !section.section?.startsWith(`${ns}.`)) {
+            problems.push(
+              `${tag}: section konfigurasi "${section.section}" harus "${ns}" atau diawali "${ns}." (G-9)`,
+            );
+            continue;
+          }
+          let ok = true;
+          for (const f of section.fields ?? []) {
+            if (!f.key?.startsWith(`${ns}.`)) {
+              problems.push(`${tag}: kunci konfigurasi "${f.key}" harus diawali "${ns}." (G-9)`);
+              ok = false;
+              continue;
+            }
+            const owner = configKeyOwner.get(f.key);
+            if (owner) {
+              problems.push(`kunci konfigurasi "${f.key}" dimiliki ${owner} dan ${manifest.name}`);
+              ok = false;
+            } else configKeyOwner.set(f.key, manifest.name);
+          }
+          if (ok) configSections.push({ ...section, module: manifest.name });
+        }
       }
     }
 
@@ -711,7 +750,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     files.push(
       await writeFile(
         join(root, 'packages/module-kit/src/generated/registry.ts'),
-        emitRegistry(ordered, permissions, menu),
+        emitRegistry(ordered, permissions, menu, configSections),
       ),
     );
     files.push(
@@ -761,6 +800,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   return {
     i18nKeys,
     widgets,
+    configSections,
     layoutsContrib,
     iconSetsContrib,
     themesContrib,
@@ -923,6 +963,7 @@ function emitRegistry(
   modules: readonly ModuleRecord[],
   permissions: readonly (PermissionDef & { module: string })[],
   menu: readonly (MenuEntryDef & { module: string })[],
+  config: readonly (ConfigSectionDef & { module: string })[] = [],
 ): string {
   const mods = modules.map(({ name, ns, version, source, path }) => ({
     name,
@@ -931,7 +972,7 @@ function emitRegistry(
     source,
     path,
   }));
-  return `${GEN_HEADER}import type { MenuEntryDef, PermissionDef } from '../contract.ts';
+  return `${GEN_HEADER}import type { ConfigSectionDef, MenuEntryDef, PermissionDef } from '../contract.ts';
 
 /** Installed modules in initialisation order (dependencies first). */
 export const modules = ${JSON.stringify(mods, null, 2)} as const;
@@ -941,6 +982,9 @@ export const modulePermissions: readonly (PermissionDef & { module: string })[] 
 
 /** Menu entries contributed by modules — merged with core menu and filtered by permission (F-1). */
 export const moduleMenu: readonly (MenuEntryDef & { module: string })[] = ${JSON.stringify(menu, null, 2)};
+
+/** Configuration sections contributed by modules (extension point 6). */
+export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = ${JSON.stringify(config, null, 2)};
 `;
 }
 

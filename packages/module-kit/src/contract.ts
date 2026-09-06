@@ -247,6 +247,83 @@ export function defineIconSets(
   return list;
 }
 
+/**
+ * Runtime configuration contributed by a module (extension point 6, PRD E-3, E-8). A section is
+ * generated into the admin settings form from this metadata; values live in the database per
+ * tenant with a global fallback (E-2). Field keys are `<ns>.<name>` (G-9).
+ */
+export type ConfigFieldType =
+  | 'string'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'secret'
+  | 'markdown'
+  | 'route'
+  | 'theme'
+  | 'locale'
+  | 'list';
+
+export interface ConfigFieldDef {
+  /** `<section>.<name>`, e.g. `billing.tax_rate`. */
+  readonly key: string;
+  readonly type: ConfigFieldType;
+  readonly title: LocalizedText;
+  readonly note?: LocalizedText;
+  /** Default when neither the tenant nor global has a value. Stored as its string form. */
+  readonly default?: string | number | boolean | readonly string[] | null;
+  /** For `select` / `list`: allowed values. */
+  readonly options?: readonly { value: string; label: LocalizedText }[];
+  /** Readable by anonymous clients (E-4). Never true for `secret`. */
+  readonly public?: boolean;
+  readonly order?: number;
+  /** Numeric bounds / string length. */
+  readonly min?: number;
+  readonly max?: number;
+}
+
+export interface ConfigSectionDef {
+  /** Section id: the module namespace (`billing`) or `<ns>.<sub>`. */
+  readonly section: string;
+  readonly title: LocalizedText;
+  readonly note?: LocalizedText;
+  readonly order?: number;
+  readonly fields: readonly ConfigFieldDef[];
+}
+
+const CONFIG_KEY_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+
+/** Declare the configuration sections a module contributes (extension point 6). */
+export function defineConfig(
+  moduleName: string,
+  list: readonly ConfigSectionDef[],
+): readonly ConfigSectionDef[] {
+  const ns = namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const s of list) {
+    if (s.section !== ns && !s.section.startsWith(`${ns}.`)) {
+      throw new ModuleContractError(
+        `section konfigurasi "${s.section}" harus "${ns}" atau diawali "${ns}."`,
+      );
+    }
+    for (const f of s.fields) {
+      if (!CONFIG_KEY_RE.test(f.key))
+        throw new ModuleContractError(`kunci konfigurasi "${f.key}" tidak valid`);
+      requirePrefix('kunci konfigurasi', f.key, `${ns}.`);
+      if (seen.has(f.key)) throw new ModuleContractError(`kunci konfigurasi "${f.key}" duplikat`);
+      seen.add(f.key);
+      if (f.type === 'secret' && f.public) {
+        throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public (E-4)`);
+      }
+      if ((f.type === 'select' || f.type === 'list') && !f.options?.length) {
+        throw new ModuleContractError(`kunci "${f.key}": tipe ${f.type} butuh options`);
+      }
+    }
+  }
+  return list;
+}
+
 /** Resource owners that belong to core; a module may reference these permissions in its menu. */
 export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'user',

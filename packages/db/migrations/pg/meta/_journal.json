@@ -29,6 +29,13 @@
       "when": 1788695938143,
       "tag": "0003_tired_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788710739317,
+      "tag": "0004_goofy_guardsmen",
+      "breakpoints": true
     }
   ]
 }

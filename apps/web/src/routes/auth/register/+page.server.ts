@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { cfgBool } from '$lib/server/config';
 import {
   actionFailure,
   apiFor,
@@ -13,7 +14,10 @@ import type { Actions, PageServerLoad } from './$types';
 /** Self-registration (A-1). The API decides whether it is open (SIGNUP_ENABLED). */
 export const load: PageServerLoad = async (event) => {
   if (event.locals.session) redirect(303, '/dashboard');
-  return { csrf: csrfToken(event) };
+  return {
+    csrf: csrfToken(event),
+    signupEnabled: cfgBool(event.locals.config, 'security.signup_enabled'),
+  };
 };
 
 export const actions: Actions = {

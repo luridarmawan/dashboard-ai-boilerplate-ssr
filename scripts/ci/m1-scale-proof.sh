@@ -24,7 +24,7 @@ run_proof() {
   docker run --rm --network "container:$CADDY" -v "$PWD":/w -w /w \
     -e NODE_TLS_REJECT_UNAUTHORIZED=0 -e WEB_URL=https://localhost \
     -e ADMIN_EMAIL="$ADMIN_EMAIL" -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-    oven/bun:1.4 bun scripts/m1-gate1-proof.ts
+    oven/bun:1.4 sh -c 'bun scripts/m1-gate1-proof.ts && bun scripts/m3-gate-proof.ts'
 }
 served_by() { $DC logs api 2>/dev/null | grep '"msg":"request"' | awk '{print $1}' | sort | uniq -c | sort -rn; }
 

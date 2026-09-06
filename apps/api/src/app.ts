@@ -2,11 +2,17 @@ import { openapi } from '@elysiajs/openapi';
 import { Elysia } from 'elysia';
 import { auth } from './domains/auth.ts';
 import { clients } from './domains/clients.ts';
+import { configuration } from './domains/configuration.ts';
 import { groups } from './domains/groups.ts';
+import { menuDomain } from './domains/menu.ts';
+import { moduleDomain } from './domains/modules.ts';
 import { system } from './domains/system.ts';
+import { themesDomain } from './domains/themes.ts';
 import { users } from './domains/users.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { csrf } from './plugins/csrf.ts';
+import { demoMode } from './plugins/demo.ts';
+import { moduleGate } from './plugins/module-gate.ts';
 import { requestContext } from './plugins/request-context.ts';
 
 /**
@@ -22,6 +28,7 @@ import { requestContext } from './plugins/request-context.ts';
 export const app = new Elysia()
   .use(requestContext)
   .use(csrf)
+  .use(demoMode)
   .use(
     openapi({
       path: '/docs',
@@ -40,12 +47,30 @@ export const app = new Elysia()
           { name: 'user', description: 'Users of the active tenant; own profile' },
           { name: 'groups', description: 'Groups, their permissions and members (per tenant)' },
           { name: 'client', description: 'Tenants' },
+          {
+            name: 'configuration',
+            description: 'Runtime configuration per tenant with global fallback',
+          },
+          { name: 'themes', description: 'Theme registry, default and allowlist' },
+          { name: 'module', description: 'Installed modules and per-tenant state' },
+          { name: 'menu', description: 'Menu entries for API clients' },
         ],
       },
     }),
   )
   .group('/v1', (v1) =>
-    v1.use(system).use(auth).use(users).use(groups).use(clients).use(modulesPlugin),
+    v1
+      .use(system)
+      .use(auth)
+      .use(users)
+      .use(groups)
+      .use(clients)
+      .use(configuration)
+      .use(themesDomain)
+      .use(moduleDomain)
+      .use(menuDomain)
+      .use(moduleGate)
+      .use(modulesPlugin),
   );
 
 export type App = typeof app;

@@ -16,7 +16,7 @@ export const load: LayoutServerLoad = async (event) => {
   if (!s)
     redirect(303, `/auth/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   const locale = event.locals.locale.locale;
-  const menu = buildMenu(s, event.url.pathname, locale);
+  const menu = buildMenu(s, event.url.pathname, locale, event.locals.config.enabledModules);
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'dashboard', variant);
   if (layout.fellBack && variant !== 'default' && import.meta.env.DEV) {
@@ -36,5 +36,6 @@ export const load: LayoutServerLoad = async (event) => {
     breadcrumb: buildBreadcrumb(event.url.pathname, menu, locale),
     layoutId: layout.layout.id,
     layoutVariant: variant,
+    appName: (event.locals.config.values['app.name'] as string | undefined) ?? 'Dashboard',
   };
 };
