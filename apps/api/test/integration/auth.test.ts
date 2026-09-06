@@ -42,6 +42,7 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
   let cookie = '';
 
   beforeAll(async () => {
+    if (!enabled) return;
     process.env.SIGNUP_ENABLED = 'true';
   });
 

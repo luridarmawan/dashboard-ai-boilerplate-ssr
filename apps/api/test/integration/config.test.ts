@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
-import { unsafeAcrossTenants } from '@core/db';
+import { type Db, unsafeAcrossTenants } from '@core/db';
 import { SettingsStore } from '@core/settings';
 import { app } from '../../src/app.ts';
 
@@ -43,11 +43,13 @@ const sessionCookie = (r: Response) =>
     ?.split(';')[0] ?? '';
 
 describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
-  const db = unsafeAcrossTenants();
+  let db: Db;
   let admin = '';
   let tenantId = '';
 
   beforeAll(async () => {
+    if (!enabled) return;
+    db = unsafeAcrossTenants(); // only when the suite actually runs (INTEGRATION=1)
     const s = await runSeed(db, { adminEmail, adminPassword });
     tenantId = s.tenantId;
     const res = await call('/v1/auth/login', {

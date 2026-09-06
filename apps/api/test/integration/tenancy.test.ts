@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
-import { and, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { and, type Db, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 
 /**
@@ -50,7 +50,7 @@ const login = async (email: string, password: string) => {
 };
 
 describe.skipIf(!enabled)('seed, tenancy and RBAC (O-3, B-2, B-4, C-3, C-5, C-7)', () => {
-  const db = unsafeAcrossTenants();
+  let db: Db;
   let defaultTenant = '';
   let userGroupId = '';
   let acmeId = '';
@@ -59,6 +59,8 @@ describe.skipIf(!enabled)('seed, tenancy and RBAC (O-3, B-2, B-4, C-3, C-5, C-7)
   let memberId = '';
 
   beforeAll(async () => {
+    if (!enabled) return;
+    db = unsafeAcrossTenants(); // only when the suite actually runs (INTEGRATION=1)
     process.env.SIGNUP_ENABLED = 'true';
   });
 

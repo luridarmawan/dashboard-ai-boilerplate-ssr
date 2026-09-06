@@ -59,6 +59,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
   const bobPassword = 'a password for bob 123';
 
   beforeAll(async () => {
+    if (!enabled) return;
     process.env.SIGNUP_ENABLED = 'true';
     const s = await runSeed((await import('@core/db')).unsafeAcrossTenants(), {
       adminEmail,

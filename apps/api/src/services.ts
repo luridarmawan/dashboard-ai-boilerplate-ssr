@@ -29,11 +29,31 @@ function cacheFor<T>(name: string) {
   return undefined; // SettingsStore / ModuleStateStore default to the database version cache
 }
 
-export const settings = new SettingsStore(unsafeAcrossTenants(), cacheFor('config'));
-export const moduleState = new ModuleStateStore(
-  unsafeAcrossTenants(),
-  modules.map((m) => m.name),
-  cacheFor('modules'),
+/**
+ * Created on first use, not at import: importing the app (unit tests, `bun check`, OpenAPI
+ * generation) must not require a database connection string.
+ */
+function lazy<T extends object>(factory: () => T): T {
+  let instance: T | null = null;
+  return new Proxy({} as T, {
+    get(_t, prop) {
+      instance ??= factory();
+      const v = (instance as Record<PropertyKey, unknown>)[prop];
+      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(instance) : v;
+    },
+  });
+}
+
+export const settings: SettingsStore = lazy(
+  () => new SettingsStore(unsafeAcrossTenants(), cacheFor('config')),
+);
+export const moduleState: ModuleStateStore = lazy(
+  () =>
+    new ModuleStateStore(
+      unsafeAcrossTenants(),
+      modules.map((m) => m.name),
+      cacheFor('modules'),
+    ),
 );
 
 /** The event bus is created by index.ts; domains emit through this indirection. */
