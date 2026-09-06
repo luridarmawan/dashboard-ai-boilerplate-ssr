@@ -88,12 +88,14 @@ Dua risiko tertinggi dibuktikan lebih dulu di M0, sebelum ada fitur dibangun di 
 ## 9. Perintah baku
 
 ```
-bun install && docker compose up -d && bun db:push && bun db:seed && bun dev
+bun install && docker compose up -d && bun db:migrate && bun db:seed && bun dev
 bun modules:sync              # generate registry (otomatis di predev/prebuild)
 bun modules:add <git-url>     # pasang modul dari repo lain sebagai submodule
 bun modgen                    # generator CRUD modul
 bun create module             # starter repo modul standalone
 bun db:codegen                # deskriptor -> skema Drizzle per dialect
+bun db:migrate                # migrasi ter-versi — satu-satunya jalur produksi (Q-4)
+bun db:push                   # schema-push, DEV SAJA; menolak jalan di production
 bun check                     # lint + format + type-check
 ```
 

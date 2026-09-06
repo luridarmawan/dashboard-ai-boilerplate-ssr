@@ -5,7 +5,7 @@
  *
  *   L-5  set ikon yang dirujuk tema harus terdaftar
  *   L-8  layout yang dirujuk tema harus terdaftar dan cocok kind-nya
- *   L-20 kontras WCAG AA pada SETIAP tema, light dan dark
+ *   L-21 kontras WCAG AA pada SETIAP tema, light dan dark
  *
  * Keluar dengan kode 1 bila ada yang gagal, supaya CI menolak merge.
  * Pemakaian: node packages/ui-theme/validate.mjs
@@ -129,7 +129,7 @@ for (const id of themeDirs) {
     }
   }
 
-  // L-20 — kontras, kedua mode
+  // L-21 — kontras, kedua mode
   const tokensPath = join(dir, theme.tokens.replace(/^\.\//, ''));
   if (!existsSync(tokensPath)) { problems.push(`${id}: berkas token ${theme.tokens} tidak ada`); continue; }
   const modes = readTokens(tokensPath);
@@ -144,7 +144,7 @@ for (const id of themeDirs) {
       lowest = Math.min(lowest, r);
       if (r < min) {
         problems.push(
-          `${id}/${mode}: --${fg} pada --${bg} = ${r.toFixed(2)}, minimum ${min} (L-20)  [${fgv} / ${bgv}]`
+          `${id}/${mode}: --${fg} pada --${bg} = ${r.toFixed(2)}, minimum ${min} (L-21)  [${fgv} / ${bgv}]`
         );
       }
     }

@@ -61,7 +61,7 @@ Delapan hal berikut adalah kegagalan struktural yang lazim pada boilerplate dash
 
 | Persona | Kebutuhan | Skenario utama |
 |---|---|---|
-| **Developer pemakai template** (persona utama) | Mulai proyek dashboard baru dalam hitungan menit, bukan minggu | `bun create` → isi `.env` → `bun db:push` → `bun dev` → dashboard jalan lengkap dengan auth, RBAC, tema, dan AI |
+| **Developer pemakai template** (persona utama) | Mulai proyek dashboard baru dalam hitungan menit, bukan minggu | `bun create` → isi `.env` → `bun db:migrate` → `bun db:seed` → `bun dev` → dashboard jalan lengkap dengan auth, RBAC, tema, dan AI |
 | **Developer modul** | Menambah fitur bisnis tanpa menyentuh core, dari repositorinya sendiri | `bun modgen` → dapat CRUD lengkap (API + halaman + tabel DB + menu + izin); atau `bun modules:add <git-url>` untuk memasang modul milik tim lain |
 | **Admin sistem (end user)** | Kelola user, group, izin, tenant, tema, dan konfigurasi dari UI | Login → tambah user → masukkan ke group → atur izin → tetapkan tema baku sistem → aktifkan fitur AI dari halaman konfigurasi |
 | **End user** | Pakai dashboard, pilih tema & bahasa sendiri, dan asisten AI | Login → lihat dashboard → pilih tema favorit → chat dengan AI (streaming, riwayat tersimpan) |
@@ -217,7 +217,7 @@ Penyimpanannya `char(36) ascii_bin`, bukan `binary(16)` yang lebih hemat. Alasan
 |---|---|---|
 | **1 — baku** | **MySQL 8+** | Dialect baku template; ini yang dipakai `compose.prod.yml`. Seluruh suite test jalan di CI |
 | **1 — diuji** | **MariaDB 11+** | Seluruh suite test jalan di CI sebagai job tersendiri. MariaDB **bukan** MySQL yang dinamai lain — perbedaan JSON, collation baku, dan tipe UUID-nya nyata (lihat tabel portabilitas di atas), jadi ia diuji terpisah, bukan diasumsikan ikut lolos |
-| **1 — diuji** | PostgreSQL 14+ | Seluruh suite test jalan di CI, sejajar MySQL — inilah yang membuat klaim portabilitas bisa dipercaya |
+| **1 — diuji** | PostgreSQL 16+ | Seluruh suite test jalan di CI pada **PostgreSQL 16**, sejajar MySQL — inilah yang membuat klaim portabilitas bisa dipercaya. Versi 14–15 kemungkinan besar jalan (tidak ada fitur khusus 16 yang dipakai) tapi tidak masuk matriks CI, jadi tidak dijamin |
 | **2 — best-effort** | SQLite | Untuk dev cepat & test; sebagian fitur operasional (backup terjadwal, concurrency tinggi) tidak setara |
 | **3 — terbuka** | Dialect lain yang didukung Drizzle | Deskriptor dan codegen terbuka untuk ditambah pemakai template; tidak ada jaminan CI dari kami |
 
@@ -345,7 +345,7 @@ modules/<Nama>/
 **Keputusan H — core membuktikan kontraknya sendiri (dogfooding), lewat dua modul bawaan.**
 Kontrak modul hanya bisa dipercaya kalau core sendiri memakainya untuk sesuatu yang besar. Karena itu **dua** fitur dibangun sebagai modul, bukan sebagai bagian core:
 
-- **Modul `AI`** — chat, riwayat, log, tool. Menyentuh titik perluasan 1–12. Kalau AI chat bisa hidup sebagai modul, kontraknya terbukti sanggup menopang fitur berat. Kalau tidak bisa, kontraknya belum selesai — dan itu ketahuan di M4, masih cukup awal untuk diperbaiki.
+- **Modul `AI`** — chat, riwayat, log, tool. Menyentuh titik perluasan 1–12. Kalau AI chat bisa hidup sebagai modul, kontraknya terbukti sanggup menopang fitur berat. Kalau tidak bisa, kontraknya belum selesai — dan itu ketahuan di M5, masih cukup awal untuk diperbaiki.
 - **Modul `Example`** — CRUD referensi **plus** landing page komersil publik (§4.6). Menyentuh titik perluasan 13 dan 14 yang tidak disentuh modul AI, sekaligus jadi contoh yang disalin developer saat membuat modul pertamanya.
 
 Keduanya wajib bisa dinonaktifkan tanpa menyisakan route yatim, menu rusak, atau tema hilang.
@@ -406,16 +406,25 @@ Dua tema boleh berbeda bukan hanya warnanya, tapi juga bahasa ikonnya dan susuna
 | **Aset merek** | logo, favicon, ilustrasi state kosong/404 | berkas aset, bisa ditimpa per tenant |
 
 ```jsonc
-// themes/corporate/theme.json
+// packages/ui-theme/themes/corporate/theme.json — berkas nyata, bukan ilustrasi
 {
   "id": "corporate",
   "name": { "id": "Korporat", "en": "Corporate" },
-  "tokens": { "light": "./tokens.light.css", "dark": "./tokens.dark.css" },
-  "typography": "./typography.css",
+  "description": {
+    "id": "Formal dan padat. Navigasi atas, bukan sidebar.",
+    "en": "Formal and dense. Top navigation instead of a sidebar."
+  },
+  "tokens": "./tokens.css",              // satu berkas memuat light DAN dark:
+                                         //   [data-app-theme='corporate']
+                                         //   [data-app-theme='corporate'][data-mode='dark']
+                                         // token tipografi (--font-sans, --font-mono)
+                                         // ikut di dalamnya — tidak ada berkas terpisah
   "icons": "outline-24",                 // id set ikon terdaftar
   "layouts": {
     "dashboard": {
-      "default":  "sidebar-classic",     // id layout terdaftar
+      "default":  "topnav-compact",      // id layout terdaftar. Inilah tema yang
+                                         // membuktikan "tema mencakup layout":
+                                         // memilihnya menukar sidebar jadi nav atas
       "wide":     "topnav-compact",      // varian untuk halaman lebar (tabel, papan)
       "focused":  "centered-narrow"      // varian untuk wizard / halaman fokus tunggal
     },
@@ -426,6 +435,8 @@ Dua tema boleh berbeda bukan hanya warnanya, tapi juga bahasa ikonnya dan susuna
   "preview": "./preview.png"
 }
 ```
+
+Bandingkan dengan `themes/base/theme.json` yang menjawab `default` dengan `sidebar-classic` dan `auth` dengan `centered-card`: dua tema, dua susunan, nol perubahan di halaman. Manifest keempat tema bawaan sudah final — lihat [`THEMES.md`](./THEMES.md).
 
 **Kontrak ikon — komponen tidak pernah mengimpor glyph langsung.**
 Core mendefinisikan daftar **nama ikon semantik** (`icon.save`, `icon.user`, `icon.menu`, `icon.chevron-right`, …); modul mendaftarkan namanya sendiri di namespace `<nama>.*` (G-9). Set ikon adalah pemetaan nama → glyph. Komponen hanya menulis `<Icon name="save" />`. Konsekuensinya ditegakkan, bukan disepakati:
@@ -721,7 +732,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | L-15 | **[P0]** Allowlist `themes.enabled` saat build: proyek hanya mengirimkan tema yang dipakainya beserta layout & set ikon yang dirujuknya, agar banyaknya tema tidak membengkakkan bundle (§4.8). |
 | L-16 | **[P0]** **DataTable** sebagai komponen inti: paginasi server-side, pengurutan, pencarian, filter kolom, pilih kolom tampil, aksi baris, aksi massal, serta state kosong/loading/error. Komponen ini **hanya menangani presentasi** — pengambilan data ada di `load` SvelteKit. |
 | L-17 | **[P0]** **FormBuilder** berbasis deklarasi field: tipe `string`, `text`, `number`, `boolean`, `date`, `select`, `multiselect`, `file`, `password`, `markdown`. Validasi memakai **skema yang sama dengan API** — satu sumber kebenaran, bukan dua. |
-| L-18 | **[P0]** Layout bawaan yang tersedia sejak awal: **dashboard** — `sidebar-classic` (sidebar + header + konten) dan `topnav-compact` (navigasi atas, tanpa sidebar); **publik** — `marketing-wide`; **auth** — `centered-card` dan `split-hero`. Semuanya responsif sampai 360 px dan menjadi contoh nyata bentuk kontrak layout bagi developer yang membuat layoutnya sendiri. |
+| L-18 | **[P0]** **Enam** layout bawaan tersedia sejak awal: **dashboard** — `sidebar-classic` (sidebar + header + konten), `topnav-compact` (navigasi atas, tanpa sidebar), dan `centered-narrow` (kolom sempit di tengah untuk wizard & form panjang — ini yang menjawab varian `focused` di keempat tema bawaan); **publik** — `marketing-wide`; **auth** — `centered-card` dan `split-hero`. Semuanya responsif sampai 360 px dan menjadi contoh nyata bentuk kontrak layout bagi developer yang membuat layoutnya sendiri. Daftar & region tiap layout ada di `packages/ui-theme/layouts/registry.json`. |
 | L-19 | **[P0]** Halaman contoh yang menunjukkan pola: list CRUD, form, detail, chart, kosong, 404, 403, 500. |
 | L-20 | **[P0]** Toast/notifikasi, dialog konfirmasi, sheet, dropdown, tabs, skeleton loading. |
 | L-21 | **[P0]** **Aksesibilitas**: navigasi keyboard penuh, fokus terlihat, label ARIA, kontras minimal WCAG AA — **diverifikasi pada setiap kombinasi tema × layout bawaan**, bukan hanya pada tema dan layout baku. |
@@ -758,7 +769,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 
 | ID | Kebutuhan |
 |---|---|
-| O-1 | **[P0]** Migrasi Drizzle ter-versi, dijalankan lewat perintah, aman diulang, dan **ada untuk setiap dialect tier-1**. Migrasi modul ikut alur yang sama. |
+| O-1 | **[P0]** Migrasi Drizzle ter-versi, dijalankan lewat perintah **`bun db:migrate`**, aman diulang, dan **ada untuk setiap dialect tier-1**. Migrasi modul ikut alur yang sama. `bun db:push` (schema-push tanpa berkas migrasi) hanya untuk dev dan menolak jalan di `NODE_ENV=production` — jalur produksi selalu `db:migrate` sebagai langkah eksplisit (Q-4). |
 | O-2 | **[P0]** `TABLE_PREFIX` opsional, agar beberapa aplikasi bisa berbagi satu database. |
 | O-3 | **[P0]** Seed idempoten: superadmin pertama, tenant baku, group baku (Administrator, Regular User), daftar izin, konfigurasi awal (termasuk tema & landing route baku), dan data contoh untuk modul `Example`. |
 | O-4 | **[P0]** **Semantik status baris didefinisikan sekali** sebagai konstanta bersama (`status_id`), dipakai seragam di core maupun modul. Tidak boleh ada dua berkas yang mengartikannya berbeda. |
@@ -831,7 +842,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 
 Rilis P0 dinyatakan selesai bila **semua** berikut terpenuhi:
 
-1. `bun install && docker compose up -d && bun db:push && bun db:seed && bun dev` menghasilkan dashboard yang berfungsi, dari repo bersih, di mesin baru, dalam **< 5 menit**.
+1. `bun install && docker compose up -d && bun db:migrate && bun db:seed && bun dev` menghasilkan dashboard yang berfungsi, dari repo bersih, di mesin baru, dalam **< 5 menit**. Jalur bakunya adalah **migrasi ter-versi** (O-1), bukan `db:push` — supaya yang diuji kriteria ini adalah mekanisme yang benar-benar dipakai di produksi (Q-4). `bun db:push` tetap ada sebagai kemudahan dev untuk iterasi skema sebelum migrasinya ditulis, dan **menolak jalan bila `NODE_ENV=production`**.
 2. Suite test yang sama **lulus pada MySQL 8, MariaDB 11, dan PostgreSQL 16** di CI — tiga job, tanpa test yang di-skip pada dialect mana pun.
 3. `docker compose up -d --scale api=3` — ketiga instance melayani alur login → CRUD → chat tanpa sticky session, tanpa error.
 4. `curl` ke `/openapi.json` menghasilkan spesifikasi yang cocok dengan perilaku nyata; klien typed terkompilasi tanpa error.
@@ -863,8 +874,8 @@ Rilis P0 dinyatakan selesai bila **semua** berikut terpenuhi:
 
 | Milestone | Isi | Keluaran yang bisa diuji |
 |---|---|---|
-| **M0 — Fondasi & Kontrak Modul** | Struktur monorepo, `packages/db` dengan codegen per dialect, `packages/module-kit`, loader env tervalidasi, Elysia + SvelteKit saling terhubung, **kontrak modul §4.5 + `modules:sync` + `modules.json`**, migrasi & seed (O-1…O-6), DX dasar (P-1…P-7, P-9), kerangka deployment (Q-1…Q-5) | `bun dev` jalan; halaman kosong ter-SSR; migrasi jalan di MySQL, MariaDB & PostgreSQL; **satu modul dummy menyumbang tabel + route + halaman + menu tanpa mengubah core**; `compose.prod.yml` menyajikan halaman di balik Caddy |
-| **M1 — Identitas** | Auth (A-1…A-7, A-10, A-12), tenancy (B-1…B-5), RBAC (C-1…C-7), CRUD user/group/client & profil (FR-D) | Bisa login, kelola user & izin, ganti tenant |
+| **M0 — Fondasi & Kontrak Modul** | Struktur monorepo, `packages/db` dengan codegen per dialect, `packages/module-kit`, loader env tervalidasi, Elysia + SvelteKit saling terhubung, **kontrak modul §4.5 + `modules:sync` + `modules.json`**, migrasi & seed (O-1…O-6), DX dasar (P-1…P-7, P-9), kerangka deployment (Q-1…Q-5) | `bun dev` jalan; halaman kosong ter-SSR; migrasi jalan di MySQL, MariaDB & PostgreSQL; **satu modul dummy menyumbang tabel + route + halaman + menu tanpa mengubah core**; **satu modul dummy kedua dipasang dari repositori git terpisah lewat `modules:add` dan berfungsi sama** (§4.9 poin 1 — ditest di M0, bukan ditunda ke M6); UUIDv7 terbukti monotonik dalam milidetik yang sama; `compose.prod.yml` menyajikan halaman di balik Caddy |
+| **M1 — Identitas** | Auth (A-1…A-7, A-10, A-12), tenancy (B-0…B-5), RBAC (C-1…C-7), CRUD user/group/client & profil (FR-D) | Bisa login, kelola user & izin, ganti tenant |
 | **M2 — Kerangka UI, Tema, & Layout** | Komponen (L-1, L-16…L-22), **sistem tema lengkap: token, set ikon, layout (L-2…L-15, §4.8)**, i18n (K-1…K-7), menu (F-1…F-4) | Dashboard terasa lengkap; 4 tema bisa dipilih dan **dua di antaranya berlayout berbeda**; warna, ikon, dan layout benar sejak SSR tanpa kedipan; satu layout kustom dibuat dari luar core dan langsung dipakai |
 | **M3 — Konfigurasi, Kontrak, & Halaman Baku** | Konfigurasi runtime (FR-E), **resolusi landing/home route (F-5…F-7, §4.7)**, OpenAPI + typed client (FR-N), observability (M-1…M-5) | Admin mengubah setelan, tema baku, dan landing page dari UI; `/docs` akurat |
 | **M4 — Modul `Example` & sisi publik** | **Modul `Example` + landing page komersil (FR-R)**, layout publik, SEO, form kontak, outbox email (FR-J) | `/` menyajikan landing komersil ter-SSR dengan data dari DB; Lighthouse SEO ≥ 90; kontrak modul terbukti sanggup melayani halaman publik & tema |
@@ -952,9 +963,21 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 Tabel yang dimiliki core. Modul menambah tabelnya sendiri dengan prefix nama modul (G-9).
 
-`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `outbox_email` · `audit_log`
+`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `email_verification_tokens` · `rate_limits` · `outbox_email` · `audit_log`
+
+Dua di antaranya dituntut kebutuhan P0 dan sebelumnya belum tercatat di sini: `email_verification_tokens` (A-6 — token verifikasi email; alurnya sejajar `password_reset_tokens`, jadi tidak boleh menumpang tabel yang sama) dan `rate_limits` (penghitung ber-window untuk adapter `database`, yang merupakan driver **baku** rate limit — Keputusan M).
+
+> `categories` belum diklaim kebutuhan mana pun. Ia peninggalan draf sebagai tabel lookup generik. Sebelum M0 mulai: beri ia FR yang jelas, atau hapus dari model data — tabel tanpa pemilik akan diikuti modul sebagai contoh yang salah.
 
 Tabel milik modul `AI`: `ai_conversations` · `ai_messages` · `ai_message_attachments` · `ai_log` · `ai_mcps` · `ai_mcp_tools`
 Tabel milik modul `Example`: `example_products` · `example_categories` · `example_inquiries`
 
-Seluruhnya memakai PK UUIDv7, kolom `client_id` untuk tenancy, `status_id` + `deleted_at` untuk hapus lunak, dan prefix tabel opsional lewat `${TABLE_PREFIX}`.
+Seluruhnya memakai PK UUIDv7 (O-6), `status_id` + `deleted_at` untuk hapus lunak (O-5), dan prefix tabel opsional lewat `${TABLE_PREFIX}` (O-2).
+
+Kolom `client_id` ada pada tabel **ber-tenant**, bukan pada semuanya — dan pengecualiannya disengaja:
+
+- `clients` tidak punya `client_id`; hierarkinya lewat `parent_id` (B-1).
+- `configurations` membolehkan `client_id IS NULL` sebagai nilai global yang jadi fallback saat tenant belum menimpanya (E-2). Pola yang sama berlaku untuk `themes` dan `modules`.
+- `rate_limits` dikunci per identitas pemanggil (IP / user / token), yang bisa jadi anonim — jadi `client_id`-nya nullable.
+
+Selain pengecualian di atas, tabel ber-tenant wajib `client_id` **dan** indeks yang diawali `client_id` (B-0).

@@ -144,7 +144,7 @@ Bisa paralel dengan M5.
 
 **Gate keluar:**
 1. `/` menyajikan landing komersil ter-SSR pada instalasi bersih
-2. Lighthouse **SEO ≥ 90** dan Performance ≥ 90 pada landing; terindeks dengan JavaScript dimatikan
+2. Lighthouse **≥ 90 pada keempat kategori** di landing — Performance, Accessibility, Best Practices, **dan SEO** (persis kriteria §8 #8, jangan disempitkan); terindeks dengan JavaScript dimatikan
 3. Form kontak bekerja tanpa JavaScript, tersimpan, dan emailnya masuk outbox
 4. `Example` dinonaktifkan → aplikasi tetap utuh, `/` jatuh ke fallback
 
@@ -250,7 +250,7 @@ Kriteria terima §8 bukan pemeriksaan sekali di ujung. Kolom kanan adalah kapan 
 | `bun check` — klien typed vs OpenAPI | #4 | M3 |
 | Test CSRF lintas-origin ditolak | #10 | M1 |
 | Test kebocoran lintas-tenant | B-3 | M1 |
-| Lighthouse landing (SEO & Performance ≥ 90) | #8 | M4 |
+| Lighthouse landing ≥ 90 — Performance, Accessibility, Best Practices, SEO | #8 | M4 |
 | `--scale api=3` **tanpa Redis** | #3 | M1 (dasar) → M7 (penuh) |
 | Audit dependensi | #7 | M0 |
 

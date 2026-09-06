@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Spesifikasi + implementasi token; siap dipakai saat `packages/ui-theme` dibangun |
 | **Berkas** | `packages/ui-theme/themes/<id>/` · `packages/ui-theme/icons/registry.json` · `packages/ui-theme/layouts/registry.json` |
-| **Validator** | `node packages/ui-theme/validate.mjs` — menegakkan L-5, L-8, L-20, L-3 |
+| **Validator** | `node packages/ui-theme/validate.mjs` — menegakkan L-3, L-5, L-8, L-21 |
 | **Kontrak** | [`PRD.md` §4.8](./PRD.md) — anatomi tema; FR-L L-2…L-15 |
 
 Dokumen ini menjelaskan **kenapa** tiap tema seperti itu. Nilai tokennya sendiri ada di berkas CSS — itu sumber kebenarannya, bukan tabel di sini.
@@ -37,7 +37,7 @@ Semua font berlisensi permisif (OFL/Apache) dan **di-host sendiri**, bukan dari 
 
 ## 2. Kontras: diverifikasi, bukan diklaim
 
-L-20 mewajibkan WCAG AA pada **setiap** tema, bukan hanya tema baku. Ini dijalankan `validate.mjs` di CI. Angka di bawah adalah keluaran nyata dari validator, bukan perkiraan.
+L-21 mewajibkan WCAG AA pada **setiap** tema, bukan hanya tema baku. Ini dijalankan `validate.mjs` di CI. Angka di bawah adalah keluaran nyata dari validator, bukan perkiraan.
 
 | Tema / mode | fg/bg | muted-fg/bg | muted-fg/muted | pri-fg/pri | pri/bg | dest-fg/dest | input/bg | ring/bg |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
