@@ -29,13 +29,17 @@ until bun -e 'const ok = async (u) => (await fetch(u)).ok; process.exit((await o
   sleep 1
 done
 
-echo "== proof M1"
-WEB_URL=http://127.0.0.1:5173 bun run scripts/m1-gate1-proof.ts
-echo "== proof M2"
-WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m2-gate-proof.ts
-echo "== proof M3"
-WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m3-gate-proof.ts
-echo "== proof M4"
-WEB_URL=http://127.0.0.1:5173 API_URL=http://127.0.0.1:3001 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m4-gate-proof.ts
-echo "== proof M5"
-WEB_URL=http://127.0.0.1:5173 MOCK_URL=http://127.0.0.1:4010/v1 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m5-gate-proof.ts
+# PROOF_ONLY=M2,M6 limits the run to those proofs (local iteration); CI runs all of them.
+wants() { [ -z "${PROOF_ONLY:-}" ] || echo ",$PROOF_ONLY," | grep -qi ",$1,"; }
+export WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD"
+if wants M1; then echo "== proof M1"; bun run scripts/m1-gate1-proof.ts; fi
+if wants M2; then echo "== proof M2"; bun run scripts/m2-gate-proof.ts; fi
+if wants M3; then echo "== proof M3"; bun run scripts/m3-gate-proof.ts; fi
+if wants M4; then echo "== proof M4"; API_URL=http://127.0.0.1:3001 bun run scripts/m4-gate-proof.ts; fi
+if wants M5; then echo "== proof M5"; MOCK_URL=http://127.0.0.1:4010/v1 bun run scripts/m5-gate-proof.ts; fi
+if [ -d "modules/${MODGEN_GUARD_NAME:-CiProbe}" ] && wants M6; then
+  echo "== proof M6 (modul hasil modgen: ${MODGEN_GUARD_NAME:-CiProbe})"
+  API_URL=http://127.0.0.1:3001 API_LOG="$LOG/m1-api.log" MODULE_NS="$(echo "${MODGEN_GUARD_NAME:-CiProbe}" | tr '[:upper:]' '[:lower:]')" MODULE_PLURAL=widgets MODULE_RES=widget bun run scripts/m6-gate-proof.ts
+elif wants M6; then
+  echo "== proof M6 dilewati (tidak ada modules/${MODGEN_GUARD_NAME:-CiProbe} — jalankan: bun run modgen:ci)"
+fi

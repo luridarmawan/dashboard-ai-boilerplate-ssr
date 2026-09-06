@@ -41,6 +41,7 @@ import { publicLink, sendTemplate } from '../mail.ts';
 import { type AuthState, clientIp, publicUser } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
+import { emit } from '../services.ts';
 
 /**
  * Users inside the ACTIVE tenant (PRD D-1) and the caller's own profile (D-4).
@@ -364,6 +365,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         });
         [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
         created = true;
+        emit('user.created', { userId: id, clientId: ts.clientId }, { requestId });
         if (!body.password) {
           // No password given: the user sets one through the reset flow (A-7).
           const raw = randomToken();
@@ -532,6 +534,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
           .set({ deleted_at: new Date() })
           .where(eq(schema.users.id, row.id));
         await revokeAllSessions(db, row.id);
+        emit('user.deleted', { userId: row.id, clientId: ts.clientId }, { requestId });
       }
       await writeAudit(db, {
         clientId: ts.clientId,

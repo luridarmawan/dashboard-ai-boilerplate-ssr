@@ -49,6 +49,9 @@ let {
 }: Props = $props();
 
 const str = (v: unknown) => (v === undefined || v === null ? '' : String(v));
+/** Eden revives ISO dates into Date objects; native inputs want `YYYY-MM-DD` (date) or ISO text. */
+const val = (f: FieldDef, v: unknown) =>
+  v instanceof Date ? (f.type === 'date' ? v.toISOString().slice(0, 10) : v.toISOString()) : str(v);
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : v ? [String(v)] : []);
 const spanOf = (f: FieldDef) => f.span ?? (f.type === 'text' || f.type === 'markdown' ? 2 : 1);
 const hasFile = $derived(fields.some((f) => f.type === 'file'));
@@ -118,7 +121,7 @@ const hasFile = $derived(fields.some((f) => f.type === 'file'));
             minlength={f.minlength}
             maxlength={f.maxlength}
             pattern={f.pattern}
-            value={f.type === 'password' ? '' : str(values[f.name])}
+            value={f.type === 'password' ? '' : val(f, values[f.name])}
             aria-invalid={err ? 'true' : undefined}
           />
         {/if}

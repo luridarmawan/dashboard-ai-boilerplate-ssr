@@ -26,7 +26,7 @@ import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { requirePermission, TENANT_HEADER, tenantContext } from '../plugins/tenancy.ts';
-import { settings } from '../services.ts';
+import { emit, settings } from '../services.ts';
 
 /**
  * Authentication (PRD FR-A). Cookie sessions, Argon2id, rate-limited login, verification and
@@ -128,6 +128,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
           .insert(schema.clientUserMaps)
           .values({ id: newId(), client_id: tenant.id, user_id: userId, is_default: true });
       }
+      emit('user.created', { userId, clientId: tenant?.id ?? null }, { requestId });
       const verify = randomToken();
       await db.insert(schema.emailVerificationTokens).values({
         id: newId(),
@@ -553,6 +554,11 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             before: { clientId: a.clientId },
             after: { clientId: body.clientId },
           });
+          emit(
+            'tenant.switched',
+            { userId: a.user.id, fromClientId: a.clientId, toClientId: body.clientId },
+            { requestId },
+          );
           const permissions = await effectivePermissions(db, a.user, body.clientId);
           return ok({ clientId: body.clientId, permissions });
         },

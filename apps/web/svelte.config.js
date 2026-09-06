@@ -7,6 +7,10 @@ export default {
   kit: {
     // adapter-node run under Bun: the safe fallback the PRD names (§10) — no community adapter.
     adapter: adapter({ out: 'build' }),
-    alias: { '@core/ui-theme': '../../packages/ui-theme' },
+    alias: {
+      '@core/ui-theme': '../../packages/ui-theme',
+      // Extension point 10: modules import core components as `@core/ui` (see src/lib/components/index.ts).
+      '@core/ui': 'src/lib/components',
+    },
   },
 };

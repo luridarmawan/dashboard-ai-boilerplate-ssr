@@ -1,0 +1,23 @@
+# CI of a standalone module (PRD §4.9 point 2): the harness clones core at the pinned ref, links
+# this module in, then typechecks, lints, generates migrations and runs the module's own tests
+# against a real MySQL. Nothing here needs a hand-made core checkout.
+name: module
+on: [push, pull_request]
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: mysql:8
+        ports: ['3306:3306']
+        env: { MYSQL_ROOT_PASSWORD: root, MYSQL_DATABASE: app, MYSQL_USER: app, MYSQL_PASSWORD: app }
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot" --health-interval 3s --health-timeout 3s --health-retries 40
+    env:
+      DB_DIALECT: mysql
+      DATABASE_URL: mysql://app:app@127.0.0.1:3306/app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: 1.4.2 }
+      - run: bun run harness --web

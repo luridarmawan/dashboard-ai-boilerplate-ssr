@@ -324,7 +324,7 @@ export default defineSeed('${name}', async ({ db: raw, tenantId, log }) => {
 `;
 
   // ---- dashboard pages (extension point 3) ----
-  files[`web/routes/${plural}/_form.ts`] = `import type { FieldDef } from '$lib/components/form';
+  files[`web/routes/${plural}/_form.ts`] = `import type { FieldDef } from '@core/ui';
 
 export const fields: FieldDef[] = [
 ${fields.map((f) => `  ${fieldDef(f)},`).join('\n')}
@@ -345,14 +345,15 @@ export const load: ServerLoad = async (event) => {
 };
 `;
   files[`web/routes/${plural}/+page.svelte`] = `<script lang="ts">
-import Icon from '$lib/components/Icon.svelte';
-import { Button, Table } from '$lib/components/ui';
+import { Button, Icon, Table } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 
 let { data } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
+/** Eden revives ISO dates into Date objects — show them as YYYY-MM-DD. */
+const cell = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ?? '—'));
 </script>
 
 <svelte:head><title>{t('${ns}.${plural}.title')}</title></svelte:head>
@@ -378,7 +379,7 @@ ${fields
   .slice(0, 4)
   .map(
     (f, i) =>
-      `          <td${i === 0 ? ' class="font-medium"' : ''}>{${f.type === 'boolean' ? `r.${camel(f.name)} ? '✓' : '—'` : `r.${camel(f.name)} ?? '—'`}}</td>`,
+      `          <td${i === 0 ? ' class="font-medium"' : ''}>{${f.type === 'boolean' ? `r.${camel(f.name)} ? '✓' : '—'` : `cell(r.${camel(f.name)})`}}</td>`,
   )
   .join('\n')}
           <td class="text-right"><a href={\`/m/${ns}/${plural}/\${r.id}\`}>{can('${perm}.edit') ? t('common.edit') : t('common.view')}</a></td>
@@ -391,9 +392,9 @@ ${fields
   <p class="text-sm text-muted-foreground">{data.meta.total} · {data.meta.page}/{data.meta.totalPages}</p>
 </div>
 `;
-  const actionPrelude = `import type { Actions } from '@sveltejs/kit';
+  const actionPrelude = `import { formToObject, validateForm } from '@core/contracts';
+import type { Actions } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
-import { formToObject, validateForm } from '@core/contracts';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 `;
   const boolNames = fields.filter((f) => f.type === 'boolean').map((f) => camel(f.name));
@@ -419,7 +420,7 @@ ${normalize}
 };
 `;
   files[`web/routes/${plural}/new/+page.svelte`] = `<script lang="ts">
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { fields } from '../_form.ts';
 
@@ -436,9 +437,9 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
 </div>
 `;
   files[`web/routes/${plural}/[id]/+page.server.ts`] =
-    `import type { Actions, ServerLoad } from '@sveltejs/kit';
+    `import { formToObject, validateForm } from '@core/contracts';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { formToObject, validateForm } from '@core/contracts';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import { ${Res}UpdateBody } from '../../../../api/schemas.ts';
 
@@ -472,10 +473,7 @@ ${normalize}
 };
 `;
   files[`web/routes/${plural}/[id]/+page.svelte`] = `<script lang="ts">
-import Csrf from '$lib/components/Csrf.svelte';
-import Icon from '$lib/components/Icon.svelte';
-import { FormBuilder } from '$lib/components/form';
-import { Button, Card } from '$lib/components/ui';
+import { Button, Card, Csrf, FormBuilder, Icon } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { fields } from '../_form.ts';

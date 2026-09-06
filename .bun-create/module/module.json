@@ -1,0 +1,11 @@
+{
+  "name": "Hello",
+  "version": "0.1.0",
+  "description": {
+    "id": "Starter module — rename me (bun run rename <Name>)",
+    "en": "Starter module — rename me (bun run rename <Name>)"
+  },
+  "engines": {
+    "core": ">=0.0.0"
+  }
+}

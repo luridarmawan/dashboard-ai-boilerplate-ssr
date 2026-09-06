@@ -2,9 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Versi 1 — kontrak M0. Bagian yang belum tersedia ditandai **[menyusul di M*]** dan tidak boleh diasumsikan |
+| **Status** | Versi 2 — kontrak M6. Semua titik perluasan yang bisa dipakai hari ini ada di §2a; yang belum ada ditandai di §6 dan tidak boleh diasumsikan |
 | **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (16 titik perluasan), §4.9 (modul lintas repositori), FR-G |
-| **Contoh hidup** | [`modules/Dummy/`](../modules/Dummy) — modul kecil yang dipakai gate M0; salin dari sana |
+| **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
+| **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
 
 Dokumen ini adalah tempat yang perlu Anda baca untuk membuat modul. Kalau ada langkah yang ternyata membutuhkan perubahan pada berkas di luar `modules/` dan `modules.json`, itu **cacat pada kontrak modul** (PRD §3 prinsip 6) — laporkan, jangan tambal core.
 
@@ -18,55 +19,77 @@ Dokumen ini adalah tempat yang perlu Anda baca untuk membuat modul. Kalau ada la
 
 ---
 
-## 2. Dari nol sampai jalan — 10 menit
+## 2. Dari nol sampai jalan — 2 menit dengan `bun modgen`
 
 ```bash
-# 1. Buat folder & paket
-mkdir -p modules/Billing/db modules/Billing/api modules/Billing/web/routes/invoices
-
-cat > modules/Billing/package.json <<'EOF'
-{
-  "name": "@modules/billing",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": { "typecheck": "tsc -p tsconfig.json" },
-  "dependencies": {
-    "@core/contracts": "workspace:*",
-    "@core/db": "workspace:*",
-    "@core/module-kit": "workspace:*",
-    "elysia": "^1.4.0"
-  },
-  "devDependencies": { "@sveltejs/kit": "^2.70.0", "svelte": "^5.40.0" }
-}
-EOF
-
-cat > modules/Billing/module.json <<'EOF'
-{
-  "name": "Billing",
-  "version": "0.1.0",
-  "description": { "id": "Penagihan", "en": "Billing" },
-  "engines": { "core": ">=0.0.0" }
-}
-EOF
-
-cat > modules/Billing/tsconfig.json <<'EOF'
-{ "extends": "../../tsconfig.base.json", "include": ["**/*.ts"] }
-EOF
-
-# 2. Daftarkan sumbernya — satu-satunya berkas di luar folder modul yang Anda sentuh
-#    (tambahkan objek ini ke array "modules" di modules.json)
-#    { "name": "Billing", "source": "local", "path": "modules/Billing" }
-
-# 3. Pasang dependensi, rakit, buat migrasi, jalankan
-bun install
-bun modules:sync          # validasi + generate registry
-bun db:generate           # migrasi baru untuk tabel Anda (kedua dialect)
-bun db:migrate            # terapkan ke database dev
-bun dev                   # http://127.0.0.1:5173/m/billing/invoices
+bun modgen Billing --resource invoice \
+  --fields "number:string!,amount:number,paid:boolean,notes:text,kind:select(sale|refund),due:date" \
+  --public
 ```
 
-Nama modul **folder-case** (`Billing`, `AI`, `Example`), nama paket **huruf kecil** (`@modules/billing`). Keduanya divalidasi.
+Satu perintah menghasilkan **modul utuh** di `modules/Billing/` dan mendaftarkannya di `modules.json` — tanpa berkas core mana pun berubah (CI menjaganya, lihat §8):
+
+| Berkas | Isi |
+|---|---|
+| `db/tables.ts` | tabel `billing_invoices` (tenant-scoped, soft delete) dari daftar field |
+| `permissions.ts` · `menu.ts` | `billing.invoice.read/create/edit/manage`; entri menu `/m/billing/invoices` yang tampil hanya bila izin ada |
+| `config.ts` · `i18n/{id,en}.json` | section "Billing" di Pengaturan (form otomatis); kunci `billing.*` untuk kedua bahasa |
+| `api/schemas.ts` · `api/routes.ts` | skema TypeBox bersama + CRUD `/v1/m/billing/invoices` lewat facade tenant, teraudit, dengan pencarian & paginasi |
+| `web/routes/invoices/**` | halaman daftar, buat, ubah/hapus — `FormBuilder` memakai skema API yang sama (L-17), jalan tanpa JavaScript |
+| `widgets.ts` · `web/widgets/` | widget dasbor terfilter izin |
+| `hooks.ts` · `jobs.ts` | contoh langganan `user.created` dan job `billing.heartbeat` setiap jam |
+| `seed.ts` | satu baris contoh, idempoten |
+| `public.ts` · `web/public/home/` | (dengan `--public`) halaman publik `/billing`, masuk sitemap |
+| `test/integration/billing.test.ts` | tes CRUD terhadap aplikasi nyata (`INTEGRATION=1`) |
+
+Tipe field: `string` `text` `number` `boolean` `date` `select(a|b|c)`; akhiran `!` = wajib. Kolom kontrak (`id`, `client_id`, `created_at`, `updated_at`, `deleted_at`) otomatis. Tanpa `--fields` di terminal interaktif, generator bertanya.
+
+Setelah itu:
+
+```bash
+bun run --cwd packages/db migrate   # migrasi yang baru dibuat generator (kedua dialect)
+bun run db:seed                     # izin + menu + baris contoh
+bun dev                             # http://127.0.0.1:5173/m/billing/invoices
+INTEGRATION=1 bun test modules/Billing/test
+```
+
+Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langkah "regenerate" yang akan menimpanya.
+
+### 2a. Peta 16 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
+
+| # | Titik perluasan | Berkas di modul | Contoh hidup | Dibuktikan oleh |
+|---|---|---|---|---|
+| 1 | Tabel & migrasi | `db/tables.ts` (`defineTables`, `defineTable`, `col.*`) | `modules/Example/db/tables.ts` | `bun db:generate` menulis migrasi mysql+pg; gate M0 #4 |
+| 2 | Route API | `api/routes.ts` (`defineApiRoutes`) → `/v1/m/<ns>/*`, muncul di OpenAPI & Eden | `modules/Example/api/routes.ts` | tes integrasi modul; `scripts/m4-gate-proof.ts` |
+| 3 | Halaman dasbor | `web/routes/**` → `/m/<ns>/*`, `export const _layoutVariant` | `modules/Example/web/routes/products/` | `scripts/m6-gate-proof.ts` (CRUD tanpa JS) |
+| 4 | Menu | `menu.ts` (`defineMenu`) | `modules/Example/menu.ts` | m6 proof: entri hilang bagi user tanpa izin |
+| 5 | Izin | `permissions.ts` (`definePermissions`, `CORE_ACTIONS`) | `modules/Example/permissions.ts` | m6 proof: 403 di API & halaman |
+| 6 | Konfigurasi | `config.ts` (`defineConfig`) → section di `/settings`, `settings.get()` | `modules/AI/config.ts` | `scripts/m3-gate-proof.ts` |
+| 7 | i18n | `i18n/<locale>.json`, kunci `<ns>.*`, `t('<ns>.x')` di halaman | `modules/Example/i18n/` | m6 proof: halaman berganti bahasa lewat `/lang` |
+| 8 | Tool AI / MCP | — | — | **belum ada kontrak** (MCP di M7, FR-I). Jangan diasumsikan |
+| 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
+| 10 | Komponen UI | `import { Button, DataTable, FormBuilder, Icon } from '@core/ui'` | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof |
+| 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
+| 12 | Job terjadwal | `jobs.ts` (`defineJobs`) — sekali per interval di semua instance | `modules/AI/jobs.ts` | `bun scheduler:proof` (M0 #6), m6 proof: terdaftar saat boot |
+| 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap | `modules/Example/public.ts` | `scripts/m4-gate-proof.ts`, m6 proof |
+| 14 | Tema | `themes/<id>/` | `modules/Dummy/themes/ocean/` | `bun theme:validate`, m2 proof #5 |
+| 15 | Layout | `layouts.ts` (`defineLayouts`) | `modules/Dummy/layouts.ts` | `scripts/ci/layout-contract.ts`, m2 proof #5 |
+| 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
+
+### 2b. Secara manual (kalau ingin memahami tiap berkas)
+
+Langkah yang dilakukan generator, bila Anda ingin menulis sendiri:
+
+```bash
+mkdir -p modules/Billing/db modules/Billing/api modules/Billing/web/routes/invoices
+# package.json  — nama @modules/billing, dependensi workspace:* untuk tiap @core/* dan @app/api yang diimpor
+# module.json   — { "name": "Billing", "version", "description": {id,en}, "engines": { "core": ">=0.0.0" } }
+# tsconfig.json — { "extends": "../../tsconfig.base.json", "include": ["**/*.ts"], "exclude": ["node_modules", "web/**"] }
+# modules.json  — tambahkan { "name": "Billing", "source": "local", "path": "modules/Billing" }  ← satu-satunya berkas di luar folder modul
+bun install && bun modules:sync && bun db:generate && bun run --cwd packages/db migrate && bun dev
+```
+
+Nama modul **folder-case** (`Billing`, `AI`, `Example`), nama paket **huruf kecil** (`@modules/billing`). Keduanya divalidasi. Salin isi berkas dari `.bun-create/module/` (templat yang selalu sinkron dengan generator) atau dari `modules/Example/`.
 
 ---
 
@@ -370,6 +393,9 @@ Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modul
 
 | Perintah | Kapan |
 |---|---|
+| `bun modgen <Nama> --fields …` | Membuat modul lengkap + daftar + sync + migrasi (§2). `--dry-run` untuk melihat daftar berkas, `--no-register` untuk berkas saja |
+| `bun create module <folder>` | Repositori modul standalone dari templat `.bun-create/module` (§7) |
+| `bun modules:add <git-url> --ref <tag>` | Memasang modul dari repositori lain sebagai submodule terkunci (§7) |
 | `bun modules:sync` | Setelah menambah/mengubah/mencabut modul. Otomatis sebelum `dev`, `build`, `check`, `test` |
 | `bun db:generate` | Setelah mengubah `db/tables.ts` — menulis migrasi baru untuk kedua dialect |
 | `bun db:migrate` | Menerapkan migrasi ke database dari `DATABASE_URL`. Satu-satunya jalur produksi (Q-4) |
@@ -383,18 +409,15 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-| Titik perluasan | Status |
+Semua titik perluasan di §2a **tersedia**, kecuali:
+
+| Hal | Status |
 |---|---|
-| 1 tabel · 2 route API · 3 halaman · 4 menu · 5 izin · 9 event hook · 12 job terjadwal | **Tersedia (M0)** — dokumen ini |
-| Penegakan izin (`permission()` / `requirePermission()` di API, `locals.session.can()` di web) & penjaga tenant di data layer (`forTenant`, B-3) | **Tersedia (M1)** — lihat §3 halaman dan route API |
-| 6 konfigurasi · 7 i18n · layout/tema membungkus halaman modul · `@core/ui` | M2–M3 |
-| 11 widget dashboard (`widgets.ts`, terfilter izin, SSR) | **Tersedia (M2)** |
-| 8 tool AI/MCP | M5 |
-| 14 tema · 15 layout · 16 set ikon (`themes/`, `layouts.ts`, `icons.ts`) | **Tersedia (M2)** |
-| 13 halaman publik (`public.ts`) | **Tersedia (M4)** |
-| Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |
-| Modul sebagai paket npm (`source: "package"`) | M6 |
-| `bun modgen` (generator CRUD) · starter repo modul | M6 |
+| 8 tool AI / MCP (`defineTools`) | **Belum ada kontrak.** Dijadwalkan bersama MCP server & client (FR-I) di M7. Modul yang butuh tool AI hari ini harus menunggu — jangan membuat jalur sendiri lewat internal modul AI |
+| Modul sebagai paket npm (`source: "package"`) | M7. Hari ini: `local` atau `submodule` |
+| UI admin modul (G-14) — daftar modul, sumber & versi, aktif/nonaktif per tenant, galat muat | Sebagian: `/modules` menampilkan modul dan status per tenant; sumber/versi/galat muat menyusul M7 |
+| Uninstall bersih dengan migrasi turun (G-15) | M7. Mencabut modul hari ini meninggalkan tabelnya (G-8) |
+| Playwright E2E untuk halaman modul (P-8) | M7. Bukti hari ini lewat HTTP tanpa browser (`scripts/m6-gate-proof.ts`) |
 
 ---
 
@@ -402,10 +425,44 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 
 Tim lain boleh mengembangkan modul di repositorinya sendiri dengan siklus rilisnya sendiri (PRD §4.9). Struktur foldernya **sama persis** dengan modul lokal — hanya lokasinya yang berbeda.
 
+### 7a. Memulai repositori modul — `bun create module`
+
 ```bash
+# dari checkout core mana pun (templat ada di .bun-create/module; Bun membacanya otomatis)
+bun create module ../mod-billing
+cd ../mod-billing
+bun run rename Billing        # sekali: Hello → Billing (namespace, tabel, izin, route, tes)
+bun run harness               # clone core ke .core/ pada ref di package.json → "core", tautkan modul, sync, tsc, lint, migrasi, tes
+```
+
+Di luar checkout core: `BUN_CREATE_DIR=<checkout>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module`. Templat ini **dibangun dari generator yang sama** dengan `bun modgen` (`bun run starter:build`; CI menolak bila keduanya berbeda), jadi modul standalone dan modul lokal identik isinya.
+
+Yang ada di repo modul selain kode modul itu sendiri:
+
+| Berkas | Guna |
+|---|---|
+| `harness.ts` | **Satu-satunya cara build/lint/test tanpa meng-clone core secara manual** (§4.9 poin 2). Menyalin modul ke `<core>/modules/<Nama>`, mendaftarkannya, `bun install`, `modules:sync`, `tsc`, `biome check`, `db:generate`, lalu `bun test modules/<Nama>/test`. Dengan `DATABASE_URL`: migrasi + tes integrasi. `--web`: + svelte-check halaman |
+| `rename.ts` | Mengganti nama modul di semua berkas & nama berkas |
+| `.github/workflows/ci.yml` | CI repo modul: MySQL service + `bun run harness --web` |
+| `package.json` → `"core": { "repo", "ref" }` | Core yang dipakai harness. Ganti `ref` ke tag core saat merilis, selaras dengan `engines.core` di `module.json` |
+
+Siklus dev di browser: arahkan harness ke checkout core yang sudah ada — modul ditautkan ke sana dan `bun dev` di core menyajikannya.
+
+```bash
+CORE_DIR=../dashboard-ai-boilerplate-ssr bun run harness   # lalu di core: bun dev → /m/billing/…
+```
+
+`tsconfig.json` modul mengacu `../../tsconfig.base.json` dan dependensinya `workspace:*` — keduanya **benar saat modul berada di dalam core** (yang selalu terjadi lewat harness atau `modules:add`). Karena itu `bun install` langsung di repo modul tidak berguna; pakai harness.
+
+### 7b. Memasang di host — `bun modules:add`
+
+```bash
+# di repo modul: rilis
+git tag v1.4.2 && git push --tags
 # di host: pasang dari git, terkunci pada tag/commit — branch ditolak (Keputusan L)
 bun modules:add git@github.com:tim/mod-billing.git --ref v1.4.2
-git add modules.json .gitmodules biome.json modules/Billing && git commit -m "modul Billing v1.4.2"
+bun db:generate && bun run --cwd packages/db migrate
+git add modules.json .gitmodules biome.json bun.lock packages/db/migrations modules/Billing && git commit -m "modul Billing v1.4.2"
 ```
 
 Yang dilakukan perintah itu: `git submodule add` ke `modules/<Nama>` (nama dibaca dari `module.json` repo), `git checkout --detach <ref>`, entri `{ "source": "submodule", "repo", "ref", "path" }` ke `modules.json`, pengecualian path itu dari Biome host, `bun install`, lalu `modules:sync`.
@@ -415,8 +472,21 @@ Aturan yang dijaga `modules:sync` untuk sumber `submodule`:
 - **Ref terkunci diverifikasi setiap sync.** HEAD submodule harus sama dengan `ref` di `modules.json`; kalau bergeser, sync gagal dan menyebut kedua commit. Menaikkan versi = ubah `ref` di `modules.json`, `git -C modules/<Nama> checkout <ref>`, sync.
 - **Submodule kosong di-init otomatis** (`git submodule update --init`) — clone baru tinggal `bun install && bun modules:sync`. CI men-checkout dengan `submodules: true`.
 - **Modifikasi lokal di folder submodule hanya diperingatkan**, bukan ditolak — tapi jangan: ubah di repo asalnya, rilis tag baru, naikkan `ref`.
-- Host **tidak** me-lint/memformat kode modul eksternal; modul itu tanggung jawab reponya sendiri (§4.9 poin 2). Starter repo dengan konfigurasi build/lint/test mandiri **[menyusul di M6, G-12]**.
+- Host **tidak** me-lint/memformat kode modul eksternal; modul itu tanggung jawab reponya sendiri — CI di repo modul (`harness --web`) yang melakukannya.
 
-`tsconfig.json` modul mengacu `../../tsconfig.base.json` — benar saat terpasang di host. Typecheck mandiri di repo modul sendiri menunggu starter M6.
+Seluruh alur ini dibuktikan otomatis di CI oleh `bun run ci:cross-repo` (`scripts/ci/cross-repo-proof.sh`): `bun create module` → rename → harness terhadap clone core → `modules:add` dari URL git pada tag → hanya `modules.json`, `.gitmodules`, `biome.json`, `bun.lock`, `modules/<Nama>` dan migrasi yang berubah → uninstall → pohon identik.
 
-Kalau Anda membutuhkan salah satu di atas sekarang, yang benar adalah **mempercepat kontraknya**, bukan mengimpor internal core dari modul. Impor internal akan pecah pada rilis berikutnya dan tidak akan lolos review.
+---
+
+## 8. Penjaga CI "tanpa ubah core" (G-6)
+
+Janji modularitas diukur, bukan dipercaya. Dua penjaga berjalan di setiap push:
+
+| Penjaga | Perintah | Yang dibuktikan |
+|---|---|---|
+| modgen | `bun run ci:modgen-guard` | `bun modgen CiProbe …` lalu `git status` hanya menyentuh `modules/CiProbe/`, `modules.json`, `bun.lock`, `packages/db/migrations/**`; migrasinya hanya `CREATE TABLE`; modul dihapus + sync → pohon identik HEAD dan tidak ada jejak `ciprobe` di output generate (gate M6 #4) |
+| lintas repo | `bun run ci:cross-repo` | seperti di §7b |
+
+Ditambah `bun run ci:sync-pure` (sync modul yang sudah tercatat adalah no-op) dan `bun run proof:m5:gate4` (tanpa modul AI, aplikasi ter-build tanpa jejak AI).
+
+Kalau Anda menemukan kebutuhan modul yang **memaksa** mengubah core, yang benar adalah **mempercepat kontraknya** (ajukan titik perluasan baru di `packages/module-kit`), bukan mengimpor internal core dari modul. Impor internal akan pecah pada rilis berikutnya dan tidak akan lolos review.
