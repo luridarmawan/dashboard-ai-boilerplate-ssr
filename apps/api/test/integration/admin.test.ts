@@ -161,7 +161,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
       409,
     );
     const detail = await json(await call(`/v1/groups/${editorsId}`, {}, [admin]));
-    expect((detail.data?.members as unknown[]).length).toBe(1);
+    expect((detail.data as { members: unknown[] }).members.length).toBe(1);
   });
 
   test('system groups keep their code and cannot be deleted', async () => {

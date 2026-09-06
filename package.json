@@ -32,6 +32,8 @@
     "modules:add": "bun run scripts/modules-add.ts",
     "modules:sync": "bun run scripts/modules-sync.ts",
     "predev": "bun run bootstrap",
+    "proof:m1": "bun run scripts/m1-gate1-proof.ts",
+    "proof:m1:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun run bootstrap && bun run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun run db:seed && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' sh scripts/ci/m1-proof.sh\"",
     "scheduler:proof": "bun run scripts/scheduler-proof.ts",
     "scheduler:proof:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app oven/bun:1.4 bun run scripts/scheduler-proof.ts",
     "test": "bun run bootstrap && bun test",

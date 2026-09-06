@@ -18,5 +18,6 @@ let { data }: { data: PageData } = $props();
   {:else}
     <p data-testid="api-status">API tidak terjangkau ({data.apiError ?? 'tanpa respons'})</p>
   {/if}
+  <p><a href="/auth/login">Masuk</a> · <a href="/auth/register">Daftar</a></p>
   <p><small>request {data.requestId}</small></p>
 </main>

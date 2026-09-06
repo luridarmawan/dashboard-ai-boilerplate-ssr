@@ -1,0 +1,260 @@
+#!/usr/bin/env bun
+/**
+ * M1 gate #1 proof, through the WEB app with plain HTTP (no browser, no JavaScript):
+ *   login → create a user → set a group's permissions → the user sees exactly them →
+ *   create a tenant → switch → the user list is per tenant → logout.
+ * It also checks gate #2 at the web layer: a cross-origin form post is refused.
+ *
+ *   WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL=… ADMIN_PASSWORD=… bun run scripts/m1-gate1-proof.ts
+ */
+const WEB = (process.env.WEB_URL ?? 'http://127.0.0.1:5173').replace(/\/$/, '');
+const ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL ?? process.env.BOOTSTRAP_ADMIN_EMAIL ?? 'admin@example.test';
+const ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD ?? process.env.BOOTSTRAP_ADMIN_PASSWORD ?? 'bootstrap admin password';
+const run = Date.now();
+
+class Jar {
+  cookies = new Map<string, string>();
+  absorb(res: Response) {
+    for (const raw of res.headers.getSetCookie()) {
+      const [pair, ...attrs] = raw.split(';');
+      const eq = pair?.indexOf('=') ?? -1;
+      if (!pair || eq < 0) continue;
+      const name = pair.slice(0, eq).trim();
+      const value = pair.slice(eq + 1).trim();
+      const gone = attrs.some((a) => /max-age=0/i.test(a)) || value === '';
+      if (gone) this.cookies.delete(name);
+      else this.cookies.set(name, value);
+    }
+  }
+  header() {
+    return [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+}
+
+let failures = 0;
+function check(name: string, cond: boolean, extra = '') {
+  console.log(`${cond ? '  ✓' : '  ✗'} ${name}${cond || !extra ? '' : ` — ${extra}`}`);
+  if (!cond) failures++;
+}
+
+async function get(jar: Jar, path: string) {
+  const res = await fetch(`${WEB}${path}`, {
+    headers: { cookie: jar.header(), accept: 'text/html' },
+    redirect: 'manual',
+  });
+  jar.absorb(res);
+  return { res, html: await res.text() };
+}
+async function post(
+  jar: Jar,
+  path: string,
+  fields: Record<string, string | string[]>,
+  origin = WEB,
+) {
+  const body = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields))
+    for (const x of Array.isArray(v) ? v : [v]) body.append(k, x);
+  const res = await fetch(`${WEB}${path}`, {
+    method: 'POST',
+    // A browser form post sends `Accept: text/html`; with `*/*` SvelteKit answers the JSON an
+    // enhanced (JavaScript) form expects.
+    headers: {
+      cookie: jar.header(),
+      origin,
+      accept: 'text/html',
+      'content-type': 'application/x-www-form-urlencoded',
+    },
+    body,
+    redirect: 'manual',
+  });
+  jar.absorb(res);
+  return { res, html: await res.text() };
+}
+const csrfOf = (html: string) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
+/** The page's error banner, for diagnostics when a step fails. */
+const errorOf = (html: string) =>
+  /class="error">([^<]*)/.exec(html)?.[1]?.trim() ?? `(no error banner; ${html.length} bytes)`;
+const location = (res: Response) => res.headers.get('location') ?? '';
+
+async function login(jar: Jar, email: string, password: string) {
+  const page = await get(jar, '/auth/login');
+  const token = csrfOf(page.html);
+  const r = await post(jar, '/auth/login', { _csrf: token, email, password, next: '/dashboard' });
+  return { status: r.res.status, location: location(r.res), token, html: r.html };
+}
+
+console.log(`M1 gate #1 via web at ${WEB}`);
+const admin = new Jar();
+
+// 1. login
+{
+  const r = await login(admin, ADMIN_EMAIL, ADMIN_PASSWORD);
+  check(
+    'admin login → 303 /dashboard',
+    r.status === 303 && r.location === '/dashboard',
+    `${r.status} ${r.location} ${r.status === 303 ? '' : errorOf(r.html)}`,
+  );
+  check('session cookie is HttpOnly', admin.cookies.has('dab_session'));
+  const dash = await get(admin, '/dashboard');
+  check(
+    'dashboard renders server-side with superadmin *.*',
+    dash.res.status === 200 && dash.html.includes('*.*'),
+  );
+}
+
+// 2. create a user with the seeded `user` group
+const gateEmail = `gate1-${run}@example.test`;
+const gatePassword = 'a gate one password 123';
+let userGroupId = '';
+let newUserId = '';
+{
+  const page = await get(admin, '/users/new');
+  const token = csrfOf(page.html);
+  userGroupId =
+    /name="groupIds" value="([0-9a-f-]{36})"[^>]*>\s*Regular User/.exec(page.html)?.[1] ?? '';
+  check('users/new lists the seeded "Regular User" group', userGroupId.length === 36);
+  const r = await post(admin, '/users/new', {
+    _csrf: token,
+    name: 'Gate One',
+    email: gateEmail,
+    password: gatePassword,
+    groupIds: [userGroupId],
+  });
+  newUserId = /\/users\/([0-9a-f-]{36})/.exec(location(r.res))?.[1] ?? '';
+  check(
+    'create user → 303 to the new user page',
+    r.res.status === 303 && newUserId.length === 36,
+    `${r.res.status} ${location(r.res)}`,
+  );
+  const list = await get(admin, `/users?q=gate1-${run}`);
+  check('users list (search) shows the new user', list.html.includes(gateEmail));
+}
+
+// 3. set the group's permissions (matrix form)
+{
+  const page = await get(admin, `/groups/${userGroupId}`);
+  const token = csrfOf(page.html);
+  check(
+    'group page shows the registry matrix',
+    page.html.includes('name="perm" value="user.read"') && page.html.includes('module'),
+  );
+  const r = await post(admin, `/groups/${userGroupId}?/permissions`, {
+    _csrf: token,
+    perm: ['user.read', 'group.read'],
+    extra: '',
+  });
+  check(
+    'set permissions → saved',
+    r.res.status === 200 && r.html.includes('Tersimpan'),
+    `${r.res.status}`,
+  );
+}
+
+// 4. the new user sees exactly those permissions; the UI hides what it cannot do
+const member = new Jar();
+{
+  const r = await login(member, gateEmail, gatePassword);
+  check('new user can log in', r.status === 303, `${r.status}`);
+  const dash = await get(member, '/dashboard');
+  check(
+    'member dashboard lists group.read and user.read',
+    dash.html.includes('group.read') && dash.html.includes('user.read'),
+  );
+  check(
+    'menu hides Tenant (no client.read) but shows Pengguna',
+    !dash.html.includes('href="/tenants"') && dash.html.includes('href="/users"'),
+  );
+  const groups = await get(member, '/groups');
+  check('member may read groups (group.read)', groups.res.status === 200);
+  const tenants = await get(member, '/tenants');
+  check(
+    'member is refused /tenants by the API (403 surfaces as an error page)',
+    tenants.res.status === 403,
+    `${tenants.res.status}`,
+  );
+  const page = await get(member, `/groups/${userGroupId}`);
+  const esc = await post(member, `/groups/${userGroupId}?/permissions`, {
+    _csrf: csrfOf(page.html),
+    perm: ['*.*'],
+    extra: '',
+  });
+  check(
+    'member cannot escalate: POST permissions → 403 from the API',
+    esc.res.status === 403,
+    `${esc.res.status}`,
+  );
+}
+
+// 5. tenant: create, switch, users are per tenant
+{
+  const page = await get(admin, '/tenants/new');
+  const r = await post(admin, '/tenants/new', {
+    _csrf: csrfOf(page.html),
+    code: `g1-${run}`.slice(0, 32),
+    name: `Gate ${run}`,
+  });
+  const tenantId = /\/tenants\/([0-9a-f-]{36})/.exec(location(r.res))?.[1] ?? '';
+  check('create tenant → 303', r.res.status === 303 && tenantId.length === 36, `${r.res.status}`);
+  const dash = await get(admin, '/dashboard');
+  check('switcher appears once there are two tenants (B-5)', dash.html.includes('name="clientId"'));
+  const sw = await post(admin, '/auth/switch-tenant', {
+    _csrf: csrfOf(dash.html),
+    clientId: tenantId,
+    back: '/dashboard',
+  });
+  check(
+    'switch tenant → 303 back (server-side navigation, B-4)',
+    sw.res.status === 303 && location(sw.res) === '/dashboard',
+  );
+  const after = await get(admin, '/dashboard');
+  check('dashboard now shows the new tenant as active', after.html.includes(`Gate ${run}`));
+  const users = await get(admin, '/users');
+  check(
+    'users list is per tenant: the member of `default` is not here',
+    !users.html.includes(gateEmail),
+  );
+  const forged = await post(admin, '/auth/switch-tenant', {
+    _csrf: csrfOf(after.html),
+    clientId: '01900000-0000-7000-8000-000000000000',
+    back: '/dashboard',
+  });
+  check(
+    'switching to a foreign tenant is refused',
+    location(forged.res).includes('tenant_error=1'),
+  );
+}
+
+// 6. gate #2 at the web layer: a cross-origin form post never reaches the API
+{
+  const page = await get(admin, '/users/new');
+  const r = await post(
+    admin,
+    '/users/new',
+    { _csrf: csrfOf(page.html), name: 'Evil', email: `evil-${run}@example.test` },
+    'http://evil.test',
+  );
+  check('cross-origin POST → 403 (no user created)', r.res.status === 403, `${r.res.status}`);
+  const bad = await post(admin, '/users/new', {
+    _csrf: 'wrong',
+    name: 'Evil',
+    email: `evil2-${run}@example.test`,
+  });
+  check('wrong CSRF field → 403', bad.res.status === 403, `${bad.res.status}`);
+}
+
+// 7. logout invalidates server-side
+{
+  const dash = await get(admin, '/dashboard');
+  const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });
+  check('logout → 303 /auth/login', r.res.status === 303 && location(r.res) === '/auth/login');
+  const again = await get(admin, '/dashboard');
+  check(
+    'dashboard afterwards redirects to login',
+    again.res.status === 303 && location(again.res).startsWith('/auth/login'),
+  );
+}
+
+console.log(failures === 0 ? '\nGATE M1 #1: LOLOS' : `\nGATE M1 #1: GAGAL (${failures})`);
+process.exit(failures === 0 ? 0 : 1);

@@ -27,6 +27,7 @@ import { permission, type TenantState, tenantContext } from '../plugins/tenancy.
 /**
  * Groups of the ACTIVE tenant, their permissions and their members (PRD C-3, C-4, D-2).
  * Three route families as in Appendix A: `/groups`, `/group-permissions`, `/group-members`.
+ * Path parameters are all `:id` on purpose: the typed client (Eden) needs one name per segment.
  *
  * Every read goes through the tenant facade; a group id from another tenant is "not found".
  * Permission strings written here must be a wildcard or exist in the registry (C-4) — the
@@ -513,14 +514,14 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
       )
       .delete(
-        '/:permissionId',
+        '/:id',
         async ({ auth, params, set, request, server, requestId, tenantState }) => {
           const a = actor(auth);
           const ts = tenantOf(tenantState);
           const row = ts
             ? await ts.tenant.selectOne(
                 schema.groupPermissions,
-                eq(schema.groupPermissions.id, params.permissionId),
+                eq(schema.groupPermissions.id, params.id),
               )
             : null;
           if (!ts || !row) return notFound(set, requestId, 'Izin');
@@ -539,7 +540,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
         {
           beforeHandle: permission('group.edit'),
-          params: t.Object({ permissionId: Id }),
+          params: t.Object({ id: Id }),
           response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
           detail: { summary: 'Remove one permission row from its group' },
         },
@@ -568,11 +569,11 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
       )
       .post(
-        '/:groupId',
+        '/:id',
         async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
           const a = actor(auth);
           const ts = tenantOf(tenantState);
-          const g = ts ? await liveGroup(ts, params.groupId) : null;
+          const g = ts ? await liveGroup(ts, params.id) : null;
           if (!ts || !g) return notFound(set, requestId, 'Grup');
           // Only members of THIS tenant can join its groups — a group never reaches outside (B-3).
           if (!(await isMemberOf(unsafeAcrossTenants(), body.userId, ts.clientId))) {
@@ -607,7 +608,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
         {
           beforeHandle: permission('group.edit'),
-          params: t.Object({ groupId: Id }),
+          params: t.Object({ id: Id }),
           body: t.Object({ userId: Id }),
           response: {
             201: OkSchema(t.Object({ id: t.String(), groupId: t.String(), userId: t.String() })),
@@ -617,7 +618,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
       )
       .delete(
-        '/:groupId/:userId',
+        '/:id/:userId',
         async ({ auth, params, set, request, server, requestId, tenantState }) => {
           const a = actor(auth);
           const ts = tenantOf(tenantState);
@@ -625,7 +626,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           const n = await ts.tenant.delete(
             schema.groupUserMaps,
             and(
-              eq(schema.groupUserMaps.group_id, params.groupId),
+              eq(schema.groupUserMaps.group_id, params.id),
               eq(schema.groupUserMaps.user_id, params.userId),
             ),
           );
@@ -635,7 +636,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             actorId: a.user.id,
             action: 'group.member_remove',
             resource: 'group',
-            resourceId: params.groupId,
+            resourceId: params.id,
             ip: clientIp(request, server),
             requestId,
             before: { userId: params.userId },
@@ -644,7 +645,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
         {
           beforeHandle: permission('group.edit'),
-          params: t.Object({ groupId: Id, userId: Id }),
+          params: t.Object({ id: Id, userId: Id }),
           response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
           detail: { summary: 'Remove a member from a group' },
         },
