@@ -211,4 +211,4 @@ jobs:
           sed -i 's/^BOOTSTRAP_ADMIN_EMAIL=.*/BOOTSTRAP_ADMIN_EMAIL=admin@example.test/; s/^BOOTSTRAP_ADMIN_PASSWORD=.*/BOOTSTRAP_ADMIN_PASSWORD="bootstrap admin password"/' .env.prod
       - run: sh scripts/ci/m1-scale-proof.sh
       - if: always()
-        run: docker compose --env-file .env.prod -f compose.prod.yml down -v
+        run: test -f .env.prod && docker compose --env-file .env.prod -f compose.prod.yml down -v || true

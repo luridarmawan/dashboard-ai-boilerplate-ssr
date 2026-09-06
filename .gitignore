@@ -6,6 +6,7 @@ build/
 .env
 .env.*
 !.env.example
+!.env.prod.example
 # generated output — the descriptors and modules.json are the source of truth (Decision G)
 packages/db/src/generated/
 apps/*/src/generated/
