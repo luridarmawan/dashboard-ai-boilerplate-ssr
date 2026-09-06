@@ -92,12 +92,20 @@ function cookieHeader(cookies: Cookies): string | undefined {
 
 /** API client bound to this browser: session cookie, CSRF pair, public origin, active tenant. */
 export function apiFor(event: RequestEvent, clientId?: string | null) {
+  let ip: string | undefined;
+  try {
+    ip = event.getClientAddress();
+  } catch {
+    ip = undefined;
+  }
   return api({
     requestId: event.locals.requestId,
     cookie: cookieHeader(event.cookies),
     csrf: event.cookies.get(CSRF_COOKIE),
     origin: event.url.origin,
     clientId: clientId ?? null,
+    // The API rate-limits per client IP (A-2); without this every browser would share the web server's IP.
+    clientIp: ip,
   });
 }
 

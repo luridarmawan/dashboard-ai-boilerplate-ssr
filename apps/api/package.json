@@ -5,7 +5,11 @@
   "type": "module",
   "description": "Elysia API \u2014 the product's source of truth; SvelteKit is its first consumer (Decision A)",
   "exports": {
-    "./app": "./src/app.ts"
+    "./app": "./src/app.ts",
+    "./plugins/*": "./src/plugins/*.ts",
+    "./services": "./src/services.ts",
+    "./mail": "./src/mail.ts",
+    "./lib/*": "./src/lib/*.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
@@ -18,6 +22,7 @@
     "@core/contracts": "workspace:*",
     "@core/db": "workspace:*",
     "@core/logger": "workspace:*",
+    "@core/mail": "workspace:*",
     "@core/module-kit": "workspace:*",
     "@core/runtime": "workspace:*",
     "@core/settings": "workspace:*",

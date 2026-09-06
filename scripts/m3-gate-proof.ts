@@ -125,8 +125,9 @@ const anon = new Jar();
 {
   const before = await get(anon, '/');
   check(
-    'default landing (/m/example not installed) → built-in landing page, 200',
-    before.res.status === 200 && !before.res.headers.get('x-landing-route'),
+    'default landing → 200 (the Example storefront when installed, else the built-in page)',
+    before.res.status === 200 &&
+      ['/example', null].includes(before.res.headers.get('x-landing-route')),
   );
   const bad = await saveApp(admin, 'global', { 'app.landing_route': '/m/ghost' });
   check(
@@ -164,9 +165,9 @@ const anon = new Jar();
   check('disable Dummy globally → 303', off.res.status === 303, `${off.res.status}`);
   const front = await get(anon, '/');
   check(
-    '#3 `/` still answers 200 with the built-in landing (not 404, not the module page)',
+    '#3 `/` still answers 200 with a safe page (not 404, not the disabled module page)',
     front.res.status === 200 &&
-      !front.res.headers.get('x-landing-route') &&
+      front.res.headers.get('x-landing-route') !== '/hello-dummy' &&
       !front.html.includes('data-testid="public-module-page"'),
   );
   const dash = await get(admin, '/dashboard');

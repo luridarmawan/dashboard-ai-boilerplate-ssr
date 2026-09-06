@@ -24,6 +24,11 @@ export const CORE_PERMISSIONS: readonly PermissionDef[] = [
   { resource: 'module', actions: ['read', 'manage'], name: { id: 'Modul', en: 'Modules' } },
   { resource: 'theme', actions: ['read', 'manage'], name: { id: 'Tema', en: 'Themes' } },
   { resource: 'audit', actions: ['read'], name: { id: 'Log audit', en: 'Audit log' } },
+  {
+    resource: 'mail',
+    actions: ['read', 'manage'],
+    name: { id: 'Outbox email', en: 'Email outbox' },
+  },
 ];
 
 export interface RegistryEntry extends PermissionDef {

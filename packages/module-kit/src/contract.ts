@@ -383,6 +383,25 @@ export function definePublicRoutes(
   return list;
 }
 
+/**
+ * Module seed (PRD O-3, R-3): idempotent demo/reference data for the default tenant, run by
+ * `bun db:seed` after the core seed. Receives a raw `db` (the seed writes several tables) and the
+ * default tenant id; MUST be safe to run on every deploy.
+ */
+export interface ModuleSeedContext {
+  readonly db: unknown;
+  readonly tenantId: string;
+  readonly log: (msg: string) => void;
+}
+export type ModuleSeed = (ctx: ModuleSeedContext) => Promise<void>;
+
+export function defineSeed(moduleName: string, run: ModuleSeed): ModuleSeed {
+  namespaceOf(moduleName);
+  if (typeof run !== 'function')
+    throw new ModuleContractError(`modul ${moduleName}: defineSeed butuh fungsi`);
+  return run;
+}
+
 /** Resource owners that belong to core; a module may reference these permissions in its menu. */
 export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'user',
@@ -392,6 +411,7 @@ export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'module',
   'theme',
   'audit',
+  'mail',
 ]);
 
 /** Declare a module's tables. Names must carry the module prefix (`<ns>_`). */

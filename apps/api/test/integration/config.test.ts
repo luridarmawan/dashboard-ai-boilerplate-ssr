@@ -114,7 +114,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     let pub = await json(
       await call('/v1/configuration/public', { headers: { 'x-client-id': tenantId } }, [admin]),
     );
-    expect(pub.data?.['app.landing_route']).toBe('/m/example');
+    expect(pub.data?.['app.landing_route']).toBe('/example');
     // global
     expect(
       (

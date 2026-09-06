@@ -1,0 +1,9 @@
+{
+  "name": "Example",
+  "version": "0.1.0",
+  "description": {
+    "id": "Modul referensi: landing komersil publik + CRUD produk & inquiry di dasbor (PRD §4.6, FR-R)",
+    "en": "Reference module: public commercial landing + product & inquiry CRUD in the dashboard (PRD §4.6, FR-R)"
+  },
+  "engines": { "core": ">=0.0.0" }
+}

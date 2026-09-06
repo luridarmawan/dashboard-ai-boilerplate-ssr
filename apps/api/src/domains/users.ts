@@ -36,8 +36,8 @@ import {
   unsafeAcrossTenants,
 } from '@core/db';
 import { Elysia, t } from 'elysia';
-import { deliverLink } from '../lib/dev-mail.ts';
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
+import { publicLink, sendTemplate } from '../mail.ts';
 import { type AuthState, clientIp, publicUser } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
@@ -373,7 +373,14 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
             token_hash: hashToken(raw),
             expires_at: new Date(Date.now() + 24 * 3600_000),
           });
-          deliverLink('set-password', email, raw);
+          await sendTemplate(db, {
+            to: email,
+            toName: body.name.trim(),
+            template: 'set-password',
+            locale: body.locale ?? 'id',
+            clientId: ts.clientId,
+            data: { name: body.name.trim(), link: publicLink(`/auth/reset?token=${raw}`) },
+          });
         }
       }
       const u = user as UserRow;

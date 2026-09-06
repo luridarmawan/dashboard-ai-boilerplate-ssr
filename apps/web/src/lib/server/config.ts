@@ -1,3 +1,4 @@
+import { modules } from '@core/module-kit/registry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { api } from '$lib/api/client';
 
@@ -16,12 +17,15 @@ export interface PublicConfig {
 
 const DEFAULTS: Record<string, unknown> = {
   'app.name': 'Dashboard',
-  'app.landing_route': '/m/example',
+  'app.landing_route': '/example',
   'app.home_route': '/dashboard',
   'app.default_theme': 'base',
   'app.allowed_themes': [],
   'app.default_locale': 'id',
 };
+
+/** Without an answer from the API we cannot know module state; installed modules stay reachable (F-6). */
+const ALL_MODULES = () => new Set(modules.map((m) => m.ns));
 
 export async function loadPublicConfig(
   event: RequestEvent,
@@ -35,9 +39,9 @@ export async function loadPublicConfig(
     ]);
     const values = cfg.data?.success ? { ...DEFAULTS, ...cfg.data.data } : DEFAULTS;
     const enabled = mods.data?.success ? new Set(mods.data.data.map((m) => m.ns)) : null;
-    return { values, enabledModules: enabled ?? new Set(), ok: !!cfg.data?.success };
+    return { values, enabledModules: enabled ?? ALL_MODULES(), ok: !!cfg.data?.success };
   } catch {
-    return { values: DEFAULTS, enabledModules: new Set(), ok: false };
+    return { values: DEFAULTS, enabledModules: ALL_MODULES(), ok: false };
   }
 }
 

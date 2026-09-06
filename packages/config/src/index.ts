@@ -85,7 +85,7 @@ const envSchema = z
     BOOTSTRAP_ADMIN_PASSWORD: z.string().min(10).optional(),
 
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
-    LANDING_ROUTE: z.string().startsWith('/').default('/m/example'),
+    LANDING_ROUTE: z.string().startsWith('/').default('/example'),
   })
   .transform((env) => ({
     ...env,

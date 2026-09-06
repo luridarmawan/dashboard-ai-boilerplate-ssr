@@ -6,6 +6,7 @@ import { configuration } from './domains/configuration.ts';
 import { groups } from './domains/groups.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
+import { outbox } from './domains/outbox.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
 import { users } from './domains/users.ts';
@@ -54,6 +55,7 @@ export const app = new Elysia()
           { name: 'themes', description: 'Theme registry, default and allowlist' },
           { name: 'module', description: 'Installed modules and per-tenant state' },
           { name: 'menu', description: 'Menu entries for API clients' },
+          { name: 'mail', description: 'Email outbox: status, retry, worker' },
         ],
       },
     }),
@@ -69,6 +71,7 @@ export const app = new Elysia()
       .use(themesDomain)
       .use(moduleDomain)
       .use(menuDomain)
+      .use(outbox)
       .use(moduleGate)
       .use(modulesPlugin),
   );

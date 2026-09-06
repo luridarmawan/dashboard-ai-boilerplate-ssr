@@ -21,7 +21,7 @@ import { env } from '@core/config';
 import { Email, errorResponses, fail, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
-import { deliverLink } from '../lib/dev-mail.ts';
+import { publicLink, sendTemplate } from '../mail.ts';
 import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '../plugins/auth.ts';
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
@@ -135,7 +135,14 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         token_hash: hashToken(verify),
         expires_at: new Date(Date.now() + VERIFY_TTL_MS),
       });
-      deliverLink('verify-email', email, verify);
+      await sendTemplate(db, {
+        to: email,
+        toName: body.name.trim(),
+        template: 'verify-email',
+        locale: 'id',
+        clientId: tenant?.id ?? null,
+        data: { name: body.name.trim(), link: publicLink(`/auth/verify?token=${verify}`) },
+      });
 
       const session = await createSession(db, {
         userId,
@@ -337,7 +344,13 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
           token_hash: hashToken(token),
           expires_at: new Date(Date.now() + RESET_TTL_MS),
         });
-        deliverLink('reset-password', email, token);
+        await sendTemplate(db, {
+          to: email,
+          template: 'reset-password',
+          locale: 'id',
+          clientId: null,
+          data: { name: '', link: publicLink(`/auth/reset?token=${token}`) },
+        });
       }
       // Always the same answer: whether the email exists is not for the caller to learn.
       return ok({ requested: true as const });

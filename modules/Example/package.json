@@ -1,0 +1,23 @@
+{
+  "name": "@modules/example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Example module \u2014 the contract reference (PRD R-1): every extension point, written to be read and copied",
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@app/api": "workspace:*",
+    "@core/auth": "workspace:*",
+    "@core/contracts": "workspace:*",
+    "@core/db": "workspace:*",
+    "@core/mail": "workspace:*",
+    "@core/module-kit": "workspace:*",
+    "elysia": "^1.4.0"
+  },
+  "devDependencies": {
+    "@sveltejs/kit": "^2.70.0",
+    "svelte": "^5.40.0"
+  }
+}

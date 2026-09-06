@@ -17,6 +17,8 @@ export interface ApiContext {
   /** The browser-facing origin; the API validates Origin against it (Decision E). */
   readonly origin?: string | undefined;
   readonly clientId?: string | null | undefined;
+  /** The browser's IP, forwarded so the API's per-IP limits apply to the visitor, not to the web server. */
+  readonly clientIp?: string | undefined;
 }
 
 export function api(ctx: ApiContext | string) {
@@ -33,6 +35,7 @@ export function api(ctx: ApiContext | string) {
     headers['x-forwarded-host'] = u.host;
   }
   if (c.clientId) headers['x-client-id'] = c.clientId;
+  if (c.clientIp) headers['x-forwarded-for'] = c.clientIp;
   return treaty<App>(env.API_URL ?? 'http://127.0.0.1:3001', { headers });
 }
 

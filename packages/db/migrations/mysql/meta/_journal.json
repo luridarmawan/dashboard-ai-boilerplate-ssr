@@ -43,6 +43,13 @@
       "when": 1788713752738,
       "tag": "0005_hard_sharon_carter",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788714334319,
+      "tag": "0006_early_mimic",
+      "breakpoints": true
     }
   ]
 }

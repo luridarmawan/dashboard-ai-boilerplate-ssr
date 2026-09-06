@@ -298,7 +298,18 @@ modules/Billing/
 - **Tema** (14): `theme.json` boleh merujuk layout & set ikon core maupun modul; kontras WCAG AA diperiksa sama seperti tema core (L-21). Token CSS-nya digabung ke bundel lewat berkas generate.
 - **Set ikon** (16): berkas glyph mengekspor `glyphs` yang **menutup seluruh nama ikon core** — yang bolong menggagalkan sync (L-5). Modul yang memakai pustaka ikon menyatakannya sebagai dependensi sendiri (mis. `@lucide/svelte`).
 
-Modul `Dummy` memuat ketiganya sebagai contoh nyata: tema `dummy.ocean` memakai layout `dummy.two-column` dan set ikon `dummy.rounded-24` — bukti gate M2 #5.
+Modul `Example` adalah referensi kontrak lengkap (§4.6): landing publik `/example`, `/product/[slug]`, form kontak → outbox, CRUD dasbor, widget, konfigurasi, seed, i18n. Modul `Dummy` memuat tema/layout/set ikon sebagai contoh nyata: tema `dummy.ocean` memakai layout `dummy.two-column` dan set ikon `dummy.rounded-24` — bukti gate M2 #5.
+
+### `seed.ts` — data awal idempoten (O-3)
+
+`bun db:seed` menjalankan seed modul setelah seed core, untuk tenant `default`. Wajib idempoten — aman dijalankan setiap deploy; baris yang sudah ada (dan sudah diubah admin) tidak disentuh.
+
+```ts
+import { defineSeed } from '@core/module-kit';
+export default defineSeed('Billing', async ({ db, tenantId, log }) => { /* cek dulu, insert bila belum ada */ });
+```
+
+**Sitemap dinamis.** Modul dengan halaman publik ber-parameter (mis. `/product/[slug]`) menyediakan `GET /v1/m/<ns>/sitemap` yang mengembalikan `{ path, lastmod }[]`; `sitemap.xml` core memanggilnya untuk setiap modul aktif (F-7). Route publik tanpa parameter cukup diberi `sitemap: true` di `public.ts`.
 
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 

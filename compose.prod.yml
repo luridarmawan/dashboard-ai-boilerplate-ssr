@@ -29,7 +29,7 @@ x-app-env: &app-env
   CACHE_DRIVER: ${CACHE_DRIVER:-database}
   RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
   REDIS_URL: ${REDIS_URL:-}
-  LANDING_ROUTE: ${LANDING_ROUTE:-/m/example}
+  LANDING_ROUTE: ${LANDING_ROUTE:-/example}
   # The public origin the CSRF check compares Origin against (A-10, Decision E)
   APP_ORIGIN: https://${DOMAIN:-localhost}
   UPLOADS_DIR: /data/uploads

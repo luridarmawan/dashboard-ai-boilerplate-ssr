@@ -4,6 +4,7 @@ import { getDb, unsafeAcrossTenants } from '@core/db';
 import { createEventBus, createScheduler, type EventBus, type Scheduler } from '@core/runtime';
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
+import { runOutboxOnce } from './mail.ts';
 
 /**
  * Process-level runtime services, assembled once per API process:
@@ -29,6 +30,24 @@ export function createRuntime(): Runtime {
 
   const scheduler = createScheduler({ db: getDb(), instanceId });
   // Core jobs. Outbox delivery (M4) and log retention (M7) join this list with their features.
+  scheduler.register({
+    name: 'core.outbox.deliver',
+    every: '1m',
+    lease: 300,
+    description: { id: 'Kirim email dari outbox', en: 'Deliver queued emails' },
+    run: async () => {
+      const r = await runOutboxOnce();
+      if (r.picked)
+        console.log(
+          JSON.stringify({
+            t: new Date().toISOString(),
+            level: 'info',
+            msg: 'outbox delivered',
+            ...r,
+          }),
+        );
+    },
+  });
   scheduler.register({
     name: 'core.sessions.cleanup',
     every: '1h',

@@ -12,7 +12,7 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     expect(env.DB_DIALECT).toBe('mysql');
     expect(env.TABLE_PREFIX).toBe('');
     expect(env.SESSION_DRIVER).toBe('database');
-    expect(env.LANDING_ROUTE).toBe('/m/example');
+    expect(env.LANDING_ROUTE).toBe('/example');
   });
 
   test('DATABASE_URL hilang → gagal cepat, menyebut kuncinya', () => {

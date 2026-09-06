@@ -29,7 +29,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   // content). A landing route that no longer exists, or belongs to a disabled module, falls back
   // to the built-in landing page with a warning instead of a 404 on the front door.
   if (event.url.pathname === '/' && event.request.method === 'GET' && !event.locals.session) {
-    const landing = cfgString(event.locals.config, 'app.landing_route', '/m/example');
+    const landing = cfgString(event.locals.config, 'app.landing_route', '/example');
     const target = landingTarget(landing, event.locals.config.enabledModules);
     if (target) {
       const forwarded = await event.fetch(new URL(target + event.url.search, event.url.origin), {

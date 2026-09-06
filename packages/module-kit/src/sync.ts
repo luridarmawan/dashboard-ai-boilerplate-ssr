@@ -198,6 +198,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const publicRoutes: (PublicRouteDef & { module: string; ns: string })[] = [];
   const publicOwner = new Map<string, string>();
   const corePublicPaths = readCoreRoutePaths(root);
+  const seedModules: { module: string; file: string }[] = [];
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
   // Extension points 14–16 (§4.8, L-7, L-14): themes, layouts, icon sets from modules.
@@ -486,6 +487,19 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           if (ok) configSections.push({ ...section, module: manifest.name });
         }
       }
+    }
+
+    // ---- seed.ts (idempotent module seed, O-3) ----
+    const seedFile = join(dir, 'seed.ts');
+    if (existsSync(seedFile)) {
+      const sd = await loadDefault<unknown>(seedFile, problems, tag);
+      if (sd !== null && typeof sd !== 'function')
+        problems.push(`${tag}: seed.ts harus meng-export default fungsi (pakai defineSeed)`);
+      else if (sd)
+        seedModules.push({
+          module: manifest.name,
+          file: relative(root, seedFile).split('\\').join('/'),
+        });
     }
 
     // ---- widgets.ts (extension point 11, G-19) ----
@@ -821,6 +835,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         ),
       );
     }
+    const seedsOut = join(root, 'packages/module-kit/src/generated/seeds.ts');
+    files.push(await writeFile(seedsOut, emitSeeds(seedModules, root, seedsOut)));
     files.push(
       await writeFile(
         join(root, 'packages/ui-theme/src/generated/contrib.ts'),
@@ -1366,5 +1382,24 @@ export const modulePublicRoutes: readonly { path: string; module: string; ns: st
     null,
     2,
   )};
+`;
+}
+
+/** Module seeds in init order, imported statically so `bun db:seed` runs them after the core seed. */
+function emitSeeds(
+  seeds: readonly { module: string; file: string }[],
+  root: string,
+  out: string,
+): string {
+  const imports = seeds
+    .map((s, i) => `import seed${i} from '${importPath(join(root, s.file), out)}';`)
+    .join('\n');
+  const entries = seeds.map((s, i) => `  { module: '${s.module}', run: seed${i} },`).join('\n');
+  return `${GEN_HEADER}import type { ModuleSeed } from '../contract.ts';
+${imports ? `${imports}\n` : ''}
+/** Idempotent module seeds (O-3), run by \`bun db:seed\` after the core seed. */
+export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [
+${entries}
+];
 `;
 }

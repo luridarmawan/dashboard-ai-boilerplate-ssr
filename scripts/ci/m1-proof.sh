@@ -6,6 +6,8 @@ set -eu
 cd "$(dirname "$0")/../.."
 export API_HOST=127.0.0.1 API_PORT=3001 API_URL=http://127.0.0.1:3001 SCHEDULER_ENABLED=false
 export SIGNUP_ENABLED=true
+# Every proof request comes from one IP; the login limit (A-2) is tested by the integration suite, not here.
+export LOGIN_RATE_LIMIT=1000/900
 LOG="$PWD/.proof-logs"; mkdir -p "$LOG"
 
 echo "== build web (adapter-node)"
@@ -31,3 +33,5 @@ echo "== proof M2"
 WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m2-gate-proof.ts
 echo "== proof M3"
 WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m3-gate-proof.ts
+echo "== proof M4"
+WEB_URL=http://127.0.0.1:5173 API_URL=http://127.0.0.1:3001 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m4-gate-proof.ts
