@@ -13,6 +13,17 @@ Wajib dibaca sebelum melakukan perubahan apa pun:
 
 Bila sebuah perubahan mengubah perilaku yang tertulis di PRD, **PRD ikut diperbarui pada commit yang sama** (ROADMAP §7 butir 7).
 
+## Konvensi bahasa
+
+| Di mana | Bahasa | Cakupan |
+|---|---|---|
+| **Komentar di kode** | **Inggris** — wajib, tanpa kecuali | Semua komentar dan docblock di `.ts`, `.js`, `.mjs`, `.svelte`, `.css`, `.sql`, `.toml`, `.yml`, `Dockerfile`, `.env.example`, `.gitignore`, dan berkas hasil generate |
+| Identifier, nama berkas, nama commit | Inggris | Nama variabel, fungsi, tabel, kolom, kunci konfigurasi |
+| Dokumen (`docs/`, `BRIEF.md`, berkas ini) | Indonesia | PRD, ROADMAP, THEMES, panduan |
+| Pesan galat runtime & string UI | Lewat i18n (`id`/`en`) begitu katalognya ada (FR-K); sebelum itu, Indonesia | Bukan komentar — jangan diterjemahkan ke Inggris hanya karena berada di kode |
+
+Aturan praktisnya: kalau teks itu dibaca **developer dari dalam kode**, Inggris; kalau dibaca **pemakai atau pembaca dokumen**, ikuti baris di atas. Komentar berbahasa Indonesia di kode adalah cacat review, bukan preferensi gaya.
+
 ## Tentang Project
 
 Ini adalah boillerplate untuk membuat app/webapp/dashboard

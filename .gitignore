@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.svelte-kit/
+*.log
+.env
+.env.*
+!.env.example
+# generated output — the descriptors and modules.json are the source of truth (Decision G)
+packages/db/src/generated/
+apps/*/src/generated/
+# local harness files
+.claude/settings.local.json

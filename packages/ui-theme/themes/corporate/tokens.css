@@ -4,10 +4,10 @@
  * susunan halaman, bukan hanya warnanya.
  */
 
-[data-app-theme='corporate'] {
+[data-app-theme="corporate"] {
   --radius: 0.25rem;
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
 
   --background: #ffffff;
   --foreground: #0b1f33;
@@ -44,8 +44,8 @@
   --chart-5: #8f1f3f;
 }
 
-[data-app-theme='corporate'][data-mode='dark'],
-[data-app-theme='corporate'] :is([data-mode='dark']) {
+[data-app-theme="corporate"][data-mode="dark"],
+[data-app-theme="corporate"] :is([data-mode="dark"]) {
   --background: #0a1622;
   --foreground: #dce6f0;
   --card: #0f1f2f;

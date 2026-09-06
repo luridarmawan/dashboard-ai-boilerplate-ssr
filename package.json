@@ -1,0 +1,30 @@
+{
+  "name": "dashboard-ai-boilerplate",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Boilerplate dashboard admin ber-AI — API-first, SSR, modular, database-agnostic, self-hosted",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "modules/*"
+  ],
+  "packageManager": "bun@1.4.2",
+  "engines": {
+    "bun": ">=1.4.0"
+  },
+  "scripts": {
+    "db:codegen": "bun run --cwd packages/db codegen",
+    "db:generate": "bun run --cwd packages/db generate",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "bun run --filter '*' typecheck",
+    "check": "bun run db:codegen && bun run lint && bun run typecheck",
+    "test": "bun run db:codegen && bun test",
+    "theme:validate": "node packages/ui-theme/validate.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@types/bun": "^1.2.0",
+    "typescript": "^5.9.0"
+  }
+}

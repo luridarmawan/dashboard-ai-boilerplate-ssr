@@ -7,10 +7,11 @@
  * Rasio terendah tema ini 4.54 (light) dan 6.25 (dark) — lihat docs/THEMES.md.
  */
 
-[data-app-theme='contrast'] {
+[data-app-theme="contrast"] {
   --radius: 0.25rem;
-  --font-sans: 'Atkinson Hyperlegible', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans:
+    "Atkinson Hyperlegible", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
   /* Tebal cincin fokus dinaikkan; komponen membacanya lewat token, bukan angka literal */
   --ring-width: 3px;
@@ -51,8 +52,8 @@
   --chart-5: #a10000;
 }
 
-[data-app-theme='contrast'][data-mode='dark'],
-[data-app-theme='contrast'] :is([data-mode='dark']) {
+[data-app-theme="contrast"][data-mode="dark"],
+[data-app-theme="contrast"] :is([data-mode="dark"]) {
   --background: #000000;
   --foreground: #ffffff;
   --card: #0d0d0d;

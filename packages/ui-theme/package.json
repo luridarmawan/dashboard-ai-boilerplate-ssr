@@ -1,0 +1,17 @@
+{
+  "name": "@core/ui-theme",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kontrak tema: token, registry ikon & layout, validator (PRD §4.8, FR-L)",
+  "files": [
+    "themes",
+    "icons",
+    "layouts",
+    "validate.mjs"
+  ],
+  "scripts": {
+    "validate": "node validate.mjs",
+    "typecheck": "echo 'ui-theme: tidak ada TS di M0'"
+  }
+}

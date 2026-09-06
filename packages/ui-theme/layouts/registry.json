@@ -14,37 +14,55 @@
       "id": "sidebar-classic",
       "kind": "dashboard",
       "name": { "id": "Sidebar klasik", "en": "Classic sidebar" },
-      "description": { "id": "Sidebar kiri yang bisa diciutkan + header.", "en": "Collapsible left sidebar with a header." }
+      "description": {
+        "id": "Sidebar kiri yang bisa diciutkan + header.",
+        "en": "Collapsible left sidebar with a header."
+      }
     },
     {
       "id": "topnav-compact",
       "kind": "dashboard",
       "name": { "id": "Navigasi atas", "en": "Top navigation" },
-      "description": { "id": "Navigasi horizontal, tanpa sidebar. Konten selebar layar.", "en": "Horizontal nav, no sidebar. Full-width content." }
+      "description": {
+        "id": "Navigasi horizontal, tanpa sidebar. Konten selebar layar.",
+        "en": "Horizontal nav, no sidebar. Full-width content."
+      }
     },
     {
       "id": "centered-narrow",
       "kind": "dashboard",
       "name": { "id": "Fokus tunggal", "en": "Single focus" },
-      "description": { "id": "Kolom sempit di tengah untuk wizard & form panjang.", "en": "Narrow centered column for wizards and long forms." }
+      "description": {
+        "id": "Kolom sempit di tengah untuk wizard & form panjang.",
+        "en": "Narrow centered column for wizards and long forms."
+      }
     },
     {
       "id": "marketing-wide",
       "kind": "public",
       "name": { "id": "Marketing lebar", "en": "Wide marketing" },
-      "description": { "id": "Header transparan, bagian selebar layar, footer tebal.", "en": "Transparent header, full-bleed sections, thick footer." }
+      "description": {
+        "id": "Header transparan, bagian selebar layar, footer tebal.",
+        "en": "Transparent header, full-bleed sections, thick footer."
+      }
     },
     {
       "id": "centered-card",
       "kind": "auth",
       "name": { "id": "Kartu tengah", "en": "Centered card" },
-      "description": { "id": "Kartu tunggal di tengah layar.", "en": "A single card centered on screen." }
+      "description": {
+        "id": "Kartu tunggal di tengah layar.",
+        "en": "A single card centered on screen."
+      }
     },
     {
       "id": "split-hero",
       "kind": "auth",
       "name": { "id": "Belah dua", "en": "Split hero" },
-      "description": { "id": "Form di kiri, panel merek di kanan; menumpuk di layar sempit.", "en": "Form on the left, brand panel on the right; stacks on narrow screens." }
+      "description": {
+        "id": "Form di kiri, panel merek di kanan; menumpuk di layar sempit.",
+        "en": "Form on the left, brand panel on the right; stacks on narrow screens."
+      }
     }
   ]
 }

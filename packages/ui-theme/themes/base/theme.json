@@ -8,7 +8,11 @@
   "tokens": "./tokens.css",
   "icons": "outline-24",
   "layouts": {
-    "dashboard": { "default": "sidebar-classic", "wide": "topnav-compact", "focused": "centered-narrow" },
+    "dashboard": {
+      "default": "sidebar-classic",
+      "wide": "topnav-compact",
+      "focused": "centered-narrow"
+    },
     "public": { "default": "marketing-wide" },
     "auth": { "default": "centered-card" }
   },

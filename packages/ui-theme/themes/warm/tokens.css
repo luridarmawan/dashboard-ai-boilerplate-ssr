@@ -3,10 +3,10 @@
  * set ikon padat (solid-24). Cocok untuk produk konsumen & landing komersil.
  */
 
-[data-app-theme='warm'] {
+[data-app-theme="warm"] {
   --radius: 0.75rem;
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
   --background: #fffaf5;
   --foreground: #2b201a;
@@ -43,8 +43,8 @@
   --chart-5: #1f6b70;
 }
 
-[data-app-theme='warm'][data-mode='dark'],
-[data-app-theme='warm'] :is([data-mode='dark']) {
+[data-app-theme="warm"][data-mode="dark"],
+[data-app-theme="warm"] :is([data-mode="dark"]) {
   --background: #1a1310;
   --foreground: #f0e6dd;
   --card: #241a15;
