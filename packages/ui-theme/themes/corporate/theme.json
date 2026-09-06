@@ -1,0 +1,17 @@
+{
+  "id": "corporate",
+  "name": { "id": "Korporat", "en": "Corporate" },
+  "description": {
+    "id": "Formal dan padat. Navigasi atas, bukan sidebar.",
+    "en": "Formal and dense. Top navigation instead of a sidebar."
+  },
+  "tokens": "./tokens.css",
+  "icons": "outline-24",
+  "layouts": {
+    "dashboard": { "default": "topnav-compact", "wide": "topnav-compact", "focused": "centered-narrow" },
+    "public": { "default": "marketing-wide" },
+    "auth": { "default": "split-hero" }
+  },
+  "assets": { "logo": "./logo.svg", "favicon": "./favicon.svg" },
+  "preview": "./preview.png"
+}

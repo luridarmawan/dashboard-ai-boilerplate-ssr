@@ -1,0 +1,41 @@
+{
+  "$comment": "Nama ikon semantik milik core. Modul mendaftarkan namanya sendiri di namespace <modul>.*  (G-9). Setiap set ikon WAJIB menutup seluruh nama di sini; yang bolong menggagalkan build di CI (L-5).",
+  "core": [
+    "menu", "close", "search", "settings", "user", "users", "group", "building",
+    "home", "dashboard", "chevron-right", "chevron-left", "chevron-down", "chevron-up",
+    "arrow-left", "arrow-right", "external-link", "plus", "minus", "edit", "trash",
+    "save", "copy", "download", "upload", "filter", "sort", "refresh", "more-horizontal",
+    "more-vertical", "check", "x", "info", "warning", "error", "success", "help",
+    "lock", "unlock", "key", "shield", "eye", "eye-off", "bell", "mail", "calendar",
+    "clock", "file", "folder", "image", "link", "logout", "login", "sun", "moon",
+    "monitor", "palette", "language", "grid", "list", "columns", "expand", "collapse",
+    "star", "bookmark", "tag", "chart-bar", "chart-line", "chart-pie", "database",
+    "server", "plug", "puzzle", "sparkles", "send", "stop", "play", "pause", "loader"
+  ],
+  "sets": {
+    "outline-24": {
+      "name": { "id": "Garis 24", "en": "Outline 24" },
+      "style": "stroke",
+      "strokeWidth": 1.75,
+      "grid": 24,
+      "source": "lucide",
+      "license": "ISC"
+    },
+    "solid-24": {
+      "name": { "id": "Padat 24", "en": "Solid 24" },
+      "style": "fill",
+      "grid": 24,
+      "source": "phosphor (weight: fill)",
+      "license": "MIT"
+    },
+    "bold-24": {
+      "name": { "id": "Tebal 24", "en": "Bold 24" },
+      "style": "stroke",
+      "strokeWidth": 2.75,
+      "grid": 24,
+      "source": "lucide (stroke dinaikkan)",
+      "license": "ISC",
+      "note": "Untuk tema kontras tinggi: garis tebal tetap terbaca pada layar murah dan cahaya terang."
+    }
+  }
+}

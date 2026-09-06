@@ -1,0 +1,81 @@
+/* Tema: warm — hangat, membulat, terracotta.
+ * Karakter: netral bersuhu hangat (bukan abu-abu netral), radius besar,
+ * set ikon padat (solid-24). Cocok untuk produk konsumen & landing komersil.
+ */
+
+[data-app-theme='warm'] {
+  --radius: 0.75rem;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --background: #fffaf5;
+  --foreground: #2b201a;
+  --card: #ffffff;
+  --card-foreground: #2b201a;
+  --popover: #ffffff;
+  --popover-foreground: #2b201a;
+
+  --primary: #b4531f;
+  --primary-foreground: #ffffff;
+  --secondary: #f5ece3;
+  --secondary-foreground: #2b201a;
+  --accent: #fdf0e6;
+  --accent-foreground: #8a3f16;
+
+  --muted: #f5ece3;
+  --muted-foreground: #6b5548;
+
+  --destructive: #b32318;
+  --destructive-foreground: #ffffff;
+  --success: #3f6212;
+  --success-foreground: #ffffff;
+  --warning: #92610a;
+  --warning-foreground: #ffffff;
+
+  --border: #ecdfd3;
+  --input: #a08070;
+  --ring: #b4531f;
+
+  --chart-1: #b4531f;
+  --chart-2: #3f6212;
+  --chart-3: #92610a;
+  --chart-4: #7c4a6b;
+  --chart-5: #1f6b70;
+}
+
+[data-app-theme='warm'][data-mode='dark'],
+[data-app-theme='warm'] :is([data-mode='dark']) {
+  --background: #1a1310;
+  --foreground: #f0e6dd;
+  --card: #241a15;
+  --card-foreground: #f0e6dd;
+  --popover: #241a15;
+  --popover-foreground: #f0e6dd;
+
+  --primary: #e07a45;
+  --primary-foreground: #1a1310;
+  --secondary: #2a1f19;
+  --secondary-foreground: #f0e6dd;
+  --accent: #33221a;
+  --accent-foreground: #f0b78d;
+
+  --muted: #2a1f19;
+  --muted-foreground: #b9a396;
+
+  --destructive: #f0705f;
+  --destructive-foreground: #1a1310;
+  --success: #8fbf5a;
+  --success-foreground: #1a1310;
+  --warning: #e3b25c;
+  --warning-foreground: #1a1310;
+
+  --border: #3a2b23;
+  --input: #8f7160;
+  --ring: #e07a45;
+
+  --chart-1: #e07a45;
+  --chart-2: #8fbf5a;
+  --chart-3: #e3b25c;
+  --chart-4: #c08cb4;
+  --chart-5: #5cb8bf;
+}

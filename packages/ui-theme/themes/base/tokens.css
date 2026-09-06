@@ -1,0 +1,95 @@
+/* Tema: base — netral, ramah, tidak berpendapat.
+ * Baku untuk instalasi bersih. Turunkan tema baru dari berkas ini.
+ *
+ * Aturan: nilai di sini adalah SATU-SATUNYA tempat warna ditulis.
+ * Komponen tidak boleh memakai warna literal (ditegakkan lint rule, L-2).
+ * Kontras terverifikasi WCAG AA — lihat docs/THEMES.md.
+ */
+
+[data-app-theme='base'] {
+  /* Bentuk */
+  --radius: 0.5rem;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Cascadia Code', monospace;
+
+  /* Permukaan */
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+
+  /* Aksi */
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --accent: #eff6ff;
+  --accent-foreground: #1d4ed8;
+
+  /* Peredam */
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+
+  /* Status */
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #a16207;
+  --warning-foreground: #ffffff;
+
+  /* Garis & fokus
+   * --border  : dekoratif (pemisah, garis kartu) — tidak wajib 3:1
+   * --input   : batas kontrol form — WAJIB >= 3:1 (WCAG 1.4.11)
+   * --ring    : cincin fokus — WAJIB >= 3:1
+   */
+  --border: #e2e8f0;
+  --input: #7d8da3;
+  --ring: #2563eb;
+
+  /* Deret warna bagan — dipakai wrapper chart (L-22) */
+  --chart-1: #2563eb;
+  --chart-2: #0d9488;
+  --chart-3: #a16207;
+  --chart-4: #7c3aed;
+  --chart-5: #be123c;
+}
+
+[data-app-theme='base'][data-mode='dark'],
+[data-app-theme='base'] :is([data-mode='dark']) {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --card: #111a2b;
+  --card-foreground: #e2e8f0;
+  --popover: #111a2b;
+  --popover-foreground: #e2e8f0;
+
+  --primary: #3b82f6;
+  --primary-foreground: #0b1220;
+  --secondary: #1e293b;
+  --secondary-foreground: #e2e8f0;
+  --accent: #172554;
+  --accent-foreground: #bfdbfe;
+
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #0b1220;
+  --success: #4ade80;
+  --success-foreground: #0b1220;
+  --warning: #fbbf24;
+  --warning-foreground: #0b1220;
+
+  --border: #243449;
+  --input: #748399;
+  --ring: #60a5fa;
+
+  --chart-1: #60a5fa;
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #fb7185;
+}

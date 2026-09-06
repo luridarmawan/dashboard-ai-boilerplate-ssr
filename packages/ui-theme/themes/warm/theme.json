@@ -1,0 +1,17 @@
+{
+  "id": "warm",
+  "name": { "id": "Hangat", "en": "Warm" },
+  "description": {
+    "id": "Hangat dan membulat, dengan ikon padat. Cocok untuk produk konsumen.",
+    "en": "Warm and rounded, with solid icons. Suits consumer-facing products."
+  },
+  "tokens": "./tokens.css",
+  "icons": "solid-24",
+  "layouts": {
+    "dashboard": { "default": "sidebar-classic", "wide": "topnav-compact", "focused": "centered-narrow" },
+    "public": { "default": "marketing-wide" },
+    "auth": { "default": "split-hero" }
+  },
+  "assets": { "logo": "./logo.svg", "favicon": "./favicon.svg" },
+  "preview": "./preview.png"
+}

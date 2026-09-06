@@ -1,0 +1,82 @@
+/* Tema: corporate — formal, padat, navy.
+ * Karakter: radius kecil, warna dingin, layout dashboard bernavigasi atas
+ * (bukan sidebar) — inilah tema yang membuktikan bahwa tema bisa mengubah
+ * susunan halaman, bukan hanya warnanya.
+ */
+
+[data-app-theme='corporate'] {
+  --radius: 0.25rem;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --background: #ffffff;
+  --foreground: #0b1f33;
+  --card: #ffffff;
+  --card-foreground: #0b1f33;
+  --popover: #ffffff;
+  --popover-foreground: #0b1f33;
+
+  --primary: #114b8f;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f6;
+  --secondary-foreground: #0b1f33;
+  --accent: #e8eff7;
+  --accent-foreground: #0d3a6b;
+
+  --muted: #eef2f6;
+  --muted-foreground: #4a5f75;
+
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --success: #116149;
+  --success-foreground: #ffffff;
+  --warning: #8a5a00;
+  --warning-foreground: #ffffff;
+
+  --border: #dbe3ec;
+  --input: #7f92aa;
+  --ring: #114b8f;
+
+  --chart-1: #114b8f;
+  --chart-2: #116149;
+  --chart-3: #8a5a00;
+  --chart-4: #5b3a8f;
+  --chart-5: #8f1f3f;
+}
+
+[data-app-theme='corporate'][data-mode='dark'],
+[data-app-theme='corporate'] :is([data-mode='dark']) {
+  --background: #0a1622;
+  --foreground: #dce6f0;
+  --card: #0f1f2f;
+  --card-foreground: #dce6f0;
+  --popover: #0f1f2f;
+  --popover-foreground: #dce6f0;
+
+  --primary: #5b9bd5;
+  --primary-foreground: #0a1622;
+  --secondary: #16283a;
+  --secondary-foreground: #dce6f0;
+  --accent: #102b45;
+  --accent-foreground: #a8cbe8;
+
+  --muted: #16283a;
+  --muted-foreground: #93a8bd;
+
+  --destructive: #e5544b;
+  --destructive-foreground: #0a1622;
+  --success: #4bbf9a;
+  --success-foreground: #0a1622;
+  --warning: #e0a33c;
+  --warning-foreground: #0a1622;
+
+  --border: #1d3247;
+  --input: #5c7fa0;
+  --ring: #7fb6e4;
+
+  --chart-1: #5b9bd5;
+  --chart-2: #4bbf9a;
+  --chart-3: #e0a33c;
+  --chart-4: #a68cd8;
+  --chart-5: #e07a9a;
+}

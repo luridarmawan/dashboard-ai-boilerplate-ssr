@@ -1,0 +1,17 @@
+{
+  "id": "contrast",
+  "name": { "id": "Kontras Tinggi", "en": "High Contrast" },
+  "description": {
+    "id": "Aksesibilitas lebih dulu: hitam-putih murni, fokus tebal, ikon tebal.",
+    "en": "Accessibility first: pure black and white, thick focus rings, bold icons."
+  },
+  "tokens": "./tokens.css",
+  "icons": "bold-24",
+  "layouts": {
+    "dashboard": { "default": "sidebar-classic", "wide": "sidebar-classic", "focused": "centered-narrow" },
+    "public": { "default": "marketing-wide" },
+    "auth": { "default": "centered-card" }
+  },
+  "assets": { "logo": "./logo.svg", "favicon": "./favicon.svg" },
+  "preview": "./preview.png"
+}
