@@ -9,7 +9,7 @@
  *   bun run harness --web           # + svelte-check of the module's pages
  *
  * What it does: copies this folder into <core>/modules/<Name>, registers it in modules.json when
- * missing, `bun install`, `bun modules:sync`, `tsc`, `biome check`, `db:generate`, tests. Nothing
+ * missing, `bun install`, `bun run bootstrap` (codegen + modules:sync), `tsc`, `biome check`, `db:generate`, tests. Nothing
  * else in the core checkout is modified — that is the whole point of the module contract (G-6).
  */
 import {
@@ -99,7 +99,7 @@ if (!modules.modules.some((m) => m.name === NAME)) {
 // ---- 3. assemble, check, test ----
 const env: Record<string, string> = {};
 sh(['bun', 'install'], coreDir);
-sh(['bun', 'run', 'modules:sync'], coreDir);
+sh(['bun', 'run', 'bootstrap'], coreDir); // db codegen → modules:sync → codegen (fresh clone has no generated files)
 sh(['bunx', 'tsc', '-p', 'tsconfig.json'], target);
 sh(['bunx', 'biome', 'check', `modules/${NAME}`], coreDir);
 sh(['bun', 'run', 'db:generate'], coreDir);
