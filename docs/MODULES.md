@@ -203,6 +203,39 @@ export const load: ServerLoad = async () => ({ title: 'Faktur' });
 
 Yang berlaku hari ini: halaman ter-SSR di `/m/billing/invoices`, `+layout.svelte` dan `+error.svelte` di dalam modul juga dicerminkan. **[Menyusul di M1/M2]:** klien API bertipe untuk `load` modul, layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
 
+### `hooks.ts` — berlangganan event core (titik perluasan 9)
+
+```ts
+import { defineHooks } from '@core/module-kit';
+
+export default defineHooks('Billing', {
+  'user.created': async ({ userId, clientId }, ctx) => {
+    // buat akun tagihan awal; ctx.requestId mengalir dari request yang memicunya
+  },
+  'tenant.switched': ({ userId, toClientId }) => { /* … */ },
+});
+```
+
+Event yang tersedia dan payload-nya adalah **kontrak** (`CoreEventPayloads` di `@core/module-kit`): `user.created` · `user.deleted` · `tenant.switched` · `config.saved` · `module.toggled` · `system.ping`. Nama yang tidak dikenal ditolak saat definisi dan saat sync. Handler dijalankan **berurutan sesuai urutan init modul** setelah aksi inti berhasil; handler yang melempar **dicatat dan tidak menggagalkan aksi** (G-7) — jangan mengandalkan hook untuk membatalkan sesuatu.
+
+### `jobs.ts` — pekerjaan berkala (titik perluasan 12)
+
+```ts
+import { defineJobs } from '@core/module-kit';
+
+export default defineJobs('Billing', [
+  {
+    name: 'billing.remind_overdue',     // wajib "billing.*"
+    every: '1h',                        // detik, atau 30s / 5m / 1h / 1d
+    lease: 600,                         // opsional; baku max(5 menit, 2×every)
+    description: { id: 'Pengingat tagihan lewat tempo', en: 'Overdue reminders' },
+    run: async ({ instanceId, signal }) => { /* hormati signal.aborted saat shutdown */ },
+  },
+]);
+```
+
+Yang dijamin penjadwal core (G-18): dengan berapa pun instance API (`--scale api=3`), sebuah job berjalan **tepat sekali per interval** — lock diambil lewat satu `UPDATE` bersyarat di tabel `scheduler_jobs`, jadi jalur bakunya tidak butuh Redis (Keputusan M). Setiap eksekusi tercatat di `scheduler_runs`. Job yang melebihi `lease`-nya boleh dimulai ulang di instance lain — buat run pendek atau pecah pekerjaannya. Modul **tidak pernah** membuat timer sendiri.
+
 ---
 
 ## 4. Apa yang diperiksa `bun modules:sync`
@@ -218,6 +251,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Core terlalu tua/baru | `… butuh core ^2.0.0, terpasang 0.0.0 (G-11)` |
 | Bentrok antar-modul | `tabel "billing_invoices" didefinisikan oleh Billing dan Legacy` |
 | `api/routes.ts` bukan Elysia | `… api/routes.ts harus meng-export default instance Elysia (pakai defineApiRoutes)` |
+| Event tak dikenal / job tanpa prefiks / interval < 1 s | `… hooks.ts berlangganan event "invoice.paid" yang tidak dikenal core` · `… job "cleanup" harus diawali "billing." (G-9)` · `… job "billing.fast": interval 0s harus bilangan bulat ≥ 1 detik` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/m/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -243,10 +277,9 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 
 | Titik perluasan | Status |
 |---|---|
-| 1 tabel · 2 route API · 3 halaman · 4 menu · 5 izin | **Tersedia (M0)** — dokumen ini |
+| 1 tabel · 2 route API · 3 halaman · 4 menu · 5 izin · 9 event hook · 12 job terjadwal | **Tersedia (M0)** — dokumen ini |
 | Penegakan izin & penjaga tenant di data layer | M1 (B-3, C-6) |
 | 6 konfigurasi · 7 i18n · layout/tema membungkus halaman modul · `@core/ui` | M2–M3 |
-| 9 event hook · 12 job terjadwal | M0 akhir (G-17, G-18) — kontraknya sedang ditulis |
 | 8 tool AI/MCP · 11 widget dashboard | M2/M5 |
 | 13 halaman publik · 14 tema · 15 layout · 16 set ikon | M2/M4 |
 | Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |

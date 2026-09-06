@@ -94,6 +94,40 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
-      - run: bun run modules:sync
+      - run: bun run bootstrap
       - name: codegen → migrate → migrate again → smoke
         run: bun run scripts/db-matrix.ts ${{ matrix.dialect }}
+
+  scheduler-proof:
+    name: job terjadwal tepat sekali · 3 instance · MySQL
+    runs-on: ubuntu-latest
+    needs: check
+    services:
+      db:
+        image: mysql:8
+        ports: ['3306:3306']
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app
+          MYSQL_USER: app
+          MYSQL_PASSWORD: app
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 40
+    env:
+      DB_DIALECT: mysql
+      DATABASE_URL: mysql://app:app@127.0.0.1:3306/app
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run bootstrap
+      - run: bun run --cwd packages/db migrate
+      - name: 3 instances share one database — exactly one run per interval (G-18, D1)
+        run: bun run scheduler:proof

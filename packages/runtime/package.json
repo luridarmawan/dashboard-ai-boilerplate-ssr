@@ -1,0 +1,18 @@
+{
+  "name": "@core/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Core runtime services: event bus (G-17) and the multi-instance-safe scheduler (G-18)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@core/config": "workspace:*",
+    "@core/db": "workspace:*",
+    "@core/module-kit": "workspace:*"
+  }
+}

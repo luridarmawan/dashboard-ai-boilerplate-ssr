@@ -4,6 +4,8 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type { MenuEntryDef, PermissionDef } from './contract.ts';
+import { CORE_EVENTS } from './events.ts';
+import { parseEvery } from './jobs.ts';
 import {
   type ModuleManifest,
   type ModuleSource,
@@ -65,6 +67,16 @@ export interface WebRouteRecord {
   readonly kind: 'svelte' | 'ts';
 }
 
+/** A module that ships `hooks.ts` (extension point 9) or `jobs.ts` (extension point 12). */
+export interface RuntimeModuleRecord {
+  readonly name: string;
+  readonly ns: string;
+  /** Module-relative file, POSIX. */
+  readonly file: string;
+  /** Event names (hooks) or job names (jobs) declared — for the registry and the admin UI. */
+  readonly items: readonly string[];
+}
+
 export interface SyncResult {
   readonly modules: readonly ModuleRecord[];
   readonly tables: readonly TableDef[];
@@ -72,6 +84,8 @@ export interface SyncResult {
   readonly menu: readonly (MenuEntryDef & { module: string })[];
   readonly apiModules: readonly ApiModuleRecord[];
   readonly webRoutes: readonly WebRouteRecord[];
+  readonly hookModules: readonly RuntimeModuleRecord[];
+  readonly jobModules: readonly RuntimeModuleRecord[];
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
@@ -136,6 +150,9 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const menu: (MenuEntryDef & { module: string })[] = [];
   const apiModules: ApiModuleRecord[] = [];
   const webRoutes: WebRouteRecord[] = [];
+  const hookModules: RuntimeModuleRecord[] = [];
+  const jobModules: RuntimeModuleRecord[] = [];
+  const jobOwner = new Map<string, string>();
 
   const tableOwner = new Map<string, string>();
   const permOwner = new Map<string, string>();
@@ -325,6 +342,64 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- hooks.ts (extension point 9) ----
+    const h = await loadDefault<{ module?: string; handlers?: Record<string, unknown> }>(
+      join(dir, 'hooks.ts'),
+      problems,
+      tag,
+    );
+    if (h !== undefined) {
+      if (!h || typeof h !== 'object' || typeof h.handlers !== 'object' || h.handlers === null) {
+        problems.push(`${tag}: hooks.ts harus meng-export default hasil defineHooks(...)`);
+      } else {
+        const names = Object.keys(h.handlers);
+        const unknown = names.filter((n) => !(CORE_EVENTS as readonly string[]).includes(n));
+        for (const n of unknown)
+          problems.push(`${tag}: hooks.ts berlangganan event "${n}" yang tidak dikenal core`);
+        if (unknown.length === 0)
+          hookModules.push({ name: manifest.name, ns, file: 'hooks.ts', items: names });
+      }
+    }
+
+    // ---- jobs.ts (extension point 12) ----
+    const j = await loadDefault<
+      readonly { name?: string; every?: number | string; run?: unknown }[]
+    >(join(dir, 'jobs.ts'), problems, tag);
+    if (j !== undefined) {
+      if (!Array.isArray(j))
+        problems.push(`${tag}: jobs.ts harus meng-export default array (pakai defineJobs)`);
+      else {
+        const names: string[] = [];
+        for (const job of j) {
+          if (typeof job?.name !== 'string' || typeof job.run !== 'function') {
+            problems.push(`${tag}: jobs.ts memuat entri tanpa name/run (pakai defineJobs)`);
+            continue;
+          }
+          if (!job.name.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: job "${job.name}" harus diawali "${ns}." (G-9)`);
+            continue;
+          }
+          try {
+            parseEvery(job.every ?? 0);
+          } catch (err) {
+            problems.push(
+              `${tag}: job "${job.name}": ${err instanceof Error ? err.message : String(err)}`,
+            );
+            continue;
+          }
+          const owner = jobOwner.get(job.name);
+          if (owner)
+            problems.push(`job "${job.name}" didefinisikan oleh ${owner} dan ${manifest.name}`);
+          else {
+            jobOwner.set(job.name, manifest.name);
+            names.push(job.name);
+          }
+        }
+        if (names.length)
+          jobModules.push({ name: manifest.name, ns, file: 'jobs.ts', items: names });
+      }
+    }
+
     // ---- web/routes/** (extension point 3) ----
     const webDir = join(dir, 'web', 'routes');
     if (existsSync(webDir)) {
@@ -372,7 +447,12 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     );
     if (existsSync(join(root, 'apps/api'))) {
       const out = join(root, 'apps/api/src/generated/modules.ts');
-      files.push(await writeFile(out, emitApiModules(apiModules, ordered, root, out)));
+      files.push(
+        await writeFile(
+          out,
+          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules),
+        ),
+      );
     }
     if (existsSync(join(root, 'apps/web/src/routes'))) {
       const mDir = join(root, 'apps/web/src/routes/m');
@@ -387,7 +467,18 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     }
   }
 
-  return { modules: ordered, tables, permissions, menu, apiModules, webRoutes, files, warnings };
+  return {
+    modules: ordered,
+    tables,
+    permissions,
+    menu,
+    apiModules,
+    webRoutes,
+    hookModules,
+    jobModules,
+    files,
+    warnings,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -567,10 +658,33 @@ export function emitApiModules(
   ordered: readonly ModuleRecord[],
   root: string,
   outFile: string,
+  hookModules: readonly RuntimeModuleRecord[] = [],
+  jobModules: readonly RuntimeModuleRecord[] = [],
 ): string {
   const byName = new Map(ordered.map((m) => [m.name, m]));
   const imports: string[] = [];
   const mounts: string[] = [];
+  const relTo = (name: string, file: string): string => {
+    const mod = byName.get(name);
+    if (!mod) return '';
+    let rel = relative(dirname(outFile), join(root, mod.path, file))
+      .split('\\')
+      .join('/');
+    if (!rel.startsWith('.')) rel = `./${rel}`;
+    return rel;
+  };
+  const hookIdents: string[] = [];
+  for (const hm of hookModules) {
+    const ident = `hooks_${hm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${relTo(hm.name, hm.file)}';`);
+    hookIdents.push(ident);
+  }
+  const jobEntries: string[] = [];
+  for (const jm of jobModules) {
+    const ident = `jobs_${jm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${relTo(jm.name, jm.file)}';`);
+    jobEntries.push(`  { module: '${jm.name}', jobs: ${ident} },`);
+  }
   for (const am of apiModules) {
     const mod = byName.get(am.name);
     if (!mod) continue;
@@ -589,6 +703,14 @@ export const modulesPlugin = new Elysia({ name: 'modules' })
 ${mounts.join('\n')};
 
 export const mountedModules = ${JSON.stringify(apiModules.map((a) => a.ns))} as const;
+
+/** Event subscriptions declared by modules (G-17), in initialisation order. */
+export const moduleHooks = [${hookIdents.join(', ')}];
+
+/** Periodic jobs declared by modules (G-18); the core scheduler registers them at boot. */
+export const moduleJobs = [
+${jobEntries.join('\n')}
+];
 `;
 }
 

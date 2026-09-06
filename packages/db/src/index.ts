@@ -9,7 +9,7 @@
  *   - `STATUS`       status_id semantics, defined once (O-4)
  */
 import { env } from '@core/config';
-import { createDb, type Db } from './generated/active.ts';
+import { activeDialect, createDb, type Db } from './generated/active.ts';
 
 /**
  * Query operators, re-exported so core and modules import them from ONE place. Modules never
@@ -66,6 +66,17 @@ let instance: Db | undefined;
  * already-validated `DATABASE_URL`. Lint forbids instantiating a DB client anywhere else.
  */
 export function getDb(): Db {
-  instance ??= createDb(env().DATABASE_URL);
+  if (!instance) {
+    const e = env();
+    // The generated schema binds a driver at codegen time. Connecting the postgres driver to a
+    // MySQL URL (or vice versa) does not fail — it hangs on the handshake. Refuse up front.
+    const family = (d: string): 'pg' | 'mysql' => (d === 'postgres' ? 'pg' : 'mysql');
+    if (family(e.DB_DIALECT) !== family(activeDialect)) {
+      throw new Error(
+        `@core/db: skema ter-generate untuk ${activeDialect}, tapi DB_DIALECT=${e.DB_DIALECT} — jalankan \`bun db:codegen\` dengan DB_DIALECT yang sama`,
+      );
+    }
+    instance = createDb(e.DATABASE_URL);
+  }
   return instance;
 }

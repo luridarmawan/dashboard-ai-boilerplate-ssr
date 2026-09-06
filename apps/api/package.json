@@ -10,13 +10,14 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "typecheck": "bun run --cwd ../.. modules:sync >/dev/null && tsc -p tsconfig.json"
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
   },
   "dependencies": {
     "@core/config": "workspace:*",
     "@core/contracts": "workspace:*",
     "@core/db": "workspace:*",
     "@core/module-kit": "workspace:*",
+    "@core/runtime": "workspace:*",
     "@elysiajs/openapi": "^1.4.0",
     "elysia": "^1.4.0"
   }

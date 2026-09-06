@@ -43,6 +43,14 @@ const envSchema = z
     /** Where SvelteKit's server-side code reaches the API — internal hop, same host by default. */
     API_URL: z.url().default('http://127.0.0.1:3001'),
 
+    /** Run the scheduler in this process (G-18). Off for one-off scripts or a dedicated worker split. */
+    SCHEDULER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    /** Stable identity of this process in lease rows and logs; defaults to hostname:pid. */
+    INSTANCE_ID: z.string().min(1).optional(),
+
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
     LANDING_ROUTE: z.string().startsWith('/').default('/m/example'),
   })

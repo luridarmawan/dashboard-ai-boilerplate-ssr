@@ -218,3 +218,57 @@ describe('syncModules — API routes & web pages (extension points 2 & 3)', () =
     );
   });
 });
+
+describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
+  test('hooks.ts and jobs.ts are registered with their declared names', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.hookModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'hooks.ts', items: ['user.created', 'system.ping'] },
+    ]);
+    expect(r.jobModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] },
+    ]);
+  });
+
+  test('unknown event, unprefixed job and sub-second interval are all reported', async () => {
+    let err: SyncError | undefined;
+    try {
+      await syncModules({ root: join(fixtures, 'bad'), write: false, coreIcons: CORE_ICONS });
+    } catch (e) {
+      err = e as SyncError;
+    }
+    const p = err?.problems ?? [];
+    expect(p.some((x) => /Naughty.*event "invoice\.paid" yang tidak dikenal/.test(x))).toBe(true);
+    expect(p.some((x) => /Naughty.*job "cleanup" harus diawali "naughty\."/.test(x))).toBe(true);
+    expect(p.some((x) => /Naughty.*job "naughty\.fast".*≥ 1 detik/.test(x))).toBe(true);
+  });
+
+  test('emitApiModules exports moduleHooks and moduleJobs from the module files', () => {
+    const mods = [
+      {
+        name: 'Alpha',
+        ns: 'alpha',
+        version: '0.1.0',
+        source: 'local' as const,
+        path: 'modules/Alpha',
+        manifest: { name: 'Alpha', version: '0.1.0', engines: { core: '*' }, dependencies: [] },
+      },
+    ];
+    const out = emitApiModules(
+      [],
+      mods,
+      '/repo',
+      '/repo/apps/api/src/generated/modules.ts',
+      [{ name: 'Alpha', ns: 'alpha', file: 'hooks.ts', items: ['system.ping'] }],
+      [{ name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] }],
+    );
+    expect(out).toContain("import hooks_alpha from '../../../../modules/Alpha/hooks.ts';");
+    expect(out).toContain("import jobs_alpha from '../../../../modules/Alpha/jobs.ts';");
+    expect(out).toContain('export const moduleHooks = [hooks_alpha];');
+    expect(out).toContain("{ module: 'Alpha', jobs: jobs_alpha },");
+  });
+});

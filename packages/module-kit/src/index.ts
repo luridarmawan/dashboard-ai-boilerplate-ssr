@@ -18,6 +18,24 @@ export {
   type PermissionDef,
 } from './contract.ts';
 export {
+  CORE_EVENTS,
+  type CoreEventName,
+  type CoreEventPayloads,
+  defineHooks,
+  type HookContext,
+  type HookHandler,
+  type HookMap,
+  type ModuleHooks,
+} from './events.ts';
+export {
+  defineJobs,
+  type JobContext,
+  type JobDef,
+  parseEvery,
+  type ResolvedJob,
+  resolveJob,
+} from './jobs.ts';
+export {
   type LocalizedText,
   MODULE_NAME_RE,
   type ModuleManifest,
