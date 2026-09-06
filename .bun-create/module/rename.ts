@@ -37,6 +37,8 @@ function walk(dir: string): void {
     const after = before
       .replaceAll(from.pascal, to.pascal)
       .replace(new RegExp(`(^|[^a-zA-Z])${from.lower}(?=[^a-zA-Z]|$)`, 'g'), `$1${to.lower}`)
+      // camelCase identifiers such as helloNotes → billingNotes
+      .replace(new RegExp(`(^|[^a-zA-Z])${from.lower}(?=[A-Z])`, 'g'), `$1${to.lower}`)
       .replaceAll(from.upper, to.upper);
     if (after !== before) {
       writeFileSync(p, after);
