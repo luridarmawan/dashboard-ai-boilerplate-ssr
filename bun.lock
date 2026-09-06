@@ -10,6 +10,7 @@
         "@core/config": "workspace:*",
         "@core/db": "workspace:*",
         "@core/i18n": "workspace:*",
+        "@core/logger": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/settings": "workspace:*",
         "@core/ui-theme": "workspace:*",
@@ -25,6 +26,7 @@
         "@core/config": "workspace:*",
         "@core/contracts": "workspace:*",
         "@core/db": "workspace:*",
+        "@core/logger": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/runtime": "workspace:*",
         "@core/settings": "workspace:*",
@@ -88,6 +90,7 @@
       "dependencies": {
         "@core/config": "workspace:*",
         "@core/db": "workspace:*",
+        "@core/logger": "workspace:*",
         "@core/module-kit": "workspace:*",
       },
     },
@@ -123,6 +126,10 @@
       "name": "@core/i18n",
       "version": "0.0.0",
     },
+    "packages/logger": {
+      "name": "@core/logger",
+      "version": "0.0.0",
+    },
     "packages/module-kit": {
       "name": "@core/module-kit",
       "version": "0.0.0",
@@ -137,6 +144,7 @@
       "dependencies": {
         "@core/config": "workspace:*",
         "@core/db": "workspace:*",
+        "@core/logger": "workspace:*",
         "@core/module-kit": "workspace:*",
       },
     },
@@ -189,6 +197,8 @@
     "@core/db": ["@core/db@workspace:packages/db"],
 
     "@core/i18n": ["@core/i18n@workspace:packages/i18n"],
+
+    "@core/logger": ["@core/logger@workspace:packages/logger"],
 
     "@core/module-kit": ["@core/module-kit@workspace:packages/module-kit"],
 

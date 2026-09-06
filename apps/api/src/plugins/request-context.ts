@@ -1,5 +1,6 @@
 import { fail } from '@core/contracts';
 import { newId } from '@core/db';
+import { logger } from '@core/logger';
 import { Elysia } from 'elysia';
 
 /**
@@ -26,18 +27,13 @@ export const requestContext = new Elysia({ name: 'request-context' })
     // `path` comes from Elysia's context; logging must never throw, whatever the fast path did.
     try {
       const { path, request, set, requestId, startedAt } = ctx;
-      console.log(
-        JSON.stringify({
-          t: new Date().toISOString(),
-          level: 'info',
-          msg: 'request',
-          method: request?.method ?? '?',
-          path,
-          status: set.status ?? 200,
-          ms: Math.round((performance.now() - startedAt) * 10) / 10,
-          requestId,
-        }),
-      );
+      logger.info('request', {
+        method: request?.method ?? '?',
+        path,
+        status: set.status ?? 200,
+        ms: Math.round((performance.now() - startedAt) * 10) / 10,
+        requestId,
+      });
     } catch {
       /* a broken log line must not break a response */
     }
@@ -59,16 +55,11 @@ export const requestContext = new Elysia({ name: 'request-context' })
         return fail('validation_failed', 'Body tidak bisa dibaca', rid);
       default: {
         set.status = 500;
-        console.error(
-          JSON.stringify({
-            t: new Date().toISOString(),
-            level: 'error',
-            msg: 'unhandled',
-            requestId: rid,
-            error: error instanceof Error ? error.message : String(error),
-            stack: !isProd && error instanceof Error ? error.stack : undefined,
-          }),
-        );
+        logger.error('unhandled', {
+          requestId: rid,
+          error: error instanceof Error ? error.message : String(error),
+          stack: !isProd && error instanceof Error ? error.stack : undefined,
+        });
         return fail(
           'internal_error',
           isProd

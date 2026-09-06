@@ -1,4 +1,5 @@
 import { type Db, newId, schema } from '@core/db';
+import { logger } from '@core/logger';
 
 /**
  * Audit trail for sensitive actions (PRD M-2): actor, tenant, IP, before/after. `audit_log` is
@@ -22,19 +23,14 @@ export interface AuditEntry {
 
 export async function writeAudit(db: Db, e: AuditEntry): Promise<void> {
   if (!e.clientId) {
-    console.log(
-      JSON.stringify({
-        t: new Date().toISOString(),
-        level: 'info',
-        msg: 'audit (no tenant)',
-        action: e.action,
-        resource: e.resource,
-        resourceId: e.resourceId ?? null,
-        actorId: e.actorId,
-        ip: e.ip ?? null,
-        requestId: e.requestId ?? null,
-      }),
-    );
+    logger.info('audit (no tenant)', {
+      action: e.action,
+      resource: e.resource,
+      resourceId: e.resourceId ?? null,
+      actorId: e.actorId,
+      ip: e.ip ?? null,
+      requestId: e.requestId ?? null,
+    });
     return;
   }
   await db.insert(schema.auditLog).values({

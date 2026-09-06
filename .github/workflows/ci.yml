@@ -144,7 +144,7 @@ jobs:
       - name: build kedua target dari compose.prod.yml
         run: |
           cp .env.prod.example .env.prod
-          docker compose --env-file .env.prod -f compose.prod.yml build
+          APP_COMMIT=$GITHUB_SHA APP_BUILT_AT=$(date -u +%FT%TZ) docker compose --env-file .env.prod -f compose.prod.yml build
       - name: ukuran image (target Q-2 < 150 MB — saat ini ±212 MB, lihat docs/DEPLOY.md)
         run: docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep '^dab/'
       - name: image api naik dan /v1/health menjawab

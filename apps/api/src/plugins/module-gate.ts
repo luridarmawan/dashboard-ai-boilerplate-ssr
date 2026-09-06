@@ -1,5 +1,6 @@
 import { fail } from '@core/contracts';
 import { newId } from '@core/db';
+import { logger } from '@core/logger';
 import { modules } from '@core/module-kit/registry';
 import { Elysia } from 'elysia';
 import { moduleState } from '../services.ts';
@@ -25,14 +26,10 @@ export const moduleGate = new Elysia({ name: 'module-gate' })
     } catch (err) {
       // Module state is an admin preference, not a security boundary: when the store cannot be
       // read (e.g. unit tests without a database) the module stays reachable, and we say so.
-      console.warn(
-        JSON.stringify({
-          level: 'warn',
-          msg: 'module-gate: state unreadable, allowing',
-          module: name,
-          error: err instanceof Error ? err.message : String(err),
-        }),
-      );
+      logger.warn('module-gate: state unreadable, allowing', {
+        module: name,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
     if (enabled) return;
     set.status = 403;

@@ -59,7 +59,10 @@ services:
     build:
       context: .
       target: web
-      args: { DB_DIALECT: '${DB_DIALECT:-mysql}' }
+      args:
+        DB_DIALECT: '${DB_DIALECT:-mysql}'
+        APP_COMMIT: '${APP_COMMIT:-dev}'
+        APP_BUILT_AT: '${APP_BUILT_AT:-}'
     image: ${IMAGE_PREFIX:-dab}/web:${IMAGE_TAG:-local}
     restart: unless-stopped
     environment:
@@ -79,7 +82,10 @@ services:
     build:
       context: .
       target: api
-      args: { DB_DIALECT: '${DB_DIALECT:-mysql}' }
+      args:
+        DB_DIALECT: '${DB_DIALECT:-mysql}'
+        APP_COMMIT: '${APP_COMMIT:-dev}'
+        APP_BUILT_AT: '${APP_BUILT_AT:-}'
     image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
     restart: unless-stopped
     environment:

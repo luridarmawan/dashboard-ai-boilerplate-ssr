@@ -5,6 +5,9 @@
 
 ARG BUN_VERSION=1.4
 ARG DB_DIALECT=mysql
+# Build identity for /version (M-5): pass --build-arg APP_COMMIT=$(git rev-parse HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
+ARG APP_COMMIT=dev
+ARG APP_BUILT_AT=
 
 # ---------------------------------------------------------------------------------------------
 # build: full install, generate registries, build the web app, then prune devDependencies
@@ -25,6 +28,9 @@ RUN find . -name node_modules -type d -prune -exec rm -rf {} + \
 # api: Elysia, run from TypeScript sources by Bun
 # ---------------------------------------------------------------------------------------------
 FROM oven/bun:${BUN_VERSION}-alpine AS api
+ARG APP_COMMIT
+ARG APP_BUILT_AT
+ENV APP_COMMIT=${APP_COMMIT} APP_BUILT_AT=${APP_BUILT_AT}
 WORKDIR /app
 ENV NODE_ENV=production API_HOST=0.0.0.0 API_PORT=3001
 COPY --from=build --chown=bun:bun /app/package.json /app/bun.lock /app/modules.json /app/tsconfig.base.json ./
@@ -44,6 +50,9 @@ CMD ["bun", "apps/api/src/index.ts"]
 # web: SvelteKit adapter-node output, served by Bun
 # ---------------------------------------------------------------------------------------------
 FROM oven/bun:${BUN_VERSION}-alpine AS web
+ARG APP_COMMIT
+ARG APP_BUILT_AT
+ENV APP_COMMIT=${APP_COMMIT} APP_BUILT_AT=${APP_BUILT_AT}
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 COPY --from=build --chown=bun:bun /app/package.json /app/bun.lock ./

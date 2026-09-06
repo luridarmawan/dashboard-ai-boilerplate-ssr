@@ -65,8 +65,31 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
 
       // Redis is optional (Decision M): only a dependency when a driver actually uses it.
       const usesRedis = [e.SESSION_DRIVER, e.CACHE_DRIVER, e.RATELIMIT_DRIVER].includes('redis');
-      if (usesRedis)
-        checks.redis = { ok: false, ms: 0, error: 'redis adapter belum diimplementasikan' };
+      if (usesRedis) {
+        const t1 = performance.now();
+        try {
+          const Client = (
+            Bun as unknown as {
+              RedisClient: new (
+                url: string,
+              ) => { send(cmd: string, args: string[]): Promise<unknown>; close(): void };
+            }
+          ).RedisClient;
+          const client = new Client(e.REDIS_URL ?? '');
+          const pong = await client.send('PING', []);
+          client.close();
+          checks.redis = {
+            ok: String(pong).toUpperCase() === 'PONG',
+            ms: Math.round(performance.now() - t1),
+          };
+        } catch (err) {
+          checks.redis = {
+            ok: false,
+            ms: Math.round(performance.now() - t1),
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
+      }
 
       const ready = Object.values(checks).every((c) => c.ok);
       if (!ready) set.status = 503;

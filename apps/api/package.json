@@ -17,6 +17,7 @@
     "@core/config": "workspace:*",
     "@core/contracts": "workspace:*",
     "@core/db": "workspace:*",
+    "@core/logger": "workspace:*",
     "@core/module-kit": "workspace:*",
     "@core/runtime": "workspace:*",
     "@core/settings": "workspace:*",

@@ -50,6 +50,7 @@
     "@core/config": "workspace:*",
     "@core/db": "workspace:*",
     "@core/i18n": "workspace:*",
+    "@core/logger": "workspace:*",
     "@core/module-kit": "workspace:*",
     "@core/settings": "workspace:*",
     "@core/ui-theme": "workspace:*",
