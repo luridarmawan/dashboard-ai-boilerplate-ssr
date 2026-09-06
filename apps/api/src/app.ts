@@ -1,7 +1,9 @@
 import { openapi } from '@elysiajs/openapi';
 import { Elysia } from 'elysia';
+import { auth } from './domains/auth.ts';
 import { system } from './domains/system.ts';
 import { modulesPlugin } from './generated/modules.ts';
+import { csrf } from './plugins/csrf.ts';
 import { requestContext } from './plugins/request-context.ts';
 
 /**
@@ -11,11 +13,12 @@ import { requestContext } from './plugins/request-context.ts';
  * Shape (Decision A, E; N-2, N-6):
  *   /openapi.json  OpenAPI 3.1 generated from the route schemas, at runtime
  *   /docs          Scalar UI over it
- *   /v1/...        versioned API surface
+ *   /v1/...        versioned API surface; every mutation passes the CSRF plugin (A-10)
  *   /v1/m/<ns>/... module APIs, composed statically by modules:sync (G-9, N-3)
  */
 export const app = new Elysia()
   .use(requestContext)
+  .use(csrf)
   .use(
     openapi({
       path: '/docs',
@@ -32,6 +35,6 @@ export const app = new Elysia()
       },
     }),
   )
-  .group('/v1', (v1) => v1.use(system).use(modulesPlugin));
+  .group('/v1', (v1) => v1.use(system).use(auth).use(modulesPlugin));
 
 export type App = typeof app;

@@ -1,5 +1,6 @@
+import { cleanupExpiredSessions } from '@core/auth';
 import { env } from '@core/config';
-import { getDb } from '@core/db';
+import { getDb, unsafeAcrossTenants } from '@core/db';
 import { createEventBus, createScheduler, type EventBus, type Scheduler } from '@core/runtime';
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
@@ -27,8 +28,20 @@ export function createRuntime(): Runtime {
   for (const hooks of moduleHooks) bus.register(hooks);
 
   const scheduler = createScheduler({ db: getDb(), instanceId });
-  // Core jobs live here. Session cleanup, outbox delivery and log retention arrive with
-  // their features (M1, M4, M7); the scheduler itself is proven now so they can rely on it.
+  // Core jobs. Outbox delivery (M4) and log retention (M7) join this list with their features.
+  scheduler.register({
+    name: 'core.sessions.cleanup',
+    every: '1h',
+    description: { id: 'Hapus sesi kedaluwarsa', en: 'Purge expired sessions' },
+    run: async () => {
+      // Sessions are a global table; no tenant in scope.
+      const n = await cleanupExpiredSessions(unsafeAcrossTenants());
+      if (n)
+        console.log(
+          JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'sessions purged', n }),
+        );
+    },
+  });
   for (const { module, jobs } of moduleJobs)
     for (const job of jobs) scheduler.register(job, module);
 

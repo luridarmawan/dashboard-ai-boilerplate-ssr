@@ -21,6 +21,16 @@ export const ERROR_CODES = [
   'rate_limited',
   'internal_error',
   'service_unavailable',
+  // auth (FR-A)
+  'csrf_failed',
+  'invalid_credentials',
+  'signup_disabled',
+  'email_taken',
+  'weak_password',
+  'token_invalid',
+  'token_expired',
+  'session_expired',
+  'tenant_forbidden',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
@@ -76,7 +86,9 @@ export function pageMeta(page: number, limit: number, total: number): PageMeta {
 // TypeBox schemas — attach to routes so the envelope appears in OpenAPI (N-1, N-2)
 // ---------------------------------------------------------------------------
 
-export const ErrorCodeSchema = t.Union(ERROR_CODES.map((c) => t.Literal(c)));
+// Elysia's UnionEnum: a registered TypeBox kind (compiles for response validation) whose static
+// type is the literal union — passing the readonly tuple keeps every literal.
+export const ErrorCodeSchema = t.UnionEnum(ERROR_CODES);
 
 export const FailSchema = t.Object({
   success: t.Literal(false),
@@ -107,7 +119,11 @@ export function PageSchema<T extends TSchema>(item: T) {
 
 /** Standard error responses to spread into a route's `response` map. */
 export const errorResponses = {
+  401: FailSchema,
+  403: FailSchema,
   404: FailSchema,
+  409: FailSchema,
   422: FailSchema,
+  429: FailSchema,
   500: FailSchema,
 } as const;

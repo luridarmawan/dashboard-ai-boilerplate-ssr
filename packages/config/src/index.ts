@@ -56,9 +56,36 @@ const envSchema = z
     /** Upload storage root — a mapped volume in production (Q-9). Local adapter; S3 is optional later (Q-16). */
     UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
 
+    /** Self-service registration (A-1). Off by default in production; on for development. */
+    SIGNUP_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    /** Session lifetime; the cookie and the row expire together (A-3). */
+    SESSION_TTL_HOURS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 365)
+      .default(720),
+    /** Public origin, e.g. https://app.example.com — used for the CSRF Origin check and absolute links. */
+    APP_ORIGIN: z.url().optional(),
+    /** Login attempts per window, per IP and per email (A-2): `<limit>/<seconds>`. */
+    LOGIN_RATE_LIMIT: z
+      .string()
+      .regex(/^\d+\s*\/\s*\d+$/)
+      .default('10/900'),
+    /** Bootstrap the first superadmin on seed (C-5). Only read by `bun db:seed`. */
+    BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
+    BOOTSTRAP_ADMIN_PASSWORD: z.string().min(10).optional(),
+
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
     LANDING_ROUTE: z.string().startsWith('/').default('/m/example'),
   })
+  .transform((env) => ({
+    ...env,
+    SIGNUP_ENABLED: env.SIGNUP_ENABLED ?? env.NODE_ENV !== 'production',
+  }))
   .superRefine((env, ctx) => {
     const drivers = ['SESSION_DRIVER', 'CACHE_DRIVER', 'RATELIMIT_DRIVER'] as const;
 

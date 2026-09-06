@@ -11,6 +11,7 @@
     "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@core/db": "workspace:*",
     "@core/module-kit": "workspace:*"
   }
 }
