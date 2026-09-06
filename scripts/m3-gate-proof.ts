@@ -142,13 +142,13 @@ const anon = new Jar();
       after.res.headers.get('x-landing-route') === '/auth/login' &&
       after.html.includes('name="password"'),
   );
-  await saveApp(admin, 'global', { 'app.landing_route': '/m/dummy/notes' });
+  await saveApp(admin, 'global', { 'app.landing_route': '/hello-dummy' });
   const mod = await get(anon, '/');
   check(
-    'landing can be a module page (Dummy notes)',
+    'landing can be a public module page (/hello-dummy, extension point 13)',
     mod.res.status === 200 &&
-      mod.res.headers.get('x-landing-route') === '/m/dummy/notes' &&
-      mod.html.includes('data-testid="module-page"'),
+      mod.res.headers.get('x-landing-route') === '/hello-dummy' &&
+      mod.html.includes('data-testid="public-module-page"'),
   );
 }
 
@@ -167,7 +167,7 @@ const anon = new Jar();
     '#3 `/` still answers 200 with the built-in landing (not 404, not the module page)',
     front.res.status === 200 &&
       !front.res.headers.get('x-landing-route') &&
-      !front.html.includes('data-testid="module-page"'),
+      !front.html.includes('data-testid="public-module-page"'),
   );
   const dash = await get(admin, '/dashboard');
   check(
@@ -189,7 +189,7 @@ const anon = new Jar();
   const restored = await get(anon, '/');
   check(
     'landing serves the module page again on the next request',
-    restored.res.headers.get('x-landing-route') === '/m/dummy/notes',
+    restored.res.headers.get('x-landing-route') === '/hello-dummy',
   );
   await saveApp(admin, 'global', { 'app.landing_route': '' });
 }

@@ -18,6 +18,7 @@ export {
   defineLayouts,
   defineMenu,
   definePermissions,
+  definePublicRoutes,
   defineTables,
   defineWidgets,
   type IconSetContribDef,
@@ -25,6 +26,7 @@ export {
   type MenuEntryDef,
   ModuleContractError,
   type PermissionDef,
+  type PublicRouteDef,
   type WidgetDef,
 } from './contract.ts';
 export {

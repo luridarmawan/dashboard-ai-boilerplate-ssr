@@ -11,7 +11,8 @@ build/
 packages/db/src/generated/
 apps/*/src/generated/
 # module pages are mirrored here as shims by modules:sync (Decision C)
-apps/web/src/routes/m/
+apps/web/src/routes/(app)/m/
+apps/web/src/routes/(public)/(modules)/
 # local harness files
 .claude/settings.local.json
 packages/module-kit/src/generated/

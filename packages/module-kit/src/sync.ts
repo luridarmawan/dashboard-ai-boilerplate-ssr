@@ -9,6 +9,7 @@ import type {
   LayoutContribDef,
   MenuEntryDef,
   PermissionDef,
+  PublicRouteDef,
   WidgetDef,
 } from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
@@ -103,6 +104,7 @@ export interface SyncResult {
   readonly iconSetsContrib: readonly (IconSetContribDef & { module: string; path: string })[];
   readonly themesContrib: readonly ThemeContrib[];
   readonly configSections: readonly (ConfigSectionDef & { module: string })[];
+  readonly publicRoutes: readonly (PublicRouteDef & { module: string; ns: string })[];
 }
 
 /** A theme folder contributed by a module (extension point 14). */
@@ -193,6 +195,9 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   let i18nKeys = 0;
   const configSections: (ConfigSectionDef & { module: string })[] = [];
   const configKeyOwner = new Map<string, string>();
+  const publicRoutes: (PublicRouteDef & { module: string; ns: string })[] = [];
+  const publicOwner = new Map<string, string>();
+  const corePublicPaths = readCoreRoutePaths(root);
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
   // Extension points 14–16 (§4.8, L-7, L-14): themes, layouts, icon sets from modules.
@@ -685,6 +690,53 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- public.ts + web/public/** (extension point 13) ----
+    const pub = await loadDefault<readonly PublicRouteDef[]>(join(dir, 'public.ts'), problems, tag);
+    if (pub) {
+      if (!Array.isArray(pub))
+        problems.push(
+          `${tag}: public.ts harus meng-export default array (pakai definePublicRoutes)`,
+        );
+      else {
+        for (const r of pub) {
+          if (!r?.path?.startsWith('/') || r.path.startsWith('/m/')) {
+            problems.push(`${tag}: route publik "${r?.path}" tidak valid`);
+            continue;
+          }
+          const pdir = join(dir, r.dir);
+          if (!existsSync(join(pdir, '+page.svelte'))) {
+            problems.push(`${tag}: route publik "${r.path}": ${r.dir}/+page.svelte tidak ada`);
+            continue;
+          }
+          if (corePublicPaths.has(r.path)) {
+            problems.push(
+              `${tag}: route publik "${r.path}" bentrok dengan halaman core (titik perluasan 13)`,
+            );
+            continue;
+          }
+          const owner = publicOwner.get(r.path);
+          if (owner) {
+            problems.push(`route publik "${r.path}" diklaim ${owner} dan ${manifest.name}`);
+            continue;
+          }
+          publicOwner.set(r.path, manifest.name);
+          publicRoutes.push({ ...r, module: manifest.name, ns });
+          for (const file of walk(pdir)) {
+            const base = file.split('/').pop() ?? '';
+            if (!WEB_ROUTE_FILES.has(base)) continue;
+            const relIn = relative(pdir, file).split('\\').join('/');
+            webRoutes.push({
+              module: manifest.name,
+              ns,
+              from: relative(root, file).split('\\').join('/'),
+              to: `apps/web/src/routes/(public)/(modules)${r.path}/${relIn}`,
+              kind: base.endsWith('.svelte') ? 'svelte' : 'ts',
+            });
+          }
+        }
+      }
+    }
+
     // ---- web/routes/** (extension point 3) ----
     const webDir = join(dir, 'web', 'routes');
     if (existsSync(webDir)) {
@@ -696,7 +748,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           module: manifest.name,
           ns,
           from: relative(root, file).split('\\').join('/'),
-          to: `apps/web/src/routes/m/${ns}/${relInRoutes}`,
+          // Dashboard pages: inside the (app) group → session required, shell + theme applied (§4.8).
+          to: `apps/web/src/routes/(app)/m/${ns}/${relInRoutes}`,
           kind: base.endsWith('.svelte') ? 'svelte' : 'ts',
         });
       }
@@ -783,10 +836,18 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       files.push(await writeFile(cOut, emitThemesCss(themesContrib, root, cOut)));
       const tOut = join(root, 'apps/web/src/generated/theme-tokens.ts');
       files.push(await writeFile(tOut, emitThemeTokens(themesContrib, root, tOut)));
+      files.push(
+        await writeFile(
+          join(root, 'apps/web/src/generated/public-routes.ts'),
+          emitPublicRoutes(publicRoutes),
+        ),
+      );
       const wOut = join(root, 'apps/web/src/generated/widgets.ts');
       files.push(await writeFile(wOut, emitWidgets(widgets, root, wOut)));
-      const mDir = join(root, 'apps/web/src/routes/m');
-      resetGeneratedDir(mDir);
+      const legacy = join(root, 'apps/web/src/routes/m');
+      if (existsSync(join(legacy, WEB_MARKER))) rmSync(legacy, { recursive: true, force: true });
+      resetGeneratedDir(join(root, 'apps/web/src/routes/(app)/m'));
+      resetGeneratedDir(join(root, 'apps/web/src/routes/(public)/(modules)'));
       for (const wr of webRoutes) {
         const to = join(root, wr.to);
         const from = join(root, wr.from);
@@ -801,6 +862,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     i18nKeys,
     widgets,
     configSections,
+    publicRoutes,
     layoutsContrib,
     iconSetsContrib,
     themesContrib,
@@ -1270,5 +1332,39 @@ function emitThemeTokens(themes: readonly ThemeContrib[], root: string, out: str
 export const moduleThemeTokens: Readonly<Record<string, string>> = {
 ${entries}
 };
+`;
+}
+
+/** Core page paths (groups stripped) for public-route collision checks; generated dirs excluded. */
+function readCoreRoutePaths(root: string): Set<string> {
+  const routes = join(root, 'apps/web/src/routes');
+  const out = new Set<string>();
+  if (!existsSync(routes)) return out;
+  for (const file of walk(routes)) {
+    if (!file.endsWith('/+page.svelte')) continue;
+    const rel = relative(routes, dirname(file)).split('\\').join('/');
+    if (rel.includes('(modules)') || /(^|\/)m(\/|$)/.test(rel.replace('(app)/', ''))) continue;
+    const path = `/${rel}`.replace(/\/\([^)]+\)/g, '').replace(/^\/+/, '/');
+    out.add(path === '' ? '/' : path);
+  }
+  return out;
+}
+
+/** Public routes contributed by modules (extension point 13): path → owning module, for G-8 and the sitemap. */
+function emitPublicRoutes(
+  routes: readonly (PublicRouteDef & { module: string; ns: string })[],
+): string {
+  return `${GEN_HEADER}
+/** Module public routes: SvelteKit path, owning module namespace, sitemap flag (F-7, G-8). */
+export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean }[] = ${JSON.stringify(
+    routes.map((r) => ({
+      path: r.path,
+      module: r.module,
+      ns: r.ns,
+      sitemap: r.sitemap ?? !r.path.includes('['),
+    })),
+    null,
+    2,
+  )};
 `;
 }

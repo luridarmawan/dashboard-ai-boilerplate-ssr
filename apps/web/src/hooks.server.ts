@@ -1,4 +1,5 @@
 import type { Handle } from '@sveltejs/kit';
+import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
 import { cfgString, loadPublicConfig } from '$lib/server/config';
 import { resolveRequestLocale } from '$lib/server/locale';
@@ -68,8 +69,8 @@ function landingTarget(landing: string, enabledModules: ReadonlySet<string>): st
     );
     return null;
   }
-  const m = /^\/m\/([a-z][a-z0-9]*)(\/|$)/.exec(landing);
-  if (m && !enabledModules.has(m[1] ?? '')) {
+  const owner = moduleOwning(landing);
+  if (owner && !enabledModules.has(owner)) {
     console.warn(
       JSON.stringify({
         level: 'warn',
@@ -80,4 +81,15 @@ function landingTarget(landing: string, enabledModules: ReadonlySet<string>): st
     return null;
   }
   return landing;
+}
+
+/** Namespace of the module that owns a public path (`/m/<ns>/…` or a route from public.ts), else null. */
+export function moduleOwning(path: string): string | null {
+  const m = /^\/m\/([a-z][a-z0-9]*)(\/|$)/.exec(path);
+  if (m) return m[1] ?? null;
+  for (const r of modulePublicRoutes) {
+    const re = new RegExp(`^${r.path.replace(/\[[^\]]+\]/g, '[^/]+')}(/|$)`);
+    if (re.test(path)) return r.ns;
+  }
+  return null;
 }

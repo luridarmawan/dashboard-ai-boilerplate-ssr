@@ -10,6 +10,7 @@ import { groupPermissions } from './group_permissions.def.ts';
 import { groupUserMaps } from './group_user_maps.def.ts';
 import { groups } from './groups.def.ts';
 import { modules } from './modules.def.ts';
+import { outboxEmail } from './outbox_email.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
 import { rateLimits } from './rate_limits.def.ts';
 import { schedulerJobs } from './scheduler_jobs.def.ts';
@@ -40,4 +41,5 @@ export const tables: readonly TableDef[] = [
   configurations,
   cacheVersions,
   modules,
+  outboxEmail,
 ];

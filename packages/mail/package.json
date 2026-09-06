@@ -1,0 +1,21 @@
+{
+  "name": "@core/mail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Email outbox: enqueue rows, deliver with retries through SMTP, branded i18n templates (PRD FR-J)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@core/db": "workspace:*",
+    "@core/logger": "workspace:*",
+    "nodemailer": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.1"
+  }
+}

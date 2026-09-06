@@ -180,7 +180,7 @@ Aturan yang berlaku:
 
 ### `web/routes/**` — halaman (titik perluasan 3)
 
-Struktur folder persis SvelteKit; sync mencerminkannya ke `apps/web/src/routes/m/billing/**` sebagai *shim* tipis (Anda tidak pernah menyentuh direktori itu — ia hasil generate, di-gitignore, dan dibersihkan setiap sync).
+Struktur folder persis SvelteKit; sync mencerminkannya ke `apps/web/src/routes/(app)/m/billing/**` sebagai *shim* tipis (Anda tidak pernah menyentuh direktori itu — ia hasil generate, di-gitignore, dan dibersihkan setiap sync). Karena berada di grup `(app)`, halaman ini **butuh sesi** dan otomatis dibungkus shell dasbor + tema aktif; halaman **publik** tanpa sesi dideklarasikan lewat `public.ts` (titik perluasan 13, di bawah).
 
 ```
 modules/Billing/web/routes/
@@ -225,6 +225,21 @@ export const load: ServerLoad = async (event) => {
 - Form: kirim `<input type="hidden" name="_csrf" value={data.csrf}>` (tersedia dari layout `(app)`) dan panggil `checkCsrf(event, form)` di awal action — persis seperti halaman core (A-10).
 
 **[Menyusul di M2]:** layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
+
+### `public.ts` + `web/public/**` — halaman publik (titik perluasan 13)
+
+Halaman tanpa sesi di luar `/m/*` — landing, katalog, detail produk. Sync mencerminkan folder ke `apps/web/src/routes/(public)/(modules)/<path>/` (layout publik tema aktif, ter-SSR, terindeks tanpa JavaScript) dan **menolak** path yang bentrok dengan halaman core atau modul lain, atau memakai awalan core (`/m`, `/auth`, `/dashboard`, …).
+
+```ts
+// public.ts
+import { definePublicRoutes } from '@core/module-kit';
+export default definePublicRoutes('Example', [
+  { path: '/example', dir: 'web/public/landing', sitemap: true },
+  { path: '/product/[slug]', dir: 'web/public/product', sitemap: false },
+]);
+```
+
+Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7). `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
 
 ### `config.ts` — konfigurasi runtime (titik perluasan 6)
 
@@ -336,7 +351,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Event tak dikenal / job tanpa prefiks / interval < 1 s | `… hooks.ts berlangganan event "invoice.paid" yang tidak dikenal core` · `… job "cleanup" harus diawali "billing." (G-9)` · `… job "billing.fast": interval 0s harus bilangan bulat ≥ 1 detik` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
-Sync juga menolak menghapus `apps/web/src/routes/m/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
+Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
 
 ---
 
@@ -365,7 +380,7 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 | 11 widget dashboard (`widgets.ts`, terfilter izin, SSR) | **Tersedia (M2)** |
 | 8 tool AI/MCP | M5 |
 | 14 tema · 15 layout · 16 set ikon (`themes/`, `layouts.ts`, `icons.ts`) | **Tersedia (M2)** |
-| 13 halaman publik | M4 |
+| 13 halaman publik (`public.ts`) | **Tersedia (M4)** |
 | Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |
 | Modul sebagai paket npm (`source: "package"`) | M6 |
 | `bun modgen` (generator CRUD) · starter repo modul | M6 |

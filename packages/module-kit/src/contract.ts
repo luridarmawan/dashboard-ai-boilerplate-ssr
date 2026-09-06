@@ -324,6 +324,65 @@ export function defineConfig(
   return list;
 }
 
+/**
+ * A public (no-auth) page tree contributed by a module (extension point 13, PRD R-2, F-7). Lives
+ * OUTSIDE `/m/<ns>` — e.g. `/example`, `/product/[slug]` — so it can be a real front door.
+ * `modules:sync` mirrors `dir` into the web app's public group and rejects a path that collides
+ * with a core page or another module.
+ */
+export interface PublicRouteDef {
+  /** URL path in SvelteKit notation, e.g. `/product/[slug]`. Must not start with `/m/`. */
+  readonly path: string;
+  /** Folder in the module holding `+page.svelte` (and siblings), relative to the module. */
+  readonly dir: string;
+  /** Include in sitemap.xml (F-7). Param routes need `sitemap: false` or a module-side lister. */
+  readonly sitemap?: boolean;
+}
+
+const PUBLIC_PATH_RE =
+  /^\/(?:[a-z0-9-]+|\[[a-z][a-zA-Z0-9]*\])(?:\/(?:[a-z0-9-]+|\[[a-z][a-zA-Z0-9]*\]))*$/;
+const RESERVED_PUBLIC = [
+  '/m',
+  '/auth',
+  '/dashboard',
+  '/api',
+  '/v1',
+  '/theme',
+  '/lang',
+  '/settings',
+  '/modules',
+  '/users',
+  '/groups',
+  '/tenants',
+  '/profile',
+  '/examples',
+];
+
+/** Declare the public pages a module contributes (extension point 13). */
+export function definePublicRoutes(
+  moduleName: string,
+  list: readonly PublicRouteDef[],
+): readonly PublicRouteDef[] {
+  namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const r of list) {
+    if (!PUBLIC_PATH_RE.test(r.path)) {
+      throw new ModuleContractError(
+        `route publik "${r.path}" tidak valid — pakai bentuk /segmen/[param]`,
+      );
+    }
+    if (RESERVED_PUBLIC.some((res) => r.path === res || r.path.startsWith(`${res}/`))) {
+      throw new ModuleContractError(`route publik "${r.path}" memakai awalan yang dipakai core`);
+    }
+    if (seen.has(r.path)) throw new ModuleContractError(`route publik "${r.path}" duplikat`);
+    seen.add(r.path);
+    if (!r.dir.startsWith('web/') || r.dir.includes('..')) {
+      throw new ModuleContractError(`route publik "${r.path}": dir harus di dalam web/ modul`);
+    }
+  }
+  return list;
+}
+
 /** Resource owners that belong to core; a module may reference these permissions in its menu. */
 export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'user',

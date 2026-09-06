@@ -180,7 +180,7 @@ describe('syncModules — API routes & web pages (extension points 2 & 3)', () =
     ).toBe(true);
   });
 
-  test('web/routes/** is mirrored to apps/web/src/routes/m/<ns>/** with the right shim kind', async () => {
+  test('web/routes/** is mirrored to apps/web/src/routes/(app)/m/<ns>/** with the right shim kind', async () => {
     const r = await syncModules({
       root: join(fixtures, 'good'),
       write: false,
@@ -191,14 +191,14 @@ describe('syncModules — API routes & web pages (extension points 2 & 3)', () =
         module: 'Alpha',
         ns: 'alpha',
         from: 'modules/Alpha/web/routes/items/+page.server.ts',
-        to: 'apps/web/src/routes/m/alpha/items/+page.server.ts',
+        to: 'apps/web/src/routes/(app)/m/alpha/items/+page.server.ts',
         kind: 'ts',
       },
       {
         module: 'Alpha',
         ns: 'alpha',
         from: 'modules/Alpha/web/routes/items/+page.svelte',
-        to: 'apps/web/src/routes/m/alpha/items/+page.svelte',
+        to: 'apps/web/src/routes/(app)/m/alpha/items/+page.svelte',
         kind: 'svelte',
       },
     ]);
