@@ -52,7 +52,8 @@ git submodule deinit -f -q "modules/$NAME"
 git rm -f -q "modules/$NAME"
 rm -rf ".git/modules/modules/$NAME" "modules/$NAME"
 git checkout -- modules.json biome.json bun.lock packages/db/migrations 2>/dev/null || true
-git ls-files --error-unmatch .gitmodules >/dev/null 2>&1 && git checkout -- .gitmodules || rm -f .gitmodules
+# .gitmodules: back to HEAD's version, or gone entirely when HEAD had none (submodule add staged it)
+if git cat-file -e HEAD:.gitmodules 2>/dev/null; then git checkout HEAD -- .gitmodules; else git rm -q -f --cached .gitmodules 2>/dev/null || true; rm -f .gitmodules; fi
 git clean -fdq packages/db/migrations
 bun install --no-summary >/dev/null
 bun run modules:sync >/dev/null
