@@ -5,7 +5,17 @@ import {
   normalizeGrants,
   writeAudit,
 } from '@core/auth';
-import { errorResponses, fail, OkSchema, ok, PageSchema, page } from '@core/contracts';
+import {
+  errorResponses,
+  fail,
+  GroupCreateBody,
+  GroupPermissionsBody,
+  GroupUpdateBody,
+  OkSchema,
+  ok,
+  PageSchema,
+  page,
+} from '@core/contracts';
 import {
   and,
   asc,
@@ -159,8 +169,6 @@ async function membersOf(ts: Scope, groupId: string) {
     .orderBy(asc(schema.users.name));
 }
 
-const CODE = t.String({ minLength: 2, maxLength: 64, pattern: '^[a-z][a-z0-9_-]*$' });
-
 export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
   .use(requestContext)
   .use(tenantContext)
@@ -282,12 +290,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         },
         {
           beforeHandle: permission('group.create'),
-          body: t.Object({
-            code: CODE,
-            name: t.String({ minLength: 1, maxLength: 191 }),
-            description: t.Optional(t.Nullable(t.String({ maxLength: 2000 }))),
-            permissions: t.Optional(t.Array(t.String({ maxLength: 191 }), { maxItems: 500 })),
-          }),
+          body: GroupCreateBody,
           response: { 201: OkSchema(Group), ...errorResponses },
           detail: { summary: 'Create a group in the active tenant, optionally with permissions' },
         },
@@ -331,11 +334,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         {
           beforeHandle: permission('group.edit'),
           params: t.Object({ id: Id }),
-          body: t.Object({
-            code: t.Optional(CODE),
-            name: t.Optional(t.String({ minLength: 1, maxLength: 191 })),
-            description: t.Optional(t.Nullable(t.String({ maxLength: 2000 }))),
-          }),
+          body: GroupUpdateBody,
           response: { 200: OkSchema(Group), ...errorResponses },
           detail: { summary: 'Rename / describe a group (system groups keep their code)' },
         },
@@ -454,7 +453,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
         {
           beforeHandle: permission('group.edit'),
           params: t.Object({ id: Id }),
-          body: t.Object({ permissions: t.Array(t.String({ maxLength: 191 }), { maxItems: 500 }) }),
+          body: GroupPermissionsBody,
           response: {
             200: OkSchema(t.Object({ groupId: t.String(), permissions: t.Array(Permission) })),
             ...errorResponses,

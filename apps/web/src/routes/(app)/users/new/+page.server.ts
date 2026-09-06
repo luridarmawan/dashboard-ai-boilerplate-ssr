@@ -1,5 +1,6 @@
+import { formToObject, UserCreateBody, validateForm } from '@core/contracts';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
+import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -11,7 +12,7 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
   default: async (event) => {
     const form = await event.request.formData();
-    const values = { email: str(form, 'email'), name: str(form, 'name') };
+    const input = formToObject(form, { arrays: ['groupIds'] });
     if (!checkCsrf(event, form)) {
       return actionFailure(
         {
@@ -19,17 +20,24 @@ export const actions: Actions = {
           code: 'csrf_failed',
           message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
         },
-        values,
+        input,
       );
     }
-    const groupIds = form.getAll('groupIds').filter((g): g is string => typeof g === 'string');
-    const res = await apiFor(event).v1.users.post({
-      ...values,
-      ...(optStr(form, 'password') ? { password: str(form, 'password') } : {}),
-      groupIds,
-    });
+    // The SAME schema the API enforces (L-17): field errors render next to the field, no JS needed.
+    const v = validateForm(UserCreateBody, input);
+    if (!v.ok)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: 'Periksa isian yang ditandai',
+          details: v.errors,
+        },
+        input,
+      );
+    const res = await apiFor(event).v1.users.post(v.value);
     const r = unwrap<{ success: true; data: { id: string } }>(res);
-    if (!r.ok) return actionFailure(r.failure, values);
+    if (!r.ok) return actionFailure(r.failure, input);
     redirect(303, `/users/${r.data.data.id}?created=1`);
   },
 };

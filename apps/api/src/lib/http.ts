@@ -4,12 +4,8 @@ import { t } from 'elysia';
 
 /** Route-level building blocks shared by the CRUD domains (N-4, N-5). */
 
-/** A UUID path/body parameter. Shape only — existence is the handler's 404. */
-export const Id = t.String({
-  minLength: 36,
-  maxLength: 36,
-  pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-});
+/** Shared with the web forms (L-17); re-exported so route files keep one import site. */
+export { Id } from '@core/contracts';
 
 export const MAX_LIMIT = 100;
 

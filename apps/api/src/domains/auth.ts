@@ -18,7 +18,7 @@ import {
   writeAudit,
 } from '@core/auth';
 import { env } from '@core/config';
-import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
+import { Email, errorResponses, fail, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
 import { deliverLink } from '../lib/dev-mail.ts';
@@ -49,9 +49,6 @@ const PublicUser = t.Object({
   lastLoginAt: t.Nullable(t.String()),
   createdAt: t.String(),
 });
-
-const Email = t.String({ format: 'email', maxLength: 191 });
-const Password = t.String({ minLength: 1, maxLength: 256 });
 
 const VERIFY_TTL_MS = 24 * 3600_000;
 const RESET_TTL_MS = 3600_000;

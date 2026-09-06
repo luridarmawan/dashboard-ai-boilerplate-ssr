@@ -1,5 +1,14 @@
 import { canActInTenant, seedTenantGroups, tenantsOf, writeAudit } from '@core/auth';
-import { errorResponses, fail, OkSchema, ok, PageSchema, page } from '@core/contracts';
+import {
+  ClientCreateBody,
+  ClientUpdateBody,
+  errorResponses,
+  fail,
+  OkSchema,
+  ok,
+  PageSchema,
+  page,
+} from '@core/contracts';
 import {
   and,
   asc,
@@ -45,7 +54,6 @@ const Scope = t.Object({
 });
 
 type ClientRow = typeof schema.clients.$inferSelect;
-const CODE = t.String({ minLength: 2, maxLength: 32, pattern: '^[a-z][a-z0-9_-]*$' });
 
 function actor(auth: AuthState | null): AuthState {
   if (!auth) throw new Error('guard missing: route reached without a session');
@@ -234,12 +242,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
     },
     {
       beforeHandle: permission('client.create'),
-      body: t.Object({
-        code: CODE,
-        name: t.String({ minLength: 1, maxLength: 191 }),
-        parentId: t.Optional(t.Nullable(Id)),
-        settings: t.Optional(t.Nullable(t.Record(t.String(), t.Unknown()))),
-      }),
+      body: ClientCreateBody,
       response: { 201: OkSchema(Client), ...errorResponses },
       detail: {
         summary: 'Create a tenant; seeds its system groups and makes the caller its admin',
@@ -285,12 +288,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
     {
       beforeHandle: permission('client.edit'),
       params: t.Object({ id: Id }),
-      body: t.Object({
-        name: t.Optional(t.String({ minLength: 1, maxLength: 191 })),
-        parentId: t.Optional(t.Nullable(Id)),
-        settings: t.Optional(t.Nullable(t.Record(t.String(), t.Unknown()))),
-        statusId: t.Optional(t.Union([t.Literal(0), t.Literal(1)])),
-      }),
+      body: ClientUpdateBody,
       response: { 200: OkSchema(Client), ...errorResponses },
       detail: { summary: 'Edit a tenant (name, parent, settings, status); the code is permanent' },
     },

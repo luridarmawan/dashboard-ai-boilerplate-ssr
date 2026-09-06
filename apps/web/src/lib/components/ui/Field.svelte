@@ -4,12 +4,12 @@ import { cn } from '$lib/utils';
 
 /** Label + control + hint/error, stacked. The workhorse of every form in the app. */
 interface Props {
-  label?: string;
-  for?: string;
-  hint?: string;
-  error?: string | null;
-  required?: boolean;
-  class?: string;
+  label?: string | undefined;
+  for?: string | undefined;
+  hint?: string | undefined;
+  error?: string | null | undefined;
+  required?: boolean | undefined;
+  class?: string | undefined;
   children?: Snippet;
 }
 let {

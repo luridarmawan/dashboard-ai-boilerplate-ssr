@@ -1,5 +1,6 @@
+import { formToObject, UserUpdateBody, validateForm } from '@core/contracts';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -27,21 +28,29 @@ export const actions: Actions = {
         message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
       });
     }
-    const groupIds = form.getAll('groupIds').filter((g): g is string => typeof g === 'string');
-    const body: {
-      name: string;
-      statusId: 0 | 1;
-      groupIds: string[];
-      isSuperadmin?: boolean;
-    } = {
-      name: str(form, 'name'),
-      statusId: form.get('active') === 'on' ? 1 : 0,
-      groupIds,
+    // Checkbox semantics → schema shape: `active` on/off becomes statusId 1/0.
+    const raw = formToObject(form, { arrays: ['groupIds'] });
+    const input: Record<string, unknown> = {
+      name: raw.name,
+      locale: raw.locale,
+      statusId: raw.active !== undefined ? 1 : 0,
+      groupIds: raw.groupIds,
     };
     if (event.locals.session?.user.isSuperadmin)
-      body.isSuperadmin = form.get('isSuperadmin') === 'on';
-    const r = unwrap(await apiFor(event).v1.users({ id: event.params.id }).put(body));
-    if (!r.ok) return actionFailure(r.failure);
+      input.isSuperadmin = raw.isSuperadmin !== undefined;
+    const v = validateForm(UserUpdateBody, input);
+    if (!v.ok)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: 'Periksa isian yang ditandai',
+          details: v.errors,
+        },
+        raw,
+      );
+    const r = unwrap(await apiFor(event).v1.users({ id: event.params.id }).put(v.value));
+    if (!r.ok) return actionFailure(r.failure, raw);
     return { saved: true };
   },
   delete: async (event) => {

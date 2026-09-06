@@ -65,7 +65,21 @@ describe.skipIf(!enabled)('seed, tenancy and RBAC (O-3, B-2, B-4, C-3, C-5, C-7)
     expect(second.created).toEqual([]);
     expect(second.tenantId).toBe(first.tenantId);
     defaultTenant = first.tenantId;
-    userGroupId = first.userGroupId;
+    // A group of our own with exactly `user.read`: the seeded `user` group is shared state that
+    // other proofs (the web flow) legitimately edit, so asserting on it would be flaky.
+    userGroupId = newId();
+    await db.insert(schema.groups).values({
+      id: userGroupId,
+      client_id: first.tenantId,
+      code: `tenancy-${run}`,
+      name: 'Tenancy test group',
+    });
+    await db.insert(schema.groupPermissions).values({
+      id: newId(),
+      client_id: first.tenantId,
+      group_id: userGroupId,
+      permission: 'user.read',
+    });
     admin = await login(adminEmail, adminPassword); // the original password still works
   });
 

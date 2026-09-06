@@ -72,6 +72,17 @@ async function post(
   jar.absorb(res);
   return { res, html: await res.text() };
 }
+/** The checkbox value for a group label, whatever the attribute order the renderer chose. */
+function groupIdFor(html: string, label: string): string {
+  const re = new RegExp(`<input([^>]*)>(?:\\s|<!---->)*${label}`, 'g');
+  for (const m of html.matchAll(re)) {
+    const attrs = m[1] ?? '';
+    if (!/name="groupIds"/.test(attrs)) continue;
+    const v = /value="([0-9a-f-]{36})"/.exec(attrs)?.[1];
+    if (v) return v;
+  }
+  return '';
+}
 const csrfOf = (html: string) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
 /** The page's error banner, for diagnostics when a step fails. */
 const errorOf = (html: string) =>
@@ -112,8 +123,7 @@ let newUserId = '';
 {
   const page = await get(admin, '/users/new');
   const token = csrfOf(page.html);
-  userGroupId =
-    /name="groupIds" value="([0-9a-f-]{36})"[^>]*>\s*Regular User/.exec(page.html)?.[1] ?? '';
+  userGroupId = groupIdFor(page.html, 'Regular User');
   check('users/new lists the seeded "Regular User" group', userGroupId.length === 36);
   const r = await post(admin, '/users/new', {
     _csrf: token,

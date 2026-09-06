@@ -1,10 +1,11 @@
+import { formToObject, PasswordChangeBody, ProfileBody, validateForm } from '@core/contracts';
 import { themes } from '@core/ui-theme';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Own profile (D-4): basics + preferences, and a separate password form. */
 export const load: PageServerLoad = async (event) => {
-  const locale = event.locals.session?.user.locale === 'en' ? 'en' : 'id';
+  const locale = event.locals.locale.locale;
   const allowed = event.locals.theme.allowed;
   return {
     themes: themes()
@@ -12,49 +13,54 @@ export const load: PageServerLoad = async (event) => {
       .map((t) => ({ id: t.id, name: t.name[locale] })),
   };
 };
+
+const csrfFail = () =>
+  actionFailure({
+    status: 403,
+    code: 'csrf_failed',
+    message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+  });
+
 export const actions: Actions = {
   profile: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) {
-      return actionFailure({
-        status: 403,
-        code: 'csrf_failed',
-        message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
-      });
-    }
-    const r = unwrap(
-      await apiFor(event).v1.users.profile.me.put({
-        name: str(form, 'name'),
-        locale: str(form, 'locale') || 'id',
-        theme: str(form, 'theme') || null,
-        avatarUrl: str(form, 'avatarUrl') || null,
-      }),
-    );
-    if (!r.ok) return actionFailure(r.failure);
+    if (!checkCsrf(event, form)) return csrfFail();
+    const input = formToObject(form, { nullable: ['theme', 'avatarUrl'] });
+    const v = validateForm(ProfileBody, input);
+    if (!v.ok)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: 'Periksa isian yang ditandai',
+          details: v.errors,
+        },
+        input,
+      );
+    const r = unwrap(await apiFor(event).v1.users.profile.me.put(v.value));
+    if (!r.ok) return actionFailure(r.failure, input);
     return { saved: 'profile' as const };
   },
   password: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) {
-      return actionFailure({
-        status: 403,
-        code: 'csrf_failed',
-        message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
-      });
-    }
+    if (!checkCsrf(event, form)) return csrfFail();
     if (str(form, 'newPassword') !== str(form, 'confirm')) {
       return actionFailure({
         status: 422,
         code: 'validation_failed',
-        message: 'Konfirmasi kata sandi tidak sama',
+        message: 'Periksa isian yang ditandai',
+        details: { confirm: 'Konfirmasi kata sandi tidak sama' },
       });
     }
-    const r = unwrap(
-      await apiFor(event).v1.users.profile.password.put({
-        currentPassword: str(form, 'currentPassword'),
-        newPassword: str(form, 'newPassword'),
-      }),
-    );
+    const v = validateForm(PasswordChangeBody, formToObject(form));
+    if (!v.ok)
+      return actionFailure({
+        status: 422,
+        code: 'validation_failed',
+        message: 'Periksa isian yang ditandai',
+        details: v.errors,
+      });
+    const r = unwrap(await apiFor(event).v1.users.profile.password.put(v.value));
     if (!r.ok) return actionFailure(r.failure);
     return { saved: 'password' as const };
   },

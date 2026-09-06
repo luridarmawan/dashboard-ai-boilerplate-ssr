@@ -8,7 +8,18 @@ import {
   verifyPassword,
   writeAudit,
 } from '@core/auth';
-import { errorResponses, fail, OkSchema, ok, PageSchema, page } from '@core/contracts';
+import {
+  errorResponses,
+  fail,
+  OkSchema,
+  ok,
+  PageSchema,
+  PasswordChangeBody,
+  ProfileBody,
+  page,
+  UserCreateBody,
+  UserUpdateBody,
+} from '@core/contracts';
 import {
   and,
   asc,
@@ -203,12 +214,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         set.status = 401;
         return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
       },
-      body: t.Object({
-        name: t.Optional(t.String({ minLength: 1, maxLength: 191 })),
-        locale: t.Optional(t.String({ minLength: 2, maxLength: 8 })),
-        theme: t.Optional(t.Nullable(t.String({ maxLength: 64 }))),
-        avatarUrl: t.Optional(t.Nullable(t.String({ maxLength: 512 }))),
-      }),
+      body: ProfileBody,
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
       detail: { summary: 'Edit my profile: name, locale, theme, avatar (D-4)' },
     },
@@ -251,10 +257,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         set.status = 401;
         return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
       },
-      body: t.Object({
-        currentPassword: t.String({ minLength: 1, maxLength: 256 }),
-        newPassword: t.String({ minLength: 1, maxLength: 256 }),
-      }),
+      body: PasswordChangeBody,
       response: {
         200: OkSchema(t.Object({ changed: t.Literal(true), revokedOtherSessions: t.Integer() })),
         ...errorResponses,
@@ -412,13 +415,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
     },
     {
       beforeHandle: permission('user.create'),
-      body: t.Object({
-        email: t.String({ format: 'email', maxLength: 191 }),
-        name: t.String({ minLength: 1, maxLength: 191 }),
-        password: t.Optional(t.String({ minLength: 1, maxLength: 256 })),
-        locale: t.Optional(t.String({ minLength: 2, maxLength: 8 })),
-        groupIds: t.Optional(t.Array(Id, { maxItems: 50 })),
-      }),
+      body: UserCreateBody,
       response: {
         201: OkSchema(t.Intersect([TenantUser, t.Object({ created: t.Boolean() })])),
         ...errorResponses,
@@ -483,13 +480,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
     {
       beforeHandle: permission('user.edit'),
       params: t.Object({ id: Id }),
-      body: t.Object({
-        name: t.Optional(t.String({ minLength: 1, maxLength: 191 })),
-        locale: t.Optional(t.String({ minLength: 2, maxLength: 8 })),
-        statusId: t.Optional(t.Union([t.Literal(0), t.Literal(1)])),
-        isSuperadmin: t.Optional(t.Boolean()),
-        groupIds: t.Optional(t.Array(Id, { maxItems: 50 })),
-      }),
+      body: UserUpdateBody,
       response: { 200: OkSchema(TenantUser), ...errorResponses },
       detail: { summary: 'Edit a user of the active tenant; groupIds replaces their groups here' },
     },

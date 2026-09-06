@@ -1,33 +1,60 @@
 <script lang="ts">
-import Csrf from '$lib/components/Csrf.svelte';
+import { type FieldDef, FormBuilder } from '$lib/components/form';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
+const fields: FieldDef[] = $derived([
+  { name: 'name', type: 'string', label: 'Nama', required: true, maxlength: 191 },
+  {
+    name: 'email',
+    type: 'email',
+    label: 'Email',
+    required: true,
+    hint: 'Akun yang sudah ada dengan email ini akan ditambahkan ke tenant ini.',
+  },
+  {
+    name: 'password',
+    type: 'password',
+    label: 'Kata sandi',
+    minlength: 12,
+    autocomplete: 'new-password',
+    hint: 'Kosongkan agar pengguna mengatur sendiri lewat tautan set kata sandi.',
+  },
+  {
+    name: 'locale',
+    type: 'select',
+    label: 'Bahasa',
+    options: [
+      { value: 'id', label: 'Bahasa Indonesia' },
+      { value: 'en', label: 'English' },
+    ],
+  },
+  {
+    name: 'groupIds',
+    type: 'multiselect',
+    label: 'Grup',
+    span: 2,
+    options: data.groups.map((g) => ({ value: g.id, label: g.name })),
+  },
+]);
+const fieldErrors = $derived(
+  (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
+);
 </script>
 
 <svelte:head><title>Tambah pengguna</title></svelte:head>
 
 <div class="page">
   <h1>Tambah pengguna</h1>
-  {#if form?.error}
-    <p class="error">{form.error}{#if Array.isArray(form.details)} — {form.details.join(', ')}{/if}</p>
-  {/if}
-  <form method="POST" class="stack">
-    <Csrf token={data.csrf} />
-    <label>Nama <input name="name" required maxlength="191" value={form?.values?.name ?? ''} /></label>
-    <label>Email <input name="email" type="email" required value={form?.values?.email ?? ''} />
-      <span class="muted">Akun yang sudah ada dengan email ini akan ditambahkan ke tenant ini.</span></label>
-    <label>Kata sandi <input name="password" type="password" minlength="12" autocomplete="new-password" />
-      <span class="muted">Kosongkan agar pengguna mengatur sendiri lewat tautan set kata sandi.</span></label>
-    <fieldset>
-      <legend>Grup</legend>
-      <div class="grid">
-        {#each data.groups as g (g.id)}
-          <label class="check"><input type="checkbox" name="groupIds" value={g.id} /> {g.name}</label>
-        {/each}
-      </div>
-    </fieldset>
-    <div class="row"><button type="submit">Simpan</button><a href="/users">Batal</a></div>
-  </form>
+  <FormBuilder
+    {fields}
+    values={(form?.values as Record<string, unknown> | undefined) ?? { locale: 'id' }}
+    errors={fieldErrors}
+    csrf={data.csrf}
+    columns={2}
+    submitLabel="Simpan"
+    cancelHref="/users"
+    error={form?.error && form.code !== 'validation_failed' ? form.error : form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null}
+  />
 </div>
