@@ -154,7 +154,7 @@ jobs:
           curl -sf http://127.0.0.1:3001/v1/health | grep -q '"status":"ok"'
 
   integration:
-    name: test integrasi · MySQL (auth, sesi, rate limit, CSRF)
+    name: test integrasi · MySQL (auth, sesi, CSRF, tenancy, RBAC, seed)
     runs-on: ubuntu-latest
     needs: check
     services:
@@ -185,4 +185,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run bootstrap
       - run: bun run --cwd packages/db migrate
+      - run: bun run db:seed
+        env:
+          BOOTSTRAP_ADMIN_EMAIL: admin@example.test
+          BOOTSTRAP_ADMIN_PASSWORD: bootstrap admin password
       - run: bun test integration

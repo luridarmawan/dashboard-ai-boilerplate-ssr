@@ -23,6 +23,7 @@
     "db:matrix": "docker compose --profile matrix up -d --wait && bun run scripts/db-matrix.ts",
     "db:matrix:docker": "docker compose --profile matrix up -d --wait && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e MATRIX_MYSQL_URL=mysql://app:app@mysql:3306/app -e MATRIX_MARIADB_URL=mysql://app:app@mariadb:3306/app -e MATRIX_POSTGRES_URL=postgres://app:app@postgres:5432/app oven/bun:1.4 bun run scripts/db-matrix.ts",
     "db:migrate": "bun run --cwd packages/db migrate",
+    "db:seed": "bun run scripts/db-seed.ts",
     "db:smoke": "bun run --cwd packages/db smoke",
     "dev": "bun run scripts/dev.ts",
     "dev:db": "docker compose up -d --wait",
@@ -35,12 +36,13 @@
     "scheduler:proof:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app oven/bun:1.4 bun run scripts/scheduler-proof.ts",
     "test": "bun run bootstrap && bun test",
     "test:integration": "INTEGRATION=1 bun test integration",
-    "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun run bootstrap && bun run --cwd packages/db migrate && bun test integration\"",
+    "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun run bootstrap && bun run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun run db:seed && bun test integration\"",
     "theme:validate": "node packages/ui-theme/validate.mjs",
     "typecheck": "bun run scripts/typecheck-all.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",
+    "@core/auth": "workspace:*",
     "@core/config": "workspace:*",
     "@core/db": "workspace:*",
     "@core/module-kit": "workspace:*",

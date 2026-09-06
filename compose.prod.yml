@@ -4,6 +4,7 @@
 #   docker compose -f compose.prod.yml build
 #   docker compose -f compose.prod.yml up -d
 #   docker compose -f compose.prod.yml run --rm migrate      # explicit, never automatic (Q-4)
+#   docker compose -f compose.prod.yml run --rm seed         # idempotent bootstrap (O-3)
 #   docker compose -f compose.prod.yml up -d --scale api=3   # stateless: scale freely (Decision F)
 #
 # One origin: Caddy terminates TLS and routes / → web, /v1/* /docs /openapi.json → api (Decisions D, E).
@@ -98,6 +99,22 @@ services:
       <<: *app-env
       SCHEDULER_ENABLED: 'false'
     command: ['bun', 'run', '--cwd', 'packages/db', 'migrate']
+    depends_on:
+      mysql:
+        condition: service_healthy
+    <<: *logging
+
+  seed:
+    # One-off, idempotent (O-3): default tenant, system groups, first superadmin from
+    # BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD. Safe to re-run on every deploy.
+    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    profiles: ['ops']
+    environment:
+      <<: *app-env
+      SCHEDULER_ENABLED: 'false'
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    command: ['bun', 'run', 'db:seed']
     depends_on:
       mysql:
         condition: service_healthy

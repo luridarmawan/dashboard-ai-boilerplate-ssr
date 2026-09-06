@@ -6,6 +6,7 @@
       "name": "dashboard-ai-boilerplate",
       "devDependencies": {
         "@biomejs/biome": "^2.2.0",
+        "@core/auth": "workspace:*",
         "@core/config": "workspace:*",
         "@core/db": "workspace:*",
         "@core/module-kit": "workspace:*",

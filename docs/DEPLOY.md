@@ -21,6 +21,7 @@ Target deployment adalah **satu VPS biasa** dengan Docker (PRD §4.4). Tidak ada
 - **Satu origin** (Keputusan E): web dan API disajikan dari domain yang sama lewat path. Tidak ada CORS, tidak ada cookie lintas-domain.
 - **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. `api` diresolusi lewat DNS Docker sebagai *dynamic upstream* — setiap replika `api` otomatis ikut dilayani.
 - **`api` stateless** (Keputusan F): tanpa port host, tanpa `container_name`, jadi `--scale api=N` langsung bekerja. State bersama ada di database (Keputusan M); Valkey hanya percepatan opsional (`--profile redis`).
+- **Seed idempoten** (O-3): service `seed` membuat tenant `default`, grup `admin` (`*.*`) dan `user`, serta superadmin pertama dari `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` di `.env.prod`. Aman dijalankan ulang setiap deploy; baris yang sudah ada (termasuk kata sandi) tidak disentuh.
 - **Migrasi adalah langkah eksplisit** (Q-4): service `migrate` (profil `ops`) dijalankan operator, tidak pernah otomatis saat container start — dua instance yang menyala bersamaan tidak berebut migrasi.
 
 ## 2. Menjalankan
@@ -30,6 +31,7 @@ cp .env.prod.example .env.prod          # isi DOMAIN, ACME_EMAIL, MYSQL_*_PASSWO
 docker compose --env-file .env.prod -f compose.prod.yml build
 docker compose --env-file .env.prod -f compose.prod.yml up -d
 docker compose --env-file .env.prod -f compose.prod.yml run --rm migrate
+docker compose --env-file .env.prod -f compose.prod.yml run --rm seed     # tenant default, grup sistem, superadmin pertama
 docker compose --env-file .env.prod -f compose.prod.yml up -d --scale api=3
 ```
 

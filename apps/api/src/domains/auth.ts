@@ -1,14 +1,19 @@
 import {
+  canActInTenant,
   consumeRateLimit,
   createSession,
+  effectivePermissions,
   hashPassword,
   hashToken,
   parseRateLimitRule,
   passwordProblems,
+  permissionRegistry,
   randomToken,
   rateLimitHeaders,
   revokeAllSessions,
   revokeSession,
+  setActiveTenant,
+  tenantsOf,
   verifyPassword,
   writeAudit,
 } from '@core/auth';
@@ -19,6 +24,7 @@ import { Elysia, t } from 'elysia';
 import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '../plugins/auth.ts';
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
+import { requirePermission, TENANT_HEADER, tenantContext } from '../plugins/tenancy.ts';
 
 /**
  * Authentication (PRD FR-A). Cookie sessions, Argon2id, rate-limited login, verification and
@@ -447,23 +453,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         '/me',
         async ({ auth }) => {
           const a = auth as NonNullable<typeof auth>;
-          const db = unsafeAcrossTenants();
-          const tenants = await db
-            .select({
-              id: schema.clients.id,
-              code: schema.clients.code,
-              name: schema.clients.name,
-              isDefault: schema.clientUserMaps.is_default,
-            })
-            .from(schema.clientUserMaps)
-            .innerJoin(schema.clients, eq(schema.clients.id, schema.clientUserMaps.client_id))
-            .where(
-              and(
-                eq(schema.clientUserMaps.user_id, a.user.id),
-                isNull(schema.clientUserMaps.deleted_at),
-                isNull(schema.clients.deleted_at),
-              ),
-            );
+          const tenants = await tenantsOf(unsafeAcrossTenants(), a.user.id);
           return ok({
             user: publicUser(a.user),
             clientId: a.clientId,
@@ -503,6 +493,98 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             ...errorResponses,
           },
           detail: { summary: 'The current user, active tenant, and reachable tenants' },
+        },
+      )
+      .use(tenantContext)
+      .get(
+        '/permissions',
+        ({ auth, tenantState }) => {
+          const a = auth as NonNullable<typeof auth>;
+          return ok({
+            clientId: tenantState.clientId,
+            isSuperadmin: a.user.is_superadmin,
+            permissions: [...tenantState.perms],
+          });
+        },
+        {
+          response: {
+            200: OkSchema(
+              t.Object({
+                clientId: t.Nullable(t.String()),
+                isSuperadmin: t.Boolean(),
+                permissions: t.Array(t.String()),
+              }),
+            ),
+            ...errorResponses,
+          },
+          detail: {
+            summary: `Effective permissions in the active tenant (C-7); honours ${TENANT_HEADER}`,
+          },
+        },
+      )
+      .post(
+        '/switch-tenant',
+        async ({ auth, body, set, request, server, requestId }) => {
+          const a = auth as NonNullable<typeof auth>;
+          const db = unsafeAcrossTenants();
+          if (!(await canActInTenant(db, a.user, body.clientId))) {
+            set.status = 403;
+            return fail('tenant_forbidden', 'Anda bukan anggota tenant tersebut', requestId);
+          }
+          await setActiveTenant(db, a.session.id, body.clientId);
+          await writeAudit(db, {
+            clientId: body.clientId,
+            actorId: a.user.id,
+            action: 'auth.switch_tenant',
+            resource: 'client',
+            resourceId: body.clientId,
+            ip: clientIp(request, server),
+            requestId,
+            before: { clientId: a.clientId },
+            after: { clientId: body.clientId },
+          });
+          const permissions = await effectivePermissions(db, a.user, body.clientId);
+          return ok({ clientId: body.clientId, permissions });
+        },
+        {
+          body: t.Object({ clientId: t.String({ minLength: 36, maxLength: 36 }) }),
+          response: {
+            200: OkSchema(t.Object({ clientId: t.String(), permissions: t.Array(t.String()) })),
+            ...errorResponses,
+          },
+          detail: { summary: 'Make another tenant the active one for this session (B-4)' },
+        },
+      )
+      // The first permission-guarded route: the registry the permission editor lists (C-4, C-7).
+      .use(requirePermission('group.read'))
+      .get(
+        '/permission-registry',
+        () =>
+          ok({
+            resources: permissionRegistry().map((r) => ({
+              module: r.module,
+              resource: r.resource,
+              actions: [...r.actions],
+              name: r.name,
+            })),
+          }),
+        {
+          response: {
+            200: OkSchema(
+              t.Object({
+                resources: t.Array(
+                  t.Object({
+                    module: t.String(),
+                    resource: t.String(),
+                    actions: t.Array(t.String()),
+                    name: t.Object({ id: t.String(), en: t.String() }),
+                  }),
+                ),
+              }),
+            ),
+            ...errorResponses,
+          },
+          detail: { summary: 'Every resource/action that exists (C-4); needs group.read' },
         },
       ),
   );
