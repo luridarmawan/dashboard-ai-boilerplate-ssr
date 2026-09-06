@@ -10,7 +10,7 @@ Wajib dibaca sebelum melakukan perubahan apa pun:
 2. [`docs/PRD.md`](./docs/PRD.md) — bagian yang menyentuh pekerjaanmu, plus §1.3 (pantangan), §4.5 (kontrak modul), dan §8 (kriteria terima).
 3. [`docs/ROADMAP.md`](./docs/ROADMAP.md) — urutan pengerjaan & gate keluar. Jangan mengerjakan milestone yang gate sebelumnya belum hijau.
 4. [`docs/THEMES.md`](./docs/THEMES.md) — bila pekerjaanmu menyentuh tema, ikon, atau layout.
-5. [`docs/MODULES.md`](./docs/MODULES.md) — bila pekerjaanmu membuat atau mengubah modul; ini kontrak yang benar-benar berlaku hari ini, bukan rencana.
+5. [`docs/MODULES.md` · `docs/AI.md`](./docs/MODULES.md) — bila pekerjaanmu membuat atau mengubah modul; ini kontrak yang benar-benar berlaku hari ini, bukan rencana.
 
 Bila sebuah perubahan mengubah perilaku yang tertulis di PRD, **PRD ikut diperbarui pada commit yang sama** (ROADMAP §7 butir 7).
 

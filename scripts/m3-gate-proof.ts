@@ -104,7 +104,7 @@ const anon = new Jar();
   );
   check(
     'secret fields never show a value, only whether they are set (E-4)',
-    settings.html.includes('name="ai.api_key"') && !settings.html.includes('value="sk-'),
+    settings.html.includes('name="ai.key"') && !settings.html.includes('value="sk-'),
   );
   // reset to a known state
   await saveApp(admin, 'global', {

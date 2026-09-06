@@ -10,6 +10,11 @@
       "name": "Example",
       "source": "local",
       "path": "modules/Example"
+    },
+    {
+      "name": "AI",
+      "source": "local",
+      "path": "modules/AI"
     }
   ]
 }

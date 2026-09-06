@@ -11,14 +11,16 @@ export LOGIN_RATE_LIMIT=1000/900
 LOG="$PWD/.proof-logs"; mkdir -p "$LOG"
 
 echo "== build web (adapter-node)"
-(cd apps/web && bun run build >"$LOG/m1-web-build.log" 2>&1) || { tail -30 "$LOG/m1-web-build.log"; exit 1; }
+(cd apps/web && bunx svelte-kit sync >/dev/null 2>&1; bun run build >"$LOG/m1-web-build.log" 2>&1) || { tail -30 "$LOG/m1-web-build.log"; exit 1; }
 
-echo "== start api + web"
+echo "== start mock AI provider + api + web"
+(PORT=4010 exec bun run scripts/ai-mock-provider.ts >"$LOG/m1-mock.log" 2>&1) &
+MOCK_PID=$!
 (cd apps/api && exec bun src/index.ts >"$LOG/m1-api.log" 2>&1) &
 API_PID=$!
 (cd apps/web && HOST=127.0.0.1 PORT=5173 ORIGIN=http://127.0.0.1:5173 exec bun build/index.js >"$LOG/m1-web.log" 2>&1) &
 WEB_PID=$!
-trap 'kill $API_PID $WEB_PID 2>/dev/null || true' EXIT
+trap 'kill $API_PID $WEB_PID $MOCK_PID 2>/dev/null || true' EXIT
 
 # Readiness via bun itself: the oven/bun image has no curl.
 i=0
@@ -35,3 +37,5 @@ echo "== proof M3"
 WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m3-gate-proof.ts
 echo "== proof M4"
 WEB_URL=http://127.0.0.1:5173 API_URL=http://127.0.0.1:3001 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m4-gate-proof.ts
+echo "== proof M5"
+WEB_URL=http://127.0.0.1:5173 MOCK_URL=http://127.0.0.1:4010/v1 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m5-gate-proof.ts

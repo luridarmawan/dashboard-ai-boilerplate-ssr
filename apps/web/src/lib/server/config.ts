@@ -1,6 +1,7 @@
 import { modules } from '@core/module-kit/registry';
 import type { RequestEvent } from '@sveltejs/kit';
 import { api } from '$lib/api/client';
+import { sessionCookieHeader } from './session.ts';
 
 /**
  * Runtime configuration for ONE request (PRD E-2, E-4, Decision I): the PUBLIC values of the
@@ -31,7 +32,13 @@ export async function loadPublicConfig(
   event: RequestEvent,
   clientId: string | null,
 ): Promise<PublicConfig> {
-  const client = api({ requestId: event.locals.requestId, clientId });
+  // With the session cookie the API resolves the SAME tenant the user is in; anonymous requests may
+  // still name a tenant (public values are public) — the API validates it exists.
+  const client = api({
+    requestId: event.locals.requestId,
+    clientId,
+    cookie: sessionCookieHeader(event.cookies),
+  });
   try {
     const [cfg, mods] = await Promise.all([
       client.v1.configuration.public.get(),

@@ -298,7 +298,7 @@ modules/Billing/
 - **Tema** (14): `theme.json` boleh merujuk layout & set ikon core maupun modul; kontras WCAG AA diperiksa sama seperti tema core (L-21). Token CSS-nya digabung ke bundel lewat berkas generate.
 - **Set ikon** (16): berkas glyph mengekspor `glyphs` yang **menutup seluruh nama ikon core** — yang bolong menggagalkan sync (L-5). Modul yang memakai pustaka ikon menyatakannya sebagai dependensi sendiri (mis. `@lucide/svelte`).
 
-Modul `Example` adalah referensi kontrak lengkap (§4.6): landing publik `/example`, `/product/[slug]`, form kontak → outbox, CRUD dasbor, widget, konfigurasi, seed, i18n. Modul `Dummy` memuat tema/layout/set ikon sebagai contoh nyata: tema `dummy.ocean` memakai layout `dummy.two-column` dan set ikon `dummy.rounded-24` — bukti gate M2 #5.
+Modul `AI` (`modules/AI`, lihat `docs/AI.md`) adalah bukti bahwa fitur besar — streaming, persistensi, job retensi, konfigurasi rahasia — muat dalam kontrak yang sama tanpa jalur istimewa. Modul `Example` adalah referensi kontrak lengkap (§4.6): landing publik `/example`, `/product/[slug]`, form kontak → outbox, CRUD dasbor, widget, konfigurasi, seed, i18n. Modul `Dummy` memuat tema/layout/set ikon sebagai contoh nyata: tema `dummy.ocean` memakai layout `dummy.two-column` dan set ikon `dummy.rounded-24` — bukti gate M2 #5.
 
 ### `seed.ts` — data awal idempoten (O-3)
 

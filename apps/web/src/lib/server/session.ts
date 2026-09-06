@@ -81,6 +81,11 @@ export function checkCsrf(event: RequestEvent, form: FormData): boolean {
   }
 }
 
+/** The session (+csrf) cookies as one header value, for server-to-API calls made outside `apiFor`. */
+export function sessionCookieHeader(cookies: Cookies): string | undefined {
+  return cookieHeader(cookies);
+}
+
 function cookieHeader(cookies: Cookies): string | undefined {
   const parts: string[] = [];
   const s = cookies.get(SESSION_COOKIE);

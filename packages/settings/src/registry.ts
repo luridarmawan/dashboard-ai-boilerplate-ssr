@@ -187,47 +187,6 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
     ],
   },
-  {
-    section: 'ai',
-    title: { id: 'AI', en: 'AI' },
-    note: {
-      id: 'Penyedia model untuk modul AI (M5).',
-      en: 'Model provider for the AI module (M5).',
-    },
-    order: 30,
-    fields: [
-      {
-        key: 'ai.provider',
-        type: 'select',
-        title: { id: 'Penyedia', en: 'Provider' },
-        default: 'anthropic',
-        options: [
-          { value: 'anthropic', label: { id: 'Anthropic', en: 'Anthropic' } },
-          { value: 'openai', label: { id: 'OpenAI', en: 'OpenAI' } },
-          { value: 'none', label: { id: 'Nonaktif', en: 'Disabled' } },
-        ],
-        order: 0,
-      },
-      {
-        key: 'ai.model',
-        type: 'string',
-        title: { id: 'Model baku', en: 'Default model' },
-        default: 'claude-sonnet-5',
-        max: 120,
-        order: 1,
-      },
-      { key: 'ai.api_key', type: 'secret', title: { id: 'Kunci API', en: 'API key' }, order: 2 },
-      {
-        key: 'ai.log_retention_days',
-        type: 'number',
-        title: { id: 'Retensi log AI (hari)', en: 'AI log retention (days)' },
-        default: 30,
-        min: 1,
-        max: 3650,
-        order: 3,
-      },
-    ],
-  },
 ];
 
 export interface RegistryField extends ConfigFieldDef {

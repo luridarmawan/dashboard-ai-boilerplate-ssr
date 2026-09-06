@@ -1,6 +1,15 @@
 import { canActInTenant, effectivePermissions, hasPermission } from '@core/auth';
 import { fail } from '@core/contracts';
-import { forTenant, newId, type TenantDb, unsafeAcrossTenants } from '@core/db';
+import {
+  and,
+  eq,
+  forTenant,
+  isNull,
+  newId,
+  schema,
+  type TenantDb,
+  unsafeAcrossTenants,
+} from '@core/db';
 import { Elysia } from 'elysia';
 import { authContext } from './auth.ts';
 
@@ -39,7 +48,28 @@ export const tenantContext = new Elysia({ name: 'tenant-context' })
   .use(authContext)
   .resolve({ as: 'global' }, async ({ auth, request, set }) => {
     const empty: TenantState = { clientId: null, tenant: null, perms: [], can: () => false };
-    if (!auth) return { tenantState: empty };
+    if (!auth) {
+      // Public reads (storefront, public config, enabled modules): anonymous may name a live tenant.
+      // No permissions come with it; module routes still guard writes with permission().
+      const wanted = request.headers.get(TENANT_HEADER)?.trim().toLowerCase() || null;
+      if (wanted && UUID_RE.test(wanted)) {
+        const [row] = await unsafeAcrossTenants()
+          .select({ id: schema.clients.id })
+          .from(schema.clients)
+          .where(and(eq(schema.clients.id, wanted), isNull(schema.clients.deleted_at)))
+          .limit(1);
+        if (row)
+          return {
+            tenantState: {
+              clientId: row.id,
+              tenant: forTenant(row.id),
+              perms: [],
+              can: () => false,
+            },
+          };
+      }
+      return { tenantState: empty };
+    }
 
     const db = unsafeAcrossTenants(); // membership + permissions are read across tenants by definition
     const requested = request.headers.get(TENANT_HEADER)?.trim().toLowerCase() || null;

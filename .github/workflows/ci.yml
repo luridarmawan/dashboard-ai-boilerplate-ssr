@@ -33,6 +33,8 @@ jobs:
         run: bun run ci:ddl-guard
       - name: modules:sync never touches tracked core files (G-6, basic)
         run: bun run ci:sync-pure
+      - name: gate M5 #4 · tanpa modul AI aplikasi ter-build tanpa jejak AI
+        run: bun run proof:m5:gate4
       - name: dependency audit (§8 #7)
         run: bun audit --audit-level=high
 

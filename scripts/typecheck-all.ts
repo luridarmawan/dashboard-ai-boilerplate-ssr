@@ -15,6 +15,16 @@ const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as 
   workspaces?: string[];
 };
 
+// A module folder that is not registered in modules.json is not part of the build (gate M5 #4): its
+// generated schema/registry entries do not exist, so typechecking it would only report that fact.
+const registered = new Set(
+  (
+    JSON.parse(readFileSync(join(root, 'modules.json'), 'utf8')) as {
+      modules: { path?: string; name: string }[];
+    }
+  ).modules.map((m) => (m.path ?? `modules/${m.name}`).replace(/\/$/, '')),
+);
+
 const dirs = new Set<string>();
 for (const pattern of rootPkg.workspaces ?? []) {
   for await (const m of new Glob(`${pattern}/package.json`).scan({ cwd: root, dot: false })) {
@@ -30,6 +40,10 @@ for (const dir of [...dirs].sort()) {
     scripts?: Record<string, string>;
   };
   const rel = relative(root, dir);
+  if (rel.startsWith('modules/') && !registered.has(rel)) {
+    console.log(`  – ${rel.padEnd(28)} (tidak terdaftar di modules.json — dilewati)`);
+    continue;
+  }
   if (!pkg.scripts?.typecheck) {
     console.log(`  – ${rel.padEnd(28)} (tidak ada skrip typecheck)`);
     continue;

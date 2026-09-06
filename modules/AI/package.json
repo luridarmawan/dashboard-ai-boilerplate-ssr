@@ -1,0 +1,27 @@
+{
+  "name": "@modules/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI module (Decision H): can be removed from modules.json, disabled per tenant, or switched off by configuration",
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@app/api": "workspace:*",
+    "@core/auth": "workspace:*",
+    "@core/contracts": "workspace:*",
+    "@core/db": "workspace:*",
+    "@core/logger": "workspace:*",
+    "@core/module-kit": "workspace:*",
+    "dompurify": "^3.4.15",
+    "elysia": "^1.4.0",
+    "marked": "^18.0.11",
+    "sanitize-html": "^2.17.7"
+  },
+  "devDependencies": {
+    "@sveltejs/kit": "^2.70.0",
+    "@types/sanitize-html": "^2.16.1",
+    "svelte": "^5.40.0"
+  }
+}

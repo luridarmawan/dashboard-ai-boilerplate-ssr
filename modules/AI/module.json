@@ -1,0 +1,9 @@
+{
+  "name": "AI",
+  "version": "0.1.0",
+  "description": {
+    "id": "Asisten AI: chat streaming kompatibel-OpenAI, riwayat percakapan, log panggilan (PRD FR-H)",
+    "en": "AI assistant: OpenAI-compatible streaming chat, conversation history, call log (PRD FR-H)"
+  },
+  "engines": { "core": ">=0.0.0" }
+}
