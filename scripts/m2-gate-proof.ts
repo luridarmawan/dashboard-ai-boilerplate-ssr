@@ -232,7 +232,71 @@ const admin = new Jar();
   );
 }
 
+// ---- #6 (language) + K-2/K-7: server-side language, picker without JS ----
+{
+  const fresh = new Jar();
+  const idHtml = (await get(fresh, '/')).html;
+  check(
+    'K-2 default language id on <html lang> for a visitor with no preference',
+    htmlAttr(idHtml, 'lang') === 'id' && idHtml.includes('Masuk'),
+  );
+  const enRes = await fetch(`${WEB}/`, {
+    headers: { accept: 'text/html', 'accept-language': 'en-US,en;q=0.9' },
+  });
+  const enHtml = await enRes.text();
+  check(
+    'K-2 Accept-Language: en → first HTML already in English (lang="en", "Sign in")',
+    htmlAttr(enHtml, 'lang') === 'en' && enHtml.includes('Sign in'),
+  );
+  const picker = await get(fresh, '/lang');
+  check(
+    'language picker lists id and en',
+    picker.res.status === 200 &&
+      picker.html.includes('name="lang" value="id"') &&
+      picker.html.includes('name="lang" value="en"'),
+  );
+  const r = await post(fresh, '/lang', {
+    _csrf: csrfOf(picker.html),
+    lang: 'en',
+    back: '/auth/login',
+  });
+  check(
+    '#6 POST /lang (no JS) → 303 back, dab_lang cookie',
+    r.res.status === 303 && fresh.cookies.get('dab_lang') === 'en',
+  );
+  const login = await get(fresh, '/auth/login');
+  check(
+    'cookie wins over header default: login page in English',
+    htmlAttr(login.html, 'lang') === 'en' &&
+      login.html.includes('Sign in') &&
+      !login.html.includes('Kata sandi'),
+  );
+  // Logged in: the menu (SSR) follows the locale, and the choice is persisted to the profile.
+  await post(admin, '/lang', {
+    _csrf: csrfOf((await get(admin, '/lang')).html),
+    lang: 'en',
+    back: '/dashboard',
+  });
+  const dash = await get(admin, '/dashboard');
+  check(
+    'dashboard menu rendered in English server-side ("Users", "Groups & permissions")',
+    dash.html.includes('>Users<') && dash.html.includes('Groups &amp; permissions'),
+  );
+  const profile = await get(admin, '/profile');
+  check(
+    'profile locale persisted (select shows en)',
+    /<option value="en"[^>]*selected/.test(profile.html),
+  );
+  await post(admin, '/lang', {
+    _csrf: csrfOf((await get(admin, '/lang')).html),
+    lang: 'id',
+    back: '/dashboard',
+  });
+  const back = await get(admin, '/dashboard');
+  check('switching back to id restores the Indonesian menu', back.html.includes('>Pengguna<'));
+}
+
 console.log(
-  failures === 0 ? '\nGATE M2 #1 #2 #3 #6(tema): LOLOS' : `\nGATE M2: GAGAL (${failures})`,
+  failures === 0 ? '\nGATE M2 #1 #2 #3 #6(tema+bahasa): LOLOS' : `\nGATE M2: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);

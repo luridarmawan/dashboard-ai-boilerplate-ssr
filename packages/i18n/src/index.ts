@@ -1,0 +1,95 @@
+import { LOCALES, type Locale, type MessageKey, messages } from './generated/messages.ts';
+
+/**
+ * i18n runtime (PRD K-1…K-5). Messages are plain JSON per locale: core in
+ * `packages/i18n/messages/<locale>.json`, modules in `modules/<Name>/i18n/<locale>.json`
+ * (keys namespaced `<ns>.*`, K-6). `modules:sync` merges them into the generated `messages.ts`,
+ * so `MessageKey` is a union of every key that exists — a typo fails `bun check` (K-5).
+ */
+export { LOCALES, type Locale, type MessageKey, messages };
+
+export const DEFAULT_LOCALE: Locale = 'id';
+
+export function isLocale(v: unknown): v is Locale {
+  return typeof v === 'string' && (LOCALES as readonly string[]).includes(v);
+}
+
+export type Params = Record<string, string | number>;
+
+/** `{name}` placeholders; unknown placeholders are left visible rather than swallowed. */
+export function interpolate(template: string, params?: Params): string {
+  if (!params) return template;
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m));
+}
+
+export type Translate = (key: MessageKey, params?: Params) => string;
+
+/**
+ * A translator bound to one locale. Missing key: falls back to the default locale, then to the
+ * key itself — never an empty string (K-4); dev logs a warning once per key.
+ */
+export function createTranslator(locale: Locale, onMissing?: (key: string) => void): Translate {
+  const primary = messages[locale] as Record<string, string>;
+  const fallback = messages[DEFAULT_LOCALE] as Record<string, string>;
+  const warned = new Set<string>();
+  return (key, params) => {
+    const text = primary[key] ?? fallback[key];
+    if (text === undefined) {
+      if (!warned.has(key)) {
+        warned.add(key);
+        onMissing?.(key);
+      }
+      return key;
+    }
+    return interpolate(text, params);
+  };
+}
+
+export interface LocaleResolutionInput {
+  /** The user's saved preference (D-4). */
+  readonly user?: string | null;
+  /** `dab_lang` cookie — anonymous visitors, and persistence for the picker (K-7). */
+  readonly cookie?: string | null;
+  /** Raw `Accept-Language` header. */
+  readonly acceptLanguage?: string | null;
+  /** Tenant / global default from configuration (K-3); M3 wires the tenant part. */
+  readonly defaultLocale?: string | null;
+}
+
+export interface LocaleResolution {
+  readonly locale: Locale;
+  readonly source: 'user' | 'cookie' | 'header' | 'default';
+}
+
+/** K-2: user → cookie → Accept-Language → configured default → built-in default. Server-side. */
+export function resolveLocale(input: LocaleResolutionInput): LocaleResolution {
+  if (isLocale(input.user)) return { locale: input.user, source: 'user' };
+  if (isLocale(input.cookie)) return { locale: input.cookie, source: 'cookie' };
+  for (const lang of parseAcceptLanguage(input.acceptLanguage)) {
+    const short = lang.split('-')[0] ?? lang;
+    if (isLocale(lang)) return { locale: lang, source: 'header' };
+    if (isLocale(short)) return { locale: short, source: 'header' };
+  }
+  if (isLocale(input.defaultLocale)) return { locale: input.defaultLocale, source: 'default' };
+  return { locale: DEFAULT_LOCALE, source: 'default' };
+}
+
+/** Languages from an Accept-Language header, best quality first. */
+export function parseAcceptLanguage(header: string | null | undefined): string[] {
+  if (!header) return [];
+  return header
+    .split(',')
+    .map((part, i) => {
+      const [tag, ...params] = part.trim().split(';');
+      const q = params.map((p) => p.trim()).find((p) => p.startsWith('q='));
+      return { tag: (tag ?? '').toLowerCase(), q: q ? Number(q.slice(2)) : 1, i };
+    })
+    .filter((x) => x.tag && x.tag !== '*' && x.q > 0)
+    .sort((a, b) => b.q - a.q || a.i - b.i)
+    .map((x) => x.tag);
+}
+
+/** Only the ACTIVE locale's messages travel to the browser — never the whole catalogue. */
+export function messagesFor(locale: Locale): Readonly<Record<string, string>> {
+  return messages[locale] as Record<string, string>;
+}

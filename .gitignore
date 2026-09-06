@@ -14,4 +14,5 @@ apps/web/src/routes/m/
 # local harness files
 .claude/settings.local.json
 packages/module-kit/src/generated/
+packages/i18n/src/generated/
 .proof-logs/

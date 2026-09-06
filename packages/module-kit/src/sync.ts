@@ -89,6 +89,8 @@ export interface SyncResult {
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
+  /** Module translation keys merged into the catalogue (K-6). */
+  readonly i18nKeys: number;
 }
 
 export class SyncError extends Error {
@@ -111,6 +113,8 @@ const WEB_ROUTE_FILES = new Set([
 
 /** Written into the generated web route dir; sync refuses to wipe a dir that lacks it. */
 const WEB_MARKER = '.generated-by-modules-sync';
+/** Supported locales (K-1). Adding one = a new JSON file in packages/i18n/messages + this list. */
+export const I18N_LOCALES = ['id', 'en'] as const;
 
 export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const root = resolve(opts.root);
@@ -153,6 +157,11 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const hookModules: RuntimeModuleRecord[] = [];
   const jobModules: RuntimeModuleRecord[] = [];
   const jobOwner = new Map<string, string>();
+  // Extension point 7 (K-6): module messages, merged into one typed catalogue per locale.
+  const i18n: Record<string, Record<string, string>> = {};
+  for (const l of I18N_LOCALES) i18n[l] = {};
+  const i18nOwner = new Map<string, string>();
+  let i18nKeys = 0;
 
   const tableOwner = new Map<string, string>();
   const permOwner = new Map<string, string>();
@@ -400,6 +409,67 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- i18n/<locale>.json (extension point 7, K-6) ----
+    const i18nDir = join(dir, 'i18n');
+    if (existsSync(i18nDir)) {
+      const perLocale: Record<string, Record<string, string>> = {};
+      for (const locale of I18N_LOCALES) {
+        const f = join(i18nDir, `${locale}.json`);
+        if (!existsSync(f)) continue;
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(readFileSync(f, 'utf8'));
+        } catch (e) {
+          problems.push(`${tag}: i18n/${locale}.json tidak bisa dibaca — ${(e as Error).message}`);
+          continue;
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          problems.push(`${tag}: i18n/${locale}.json harus objek datar { "kunci": "teks" }`);
+          continue;
+        }
+        const flat: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+          if (typeof v !== 'string') {
+            problems.push(`${tag}: i18n/${locale}.json: "${k}" harus string`);
+            continue;
+          }
+          if (!k.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: kunci terjemahan "${k}" harus diawali "${ns}." (K-6, G-9)`);
+            continue;
+          }
+          flat[k] = v;
+        }
+        perLocale[locale] = flat;
+      }
+      const base = perLocale[I18N_LOCALES[0]] ?? {};
+      for (const k of Object.keys(base)) {
+        const owner = i18nOwner.get(k);
+        if (owner && owner !== manifest.name) {
+          problems.push(`kunci terjemahan "${k}" dimiliki ${owner} dan ${manifest.name}`);
+          continue;
+        }
+        i18nOwner.set(k, manifest.name);
+        i18nKeys++;
+      }
+      for (const locale of I18N_LOCALES) {
+        const dict = perLocale[locale];
+        if (!dict) {
+          if (Object.keys(base).length)
+            warnings.push(
+              `${tag}: i18n/${locale}.json tidak ada — memakai fallback ${I18N_LOCALES[0]} (K-4)`,
+            );
+          continue;
+        }
+        const missing = Object.keys(base).filter((k) => !(k in dict));
+        if (missing.length)
+          warnings.push(
+            `${tag}: i18n/${locale}.json belum menerjemahkan ${missing.length} kunci (mis. ${missing[0]})`,
+          );
+        for (const [k, v] of Object.entries(dict))
+          if (i18nOwner.get(k) === manifest.name) (i18n[locale] as Record<string, string>)[k] = v;
+      }
+    }
+
     // ---- web/routes/** (extension point 3) ----
     const webDir = join(dir, 'web', 'routes');
     if (existsSync(webDir)) {
@@ -445,6 +515,12 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         emitRegistry(ordered, permissions, menu),
       ),
     );
+    files.push(
+      await writeFile(
+        join(root, 'packages/i18n/src/generated/messages.ts'),
+        emitMessages(root, i18n),
+      ),
+    );
     if (existsSync(join(root, 'apps/api'))) {
       const out = join(root, 'apps/api/src/generated/modules.ts');
       files.push(
@@ -468,6 +544,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   }
 
   return {
+    i18nKeys,
     modules: ordered,
     tables,
     permissions,
@@ -739,4 +816,30 @@ function importPath(from: string, to: string): string {
   let rel = relative(dirname(to), from).split('\\').join('/');
   if (!rel.startsWith('.')) rel = `./${rel}`;
   return rel;
+}
+
+/**
+ * One typed catalogue per locale: core messages (packages/i18n/messages/<locale>.json) merged
+ * with every module's. `as const` makes `MessageKey` the union of ALL keys (K-5).
+ */
+function emitMessages(root: string, modules: Record<string, Record<string, string>>): string {
+  const merged: Record<string, Record<string, string>> = {};
+  for (const locale of I18N_LOCALES) {
+    const coreFile = join(root, 'packages/i18n/messages', `${locale}.json`);
+    const core = existsSync(coreFile)
+      ? (JSON.parse(readFileSync(coreFile, 'utf8')) as Record<string, string>)
+      : {};
+    merged[locale] = { ...core, ...(modules[locale] ?? {}) };
+  }
+  const first = I18N_LOCALES[0];
+  return `${GEN_HEADER}
+export const LOCALES = ${JSON.stringify(I18N_LOCALES)} as const;
+export type Locale = (typeof LOCALES)[number];
+
+/** Core + module messages per locale (K-6). Only the active locale is sent to the browser. */
+export const messages = ${JSON.stringify(merged, null, 2)} as const;
+
+/** Every key that exists in the ${first} catalogue — a typo is a type error (K-5). */
+export type MessageKey = keyof (typeof messages)['${first}'] & string;
+`;
 }

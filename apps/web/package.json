@@ -11,6 +11,7 @@
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings"
   },
   "dependencies": {
+    "@core/i18n": "workspace:*",
     "@core/module-kit": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@elysiajs/eden": "^1.4.0",

@@ -2,6 +2,7 @@
 import '../app.css';
 import { setContext } from 'svelte';
 import Toaster from '$lib/components/ui/Toaster.svelte';
+import { provideI18n } from '$lib/i18n';
 import type { LayoutData } from './$types';
 
 /**
@@ -20,6 +21,14 @@ setContext('ui-theme', {
   },
   get mode() {
     return data.theme.mode;
+  },
+});
+provideI18n({
+  get locale() {
+    return data.locale;
+  },
+  get messages() {
+    return data.messages;
   },
 });
 </script>

@@ -2,6 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 import type { LayoutData } from './$types';
 
 /**
@@ -11,13 +12,14 @@ import type { LayoutData } from './$types';
  */
 let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 const Layout = $derived(data.Layout);
+const t = useT();
 const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 </script>
 
 {#snippet brand()}
   <a href="/dashboard" class="flex items-center gap-2 font-semibold text-foreground no-underline hover:no-underline">
     <Icon name="sparkles" class="text-primary" />
-    <span>Dashboard</span>
+    <span>{t('app.name')}</span>
   </a>
 {/snippet}
 
@@ -52,24 +54,25 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
     <form method="POST" action="/auth/switch-tenant" class="flex items-center gap-1">
       <Csrf token={data.csrf} />
       <input type="hidden" name="back" value={data.path} />
-      <label class="sr-only" for="tenant-switch">Tenant</label>
+      <label class="sr-only" for="tenant-switch">{t('shell.tenant')}</label>
       <select id="tenant-switch" name="clientId" class="h-8 rounded-md border border-input bg-background px-2 text-sm">
         {#each data.tenants as t (t.id)}
           <option value={t.id} selected={t.id === data.clientId}>{t.name}</option>
         {/each}
       </select>
-      <Button type="submit" variant="outline" size="sm">Ganti</Button>
+      <Button type="submit" variant="outline" size="sm">{t('shell.switch_tenant')}</Button>
     </form>
   {:else if activeTenant}
     <span class="hidden text-sm text-muted-foreground sm:inline">{activeTenant.name}</span>
   {/if}
-  <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label="Tema & tampilan"><Icon name="palette" size={18} /></a>
+  <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('shell.theme_link')}><Icon name="palette" size={18} /></a>
+  <a href={`/lang?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('nav.language')}><Icon name="language" size={18} /></a>
   <a href="/profile" class="hidden items-center gap-2 rounded-md px-2 py-1 text-sm no-underline hover:bg-accent hover:no-underline sm:flex">
     <Icon name="user" size={18} /><span>{data.user.name}</span>
   </a>
   <form method="POST" action="/auth/logout">
     <Csrf token={data.csrf} />
-    <Button type="submit" variant="ghost" size="sm" aria-label="Keluar"><Icon name="logout" size={18} /><span class="hidden sm:inline">Keluar</span></Button>
+    <Button type="submit" variant="ghost" size="sm" aria-label={t('nav.logout')}><Icon name="logout" size={18} /><span class="hidden sm:inline">{t('nav.logout')}</span></Button>
   </form>
 {/snippet}
 
@@ -87,12 +90,12 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 {/snippet}
 
 {#snippet content()}
-  {#if data.tenantError}<p class="error mb-4">Tenant tidak bisa diganti — Anda bukan anggotanya.</p>{/if}
+  {#if data.tenantError}<p class="error mb-4">{t('shell.tenant_error')}</p>{/if}
   {@render children()}
 {/snippet}
 
 {#snippet footer()}
-  <span>Dashboard AI Boilerplate · tema <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
+  <span>{t('shell.footer')} · tema <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
 {/snippet}
 
 <Layout {brand} {nav} {header} {breadcrumb} {content} {footer} />

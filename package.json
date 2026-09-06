@@ -49,6 +49,7 @@
     "@core/auth": "workspace:*",
     "@core/config": "workspace:*",
     "@core/db": "workspace:*",
+    "@core/i18n": "workspace:*",
     "@core/module-kit": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@types/bun": "^1.2.0",

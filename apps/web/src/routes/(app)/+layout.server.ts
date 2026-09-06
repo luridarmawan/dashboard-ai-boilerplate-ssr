@@ -15,7 +15,7 @@ export const load: LayoutServerLoad = async (event) => {
   const s = event.locals.session;
   if (!s)
     redirect(303, `/auth/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
-  const locale = s.user.locale === 'en' ? 'en' : 'id';
+  const locale = event.locals.locale.locale;
   const menu = buildMenu(s, event.url.pathname, locale);
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'dashboard', variant);

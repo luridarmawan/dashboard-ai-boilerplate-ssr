@@ -1,3 +1,4 @@
+import type { Locale } from '@core/i18n';
 import { moduleMenu } from '@core/module-kit/registry';
 import type { Session } from './session.ts';
 
@@ -70,11 +71,7 @@ export const CORE_MENU: readonly Entry[] = [
   },
 ];
 
-export function buildMenu(
-  session: Session,
-  pathname: string,
-  locale: 'id' | 'en' = 'id',
-): MenuItem[] {
+export function buildMenu(session: Session, pathname: string, locale: Locale = 'id'): MenuItem[] {
   const all: Entry[] = [...CORE_MENU, ...moduleMenu];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));
   const byId = new Map<string, MenuItem>();
@@ -115,7 +112,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function buildBreadcrumb(
   pathname: string,
   menu: MenuItem[],
-  locale: 'id' | 'en' = 'id',
+  locale: Locale = 'id',
 ): Crumb[] {
   const labels = new Map<string, string>();
   const collect = (list: MenuItem[]) => {

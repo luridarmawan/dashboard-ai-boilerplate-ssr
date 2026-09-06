@@ -1,0 +1,14 @@
+{
+  "name": "@core/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Internationalisation: typed message keys, server-side locale resolution, module message merging (PRD FR-K)",
+  "exports": {
+    ".": "./src/index.ts",
+    "./messages": "./src/generated/messages.ts"
+  },
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  }
+}

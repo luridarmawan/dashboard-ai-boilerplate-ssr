@@ -9,6 +9,7 @@
         "@core/auth": "workspace:*",
         "@core/config": "workspace:*",
         "@core/db": "workspace:*",
+        "@core/i18n": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/ui-theme": "workspace:*",
         "@types/bun": "^1.2.0",
@@ -33,6 +34,7 @@
       "name": "@app/web",
       "version": "0.0.0",
       "dependencies": {
+        "@core/i18n": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/ui-theme": "workspace:*",
         "@elysiajs/eden": "^1.4.0",
@@ -111,6 +113,10 @@
         "drizzle-kit": "^0.31.0",
       },
     },
+    "packages/i18n": {
+      "name": "@core/i18n",
+      "version": "0.0.0",
+    },
     "packages/module-kit": {
       "name": "@core/module-kit",
       "version": "0.0.0",
@@ -165,6 +171,8 @@
     "@core/contracts": ["@core/contracts@workspace:packages/contracts"],
 
     "@core/db": ["@core/db@workspace:packages/db"],
+
+    "@core/i18n": ["@core/i18n@workspace:packages/i18n"],
 
     "@core/module-kit": ["@core/module-kit@workspace:packages/module-kit"],
 
