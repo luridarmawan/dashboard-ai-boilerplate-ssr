@@ -12,6 +12,7 @@ const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
 const TOKEN = 'C'.repeat(43);
 const run = Date.now();
+const RUN_IP = `10.77.${Math.floor(run / 1000) % 250}.${run % 250}`;
 const adminEmail = `seed-admin-${run}@example.test`;
 const adminPassword = 'a bootstrap admin password';
 const userEmail = `member-${run}@example.test`;
@@ -27,6 +28,9 @@ const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   headers.set('origin', ORIGIN);
   headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
+  // A per-run client IP: the login rate limit (A-2) is keyed by IP and lives in the shared dev
+  // database for 15 minutes, so repeated local runs must not exhaust each other's budget.
+  if (!headers.has('x-forwarded-for')) headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
   return app.handle(new Request(`${ORIGIN}${path}`, { ...init, headers }));
 };
