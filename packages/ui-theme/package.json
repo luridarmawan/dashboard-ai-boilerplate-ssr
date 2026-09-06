@@ -3,8 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Kontrak tema: token, registry ikon & layout, validator (PRD §4.8, FR-L)",
+  "description": "Theme contract: tokens, icon & layout registries, resolution chain, validator (PRD §4.8, FR-L)",
+  "exports": {
+    ".": "./src/index.ts",
+    "./themes/*": "./themes/*",
+    "./icons/registry.json": "./icons/registry.json",
+    "./layouts/registry.json": "./layouts/registry.json"
+  },
   "files": [
+    "src",
     "themes",
     "icons",
     "layouts",
@@ -12,6 +19,6 @@
   ],
   "scripts": {
     "validate": "node validate.mjs",
-    "typecheck": "echo 'ui-theme: tidak ada TS di M0'"
+    "typecheck": "tsc -p tsconfig.json"
   }
 }

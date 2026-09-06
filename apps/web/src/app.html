@@ -1,8 +1,22 @@
 <!doctype html>
-<html lang="%lang%" data-app-theme="base">
+<html lang="%lang%" data-app-theme="%theme%" data-mode="%mode%">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Theme + mode are decided on the SERVER (hooks.server.ts, PRD L-12) and written into the
+      attributes above before the first byte, so the first paint already has the right palette,
+      icons and layout. This tiny inline script only refines `system` mode from the OS
+      preference before paint; without JavaScript, `system` renders light (L-4).
+    -->
+    <script>
+      (() => {
+        var h = document.documentElement;
+        if (h.getAttribute('data-mode') === 'system') {
+          h.setAttribute('data-mode', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        }
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
