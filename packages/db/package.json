@@ -14,7 +14,9 @@
     "generate": "bun run scripts/codegen.ts && drizzle-kit generate --config drizzle.mysql.config.ts && drizzle-kit generate --config drizzle.pg.config.ts",
     "typecheck": "bun run typecheck:mysql && bun run typecheck:postgres",
     "typecheck:mysql": "DB_DIALECT=mysql bun run scripts/codegen.ts && tsc -p tsconfig.json",
-    "typecheck:postgres": "DB_DIALECT=postgres bun run scripts/codegen.ts && tsc -p tsconfig.json"
+    "typecheck:postgres": "DB_DIALECT=postgres bun run scripts/codegen.ts && tsc -p tsconfig.json",
+    "migrate": "bun run scripts/codegen.ts && bun run scripts/migrate.ts",
+    "smoke": "bun run scripts/codegen.ts && bun run scripts/smoke.ts"
   },
   "dependencies": {
     "@core/config": "workspace:*",

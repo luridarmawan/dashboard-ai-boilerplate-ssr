@@ -1,9 +1,13 @@
 import { drizzle, type MySql2Database } from 'drizzle-orm/mysql2';
-import mysql from 'mysql2/promise';
+import mysql, { type Pool } from 'mysql2/promise';
 import * as schema from '../generated/schema.mysql.ts';
 
-/** Concrete database type for MySQL/MariaDB. Re-exported as `Db` through `generated/active.ts`. */
-export type Db = MySql2Database<typeof schema>;
+/**
+ * Concrete database type for MySQL/MariaDB. Re-exported as `Db` through `generated/active.ts`.
+ * `$client` is the underlying pool — for infrastructure scripts (migrate, smoke) to close
+ * cleanly; domain code never touches it.
+ */
+export type Db = MySql2Database<typeof schema> & { $client: Pool };
 
 /**
  * Creates ONE pool + Drizzle instance. Never call this from domain code — use `getDb()`

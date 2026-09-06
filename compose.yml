@@ -1,0 +1,92 @@
+# Development databases (PRD P-2). Nothing is installed on the host — every service is a
+# disposable container.
+#
+#   docker compose up -d                       MySQL 8 only (the default dialect)
+#   docker compose --profile redis up -d       + Valkey (optional accelerator, Decision M)
+#   docker compose --profile matrix up -d      + MariaDB 11 + PostgreSQL 16 (the tier-1 matrix, P-9)
+#
+# Host ports deliberately avoid the well-known ones (3306/5432/6379) so these containers
+# never collide with a database already installed on the machine. Override with
+# MYSQL_PORT / MARIADB_PORT / POSTGRES_PORT / VALKEY_PORT if needed.
+
+name: dashboard-ai-boilerplate
+
+services:
+  mysql:
+    image: mysql:8
+    # Explicit server defaults so a forgotten COLLATE in DDL fails loudly rather than
+    # silently inheriting utf8mb4_0900_ai_ci, which MariaDB does not have (§4.3).
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+    ports:
+      - '${MYSQL_PORT:-33306}:3306'
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-proot']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mariadb:
+    image: mariadb:11
+    profiles: ['matrix']
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: app
+      MARIADB_USER: app
+      MARIADB_PASSWORD: app
+    ports:
+      - '${MARIADB_PORT:-33307}:3306'
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  postgres:
+    image: postgres:16
+    profiles: ['matrix']
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - '${POSTGRES_PORT:-35432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d app']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    profiles: ['redis']
+    ports:
+      - '${VALKEY_PORT:-36379}:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  mysql-data:
+  mariadb-data:
+  postgres-data:

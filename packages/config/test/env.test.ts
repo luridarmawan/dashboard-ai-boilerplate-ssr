@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { EnvError, loadEnv } from '../src/index.ts';
 
 const valid = {
-  DATABASE_URL: 'mysql://app:app@127.0.0.1:3306/app',
+  DATABASE_URL: 'mysql://app:app@127.0.0.1:33306/app',
 };
 
 describe('loadEnv (P-4, E-6, Keputusan M)', () => {
