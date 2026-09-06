@@ -29,21 +29,13 @@ const out = join(root, '.bun-create', 'module');
 const check = process.argv.includes('--check');
 const starterDir = join(root, 'scripts', 'modgen', 'starter');
 
-const remote = Bun.spawnSync(['git', 'remote', 'get-url', 'origin'], {
-  cwd: root,
-  stdout: 'pipe',
-  stderr: 'pipe',
-});
-/** Clone URL for the harness: https so CI runners without SSH keys can fetch core. */
-const httpsOf = (url: string) =>
-  url
-    .replace(/^git@github\.com:/, 'https://github.com/')
-    .replace(/^ssh:\/\/git@github\.com\//, 'https://github.com/');
+/**
+ * Clone URL the standalone harness uses. Deterministic on purpose: it must not depend on how the
+ * local checkout's remote is spelled (ssh vs https, with or without .git), or `ci:starter-check`
+ * would disagree between machines. Override with CORE_REPO when building for a fork.
+ */
 const CORE_REPO =
-  process.env.CORE_REPO ??
-  (remote.exitCode === 0
-    ? httpsOf(remote.stdout.toString().trim())
-    : 'https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git');
+  process.env.CORE_REPO ?? 'https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git';
 
 const spec = makeSpec({
   name: 'Hello',
