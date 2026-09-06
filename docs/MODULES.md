@@ -249,8 +249,31 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 | 9 event hook · 12 job terjadwal | M0 akhir (G-17, G-18) — kontraknya sedang ditulis |
 | 8 tool AI/MCP · 11 widget dashboard | M2/M5 |
 | 13 halaman publik · 14 tema · 15 layout · 16 set ikon | M2/M4 |
-| Modul dari **repositori git terpisah** (`bun modules:add <url>`, `source: "submodule"`) | M0 gate 5 — berikutnya |
+| Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |
 | Modul sebagai paket npm (`source: "package"`) | M6 |
 | `bun modgen` (generator CRUD) · starter repo modul | M6 |
+
+---
+
+## 7. Modul di repositori sendiri
+
+Tim lain boleh mengembangkan modul di repositorinya sendiri dengan siklus rilisnya sendiri (PRD §4.9). Struktur foldernya **sama persis** dengan modul lokal — hanya lokasinya yang berbeda.
+
+```bash
+# di host: pasang dari git, terkunci pada tag/commit — branch ditolak (Keputusan L)
+bun modules:add git@github.com:tim/mod-billing.git --ref v1.4.2
+git add modules.json .gitmodules biome.json modules/Billing && git commit -m "modul Billing v1.4.2"
+```
+
+Yang dilakukan perintah itu: `git submodule add` ke `modules/<Nama>` (nama dibaca dari `module.json` repo), `git checkout --detach <ref>`, entri `{ "source": "submodule", "repo", "ref", "path" }` ke `modules.json`, pengecualian path itu dari Biome host, `bun install`, lalu `modules:sync`.
+
+Aturan yang dijaga `modules:sync` untuk sumber `submodule`:
+
+- **Ref terkunci diverifikasi setiap sync.** HEAD submodule harus sama dengan `ref` di `modules.json`; kalau bergeser, sync gagal dan menyebut kedua commit. Menaikkan versi = ubah `ref` di `modules.json`, `git -C modules/<Nama> checkout <ref>`, sync.
+- **Submodule kosong di-init otomatis** (`git submodule update --init`) — clone baru tinggal `bun install && bun modules:sync`. CI men-checkout dengan `submodules: true`.
+- **Modifikasi lokal di folder submodule hanya diperingatkan**, bukan ditolak — tapi jangan: ubah di repo asalnya, rilis tag baru, naikkan `ref`.
+- Host **tidak** me-lint/memformat kode modul eksternal; modul itu tanggung jawab reponya sendiri (§4.9 poin 2). Starter repo dengan konfigurasi build/lint/test mandiri **[menyusul di M6, G-12]**.
+
+`tsconfig.json` modul mengacu `../../tsconfig.base.json` — benar saat terpasang di host. Typecheck mandiri di repo modul sendiri menunggu starter M6.
 
 Kalau Anda membutuhkan salah satu di atas sekarang, yang benar adalah **mempercepat kontraknya**, bukan mengimpor internal core dari modul. Impor internal akan pecah pada rilis berikutnya dan tidak akan lolos review.

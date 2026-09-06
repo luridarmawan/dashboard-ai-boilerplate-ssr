@@ -27,6 +27,7 @@
     "dev:db": "docker compose up -d --wait",
     "format": "biome format --write .",
     "lint": "biome check .",
+    "modules:add": "bun run scripts/modules-add.ts",
     "modules:sync": "bun run scripts/modules-sync.ts",
     "predev": "bun run modules:sync && bun run db:codegen",
     "test": "bun run modules:sync && bun run db:codegen && bun test",

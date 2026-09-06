@@ -73,6 +73,8 @@ export interface SyncResult {
   readonly apiModules: readonly ApiModuleRecord[];
   readonly webRoutes: readonly WebRouteRecord[];
   readonly files: readonly string[];
+  /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
+  readonly warnings: readonly string[];
 }
 
 export class SyncError extends Error {
@@ -100,6 +102,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const root = resolve(opts.root);
   const write = opts.write ?? true;
   const problems: string[] = [];
+  const warnings: string[] = [];
 
   // ---- modules.json ----
   const modulesFile = join(root, 'modules.json');
@@ -148,12 +151,39 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       problems.push(`${tag}: sumber "package" belum didukung di M0 — pakai local atau submodule`);
       continue;
     }
-    if (!existsSync(dir)) {
-      problems.push(
-        src.source === 'submodule'
-          ? `${tag}: folder tidak ada — jalankan \`git submodule update --init ${rel}\` (ref ${src.ref})`
-          : `${tag}: folder tidak ada`,
-      );
+    if (src.source === 'submodule') {
+      // G-10: a submodule may be un-initialised on a fresh clone — bring it in, then make sure
+      // the checkout is exactly the pinned ref. A drifted checkout is an error, not a warning:
+      // modules.json must be enough to reproduce the build (Q-5).
+      if (!existsSync(dir) || readdirSync(dir).length === 0) {
+        const init = git(root, ['submodule', 'update', '--init', '--', rel]);
+        if (!init.ok) {
+          problems.push(`${tag}: submodule gagal di-init dari ${src.repo} — ${init.out}`);
+          continue;
+        }
+      }
+      const want = git(dir, ['rev-parse', '--verify', `${src.ref}^{commit}`]);
+      const have = git(dir, ['rev-parse', 'HEAD']);
+      if (!want.ok || !have.ok) {
+        problems.push(
+          `${tag}: tidak bisa memverifikasi ref "${src.ref}" — ${want.out || have.out}`,
+        );
+        continue;
+      }
+      if (want.out !== have.out) {
+        problems.push(
+          `${tag}: terkunci pada ${src.ref} (${want.out.slice(0, 12)}) tapi checkout di ${have.out.slice(0, 12)} — jalankan \`git -C ${rel} checkout ${src.ref}\` atau perbarui ref di modules.json`,
+        );
+        continue;
+      }
+      const dirty = git(dir, ['status', '--porcelain', '--untracked-files=normal']);
+      if (dirty.ok && dirty.out.length > 0) {
+        warnings.push(
+          `${tag}: folder submodule dimodifikasi lokal — ubah di repo asalnya, bukan di sini (§4.9 poin 5):\n      ${dirty.out.split('\n').slice(0, 5).join('\n      ')}`,
+        );
+      }
+    } else if (!existsSync(dir)) {
+      problems.push(`${tag}: folder tidak ada`);
       continue;
     }
 
@@ -357,7 +387,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     }
   }
 
-  return { modules: ordered, tables, permissions, menu, apiModules, webRoutes, files };
+  return { modules: ordered, tables, permissions, menu, apiModules, webRoutes, files, warnings };
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +441,12 @@ async function loadDefault<T>(
     );
     return undefined;
   }
+}
+
+function git(cwd: string, args: string[]): { ok: boolean; out: string } {
+  const p = Bun.spawnSync(['git', ...args], { cwd, stdout: 'pipe', stderr: 'pipe' });
+  const out = (p.exitCode === 0 ? p.stdout : p.stderr).toString().trim();
+  return { ok: p.exitCode === 0, out };
 }
 
 /** Duck-typed so module-kit does not depend on elysia: an instance has `routes[]` and `handle()`. */

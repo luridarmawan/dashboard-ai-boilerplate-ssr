@@ -17,6 +17,7 @@ try {
     `modules:sync: ${result.modules.length} modul [${names}] → ${result.tables.length} tabel, ${result.permissions.length} izin, ${result.menu.length} menu`,
   );
   for (const f of result.files) console.log(`  ↳ ${relative(root, f)}`);
+  for (const w of result.warnings) console.warn(`  ⚠ ${w}`);
 } catch (err) {
   if (err instanceof SyncError) {
     console.error(err.message);
