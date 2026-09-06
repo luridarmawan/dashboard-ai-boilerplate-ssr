@@ -38,6 +38,8 @@ const envSchema = z
     RATELIMIT_DRIVER: driver,
     REDIS_URL: z.url().optional(),
 
+    /** Bind address. 127.0.0.1 on a developer machine; 0.0.0.0 inside a container. */
+    API_HOST: z.string().min(1).default('127.0.0.1'),
     /** Port the Elysia process listens on; the reverse proxy fronts it in production (§4.4). */
     API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
     /** Where SvelteKit's server-side code reaches the API — internal hop, same host by default. */
@@ -50,6 +52,9 @@ const envSchema = z
       .transform((v) => v === 'true'),
     /** Stable identity of this process in lease rows and logs; defaults to hostname:pid. */
     INSTANCE_ID: z.string().min(1).optional(),
+
+    /** Upload storage root — a mapped volume in production (Q-9). Local adapter; S3 is optional later (Q-16). */
+    UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
 
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
     LANDING_ROUTE: z.string().startsWith('/').default('/m/example'),
@@ -97,7 +102,10 @@ export class EnvError extends Error {
 
 /** Parse & validate. Throws `EnvError` carrying ALL problems at once, not one at a time. */
 export function loadEnv(source: Readonly<Record<string, string | undefined>> = process.env): Env {
-  const result = envSchema.safeParse(source);
+  // An empty value means "not set": compose files and CI commonly pass `VAR=` for optional
+  // settings, and `REDIS_URL=` must not be rejected as an invalid URL.
+  const cleaned = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== ''));
+  const result = envSchema.safeParse(cleaned);
   if (result.success) return result.data;
   const problems = result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
   throw new EnvError(problems);

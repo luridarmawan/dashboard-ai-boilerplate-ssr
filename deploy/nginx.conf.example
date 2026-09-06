@@ -1,0 +1,42 @@
+# Nginx equivalent of deploy/Caddyfile for teams with an existing Nginx standard (PRD Q-3).
+# TLS is left to your certbot setup. Upstreams point at the compose services; when scaling api,
+# add one server line per replica or resolve via Docker DNS with `resolver 127.0.0.11`.
+
+upstream dab_api { server api:3001; }
+upstream dab_web { server web:3000; }
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    location ~ ^/(v1/|docs|openapi\.json) {
+        proxy_pass http://dab_api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_buffering off;          # streaming AI responses (FR-H)
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        proxy_pass http://dab_web;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+}
+
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}

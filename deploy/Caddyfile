@@ -1,0 +1,39 @@
+# Reverse proxy for the single-VPS stack (PRD Decision D, E). Automatic TLS via Let's Encrypt for a
+# real DOMAIN; for `localhost` Caddy issues a certificate from its internal CA. One origin: the API is
+# reachable on the same host under /v1, so cookies and CORS never cross domains.
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Same-origin API surface. Dynamic upstreams resolve every replica of `api` (--scale api=N).
+	@api path /v1/* /docs /docs/* /openapi.json
+	reverse_proxy @api {
+		dynamic a {
+			name api
+			port 3001
+			refresh 5s
+		}
+		health_uri /v1/health
+		health_interval 10s
+	}
+
+	reverse_proxy {
+		dynamic a {
+			name web
+			port 3000
+			refresh 5s
+		}
+	}
+
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

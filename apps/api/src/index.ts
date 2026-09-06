@@ -5,7 +5,7 @@ import { createRuntime } from './runtime.ts';
 // Fail fast on a bad environment before the port is even opened (P-4).
 const e = env();
 
-app.listen({ port: e.API_PORT, hostname: '127.0.0.1' });
+app.listen({ port: e.API_PORT, hostname: e.API_HOST });
 
 // Event bus + scheduler live for the life of the process; stop cleanly so a running job can
 // finish (or abort) before the port closes.
@@ -27,8 +27,8 @@ console.log(
     t: new Date().toISOString(),
     level: 'info',
     msg: 'api listening',
-    url: `http://127.0.0.1:${e.API_PORT}`,
-    docs: `http://127.0.0.1:${e.API_PORT}/docs`,
+    url: `http://${e.API_HOST}:${e.API_PORT}`,
+    docs: `http://${e.API_HOST}:${e.API_PORT}/docs`,
     dialect: e.DB_DIALECT,
     instanceId: runtime.instanceId,
     jobs: runtime.scheduler.jobs().map((j) => j.name),

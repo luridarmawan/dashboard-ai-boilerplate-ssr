@@ -36,6 +36,13 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     }
   });
 
+  test('string kosong diperlakukan sebagai tidak diset (REDIS_URL= dari compose)', () => {
+    const env = loadEnv({ ...valid, REDIS_URL: '', INSTANCE_ID: '', TABLE_PREFIX: '' });
+    expect(env.REDIS_URL).toBeUndefined();
+    expect(env.INSTANCE_ID).toBeUndefined();
+    expect(env.TABLE_PREFIX).toBe('');
+  });
+
   test('adapter memory ditolak di production (D1)', () => {
     expect(() => loadEnv({ ...valid, NODE_ENV: 'production', CACHE_DRIVER: 'memory' })).toThrow(
       /memory.*production/,

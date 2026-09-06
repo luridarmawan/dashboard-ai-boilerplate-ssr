@@ -1,0 +1,146 @@
+# Single-VPS production stack (PRD §4.4, Q-1..Q-9). From a clean host with Docker:
+#
+#   cp .env.prod.example .env.prod   # then edit DOMAIN, ACME_EMAIL, secrets
+#   docker compose -f compose.prod.yml build
+#   docker compose -f compose.prod.yml up -d
+#   docker compose -f compose.prod.yml run --rm migrate      # explicit, never automatic (Q-4)
+#   docker compose -f compose.prod.yml up -d --scale api=3   # stateless: scale freely (Decision F)
+#
+# One origin: Caddy terminates TLS and routes / → web, /v1/* /docs /openapi.json → api (Decisions D, E).
+# Valkey is optional (Decision M): `--profile redis`. Everything restarts on crash and on reboot (Q-6).
+
+name: dab-prod
+
+x-logging: &logging
+  # JSON logs must never fill a small VPS disk (Q-7)
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '5'
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DB_DIALECT: ${DB_DIALECT:-mysql}
+  DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+  TABLE_PREFIX: ${TABLE_PREFIX:-}
+  SESSION_DRIVER: ${SESSION_DRIVER:-database}
+  CACHE_DRIVER: ${CACHE_DRIVER:-database}
+  RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
+  REDIS_URL: ${REDIS_URL:-}
+  LANDING_ROUTE: ${LANDING_ROUTE:-/m/example}
+  UPLOADS_DIR: /data/uploads
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    <<: *logging
+
+  web:
+    build:
+      context: .
+      target: web
+      args: { DB_DIALECT: '${DB_DIALECT:-mysql}' }
+    image: ${IMAGE_PREFIX:-dab}/web:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      ORIGIN: https://${DOMAIN:-localhost}
+      API_URL: http://api:3001
+      # SvelteKit trusts the proxy for the client IP / protocol
+      ADDRESS_HEADER: X-Forwarded-For
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+    depends_on:
+      api:
+        condition: service_healthy
+    <<: *logging
+
+  api:
+    # No host port and no container_name → `--scale api=N` just works.
+    build:
+      context: .
+      target: api
+      args: { DB_DIALECT: '${DB_DIALECT:-mysql}' }
+    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      API_HOST: 0.0.0.0
+      API_PORT: 3001
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    <<: *logging
+
+  migrate:
+    # One-off, explicit (Q-4): `docker compose -f compose.prod.yml run --rm migrate`
+    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    profiles: ['ops']
+    environment:
+      <<: *app-env
+      SCHEDULER_ENABLED: 'false'
+    command: ['bun', 'run', '--cwd', 'packages/db', 'migrate']
+    depends_on:
+      mysql:
+        condition: service_healthy
+    <<: *logging
+
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-p${MYSQL_ROOT_PASSWORD:-change-me-root}']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    <<: *logging
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    profiles: ['redis']
+    restart: unless-stopped
+    command: ['valkey-server', '--save', '60', '1', '--appendonly', 'yes']
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    <<: *logging
+
+volumes:
+  caddy-data:
+  caddy-config:
+  mysql-data:
+  valkey-data:
+  uploads:

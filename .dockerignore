@@ -1,0 +1,15 @@
+.git
+.github
+node_modules
+**/node_modules
+**/.svelte-kit
+apps/web/build
+**/generated
+apps/web/src/routes/m
+.env
+.env.*
+!.env.example
+!.env.prod.example
+*.log
+.tmp-modules-add
+docs

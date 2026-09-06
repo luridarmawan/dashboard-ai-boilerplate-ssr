@@ -1,8 +1,8 @@
-import { hostname } from 'node:os';
 import { env } from '@core/config';
 import { getDb } from '@core/db';
 import { createEventBus, createScheduler, type EventBus, type Scheduler } from '@core/runtime';
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
+import { instanceId } from './instance.ts';
 
 /**
  * Process-level runtime services, assembled once per API process:
@@ -22,7 +22,6 @@ export interface Runtime {
 
 export function createRuntime(): Runtime {
   const e = env();
-  const instanceId = e.INSTANCE_ID ?? `${hostname()}:${process.pid}`;
 
   const bus = createEventBus();
   for (const hooks of moduleHooks) bus.register(hooks);

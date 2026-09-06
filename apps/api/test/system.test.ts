@@ -10,7 +10,10 @@ describe('envelope & request id (N-4, M-1)', () => {
     const res = await call('/v1/health');
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ success: true, data: { status: 'ok', uptime: expect.any(Number) } });
+    expect(body).toEqual({
+      success: true,
+      data: { status: 'ok', uptime: expect.any(Number), instance: expect.any(String) },
+    });
     const rid = res.headers.get('x-request-id');
     expect(rid).toMatch(/^[0-9a-f-]{36}$/);
     expect(rid?.[14]).toBe('7'); // UUIDv7 from the single generator (O-6)

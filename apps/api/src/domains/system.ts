@@ -4,6 +4,7 @@ import { OkSchema, ok } from '@core/contracts';
 import { activeDialect, getDb, schema } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import { Elysia, t } from 'elysia';
+import { instanceId } from '../instance.ts';
 
 /**
  * System endpoints (PRD M-4, M-5).
@@ -32,10 +33,16 @@ const ModuleInfo = t.Object({
 });
 
 export const system = new Elysia({ name: 'system', tags: ['system'] })
-  .get('/health', () => ok({ status: 'ok' as const, uptime: Math.round(process.uptime()) }), {
-    response: OkSchema(t.Object({ status: t.Literal('ok'), uptime: t.Integer() })),
-    detail: { summary: 'Liveness — the process is up' },
-  })
+  .get(
+    '/health',
+    () => ok({ status: 'ok' as const, uptime: Math.round(process.uptime()), instance: instanceId }),
+    {
+      response: OkSchema(
+        t.Object({ status: t.Literal('ok'), uptime: t.Integer(), instance: t.String() }),
+      ),
+      detail: { summary: 'Liveness — the process is up' },
+    },
+  )
 
   .get(
     '/ready',
