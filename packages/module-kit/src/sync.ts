@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
-import type { MenuEntryDef, PermissionDef } from './contract.ts';
+import type { MenuEntryDef, PermissionDef, WidgetDef } from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
 import { parseEvery } from './jobs.ts';
 import {
@@ -91,6 +91,7 @@ export interface SyncResult {
   readonly warnings: readonly string[];
   /** Module translation keys merged into the catalogue (K-6). */
   readonly i18nKeys: number;
+  readonly widgets: readonly (WidgetDef & { module: string; path: string })[];
 }
 
 export class SyncError extends Error {
@@ -162,6 +163,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   for (const l of I18N_LOCALES) i18n[l] = {};
   const i18nOwner = new Map<string, string>();
   let i18nKeys = 0;
+  const widgets: (WidgetDef & { module: string; path: string })[] = [];
+  const widgetOwner = new Map<string, string>();
 
   const tableOwner = new Map<string, string>();
   const permOwner = new Map<string, string>();
@@ -409,6 +412,32 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- widgets.ts (extension point 11, G-19) ----
+    const w = await loadDefault<readonly WidgetDef[]>(join(dir, 'widgets.ts'), problems, tag);
+    if (w) {
+      if (!Array.isArray(w))
+        problems.push(`${tag}: widgets.ts harus meng-export default array (pakai defineWidgets)`);
+      else {
+        for (const widget of w) {
+          if (!widget?.id?.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: id widget "${widget?.id}" harus diawali "${ns}." (G-9)`);
+            continue;
+          }
+          if (!existsSync(join(dir, widget.component))) {
+            problems.push(`${tag}: widget "${widget.id}": komponen ${widget.component} tidak ada`);
+            continue;
+          }
+          const owner = widgetOwner.get(widget.id);
+          if (owner)
+            problems.push(`widget "${widget.id}" didefinisikan oleh ${owner} dan ${manifest.name}`);
+          else {
+            widgetOwner.set(widget.id, manifest.name);
+            widgets.push({ ...widget, module: manifest.name, path: `${rel}/${widget.component}` });
+          }
+        }
+      }
+    }
+
     // ---- i18n/<locale>.json (extension point 7, K-6) ----
     const i18nDir = join(dir, 'i18n');
     if (existsSync(i18nDir)) {
@@ -531,6 +560,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       );
     }
     if (existsSync(join(root, 'apps/web/src/routes'))) {
+      const wOut = join(root, 'apps/web/src/generated/widgets.ts');
+      files.push(await writeFile(wOut, emitWidgets(widgets, root, wOut)));
       const mDir = join(root, 'apps/web/src/routes/m');
       resetGeneratedDir(mDir);
       for (const wr of webRoutes) {
@@ -545,6 +576,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
 
   return {
     i18nKeys,
+    widgets,
     modules: ordered,
     tables,
     permissions,
@@ -841,5 +873,39 @@ export const messages = ${JSON.stringify(merged, null, 2)} as const;
 
 /** Every key that exists in the ${first} catalogue — a typo is a type error (K-5). */
 export type MessageKey = keyof (typeof messages)['${first}'] & string;
+`;
+}
+
+/**
+ * Dashboard widget registry for the web app (G-19): metadata for the server-side permission
+ * filter, and a lazy loader per widget so only the widgets a user may see are downloaded.
+ */
+function emitWidgets(
+  widgets: readonly (WidgetDef & { module: string; path: string })[],
+  root: string,
+  out: string,
+): string {
+  const entries = widgets.map((w) => {
+    const from = join(root, w.path);
+    const { module: _m, path: _p, ...meta } = w;
+    return `  {\n    ...${JSON.stringify({ ...meta, module: w.module })},\n    load: () => import('${importPath(from, out)}'),\n  },`;
+  });
+  return `${GEN_HEADER}import type { Component } from 'svelte';
+
+export interface WidgetEntry {
+  readonly id: string;
+  readonly title: { readonly id: string; readonly en: string };
+  readonly component: string;
+  readonly permission?: string;
+  readonly order?: number;
+  readonly size?: 'sm' | 'md' | 'lg';
+  readonly module: string;
+  readonly load: () => Promise<{ default: Component<Record<string, unknown>> }>;
+}
+
+/** Widgets contributed by modules (extension point 11), in module initialisation order. */
+export const moduleWidgets: readonly WidgetEntry[] = [
+${entries.join('\n')}
+];
 `;
 }

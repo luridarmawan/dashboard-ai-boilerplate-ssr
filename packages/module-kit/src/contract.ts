@@ -113,6 +113,59 @@ export function defineMenu(
   return list;
 }
 
+/**
+ * A dashboard widget (extension point 11, PRD G-19): a card the module contributes to the
+ * dashboard home. Filtered by permission and rendered on the server like the menu (F-1, F-2);
+ * a widget the user may not see is never sent to the browser. Placement is metadata, never a
+ * change to the core page.
+ */
+export interface WidgetDef {
+  /** `<ns>.<id>` — stable key. */
+  readonly id: string;
+  readonly title: LocalizedText;
+  /** Svelte component path relative to the module folder, e.g. `web/widgets/Summary.svelte`. */
+  readonly component: string;
+  /** `<resource>.<action>`; the widget is dropped when the user lacks it (G-19). */
+  readonly permission?: string;
+  /** Sort key on the dashboard grid. Core uses 0–99; modules default to 100+. */
+  readonly order?: number;
+  /** Grid span: sm = 1 column, md = 2, lg = full row. */
+  readonly size?: 'sm' | 'md' | 'lg';
+}
+
+/** Declare the dashboard widgets a module contributes (extension point 11). */
+export function defineWidgets(
+  moduleName: string,
+  list: readonly WidgetDef[],
+): readonly WidgetDef[] {
+  const ns = namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const w of list) {
+    if (!ID_RE.test(w.id)) throw new ModuleContractError(`id widget "${w.id}" tidak valid`);
+    requirePrefix('id widget', w.id, `${ns}.`);
+    if (seen.has(w.id)) throw new ModuleContractError(`id widget "${w.id}" duplikat`);
+    seen.add(w.id);
+    if (
+      !w.component.startsWith('web/') ||
+      !w.component.endsWith('.svelte') ||
+      w.component.includes('..')
+    ) {
+      throw new ModuleContractError(
+        `widget "${w.id}": component harus berkas .svelte di dalam web/ modul, mis. web/widgets/Summary.svelte`,
+      );
+    }
+    if (w.permission !== undefined) {
+      const owner = w.permission.split('.')[0];
+      if (owner && owner !== ns && !CORE_PERMISSION_OWNERS.has(owner)) {
+        throw new ModuleContractError(
+          `widget "${w.id}" memakai izin milik modul lain: "${w.permission}"`,
+        );
+      }
+    }
+  }
+  return list;
+}
+
 /** Resource owners that belong to core; a module may reference these permissions in its menu. */
 export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'user',

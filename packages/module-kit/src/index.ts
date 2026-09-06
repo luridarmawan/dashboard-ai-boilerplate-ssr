@@ -13,9 +13,11 @@ export {
   defineMenu,
   definePermissions,
   defineTables,
+  defineWidgets,
   type MenuEntryDef,
   ModuleContractError,
   type PermissionDef,
+  type WidgetDef,
 } from './contract.ts';
 export {
   CORE_EVENTS,

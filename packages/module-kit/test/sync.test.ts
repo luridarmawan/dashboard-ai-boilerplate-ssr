@@ -34,6 +34,20 @@ describe('syncModules — happy path (G-2, G-9, G-11)', () => {
     expect(r.files).toEqual([]); // write: false
   });
 
+  test('collects widgets (G-19) with the module path of their component, and module i18n keys (K-6)', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.widgets.map((w) => w.id)).toEqual(['alpha.summary']);
+    expect(r.widgets[0]?.path).toBe('modules/Alpha/web/widgets/Summary.svelte');
+    expect(r.widgets[0]?.module).toBe('Alpha');
+    expect(r.i18nKeys).toBe(2);
+    // en is missing one key → a warning, not an error (K-4)
+    expect(r.warnings.some((w) => w.includes('i18n/en.json') && w.includes('1 kunci'))).toBe(true);
+  });
+
   test('module-namespaced icon (`beta.rocket`) is accepted without being a core icon', async () => {
     const r = await syncModules({
       root: join(fixtures, 'good'),
@@ -78,6 +92,8 @@ describe('syncModules — every violation reported at once, naming the module', 
     has(/Naughty.*tabel "notes" harus diawali "naughty_"/);
     has(/Naughty.*resource izin "user\.read" harus diawali "naughty\."/);
     has(/Naughty.*href menu "naughty\.a" harus di bawah \/m\/naughty/);
+    has(/Naughty.*widget "naughty\.ghost": komponen web\/widgets\/Missing\.svelte tidak ada/);
+    has(/Naughty.*id widget "other\.widget" harus diawali "naughty\."/);
     // Nothing valid slipped through.
     expect(p.length).toBeGreaterThanOrEqual(6);
   });

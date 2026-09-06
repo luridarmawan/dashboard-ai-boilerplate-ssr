@@ -226,6 +226,29 @@ export const load: ServerLoad = async (event) => {
 
 **[Menyusul di M2]:** layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
 
+### `widgets.ts` — widget dasbor (titik perluasan 11)
+
+Kartu di halaman utama dasbor. Difilter izin dan dirender **di server** seperti menu (F-1, F-2): widget yang izinnya tidak dipenuhi tidak ikut terkirim ke browser, dan komponennya tidak diunduh. Penempatan lewat metadata (`order`, `size`), bukan lewat perubahan halaman core (G-19).
+
+```ts
+// widgets.ts
+import { defineWidgets } from '@core/module-kit';
+export default defineWidgets('Billing', [
+  { id: 'billing.outstanding', title: { id: 'Piutang', en: 'Outstanding' },
+    component: 'web/widgets/Outstanding.svelte', permission: 'billing.invoice.read', order: 100, size: 'sm' },
+]);
+```
+
+```svelte
+<!-- web/widgets/Outstanding.svelte — komponen biasa; menerima `context` dari dasbor -->
+<script lang="ts">
+  let { context }: { context: { locale: string; clientId: string | null; permissions: string[] } } = $props();
+</script>
+<p class="text-3xl font-semibold">…</p>
+```
+
+Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core. Widget **tidak mengambil data saat SSR**; angka yang butuh API diambil halaman modul sendiri (hook data widget menyusul).
+
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 
 ```ts
@@ -303,7 +326,8 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 | 1 tabel · 2 route API · 3 halaman · 4 menu · 5 izin · 9 event hook · 12 job terjadwal | **Tersedia (M0)** — dokumen ini |
 | Penegakan izin (`permission()` / `requirePermission()` di API, `locals.session.can()` di web) & penjaga tenant di data layer (`forTenant`, B-3) | **Tersedia (M1)** — lihat §3 halaman dan route API |
 | 6 konfigurasi · 7 i18n · layout/tema membungkus halaman modul · `@core/ui` | M2–M3 |
-| 8 tool AI/MCP · 11 widget dashboard | M2/M5 |
+| 11 widget dashboard (`widgets.ts`, terfilter izin, SSR) | **Tersedia (M2)** |
+| 8 tool AI/MCP | M5 |
 | 13 halaman publik · 14 tema · 15 layout · 16 set ikon | M2/M4 |
 | Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |
 | Modul sebagai paket npm (`source: "package"`) | M6 |

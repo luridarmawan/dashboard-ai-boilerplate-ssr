@@ -80,5 +80,6 @@
   "lang.title": "Language",
   "lang.lead": "The language is decided on the server: profile preference, then cookie, then the browser header.",
   "lang.id": "Bahasa Indonesia",
-  "lang.en": "English"
+  "lang.en": "English",
+  "nav.examples": "Patterns"
 }

@@ -80,5 +80,6 @@
   "lang.title": "Bahasa",
   "lang.lead": "Bahasa ditentukan di server: preferensi profil, lalu cookie, lalu header browser.",
   "lang.id": "Bahasa Indonesia",
-  "lang.en": "English"
+  "lang.en": "English",
+  "nav.examples": "Contoh pola"
 }

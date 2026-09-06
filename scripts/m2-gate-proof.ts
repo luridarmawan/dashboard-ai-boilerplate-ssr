@@ -296,7 +296,50 @@ const admin = new Jar();
   check('switching back to id restores the Indonesian menu', back.html.includes('>Pengguna<'));
 }
 
+// ---- G-19: dashboard widgets are permission-filtered on the server ----
+{
+  await post(admin, '/theme', {
+    _csrf: csrfOf((await get(admin, '/theme')).html),
+    theme: 'base',
+    mode: 'light',
+    back: '/dashboard',
+  });
+  const dash = await get(admin, '/dashboard');
+  check(
+    'superadmin sees the Dummy module widget on the dashboard (SSR)',
+    dash.html.includes('data-testid="widget-dummy"'),
+  );
+  // A brand-new member has no dummy.note.read → the widget is absent from the HTML, not hidden by CSS.
+  const member = new Jar();
+  const email = `w-${Date.now()}@example.test`;
+  const reg = await get(member, '/auth/register');
+  const r = await post(member, '/auth/register', {
+    _csrf: csrfOf(reg.html),
+    name: 'Widget Less',
+    email,
+    password: 'a widget less password 1',
+  });
+  check('member registers', r.res.status === 303, `${r.res.status}`);
+  const mdash = await get(member, '/dashboard');
+  check(
+    'member without dummy.note.read gets no widget markup at all',
+    !mdash.html.includes('widget-dummy') && !mdash.html.includes('NotesCount'),
+  );
+  const ex = await get(admin, '/examples/list');
+  check(
+    'L-19 example list page renders the DataTable with paging (wide variant)',
+    ex.res.status === 200 &&
+      ex.html.includes('Contoh daftar produk') &&
+      footerVariant(ex.html) === 'wide',
+  );
+  const err = await get(admin, '/examples/errors?code=403');
+  check(
+    'L-19 403 inside the shell: status 403 and the menu still rendered',
+    err.res.status === 403 && err.html.includes('href="/users"'),
+  );
+}
+
 console.log(
-  failures === 0 ? '\nGATE M2 #1 #2 #3 #6(tema+bahasa): LOLOS' : `\nGATE M2: GAGAL (${failures})`,
+  failures === 0 ? '\nGATE M2 #1 #2 #3 #6 + G-19 + L-19: LOLOS' : `\nGATE M2: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);
