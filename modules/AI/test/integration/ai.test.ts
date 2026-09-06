@@ -37,6 +37,20 @@ const sessionCookie = (r: Response) =>
     .find((c) => c.startsWith('dab_session='))
     ?.split(';')[0] ?? '';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** The call log is written AFTER the response (H-9): poll for it instead of guessing a delay. */
+async function waitFor<T>(
+  fn: () => Promise<T | null | undefined>,
+  pred: (v: T) => boolean,
+  timeoutMs = 3000,
+): Promise<T | null> {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    const v = await fn();
+    if (v && pred(v)) return v;
+    if (Date.now() > until) return v ?? null;
+    await sleep(50);
+  }
+}
 
 describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
   let db: Db;
@@ -167,17 +181,24 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { choices: { message: { content: string } }[] };
     expect(body.choices[0]?.message.content.startsWith('SYS ')).toBe(true); // injected (H-5)
-    await sleep(150); // the log write is asynchronous (H-9)
     const one = await json(await call(`/v1/m/ai/conversations/${id}`, {}, [admin]));
     const msgs = one.data?.messages as { role: string; content: string }[];
     expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant']);
     expect(one.data?.title).toBe('What is Gayo?'); // auto title from first message (H-6)
-    const [log] = await db
-      .select()
-      .from(schema.aiCalls)
-      .where(and(eq(schema.aiCalls.client_id, tenantId), eq(schema.aiCalls.conversation_id, id)))
-      .orderBy(desc(schema.aiCalls.created_at))
-      .limit(1);
+    const log = await waitFor(
+      async () =>
+        (
+          await db
+            .select()
+            .from(schema.aiCalls)
+            .where(
+              and(eq(schema.aiCalls.client_id, tenantId), eq(schema.aiCalls.conversation_id, id)),
+            )
+            .orderBy(desc(schema.aiCalls.created_at))
+            .limit(1)
+        )[0],
+      (l) => l.status === 'ok',
+    );
     expect(log?.status).toBe('ok');
     expect(log?.tokens_in).toBe(11);
     expect(log?.tokens_out).toBe(7);
@@ -215,13 +236,18 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect(text).toContain('data: ');
     expect(text).toContain('[DONE]');
     expect(firstChunkAt).toBeLessThan(500); // first token reached us long before the stream ended
-    await sleep(150);
-    const [log] = await db
-      .select()
-      .from(schema.aiCalls)
-      .where(eq(schema.aiCalls.client_id, tenantId))
-      .orderBy(desc(schema.aiCalls.created_at))
-      .limit(1);
+    const log = await waitFor(
+      async () =>
+        (
+          await db
+            .select()
+            .from(schema.aiCalls)
+            .where(eq(schema.aiCalls.client_id, tenantId))
+            .orderBy(desc(schema.aiCalls.created_at))
+            .limit(1)
+        )[0],
+      (l) => l.streamed && l.status === 'ok',
+    );
     expect(log?.streamed).toBe(true);
     expect(log?.status).toBe('ok');
     expect(log?.tokens_out).toBeGreaterThan(0);
@@ -253,14 +279,19 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     await reader.read(); // one chunk arrived
     ac.abort();
     await reader.cancel().catch(() => undefined);
-    await sleep(400);
+    const log = await waitFor(
+      async () =>
+        (
+          await db
+            .select()
+            .from(schema.aiCalls)
+            .where(eq(schema.aiCalls.client_id, tenantId))
+            .orderBy(desc(schema.aiCalls.created_at))
+            .limit(1)
+        )[0],
+      (l) => l.status === 'cancelled',
+    );
     expect(mockAborted).toBeGreaterThan(before);
-    const [log] = await db
-      .select()
-      .from(schema.aiCalls)
-      .where(eq(schema.aiCalls.client_id, tenantId))
-      .orderBy(desc(schema.aiCalls.created_at))
-      .limit(1);
     expect(log?.status).toBe('cancelled');
   });
 
