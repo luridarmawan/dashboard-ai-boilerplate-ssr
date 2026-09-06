@@ -8,7 +8,7 @@ let { data, form }: { data: LayoutData; form: ActionData } = $props();
 
 <svelte:head><title>Tambah tenant</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Tambah tenant</h1>
   {#if form?.error}<p class="error">{form.error}</p>{/if}
   <form method="POST" class="stack">
@@ -18,4 +18,4 @@ let { data, form }: { data: LayoutData; form: ActionData } = $props();
     <p class="muted">Tenant baru langsung punya grup <code>admin</code> dan <code>user</code>; Anda menjadi anggota dan admin pertamanya.</p>
     <div class="row"><button type="submit">Buat</button><a href="/tenants">Batal</a></div>
   </form>
-</main>
+</div>

@@ -2,6 +2,10 @@ import { error } from '@sveltejs/kit';
 import { apiFor, unwrap } from '$lib/server/session';
 import type { PageServerLoad } from './$types';
 
+/** A wide table: ask the theme for its `wide` layout (Decision K). The page never names a layout id.
+ * SvelteKit only allows custom page-module exports with a `_` prefix, hence `_layoutVariant`. */
+export const _layoutVariant = 'wide';
+
 /** Users of the active tenant: search + paging through the URL, so it works without JS (D-1). */
 export const load: PageServerLoad = async (event) => {
   const q = event.url.searchParams.get('q') ?? '';

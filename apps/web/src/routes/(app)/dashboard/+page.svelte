@@ -6,7 +6,7 @@ let { data }: { data: LayoutData } = $props();
 
 <svelte:head><title>Dasbor</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Halo, {data.user.name}</h1>
   <div class="card">
     <p><strong>Email:</strong> {data.user.email}{#if data.user.isSuperadmin} · <code>superadmin</code>{/if}</p>
@@ -14,4 +14,4 @@ let { data }: { data: LayoutData } = $props();
     <p><strong>Izin efektif:</strong> {#if data.permissions.length}{#each data.permissions as p (p)}<code>{p}</code>{' '}{/each}{:else}<span class="muted">tidak ada</span>{/if}</p>
   </div>
   <p class="muted">Widget dasbor dan tema hadir di M2 (G-19, FR-L).</p>
-</main>
+</div>

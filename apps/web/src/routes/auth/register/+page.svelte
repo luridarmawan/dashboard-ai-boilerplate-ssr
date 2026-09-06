@@ -7,7 +7,7 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
 
 <svelte:head><title>Daftar</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Daftar</h1>
   {#if form?.error}
     <p class="error">{form.error}{#if Array.isArray(form.details)} — {form.details.join(', ')}{/if}</p>
@@ -19,4 +19,4 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
     <label>Kata sandi <input name="password" type="password" required minlength="12" autocomplete="new-password" /><span class="muted">Minimal 12 karakter.</span></label>
     <div class="row"><button type="submit">Buat akun</button><a href="/auth/login">Sudah punya akun</a></div>
   </form>
-</main>
+</div>

@@ -112,8 +112,11 @@
 
 /* Transitional classes used by the M1 pages until they move onto components (M2 S5). */
 @layer components {
-  main {
-    @apply mx-auto w-full max-w-5xl px-4 py-6;
+  .page {
+    @apply grid gap-4;
+  }
+  .page > h1:first-child {
+    @apply mb-0;
   }
   form.stack {
     @apply grid max-w-md gap-3;

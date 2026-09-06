@@ -1,7 +1,17 @@
+import { themes } from '@core/ui-theme';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 /** Own profile (D-4): basics + preferences, and a separate password form. */
+export const load: PageServerLoad = async (event) => {
+  const locale = event.locals.session?.user.locale === 'en' ? 'en' : 'id';
+  const allowed = event.locals.theme.allowed;
+  return {
+    themes: themes()
+      .filter((t) => !allowed || allowed.includes(t.id))
+      .map((t) => ({ id: t.id, name: t.name[locale] })),
+  };
+};
 export const actions: Actions = {
   profile: async (event) => {
     const form = await event.request.formData();

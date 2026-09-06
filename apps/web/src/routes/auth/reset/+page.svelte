@@ -7,7 +7,7 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
 
 <svelte:head><title>Atur kata sandi baru</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Atur kata sandi baru</h1>
   {#if !data.valid}
     <p class="error">Tautan tidak valid atau sudah kedaluwarsa. <a href="/auth/forgot">Minta tautan baru</a>.</p>
@@ -22,4 +22,4 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
       <button type="submit">Simpan</button>
     </form>
   {/if}
-</main>
+</div>

@@ -9,7 +9,7 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
 
 <svelte:head><title>Pengguna</title></svelte:head>
 
-<main>
+<div class="page">
   <div class="row" style="justify-content: space-between">
     <h1>Pengguna</h1>
     {#if can('user.create')}<a class="btn" href="/users/new">Tambah pengguna</a>{/if}
@@ -39,4 +39,4 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
     {#if data.meta.page > 1}<a href={`?q=${encodeURIComponent(data.q)}&page=${data.meta.page - 1}`}>‹ sebelumnya</a>{/if}
     {#if data.meta.page < data.meta.totalPages}<a href={`?q=${encodeURIComponent(data.q)}&page=${data.meta.page + 1}`}>berikutnya ›</a>{/if}
   </p>
-</main>
+</div>

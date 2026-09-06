@@ -11,7 +11,7 @@ const c = $derived(data.client);
 
 <svelte:head><title>Tenant {c.name}</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>{c.name} <code>{c.code}</code></h1>
   {#if form?.saved}<p class="notice">Tersimpan.</p>{/if}
   {#if form?.error}<p class="error">{form.error}</p>{/if}
@@ -32,4 +32,4 @@ const c = $derived(data.client);
       <span class="muted">Hapus lunak; sesi yang sedang berada di tenant ini kembali ke "tanpa tenant".</span>
     </form>
   {/if}
-</main>
+</div>

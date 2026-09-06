@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# M1 gate #1 + #2 (web layer) proof runner: starts the API and the BUILT web app against an
+# Web proof runner (M1 gate #1/#2 at the web layer, M2 gates #1/#2/#3/#6): starts the API and the BUILT web app against an
 # already-migrated + seeded database, runs scripts/m1-gate1-proof.ts, then stops both.
 # Needs DATABASE_URL, DB_DIALECT, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD in the env.
 set -eu
@@ -25,5 +25,7 @@ until bun -e 'const ok = async (u) => (await fetch(u)).ok; process.exit((await o
   sleep 1
 done
 
-echo "== proof"
+echo "== proof M1"
 WEB_URL=http://127.0.0.1:5173 bun run scripts/m1-gate1-proof.ts
+echo "== proof M2"
+WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL="$BOOTSTRAP_ADMIN_EMAIL" ADMIN_PASSWORD="$BOOTSTRAP_ADMIN_PASSWORD" bun run scripts/m2-gate-proof.ts

@@ -8,7 +8,7 @@ let { data }: { data: PageData } = $props();
   <title>Dashboard AI Boilerplate</title>
 </svelte:head>
 
-<main>
+<div class="page">
   <h1>Dashboard AI Boilerplate</h1>
   {#if data.api}
     <p data-testid="api-status">
@@ -20,4 +20,4 @@ let { data }: { data: PageData } = $props();
   {/if}
   <p><a href="/auth/login">Masuk</a> · <a href="/auth/register">Daftar</a></p>
   <p><small>request {data.requestId}</small></p>
-</main>
+</div>

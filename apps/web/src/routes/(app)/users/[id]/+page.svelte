@@ -12,7 +12,7 @@ const member = $derived(new Set(u.groups.map((g) => g.id)));
 
 <svelte:head><title>{u.name}</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>{u.name} <span class="muted">{u.email}</span></h1>
   {#if data.created}<p class="notice">Pengguna dibuat.</p>{/if}
   {#if form?.saved}<p class="notice">Tersimpan.</p>{/if}
@@ -48,4 +48,4 @@ const member = $derived(new Set(u.groups.map((g) => g.id)));
       <span class="muted">Akun ikut dihapus (lunak) bila ini tenant terakhirnya.</span>
     </form>
   {/if}
-</main>
+</div>

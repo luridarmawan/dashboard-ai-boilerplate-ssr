@@ -9,7 +9,7 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
 
 <svelte:head><title>Tenant</title></svelte:head>
 
-<main>
+<div class="page">
   <div class="row" style="justify-content: space-between">
     <h1>Tenant</h1>
     {#if can('client.create')}<a class="btn" href="/tenants/new">Tambah tenant</a>{/if}
@@ -28,4 +28,4 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
       {/each}
     </tbody>
   </table>
-</main>
+</div>

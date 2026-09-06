@@ -1,53 +1,98 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
-import { hasPermission } from '$lib/permissions';
+import Icon from '$lib/components/Icon.svelte';
+import { Button } from '$lib/components/ui';
 import type { LayoutData } from './$types';
 
+/**
+ * The dashboard shell. Core fills the named regions (brand, nav, header, breadcrumb, footer) and
+ * the resolved theme layout ARRANGES them (§4.8). Pages only ever render into `content`.
+ * Every control here is a plain form or link — the shell works with JavaScript disabled (L-22).
+ */
 let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
-
-// Cosmetic only (C-6b): the API refuses what the menu merely hides.
-const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-const active = $derived(data.tenants.find((t) => t.id === data.clientId));
+const Layout = $derived(data.Layout);
+const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 </script>
 
-<header class="bar">
-  <nav class="row">
-    <a href="/dashboard"><strong>Dashboard</strong></a>
-    {#if can('user.read')}<a href="/users">Pengguna</a>{/if}
-    {#if can('group.read')}<a href="/groups">Grup &amp; izin</a>{/if}
-    {#if can('client.read')}<a href="/tenants">Tenant</a>{/if}
-    <a href="/profile">Profil</a>
-  </nav>
-  <div class="row">
-    {#if data.tenants.length > 1}
-      <!-- Tenant switcher (B-4): a POST and a full server-side navigation; hidden for one tenant (B-5). -->
-      <form method="POST" action="/auth/switch-tenant" class="row">
-        <Csrf token={data.csrf} />
-        <input type="hidden" name="back" value={data.path} />
-        <label class="row">Tenant
-          <select name="clientId">
-            {#each data.tenants as t (t.id)}
-              <option value={t.id} selected={t.id === data.clientId}>{t.name}</option>
+{#snippet brand()}
+  <a href="/dashboard" class="flex items-center gap-2 font-semibold text-foreground no-underline hover:no-underline">
+    <Icon name="sparkles" class="text-primary" />
+    <span>Dashboard</span>
+  </a>
+{/snippet}
+
+{#snippet nav({ orientation }: { orientation: 'vertical' | 'horizontal' })}
+  <ul class={orientation === 'horizontal' ? 'flex items-center gap-1' : 'grid gap-0.5'}>
+    {#each data.menu as item (item.id)}
+      <li>
+        <a
+          href={item.href}
+          aria-current={item.active ? 'page' : undefined}
+          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:font-medium"
+        >
+          <Icon name={item.icon} size={18} />
+          <span>{item.label}</span>
+          {#if item.badge !== undefined}<span class="ml-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{item.badge}</span>{/if}
+        </a>
+        {#if item.children.length && orientation === 'vertical'}
+          <ul class="ml-6 grid gap-0.5 border-l pl-2">
+            {#each item.children as c (c.id)}
+              <li><a href={c.href} aria-current={c.active ? 'page' : undefined} class="block rounded-md px-2 py-1 text-sm text-foreground no-underline hover:bg-accent hover:no-underline aria-[current=page]:font-medium">{c.label}</a></li>
             {/each}
-          </select>
-        </label>
-        <button type="submit" class="secondary">Ganti</button>
-      </form>
-    {:else if active}
-      <span class="muted">Tenant: {active.name}</span>
-    {/if}
-    <span class="muted">{data.user.name}</span>
-    <form method="POST" action="/auth/logout">
+          </ul>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
+{#snippet header()}
+  {#if data.tenants.length > 1}
+    <!-- Tenant switcher (B-4): a POST and a full server-side navigation; hidden for one tenant (B-5). -->
+    <form method="POST" action="/auth/switch-tenant" class="flex items-center gap-1">
       <Csrf token={data.csrf} />
-      <button type="submit" class="secondary">Keluar</button>
+      <input type="hidden" name="back" value={data.path} />
+      <label class="sr-only" for="tenant-switch">Tenant</label>
+      <select id="tenant-switch" name="clientId" class="h-8 rounded-md border border-input bg-background px-2 text-sm">
+        {#each data.tenants as t (t.id)}
+          <option value={t.id} selected={t.id === data.clientId}>{t.name}</option>
+        {/each}
+      </select>
+      <Button type="submit" variant="outline" size="sm">Ganti</Button>
     </form>
-  </div>
-</header>
-{#if data.tenantError}<main><p class="error">Tenant tidak bisa diganti — Anda bukan anggotanya.</p></main>{/if}
+  {:else if activeTenant}
+    <span class="hidden text-sm text-muted-foreground sm:inline">{activeTenant.name}</span>
+  {/if}
+  <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label="Tema & tampilan"><Icon name="palette" size={18} /></a>
+  <a href="/profile" class="hidden items-center gap-2 rounded-md px-2 py-1 text-sm no-underline hover:bg-accent hover:no-underline sm:flex">
+    <Icon name="user" size={18} /><span>{data.user.name}</span>
+  </a>
+  <form method="POST" action="/auth/logout">
+    <Csrf token={data.csrf} />
+    <Button type="submit" variant="ghost" size="sm" aria-label="Keluar"><Icon name="logout" size={18} /><span class="hidden sm:inline">Keluar</span></Button>
+  </form>
+{/snippet}
 
-{@render children()}
+{#snippet breadcrumb()}
+  <nav aria-label="Breadcrumb">
+    <ol class="flex flex-wrap items-center gap-1">
+      {#each data.breadcrumb as c, i (c.href ?? c.label)}
+        {#if i > 0}<li aria-hidden="true"><Icon name="chevron-right" size={14} /></li>{/if}
+        <li>
+          {#if c.href}<a href={c.href} class="text-muted-foreground hover:text-foreground">{c.label}</a>{:else}<span aria-current="page" class="text-foreground">{c.label}</span>{/if}
+        </li>
+      {/each}
+    </ol>
+  </nav>
+{/snippet}
 
-<style>
-  .bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .6rem 1rem; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-  nav a { margin-right: .9rem; text-decoration: none; }
-</style>
+{#snippet content()}
+  {#if data.tenantError}<p class="error mb-4">Tenant tidak bisa diganti — Anda bukan anggotanya.</p>{/if}
+  {@render children()}
+{/snippet}
+
+{#snippet footer()}
+  <span>Dashboard AI Boilerplate · tema <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
+{/snippet}
+
+<Layout {brand} {nav} {header} {breadcrumb} {content} {footer} />

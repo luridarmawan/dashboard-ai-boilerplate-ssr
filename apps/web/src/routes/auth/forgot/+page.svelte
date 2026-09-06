@@ -7,7 +7,7 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
 
 <svelte:head><title>Lupa kata sandi</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Lupa kata sandi</h1>
   {#if form?.sent}
     <p class="notice">Jika email itu terdaftar, tautan reset telah dikirim. Periksa kotak masuk Anda.</p>
@@ -19,4 +19,4 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
       <div class="row"><button type="submit">Kirim tautan reset</button><a href="/auth/login">Kembali</a></div>
     </form>
   {/if}
-</main>
+</div>

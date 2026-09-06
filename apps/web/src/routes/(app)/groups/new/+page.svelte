@@ -8,7 +8,7 @@ let { data, form }: { data: LayoutData; form: ActionData } = $props();
 
 <svelte:head><title>Tambah grup</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Tambah grup</h1>
   {#if form?.error}<p class="error">{form.error}</p>{/if}
   <form method="POST" class="stack">
@@ -19,4 +19,4 @@ let { data, form }: { data: LayoutData; form: ActionData } = $props();
     <p class="muted">Izin dan anggota diatur setelah grup dibuat.</p>
     <div class="row"><button type="submit">Buat</button><a href="/groups">Batal</a></div>
   </form>
-</main>
+</div>

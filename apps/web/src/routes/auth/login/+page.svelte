@@ -7,7 +7,7 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
 
 <svelte:head><title>Masuk</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Masuk</h1>
   {#if form?.error}<p class="error">{form.error}</p>{/if}
   <form method="POST" class="stack">
@@ -21,4 +21,4 @@ let { data, form }: { data: PageData; form: ActionData } = $props();
       <a href="/auth/register">Daftar</a>
     </div>
   </form>
-</main>
+</div>

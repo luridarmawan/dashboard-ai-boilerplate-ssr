@@ -20,7 +20,7 @@ const editable = $derived(can('group.edit'));
 
 <svelte:head><title>Grup {g.name}</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>{g.name} <code>{g.code}</code>{#if g.isSystem} <span class="muted">grup sistem</span>{/if}</h1>
   {#if form?.saved}<p class="notice">Tersimpan — perubahan langsung berlaku untuk semua anggota.</p>{/if}
   {#if form?.error}
@@ -99,4 +99,4 @@ const editable = $derived(can('group.edit'));
     </form>
   {/if}
   <p><a href="/groups">← Semua grup</a></p>
-</main>
+</div>

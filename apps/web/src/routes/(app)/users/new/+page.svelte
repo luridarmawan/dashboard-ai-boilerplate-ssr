@@ -8,7 +8,7 @@ let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props()
 
 <svelte:head><title>Tambah pengguna</title></svelte:head>
 
-<main>
+<div class="page">
   <h1>Tambah pengguna</h1>
   {#if form?.error}
     <p class="error">{form.error}{#if Array.isArray(form.details)} — {form.details.join(', ')}{/if}</p>
@@ -30,4 +30,4 @@ let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props()
     </fieldset>
     <div class="row"><button type="submit">Simpan</button><a href="/users">Batal</a></div>
   </form>
-</main>
+</div>

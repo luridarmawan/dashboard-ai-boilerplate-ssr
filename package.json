@@ -13,7 +13,7 @@
     "bun": ">=1.4.0"
   },
   "scripts": {
-    "bootstrap": "bun run db:codegen && bun run modules:sync && bun run db:codegen",
+    "bootstrap": "bun run db:codegen && bun run modules:sync && bun run db:codegen && bun run layout:variants",
     "build": "bun run bootstrap && bun run --cwd apps/web build",
     "check": "bun run bootstrap && bun run lint && bun run typecheck",
     "ci:ddl-guard": "bun run scripts/ci/ddl-charset-guard.ts",
@@ -28,6 +28,7 @@
     "dev": "bun run scripts/dev.ts",
     "dev:db": "docker compose up -d --wait",
     "format": "biome format --write .",
+    "layout:variants": "bun run scripts/layout-variants.ts",
     "lint": "biome check .",
     "modules:add": "bun run scripts/modules-add.ts",
     "modules:sync": "bun run scripts/modules-sync.ts",
@@ -40,7 +41,7 @@
     "test": "bun run bootstrap && bun test",
     "test:integration": "INTEGRATION=1 bun test integration",
     "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun run bootstrap && bun run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun run db:seed && bun test integration\"",
-    "theme:validate": "node packages/ui-theme/validate.mjs && bun run scripts/ci/icon-coverage.ts",
+    "theme:validate": "node packages/ui-theme/validate.mjs && bun run scripts/ci/icon-coverage.ts && bun run scripts/ci/layout-contract.ts",
     "typecheck": "bun run scripts/typecheck-all.ts"
   },
   "devDependencies": {
