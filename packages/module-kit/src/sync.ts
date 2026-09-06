@@ -150,6 +150,10 @@ export const I18N_LOCALES = ['id', 'en'] as const;
 export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const root = resolve(opts.root);
   const write = opts.write ?? true;
+  // Fresh checkout: module files imported below (api/routes.ts → @app/api/services → the generated
+  // registry) must resolve BEFORE the first sync has written anything. Placeholders break the loop;
+  // the real content overwrites them at the end of this run.
+  if (write) ensureGeneratedPlaceholders(root);
   const problems: string[] = [];
   const warnings: string[] = [];
 
@@ -1402,4 +1406,63 @@ export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [
 ${entries}
 ];
 `;
+}
+
+/** Minimal generated files so imports resolve on a fresh checkout; real content replaces them below. */
+function ensureGeneratedPlaceholders(root: string): void {
+  const H = `${GEN_HEADER}// placeholder until the first modules:sync completes\n`;
+  const files: Record<string, string> = {
+    'packages/module-kit/src/generated/registry.ts': `${H}import type { ConfigSectionDef, MenuEntryDef, PermissionDef } from '../contract.ts';
+export const modules = [] as const;
+export const modulePermissions: readonly (PermissionDef & { module: string })[] = [];
+export const moduleMenu: readonly (MenuEntryDef & { module: string })[] = [];
+export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = [];
+`,
+    'packages/module-kit/src/generated/seeds.ts': `${H}import type { ModuleSeed } from '../contract.ts';
+export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [];
+`,
+    'packages/i18n/src/generated/messages.ts': `${H}export const LOCALES = ${JSON.stringify(I18N_LOCALES)} as const;
+export type Locale = (typeof LOCALES)[number];
+export const messages = { id: {}, en: {} } as const;
+export type MessageKey = keyof (typeof messages)['id'] & string;
+`,
+    'packages/ui-theme/src/generated/contrib.ts': `${H}export const moduleThemes: never[] = [];
+export const moduleLayouts: never[] = [];
+export const moduleIconSets: never[] = [];
+`,
+    'packages/settings/src/generated/routes.ts': `${H}export const webRoutes: readonly string[] = ['/', '/dashboard', '/auth/login'];
+`,
+    'apps/web/src/generated/routes.ts': `${H}export const webRoutes: readonly string[] = ['/', '/dashboard', '/auth/login'];
+`,
+    'apps/web/src/generated/layout-variants.ts': `${H}export const layoutVariants: Readonly<Record<string, string>> = {};
+`,
+    'apps/web/src/generated/layouts.ts': `${H}export const moduleDashboardLayouts = {} as const;
+export const modulePublicLayouts = {} as const;
+export const moduleAuthLayouts = {} as const;
+`,
+    'apps/web/src/generated/icon-sets.ts': `${H}export const moduleIconGlyphs = {} as const;
+`,
+    'apps/web/src/generated/theme-tokens.ts': `${H}export const moduleThemeTokens: Readonly<Record<string, string>> = {};
+`,
+    'apps/web/src/generated/themes.css': '/* placeholder until modules:sync runs */\n',
+    'apps/web/src/generated/widgets.ts': `${H}import type { Component } from 'svelte';
+export interface WidgetEntry { readonly id: string; readonly title: { readonly id: string; readonly en: string }; readonly component: string; readonly permission?: string; readonly order?: number; readonly size?: 'sm' | 'md' | 'lg'; readonly module: string; readonly load: () => Promise<{ default: Component<Record<string, unknown>> }> }
+export const moduleWidgets: readonly WidgetEntry[] = [];
+`,
+    'apps/web/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean }[] = [];
+`,
+    'apps/api/src/generated/modules.ts': `${H}import { Elysia } from 'elysia';
+export const modulesPlugin = new Elysia({ name: 'modules' });
+export const mountedModules = [] as const;
+export const moduleHooks = [];
+export const moduleJobs = [];
+`,
+  };
+  for (const [rel, content] of Object.entries(files)) {
+    const file = join(root, rel);
+    if (existsSync(file)) continue;
+    // Only inside a real host repo — the test fixtures have no apps/ or packages/i18n.
+    if (!existsSync(dirname(dirname(file))) && !rel.startsWith('packages/module-kit')) continue;
+    Bun.write(file, content);
+  }
 }
