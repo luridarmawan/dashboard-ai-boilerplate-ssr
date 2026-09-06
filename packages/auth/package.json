@@ -1,0 +1,16 @@
+{
+  "name": "@core/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Identity primitives shared by the API: permission matching (C-1, C-2), the resource registry (C-4), password & token helpers",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@core/module-kit": "workspace:*"
+  }
+}

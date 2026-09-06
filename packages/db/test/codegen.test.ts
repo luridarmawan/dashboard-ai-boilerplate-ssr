@@ -124,8 +124,12 @@ describe('codegen — sifat umum', () => {
     const out = emitMysql(tables);
     expect(out).toContain("'clients', // global");
     expect(out).toContain("'audit_log', // tenant-scoped");
-    expect(out).toContain("tenantTables: ReadonlySet<string> = new Set(['audit_log'])");
-    const auditBlock = out.slice(out.indexOf("'audit_log'"), out.indexOf('export const clients'));
+    expect(out).toMatch(
+      /tenantTables: ReadonlySet<string> = new Set\(\[.*'audit_log'.*'groups'.*\]\)/,
+    );
+    expect(out).not.toMatch(/new Set\(\[[^\]]*'users'/); // users is global
+    const start = out.indexOf("'audit_log'");
+    const auditBlock = out.slice(start, out.indexOf('export const ', start + 1));
     expect(auditBlock).not.toContain('deleted_at');
   });
 
@@ -133,5 +137,44 @@ describe('codegen — sifat umum', () => {
     expect(camel('audit_log')).toBe('auditLog');
     expect(camel('client_user_maps')).toBe('clientUserMaps');
     expect(camel('clients')).toBe('clients');
+  });
+});
+
+describe('references (foreign keys)', () => {
+  const parent = defineTable({ name: 'parents', tenant: false, columns: {} });
+  const child = defineTable({
+    name: 'children',
+    tenant: false,
+    columns: {
+      parent_id: col.uuid().references('parents', 'cascade'),
+      other_id: col.uuid().references('parents').nullable(),
+    },
+  });
+
+  test('emits a lazy .references(() => table.id, { onDelete }) on both dialects', () => {
+    for (const out of [emitMysql([child, parent]), emitPg([child, parent])]) {
+      expect(out).toContain(".references(() => parents.id, { onDelete: 'cascade' })");
+      expect(out).toContain(".references(() => parents.id, { onDelete: 'restrict' })");
+    }
+  });
+
+  test('a reference to an unknown table fails codegen with both names', () => {
+    expect(() => emitPg([child])).toThrow(
+      /children\.parent_id merujuk tabel "parents" yang tidak ada/,
+    );
+  });
+
+  test('references() is only valid on uuid columns', () => {
+    expect(() => col.int().references('parents')).toThrow(/hanya untuk kolom uuid/);
+  });
+
+  test('a global table may define client_id with its own meaning; a tenant table may not', () => {
+    expect(
+      defineTable({ name: 'g', tenant: false, columns: { client_id: col.uuid().nullable() } })
+        .columns.client_id?.nullable,
+    ).toBe(true);
+    expect(() =>
+      defineTable({ name: 't', tenant: true, columns: { client_id: col.uuid() } }),
+    ).toThrow(/milik kontrak/);
   });
 });

@@ -64,6 +64,27 @@
           }
         }
       }
+    },
+    {
+      "includes": ["apps/api/src/domains/**", "modules/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@core/db": {
+                    "importNames": ["getDb"],
+                    "message": "Domain code must not take the raw connection: use forTenant(clientId) for tenant tables, or unsafeAcrossTenants() — explicit and greppable (PRD B-3)."
+                  },
+                  "drizzle-orm": "Import query operators from @core/db, not drizzle-orm (one ORM version; Kysely fallback stays open, PRD §10)."
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

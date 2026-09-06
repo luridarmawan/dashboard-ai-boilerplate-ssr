@@ -988,6 +988,7 @@ Kolom `client_id` ada pada tabel **ber-tenant**, bukan pada semuanya — dan pen
 
 - `clients` tidak punya `client_id`; hierarkinya lewat `parent_id` (B-1).
 - `configurations` membolehkan `client_id IS NULL` sebagai nilai global yang jadi fallback saat tenant belum menimpanya (E-2). Pola yang sama berlaku untuk `themes` dan `modules`.
-- `rate_limits` dikunci per identitas pemanggil (IP / user / token), yang bisa jadi anonim — jadi `client_id`-nya nullable.
+- `rate_limits` global: dikunci per identitas pemanggil lewat `key` unik (`login:ip:…`, `tenant:<id>:api:<user>`). Bukan `client_id` nullable — NULL dalam unique index tidak unik di MySQL maupun PostgreSQL.
+- `sessions` dan `api_tokens` punya `client_id` dengan arti **tenant aktif**, bukan kepemilikan; keduanya tabel global dan tidak disaring penjaga tenant.
 
 Selain pengecualian di atas, tabel ber-tenant wajib `client_id` **dan** indeks yang diawali `client_id` (B-0).

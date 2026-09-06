@@ -182,6 +182,10 @@ function modifiers(c: ColumnDef, opt: { now: string }): string {
     m += c.default.kind === 'now' ? opt.now : `.default(${JSON.stringify(c.default.value)})`;
   }
   if (c.onUpdateNow) m += '.$onUpdate(() => new Date())';
+  if (c.references) {
+    // Lazy reference: the target const may be declared later in the file (tables are sorted by name).
+    m += `.references(() => ${camel(c.references.table)}.id, { onDelete: '${c.references.onDelete}' })`;
+  }
   return m;
 }
 
@@ -224,6 +228,15 @@ function sortTables(tables: readonly TableDef[]): TableDef[] {
   const names = tables.map((t) => t.name);
   const dup = names.find((n, i) => names.indexOf(n) !== i);
   if (dup) throw new Error(`codegen: tabel "${dup}" didefinisikan dua kali`);
+  for (const t of tables) {
+    for (const [col, c] of Object.entries(t.columns)) {
+      if (c.references && !names.includes(c.references.table)) {
+        throw new Error(
+          `codegen: ${t.name}.${col} merujuk tabel "${c.references.table}" yang tidak ada`,
+        );
+      }
+    }
+  }
   return [...tables].sort((a, b) => a.name.localeCompare(b.name));
 }
 

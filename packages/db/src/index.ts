@@ -59,6 +59,10 @@ export {
 export { activeDialect, type Db, schema, tenantTables } from './generated/active.ts';
 export { createUuidV7Generator, isUuidV7, newId, uuidV7Time } from './id.ts';
 
+import { type TenantDb, tenantScope } from './tenant.ts';
+
+export { type TenantDb, TenantGuardError, tenantScope } from './tenant.ts';
+
 let instance: Db | undefined;
 
 /**
@@ -79,4 +83,20 @@ export function getDb(): Db {
     instance = createDb(e.DATABASE_URL);
   }
   return instance;
+}
+
+/**
+ * The connection scoped to ONE tenant (B-3): every query on a tenant table carries
+ * `client_id = clientId`. This is what domain code and modules use.
+ */
+export function forTenant(clientId: string): TenantDb {
+  return tenantScope(getDb(), clientId);
+}
+
+/**
+ * The raw connection — no tenant filter. Deliberately verbose and greppable: an audit lists every
+ * cross-tenant query with `grep unsafeAcrossTenants`. Justify each use in a comment.
+ */
+export function unsafeAcrossTenants(): Db {
+  return getDb();
 }

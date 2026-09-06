@@ -1,5 +1,5 @@
 import { OkSchema, ok } from '@core/contracts';
-import { count, getDb, schema } from '@core/db';
+import { count, schema, unsafeAcrossTenants } from '@core/db';
 import { defineApiRoutes } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 
@@ -19,7 +19,7 @@ export default defineApiRoutes(
     .get(
       '/notes/count',
       async () => {
-        const [row] = await getDb().select({ n: count() }).from(schema.dummyNotes);
+        const [row] = await unsafeAcrossTenants().select({ n: count() }).from(schema.dummyNotes);
         return ok({ count: Number(row?.n ?? 0) });
       },
       {

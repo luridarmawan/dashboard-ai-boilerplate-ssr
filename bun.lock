@@ -57,6 +57,13 @@
         "svelte": "^5.40.0",
       },
     },
+    "packages/auth": {
+      "name": "@core/auth",
+      "version": "0.0.0",
+      "dependencies": {
+        "@core/module-kit": "workspace:*",
+      },
+    },
     "packages/config": {
       "name": "@core/config",
       "version": "0.0.0",
@@ -130,6 +137,8 @@
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.5.12", "", { "os": "win32", "cpu": "x64" }, "sha512-B1R/l+CwEpKFSuqiwePzPNRk1EiJN8kc0UhdafNz6MZN9v5OFP9HYP1irptvWzHrwVI4blVNGMbxc5zt70m3IA=="],
 
     "@borewit/text-codec": ["@borewit/text-codec@0.2.2", "", {}, "sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ=="],
+
+    "@core/auth": ["@core/auth@workspace:packages/auth"],
 
     "@core/config": ["@core/config@workspace:packages/config"],
 

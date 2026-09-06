@@ -28,12 +28,20 @@ export type DefaultValue =
   | { readonly kind: 'now' }
   | { readonly kind: 'literal'; readonly value: string | number | boolean };
 
+export interface ReferenceDef {
+  /** Referenced table name (the `id` column is always the target — every table has a UUIDv7 `id`). */
+  readonly table: string;
+  readonly onDelete: 'cascade' | 'restrict' | 'set null';
+}
+
 export interface ColumnDef {
   readonly type: ColumnType;
   readonly nullable: boolean;
   readonly primaryKey: boolean;
   readonly onUpdateNow: boolean;
   readonly default?: DefaultValue;
+  /** Foreign key to another table's `id`. Only valid on `uuid` columns. */
+  readonly references?: ReferenceDef;
 }
 
 export interface IndexDef {
@@ -95,6 +103,18 @@ export class Col {
       throw new DescriptorError('defaultNow() hanya untuk kolom datetime');
     }
     return new Col({ ...this.def, default: { kind: 'now' } });
+  }
+  /**
+   * Foreign key to `<table>.id`. Soft delete (O-5) is the norm, so `restrict` is the default:
+   * a hard delete that would orphan rows fails loudly instead of silently cascading.
+   */
+  references(table: string, onDelete: ReferenceDef['onDelete'] = 'restrict'): Col {
+    if (this.def.type.kind !== 'uuid') {
+      throw new DescriptorError('references() hanya untuk kolom uuid (semua PK adalah UUIDv7)');
+    }
+    if (!NAME_RE.test(table))
+      throw new DescriptorError(`references(): nama tabel "${table}" tidak valid`);
+    return new Col({ ...this.def, references: { table, onDelete } });
   }
   /** Refreshed by the application on UPDATE — not a DB trigger, to stay portable. */
   onUpdateNow(): Col {
@@ -185,7 +205,11 @@ export function defineTable(opts: DefineTableOptions): TableDef {
 
   for (const [key, c] of Object.entries(opts.columns)) {
     assertName(key, `kolom di tabel ${name}`);
-    if ((RESERVED_COLUMNS as readonly string[]).includes(key)) {
+    // `client_id` is a contract column only on tenant tables. A global table may carry one with
+    // its own meaning (e.g. `sessions.client_id` = the ACTIVE tenant); the tenant guard ignores it.
+    const reserved =
+      key === 'client_id' ? tenant !== null : (RESERVED_COLUMNS as readonly string[]).includes(key);
+    if (reserved) {
       throw new DescriptorError(
         `tabel ${name}: kolom "${key}" milik kontrak dan tidak boleh didefinisikan ulang`,
       );

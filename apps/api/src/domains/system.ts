@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { env } from '@core/config';
 import { OkSchema, ok } from '@core/contracts';
-import { activeDialect, getDb, schema } from '@core/db';
+import { activeDialect, schema, unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import { Elysia, t } from 'elysia';
 import { instanceId } from '../instance.ts';
@@ -52,7 +52,8 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
 
       const t0 = performance.now();
       try {
-        await getDb().select({ id: schema.clients.id }).from(schema.clients).limit(1);
+        // Readiness probe on a global table — no tenant in scope here, by design.
+        await unsafeAcrossTenants().select({ id: schema.clients.id }).from(schema.clients).limit(1);
         checks.database = { ok: true, ms: Math.round(performance.now() - t0) };
       } catch (err) {
         checks.database = {

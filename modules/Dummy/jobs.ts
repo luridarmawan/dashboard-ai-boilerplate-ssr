@@ -1,4 +1,4 @@
-import { count, getDb, schema } from '@core/db';
+import { count, schema, unsafeAcrossTenants } from '@core/db';
 import { defineJobs } from '@core/module-kit';
 
 /** Periodic work (extension point 12). The core scheduler runs each job once per interval across all instances. */
@@ -8,7 +8,7 @@ export default defineJobs('Dummy', [
     every: '5m',
     description: { id: 'Menghitung catatan', en: 'Counts notes' },
     run: async ({ instanceId }) => {
-      const [row] = await getDb().select({ n: count() }).from(schema.dummyNotes);
+      const [row] = await unsafeAcrossTenants().select({ n: count() }).from(schema.dummyNotes);
       console.log(
         JSON.stringify({
           t: new Date().toISOString(),
