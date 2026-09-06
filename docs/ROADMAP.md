@@ -6,7 +6,7 @@
 | **Dokumen terkait** | [`THEMES.md`](./THEMES.md) — tema bawaan (sudah selesai, lihat M2) |
 | **Asumsi tim** | **2 developer** yang bisa mengerjakan backend maupun frontend, penuh waktu |
 | **Estimasi** | Dalam **person-week (pw)** dan rentang, bukan tanggal. Kalibrasi ulang setelah M0 selesai — M0 adalah pengukur kecepatan tim yang sesungguhnya |
-| **Total kasar** | 31–43 pw ≈ **16–22 minggu kalender** dengan 2 developer |
+| **Total kasar** | 32–44 pw ≈ **17–23 minggu kalender** dengan 2 developer |
 
 Estimasi di sini adalah dugaan terdidik, bukan komitmen. Yang bisa dipegang adalah **urutannya** dan **gate keluarnya** — keduanya diturunkan dari risiko, bukan dari kenyamanan.
 
@@ -73,11 +73,11 @@ M1∥M2 dan M4∥M5 adalah satu-satunya paralelisasi yang aman. Memaksakan lebih
 
 Setiap milestone punya **gate keluar** — pernyataan yang bisa dijawab ya/tidak, bukan "kira-kira sudah". Milestone tidak dinyatakan selesai sebelum seluruh gate-nya hijau.
 
-### M0 — Fondasi & Kontrak Modul · 4–6 pw
+### M0 — Fondasi & Kontrak Modul · 5–7 pw
 
 Gerbang risiko. Tidak ada fitur bisnis di sini; yang dibangun adalah hal-hal yang mahal diubah nanti.
 
-**Isi:** struktur monorepo · `packages/db` dengan deskriptor netral + codegen per dialect (§4.3) · generator UUIDv7 tunggal, monotonik dalam milidetik (§4.3.1, O-6) · `packages/config` loader env tervalidasi (P-4) · `packages/module-kit` **sebagai paket nyata, bukan alias tsconfig** (§4.9 poin 1) · Elysia + SvelteKit tersambung lewat Eden Treaty · `modules:sync` + `modules.json` (G-2, G-10) · migrasi & seed (O-1…O-6) · **CI matriks tiga dialect: MySQL 8 + MariaDB 11 + PostgreSQL 16** (P-9) · kerangka Docker Compose dev + prod (Q-1…Q-5) · **dokumen kontrak modul** untuk developer (G-13, versi pertama)
+**Isi:** struktur monorepo · `packages/db` dengan deskriptor netral + codegen per dialect (§4.3) · generator UUIDv7 tunggal, monotonik dalam milidetik (§4.3.1, O-6) · `packages/config` loader env tervalidasi (P-4) · `packages/module-kit` **sebagai paket nyata, bukan alias tsconfig** (§4.9 poin 1) · Elysia + SvelteKit tersambung lewat Eden Treaty · `modules:sync` + `modules.json` (G-2, G-10) · **event bus + penjadwal core aman multi-instance (G-17, G-18)** · migrasi & seed (O-1…O-6) · **CI matriks tiga dialect: MySQL 8 + MariaDB 11 + PostgreSQL 16** (P-9) · kerangka Docker Compose dev + prod (Q-1…Q-5) · **dokumen kontrak modul** untuk developer (G-13, versi pertama)
 
 **Gate keluar:**
 1. `bun dev` menyalakan web + API; halaman kosong ter-SSR
@@ -85,7 +85,10 @@ Gerbang risiko. Tidak ada fitur bisnis di sini; yang dibangun adalah hal-hal yan
 3. Ada test yang membuktikan UUIDv7 **monotonik dalam milidetik yang sama** — sifat yang nanti diandalkan paginasi cursor (N-5), jadi jauh lebih murah diuji sekarang
 4. Satu modul dummy menyumbang tabel + route API + halaman + menu, **tanpa mengubah berkas core** — diperiksa `git diff`
 5. **Satu modul dummy kedua dipasang dari repositori git terpisah** lewat `modules:add`, dan berfungsi sama
-6. `compose.prod.yml` menyajikan halaman di balik Caddy dengan TLS
+6. Sebuah job terjadwal yang didaftarkan modul dummy berjalan **tepat sekali** dengan `--scale api=3`, dan sebuah event core yang diterbitkan memanggil hook modul itu — keduanya dibuktikan test, bukan diasumsikan
+7. `compose.prod.yml` menyajikan halaman di balik Caddy dengan TLS
+
+> **Kenapa penjadwal masuk M0 (gate 6), bukan M7 bersama operasi.** Empat kebutuhan P0 sudah mengandaikannya sejak awal — pembersihan `sessions`, worker outbox (J-2), retensi log AI (M-3), dan backup terjadwal (Q-8) — dan sifat yang mahal itu bukan "menjalankan job", melainkan **menjalankannya sekali saat instance-nya tiga**. Penjadwal naif akan lolos di dev satu proses dan baru salah di produksi. Sama seperti gate 5: ini kontrak, dan kontrak tidak boleh ditemukan setelah ada pemakainya.
 
 > **Gate 5 sering ditunda orang ke akhir proyek. Jangan.** Kalau `@core/*` telanjur jadi alias tsconfig, memperbaikinya di M6 berarti menyentuh setiap impor di setiap modul. Di M0, biayanya satu hari.
 
@@ -113,7 +116,7 @@ Bisa berjalan paralel dengan M1 setelah M0 selesai.
 
 **Sudah selesai sebelum milestone dimulai:** token, manifest, registry ikon & layout, dan validator empat tema bawaan — lihat [`THEMES.md`](./THEMES.md). Yang tersisa adalah mengisi, bukan memutuskan.
 
-**Isi:** komponen shadcn-svelte (L-1) · **DataTable** (L-16) dan **FormBuilder** (L-17) — dua komponen terbesar di proyek ini, sisihkan waktunya · komponen `<Icon>` + pemetaan tiga set ikon (L-5) · enam komponen layout terdaftar (L-6…L-8) · resolusi tema & varian layout saat SSR (L-11) · pemilih tema tanpa JavaScript (L-12) · i18n (K-1…K-7) · menu terfilter izin (F-1…F-4) · aksesibilitas (L-21) · font & aset merek
+**Isi:** komponen shadcn-svelte (L-1) · **DataTable** (L-16) dan **FormBuilder** (L-17) — dua komponen terbesar di proyek ini, sisihkan waktunya · komponen `<Icon>` + pemetaan tiga set ikon (L-5) · enam komponen layout terdaftar (L-6…L-8) · resolusi tema & varian layout saat SSR (L-11) · pemilih tema tanpa JavaScript (L-12) · i18n (K-1…K-7) · menu terfilter izin (F-1…F-4) · registry widget dashboard (G-19) · aksesibilitas (L-21) · font & aset merek
 
 **Gate keluar:**
 1. Empat tema bisa dipilih; berpindah tema mengubah warna, ikon, **dan** layout
@@ -127,7 +130,7 @@ Bisa berjalan paralel dengan M1 setelah M0 selesai.
 
 ### M3 — Konfigurasi, Kontrak API, & Halaman Baku · 3–4 pw
 
-**Isi:** konfigurasi runtime + form ter-generate (FR-E) · adapter cache versi `database` (E-5) · resolusi landing/home route (F-5…F-7, §4.7) · OpenAPI runtime + typed client (FR-N) · observability dasar (M-1…M-5)
+**Isi:** konfigurasi runtime + form ter-generate (FR-E) · adapter cache versi `database` (E-5) · resolusi landing/home route (F-5…F-7, §4.7) · OpenAPI runtime + typed client (FR-N) · observability dasar (M-1, M-4, M-5) · **penyamaran data sensitif di logger (M-7)** · audit log (M-2)
 
 **Gate keluar:**
 1. Admin mengubah setelan, tema baku, dan landing page dari UI — berlaku **tanpa restart**, dan terlihat oleh ketiga instance
@@ -187,7 +190,7 @@ Gerbang janji produk. Setelah ini, "developer bisa membangun modul sendiri" berh
 
 ### M7 — Pengerasan & Operasi · 4–6 pw
 
-**Isi:** MCP server & client (FR-I) · rate limit terdistribusi · audit log & retensi (M-2, M-3, M-6, M-7) · backup/restore teruji (O-7, Q-8) · deploy tanpa downtime (Q-12) · preflight (Q-13) · adapter Redis opsional · panduan deploy VPS (Q-10) · dokumentasi (P-10)
+**Isi:** MCP server & client (FR-I) · rate limit terdistribusi (adapter Redis) · **retensi log & audit (M-3)** — fasilitas audit log-nya sendiri sudah ada sejak M3, yang tersisa di sini kebijakan retensinya · backup/restore teruji (O-7, Q-8) · deploy tanpa downtime (Q-12) · preflight (Q-13) · adapter Redis opsional · panduan deploy VPS (Q-10) · dokumentasi (P-10)
 
 **Gate keluar:** seluruh 25 kriteria terima §8 hijau, termasuk yang hanya bisa diuji manual:
 1. Dari VPS bersih ke HTTPS dalam < 15 menit mengikuti panduan, **tanpa langkah tak tertulis**
@@ -203,7 +206,7 @@ Gerbang janji produk. Setelah ini, "developer bisa membangun modul sendiri" berh
 
 | Fase | Developer A | Developer B |
 |---|---|---|
-| 1 | M0 — db codegen, deskriptor, migrasi | M0 — module-kit, `modules:sync`, CI, compose |
+| 1 | M0 — db codegen, deskriptor, migrasi | M0 — module-kit, `modules:sync`, event bus & penjadwal, CI, compose |
 | 2 | M1 — auth, tenancy, RBAC | M2 — komponen, DataTable, FormBuilder |
 | 3 | M1 — CRUD user/group/client | M2 — tema, layout, ikon, i18n |
 | 4 | M3 — konfigurasi, OpenAPI, observability | M3 — form ter-generate, resolusi route |
@@ -252,6 +255,7 @@ Kriteria terima §8 bukan pemeriksaan sekali di ujung. Kolom kanan adalah kapan 
 | Test kebocoran lintas-tenant | B-3 | M1 |
 | Lighthouse landing ≥ 90 — Performance, Accessibility, Best Practices, SEO | #8 | M4 |
 | `--scale api=3` **tanpa Redis** | #3 | M1 (dasar) → M7 (penuh) |
+| Job terjadwal berjalan tepat sekali di bawah `--scale api=3` | D1, G-18 | M0 |
 | Audit dependensi | #7 | M0 |
 
 ---
@@ -276,7 +280,7 @@ Urutan yang disarankan untuk P1, berdasarkan apa yang paling cepat terasa oleh p
 
 1. **UI admin modul + editor tema** (G-14, L-24) — dua hal yang paling sering diminta setelah orang mulai memakai
 2. **Notifikasi dalam aplikasi** (J-4) — backend-nya sudah ada sebagian lewat outbox
-3. **Upload berkas + adapter S3** (Q-9)
+3. **Fitur unggah berkas + adapter S3** (Q-16) — volume & path-nya sudah disiapkan di MVP lewat Q-9
 4. **Multi-provider AI + dashboard biaya** (H-10, H-15)
 5. **Metrik Prometheus** (M-6)
 

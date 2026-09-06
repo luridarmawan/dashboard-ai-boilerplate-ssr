@@ -29,7 +29,7 @@ Struktur: `apps/{web,api}` · `packages/{db,contracts,config,module-kit,ui-theme
 
 Ini pantangan desain (PRD §1.3) — pelanggarannya adalah cacat, bukan preferensi gaya.
 
-1. **Tidak ada state bersama di memori proses.** Sesi, cache konfigurasi, rate limit, token CSRF → database atau Redis lewat adapter. Adapter memori murni menolak start di `NODE_ENV=production`. Uji `--scale api=3` dijalankan **tanpa** Redis.
+1. **Tidak ada state bersama di memori proses.** Sesi, cache konfigurasi, rate limit, token CSRF → database atau Redis lewat adapter. Adapter memori murni menolak start di `NODE_ENV=production`. Uji `--scale api=3` dijalankan **tanpa** Redis. Konsekuensi yang mudah terlewat: **job terjadwal wajib mengambil lock lewat database**, supaya `--scale api=3` tidak menjalankannya tiga kali (G-18).
 2. **Rahasia tidak pernah ke bundle klien.** Hanya `PUBLIC_*` yang boleh sampai ke browser (`$env/static/private` vs `$env/static/public`). Dicek otomatis di CI.
 3. **Satu instance koneksi DB**, diekspor dari `packages/db`. Lint melarang instansiasi di tempat lain.
 4. **SSR wajib.** Alur inti (login, CRUD, pemilih tema & bahasa, form kontak) berfungsi tanpa JavaScript lewat form actions.
@@ -44,7 +44,7 @@ Ini pantangan desain (PRD §1.3) — pelanggarannya adalah cacat, bukan preferen
 
 > Kalau sebuah kebutuhan modul memaksa perubahan di core, itu **cacat pada kontrak modul**. Yang diperbaiki adalah kontraknya — jangan ditambal di core.
 
-- Bentuk modul & **16 titik perluasan**: PRD §4.5. Daftar itu tertutup.
+- Bentuk modul & **16 titik perluasan**: PRD §4.5. Daftar itu tertutup. Tiga di antaranya adalah kontrak fondasi yang dibangun di M0: **event bus** (G-17), **penjadwal core** (G-18), dan **registry widget dashboard** (G-19).
 - Modul dirakit **saat build** (`bun modules:sync`), bukan ditemukan saat runtime.
 - Sumber modul di `modules.json`: `local` / `submodule` (baku untuk lintas repo, `ref` selalu tag/commit) / `package`.
 - `@core/*` harus **paket nyata**, bukan alias tsconfig — kalau tidak, modul eksternal gagal dibangun sendiri.

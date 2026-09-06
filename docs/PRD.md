@@ -330,10 +330,10 @@ modules/<Nama>/
 | 6 | **Konfigurasi** | Menambah section konfigurasi; form-nya di-generate otomatis (FR-E) |
 | 7 | **i18n** | Membawa berkas terjemahan sendiri |
 | 8 | **Tool AI / MCP** | Menyumbang tool yang bisa dipanggil asisten AI, tetap tunduk RBAC (I-3) |
-| 9 | **Event hook** | Berlangganan event core (`user.created`, `tenant.switched`, dst.) |
+| 9 | **Event hook** | Berlangganan event core (`user.created`, `tenant.switched`, dst.) — kontraknya di G-17 |
 | 10 | **Komponen UI** | Memakai seluruh komponen core lewat alias `@core/ui` |
-| 11 | **Widget dashboard** | Menyumbang kartu/widget ke halaman utama dashboard |
-| 12 | **Job terjadwal** | Mendaftarkan pekerjaan berkala ke penjadwal core |
+| 11 | **Widget dashboard** | Menyumbang kartu/widget ke halaman utama dashboard, terfilter izin (G-19) |
+| 12 | **Job terjadwal** | Mendaftarkan pekerjaan berkala ke penjadwal core, yang aman di multi-instance (G-18) |
 | 13 | **Halaman publik / landing** | Menyumbang route publik tanpa auth di luar namespace `/m/*` (mis. `/`, `/product/:slug`), lengkap dengan metadata SEO. Bentrokan route ditolak saat `modules:sync` dengan pesan jelas |
 | 14 | **Tema** | Menyumbang tema lengkap ke registry — token warna, tipografi, set ikon, aset merek, dan pilihan layout; langsung muncul di pemilih tema admin & user (§4.8, FR-L) |
 | 15 | **Layout** | Menyumbang layout shell kustom (dashboard / publik / auth) yang memenuhi kontrak region, dan bisa dipakai tema mana pun — termasuk tema bawaan core |
@@ -529,10 +529,12 @@ Modul harus bisa dikerjakan tim lain, di repositori lain, dengan siklus rilisnya
 
 | Prioritas | Isi |
 |---|---|
-| **P0 — MVP** | **Kontrak modul + generator modul + modul lintas repositori**, auth & sesi, multi-tenant, RBAC, CRUD user/group/permission/client, konfigurasi runtime, menu dinamis, **sistem tema lengkap (warna + ikon + layout; baku sistem + pilihan user; layout kustom oleh developer)**, multi-bahasa, DataTable + FormBuilder, **modul `Example` + landing page komersil**, **modul `AI`** (chat streaming + riwayat, bisa dimatikan), OpenAPI + typed client, migrasi Drizzle multi-dialect, seed, **paket deployment single-VPS** |
-| **P1** | MCP (server & client), email + outbox, notifikasi, audit log & log AI dengan dashboard biaya, upload berkas, rate limit terdistribusi, UI admin modul, editor tema dari UI |
-| **P2** | 2FA/TOTP, SSO tambahan (GitHub, X, Microsoft), webhook keluar, ekspor data (CSV/XLSX), impersonasi user oleh admin, background job queue, dashboard analitik penggunaan AI, registry/marketplace modul |
+| **P0 — MVP** | **Kontrak modul + generator modul + modul lintas repositori**, **event bus + penjadwal core** (G-17, G-18), auth & sesi, multi-tenant, RBAC, CRUD user/group/permission/client, konfigurasi runtime, menu dinamis, **sistem tema lengkap (warna + ikon + layout; baku sistem + pilihan user; layout kustom oleh developer)**, multi-bahasa, DataTable + FormBuilder, **modul `Example` + landing page komersil**, **modul `AI`** (chat streaming + riwayat, bisa dimatikan), OpenAPI + typed client, migrasi Drizzle multi-dialect, seed, **email + outbox** (J-1…J-3), **audit log + log AI + kebijakan retensi** (M-2, M-3, H-9), **penyamaran data sensitif di log** (M-7), **volume berkas unggahan & path lewat env** (Q-9), **paket deployment single-VPS** |
+| **P1** | MCP server & client (FR-I), notifikasi dalam aplikasi (J-4), multi-provider AI + perhitungan biaya per model (H-10), **endpoint upload berkas + adapter S3** (Q-16), **adapter Redis untuk sesi/cache/rate limit** — inilah yang dimaksud "rate limit terdistribusi" (Keputusan M), UI admin modul (G-14), editor tema dari UI (L-24), metrik Prometheus (M-6) |
+| **P2** | 2FA/TOTP, SSO tambahan (GitHub, X, Microsoft), webhook keluar, ekspor data (CSV/XLSX), impersonasi user oleh admin, **queue pekerjaan ad-hoc** (retry, prioritas, dead-letter — bukan penjadwal berkala yang sudah P0), dashboard analitik penggunaan AI (H-15), registry/marketplace modul |
 | **Out of scope** | Billing/subscription, mobile app native, editor visual halaman (page builder), multi-region active-active |
+
+Tabel ini adalah ringkasan; **tag `[P0]`/`[P1]`/`[P2]` pada tiap kebutuhan di §6 adalah yang mengikat.** Kalau keduanya berbeda, tag per-kebutuhan yang menang dan tabel ini yang salah — perbaiki tabelnya di PR yang sama.
 
 ---
 
@@ -641,6 +643,9 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | G-14 | **[P1]** UI admin: daftar modul terpasang, sumber & versinya, status aktif/nonaktif per tenant, dan pesan galat bila gagal dimuat. |
 | G-15 | **[P1]** Uninstall modul yang bersih: perintah yang menghapus registrasi dan menyediakan migrasi turun untuk tabelnya (dengan konfirmasi eksplisit). |
 | G-16 | **[P2]** Registry/marketplace modul sederhana — telusuri dan pasang modul dari katalog. |
+| G-17 | **[P0]** **Event bus core** (titik perluasan 9). Core menerbitkan event bernama (`user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.enabled`, dst.); modul berlangganan lewat `hooks.ts`. Kegagalan sebuah hook dicatat dan **tidak menggagalkan aksi intinya** (sejalan G-7). Urutan eksekusi deterministik, mengikuti urutan dependensi modul (G-11). Daftar event adalah bagian kontrak: menghapus atau mengubah payload sebuah event adalah perubahan yang merusak dan tunduk `engines.core` (N-6). |
+| G-18 | **[P0]** **Penjadwal core** (titik perluasan 12). Core dan modul mendaftarkan pekerjaan berkala. **Wajib benar di multi-instance:** dengan `--scale api=3` sebuah job berjalan **sekali per jadwal, bukan tiga kali** — lock diambil lewat database supaya jalur bakunya tidak menuntut Redis (Keputusan M, D1). Job yang gagal dicatat, di-retry dengan backoff, dan tidak menahan job lain. Pemakai P0-nya sudah ada sejak awal: pembersihan `sessions`, worker outbox (J-2), retensi log AI (M-3), dan backup terjadwal (Q-8) — jadi ini kontrak fondasi, bukan fitur lanjutan. |
+| G-19 | **[P0]** **Registry widget dashboard** (titik perluasan 11). Modul menyumbang kartu/widget ke halaman utama dashboard, **terfilter izin dan ter-render saat SSR** dengan aturan yang sama seperti menu (F-1, F-2) — widget yang izinnya tidak terpenuhi tidak ikut terkirim ke klien, bukan disembunyikan CSS. Urutan & penempatan lewat metadata, bukan lewat perubahan halaman core. |
 
 ### FR-R · Modul `Example` & Halaman Publik
 
@@ -750,7 +755,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | M-4 | **[P0]** Endpoint `/health` (liveness) dan `/ready` (cek DB, dan Redis hanya bila driver Redis aktif — `/ready` tidak boleh merah karena komponen opsional yang memang tidak dipasang). |
 | M-5 | **[P0]** Endpoint `/version` — nama app, versi, commit hash, tanggal build, dan daftar modul terpasang beserta versinya. |
 | M-6 | **[P1]** Metrik Prometheus: laju request, latensi p50/p95/p99, error rate, koneksi DB. |
-| M-7 | **[P1]** Data sensitif (password, token, API key, header `Authorization`) **wajib disamarkan** di semua log. |
+| M-7 | **[P0]** Data sensitif (password, token, API key, header `Authorization`, cookie sesi) **wajib disamarkan** di semua log. P0 bersama M-1: penyamaran ditulis di dalam logger sejak awal, karena menambalnya setelah pemanggilan log tersebar berarti memburu setiap call-site — dan yang terlewat baru ketahuan dari log yang sudah bocor. |
 
 ### FR-N · Kontrak API & Dokumentasi
 
@@ -805,13 +810,14 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | Q-6 | **[P0]** Restart otomatis saat proses mati (`restart: unless-stopped` atau `Restart=always` di systemd) dan saat host reboot. |
 | Q-7 | **[P0]** Rotasi log terkonfigurasi — log JSON tidak boleh memenuhi disk VPS. |
 | Q-8 | **[P0]** Backup database terjadwal ke volume/host, dengan retensi dan perintah restore yang terdokumentasi (O-7). |
-| Q-9 | **[P0]** Berkas unggahan disimpan di volume yang dipetakan; jalur penyimpanan dikonfigurasi lewat env. Adapter S3-compatible tersedia sebagai opsi, bukan syarat. |
+| Q-9 | **[P0]** **Penyimpanan berkas tersedia sebagai infrastruktur:** volume yang dipetakan di `compose.prod.yml`, jalur dikonfigurasi lewat env, izin direktori benar, dan ikut diperiksa `preflight` (Q-13). Ini P0 karena `compose.prod.yml` dan proses stateless (Keputusan F) sudah mengandaikannya — bukan karena fitur unggah sudah ada. |
 | Q-10 | **[P0]** Panduan deployment yang benar-benar diikuti dari nol pada VPS bersih, ditulis sebagai langkah berurutan — bukan potongan konfigurasi lepas. |
 | Q-11 | **[P1]** Unit systemd untuk mode tanpa Docker (web & api sebagai service, `EnvironmentFile`, `After=network.target`). |
 | Q-12 | **[P1]** Deploy tanpa downtime pada satu host: jalankan versi baru berdampingan, tunggu `/ready` hijau, alihkan proxy, matikan yang lama. |
 | Q-13 | **[P1]** Skrip `preflight` yang memeriksa kesiapan sebelum start: env lengkap, DB terjangkau, Valkey terjangkau bila diaktifkan, migrasi mutakhir, modul tersinkron, izin volume benar. Gagal dengan pesan yang bisa ditindaklanjuti. |
 | Q-14 | **[P1]** Sumber daya dibatasi per service (`mem_limit`, `cpus`) agar satu container tidak menjatuhkan VPS. |
 | Q-15 | **[P2]** Pipeline CD contoh (GitHub Actions → registry → `docker compose pull && up -d` lewat SSH). |
+| Q-16 | **[P1]** **Fitur unggah berkas:** endpoint upload dengan validasi tipe & ukuran, tunduk RBAC dan tenancy, plus adapter S3-compatible sebagai opsi di samping volume lokal (Q-9). Dipisah dari Q-9 supaya jelas: MVP menyediakan tempatnya, bukan fiturnya. |
 
 ---
 
@@ -852,7 +858,7 @@ Rilis P0 dinyatakan selesai bila **semua** berikut terpenuhi:
 8. Lighthouse ≥ 90 untuk Performance, Accessibility, Best Practices, **dan SEO** pada landing page publik; ≥ 90 untuk Performance & Accessibility pada halaman dashboard.
 9. Chat AI streaming berjalan, riwayat tersimpan, dan setiap panggilan tercatat dengan token & latensi terisi.
 10. Setiap endpoint yang mengubah state terproteksi CSRF; ada test yang membuktikan request lintas-origin ditolak.
-11. Sebuah modul baru dibuat lewat `bun modgen` dan langsung berfungsi (tabel dibuat, menu muncul, izin ter-seed, CRUD jalan, terjemahan terpakai) **tanpa mengedit berkas core mana pun** — dibuktikan otomatis di CI lewat pemeriksaan `git diff` (G-6), bukan inspeksi manual.
+11. Sebuah modul baru dibuat lewat `bun modgen` dan langsung berfungsi (tabel dibuat, menu muncul, izin ter-seed, CRUD jalan, terjemahan terpakai, **satu event hook terpanggil, satu job terjadwal berjalan, dan satu widget dashboard muncul** — G-17, G-18, G-19) **tanpa mengedit berkas core mana pun** — dibuktikan otomatis di CI lewat pemeriksaan `git diff` (G-6), bukan inspeksi manual.
 12. **Modul AI berjalan sebagai modul**, memakai kontrak yang sama dengan modul pihak ketiga. Menonaktifkannya untuk satu tenant membuat menu, route, dan tool AI-nya hilang — sisa aplikasi tetap utuh. Melepasnya dari `modules.json` membuat aplikasi tetap dibangun dan berjalan tanpa jejak AI.
 13. **Modul dari repositori lain berfungsi penuh:** sebuah modul dibuat di repo terpisah lewat `bun create module`, di-build dan dites di sana, lalu dipasang lewat `bun modules:add <git-url>` — tabel, route, menu, izin, i18n, dan temanya bekerja tanpa satu pun berkas core berubah (G-10).
 14. Menghapus folder sebuah modul lalu menjalankan `modules:sync` menghasilkan aplikasi yang tetap berfungsi, tanpa route yatim, entri menu rusak, atau user yang terjebak pada tema yang tidak ada.
@@ -874,14 +880,14 @@ Rilis P0 dinyatakan selesai bila **semua** berikut terpenuhi:
 
 | Milestone | Isi | Keluaran yang bisa diuji |
 |---|---|---|
-| **M0 — Fondasi & Kontrak Modul** | Struktur monorepo, `packages/db` dengan codegen per dialect, `packages/module-kit`, loader env tervalidasi, Elysia + SvelteKit saling terhubung, **kontrak modul §4.5 + `modules:sync` + `modules.json`**, migrasi & seed (O-1…O-6), DX dasar (P-1…P-7, P-9), kerangka deployment (Q-1…Q-5) | `bun dev` jalan; halaman kosong ter-SSR; migrasi jalan di MySQL, MariaDB & PostgreSQL; **satu modul dummy menyumbang tabel + route + halaman + menu tanpa mengubah core**; **satu modul dummy kedua dipasang dari repositori git terpisah lewat `modules:add` dan berfungsi sama** (§4.9 poin 1 — ditest di M0, bukan ditunda ke M6); UUIDv7 terbukti monotonik dalam milidetik yang sama; `compose.prod.yml` menyajikan halaman di balik Caddy |
+| **M0 — Fondasi & Kontrak Modul** | Struktur monorepo, `packages/db` dengan codegen per dialect, `packages/module-kit`, loader env tervalidasi, Elysia + SvelteKit saling terhubung, **kontrak modul §4.5 + `modules:sync` + `modules.json`**, **event bus + penjadwal core (G-17, G-18)**, migrasi & seed (O-1…O-6), DX dasar (P-1…P-7, P-9), kerangka deployment (Q-1…Q-5) | `bun dev` jalan; halaman kosong ter-SSR; migrasi jalan di MySQL, MariaDB & PostgreSQL; **satu modul dummy menyumbang tabel + route + halaman + menu + event hook + job terjadwal tanpa mengubah core**; **satu modul dummy kedua dipasang dari repositori git terpisah lewat `modules:add` dan berfungsi sama** (§4.9 poin 1 — ditest di M0, bukan ditunda ke M6); UUIDv7 terbukti monotonik dalam milidetik yang sama; `compose.prod.yml` menyajikan halaman di balik Caddy |
 | **M1 — Identitas** | Auth (A-1…A-7, A-10, A-12), tenancy (B-0…B-5), RBAC (C-1…C-7), CRUD user/group/client & profil (FR-D) | Bisa login, kelola user & izin, ganti tenant |
-| **M2 — Kerangka UI, Tema, & Layout** | Komponen (L-1, L-16…L-22), **sistem tema lengkap: token, set ikon, layout (L-2…L-15, §4.8)**, i18n (K-1…K-7), menu (F-1…F-4) | Dashboard terasa lengkap; 4 tema bisa dipilih dan **dua di antaranya berlayout berbeda**; warna, ikon, dan layout benar sejak SSR tanpa kedipan; satu layout kustom dibuat dari luar core dan langsung dipakai |
-| **M3 — Konfigurasi, Kontrak, & Halaman Baku** | Konfigurasi runtime (FR-E), **resolusi landing/home route (F-5…F-7, §4.7)**, OpenAPI + typed client (FR-N), observability (M-1…M-5) | Admin mengubah setelan, tema baku, dan landing page dari UI; `/docs` akurat |
-| **M4 — Modul `Example` & sisi publik** | **Modul `Example` + landing page komersil (FR-R)**, layout publik, SEO, form kontak, outbox email (FR-J) | `/` menyajikan landing komersil ter-SSR dengan data dari DB; Lighthouse SEO ≥ 90; kontrak modul terbukti sanggup melayani halaman publik & tema |
+| **M2 — Kerangka UI, Tema, & Layout** | Komponen (L-1, L-16…L-22), **sistem tema lengkap: token, set ikon, layout (L-2…L-15, §4.8)**, i18n (K-1…K-7), menu (F-1…F-4), registry widget dashboard (G-19) | Dashboard terasa lengkap; 4 tema bisa dipilih dan **dua di antaranya berlayout berbeda**; warna, ikon, dan layout benar sejak SSR tanpa kedipan; satu layout kustom dibuat dari luar core dan langsung dipakai |
+| **M3 — Konfigurasi, Kontrak, & Halaman Baku** | Konfigurasi runtime (FR-E), **resolusi landing/home route (F-5…F-7, §4.7)**, OpenAPI + typed client (FR-N), observability (M-1, M-4, M-5), penyamaran data sensitif (M-7), audit log (M-2) | Admin mengubah setelan, tema baku, dan landing page dari UI; `/docs` akurat |
+| **M4 — Modul `Example` & sisi publik** | **Modul `Example` + landing page komersil (FR-R)**, layout publik, SEO, form kontak, outbox email (FR-J) | `/` menyajikan landing komersil ter-SSR dengan data dari DB; Lighthouse ≥ 90 pada keempat kategori (§8 #8); kontrak modul terbukti sanggup melayani halaman publik & tema |
 | **M5 — Modul `AI`** | Chat streaming (H-1…H-9), riwayat, log AI — **dibangun sebagai modul** (Keputusan H) | Chat berfungsi penuh dengan pencatatan; **kontrak modul terbukti sanggup menopang fitur berat**, atau kekurangannya ketahuan di sini — masih cukup awal untuk diperbaiki |
 | **M6 — Modul lintas repositori** | Generator lengkap (G-4), starter modul standalone (G-12), `modules:add` + submodule (G-10), penjaga CI "tanpa ubah core" (G-6), UI admin modul (G-14), dokumen membangun modul (G-13) | Modul dibuat di repo terpisah, dipasang lewat git URL, langsung jalan; CI menolak perubahan yang menyentuh core |
-| **M7 — Pengerasan & Operasi** | MCP (FR-I), rate limit terdistribusi, audit log & retensi (M-2, M-3, M-6, M-7), backup/restore (O-7), operasi & deployment lanjutan (Q-11…Q-15), dokumentasi (P-10) | Semua kriteria terima §8 terpenuhi — termasuk uji deploy dari VPS bersih dan uji restore |
+| **M7 — Pengerasan & Operasi** | MCP (FR-I), rate limit terdistribusi, kebijakan retensi log (M-3), backup/restore (O-7), operasi & deployment lanjutan (Q-11…Q-15), dokumentasi (P-10) | Semua kriteria terima §8 terpenuhi — termasuk uji deploy dari VPS bersih dan uji restore |
 
 ---
 
@@ -942,6 +948,8 @@ Rilis P0 dinyatakan selesai bila **semua** berikut terpenuhi:
 
 Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`) berada di luar daftar ini dan tumbuh mengikuti modul yang terpasang.
 
+**Grup yang ditandai `[P1]` bukan bagian MVP.** Ia dicantumkan di sini hanya supaya bentuk permukaan API-nya sudah dikunci lebih dulu, sehingga menambahkannya kelak tidak menggeser route yang sudah dipakai klien.
+
 | Grup | Endpoint |
 |---|---|
 | `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `POST /google-login` |
@@ -956,7 +964,7 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 | `themes` | `GET /` (registry tema + layout + set ikon yang tersedia, dengan pratinjau) · `GET /:id` · `PUT /me` (pilihan tema user) · `PUT /default` (tema baku sistem, butuh izin admin) |
 | `menu` | `GET /` |
 | `module` | `GET /` · `PUT /:id/enabled` |
-| `mcp` | `POST /initialize` · `POST /tools/list` · `POST /tools/call` · `POST /resources/list` · `POST /resources/read` · `POST /prompts/list` · `POST /prompts/get` |
+| `mcp` **[P1]** | `POST /initialize` · `POST /tools/list` · `POST /tools/call` · `POST /resources/list` · `POST /resources/read` · `POST /prompts/list` · `POST /prompts/get` — seluruh FR-I P1 kecuali I-6 (endpoint terautentikasi & tunduk tenancy), dan I-6 baru berlaku begitu endpoint ini ada, jadi ia tidak menciptakan pekerjaan P0 sendirian |
 | sistem | `GET /health` · `GET /ready` · `GET /version` · `GET /openapi.json` · `GET /docs` |
 
 ## Lampiran B — Model data inti
