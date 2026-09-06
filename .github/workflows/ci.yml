@@ -16,7 +16,7 @@ jobs:
     name: lint · typecheck (both dialects) · unit tests · guards
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
@@ -85,7 +85,7 @@ jobs:
       MATRIX_MARIADB_URL: ${{ matrix.url }}
       MATRIX_POSTGRES_URL: ${{ matrix.url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.2
