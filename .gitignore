@@ -11,3 +11,4 @@ packages/db/src/generated/
 apps/*/src/generated/
 # local harness files
 .claude/settings.local.json
+packages/module-kit/src/generated/

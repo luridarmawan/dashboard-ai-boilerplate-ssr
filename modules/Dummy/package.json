@@ -1,0 +1,14 @@
+{
+  "name": "@modules/dummy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "M0 gate-4 probe: a module that contributes a table, permissions and a menu entry without touching any core file",
+  "dependencies": {
+    "@core/db": "workspace:*",
+    "@core/module-kit": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

@@ -8,6 +8,13 @@
       "when": 1788686747831,
       "tag": "0000_keen_wind_dancer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788689576584,
+      "tag": "0001_sharp_harpoon",
+      "breakpoints": true
     }
   ]
 }

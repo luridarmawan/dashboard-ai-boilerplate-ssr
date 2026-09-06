@@ -1,0 +1,6 @@
+{
+  "name": "Dummy",
+  "version": "0.1.0",
+  "description": { "id": "Modul contoh untuk gate M0", "en": "Probe module for the M0 gate" },
+  "engines": { "core": ">=0.0.0" }
+}

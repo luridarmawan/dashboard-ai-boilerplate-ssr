@@ -1,0 +1,6 @@
+{
+  "modules": [
+    { "name": "Beta", "source": "local", "path": "modules/Beta" },
+    { "name": "Alpha", "source": "local", "path": "modules/Alpha" }
+  ]
+}

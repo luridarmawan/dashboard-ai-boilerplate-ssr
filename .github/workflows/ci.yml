@@ -1,0 +1,95 @@
+# CI guards that are switched on at M0 (ROADMAP §6). Each later milestone adds its own job
+# here rather than one big check at the end.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint · typecheck (both dialects) · unit tests · guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: check (modules:sync → db:codegen → biome → typecheck ×2)
+        run: bun run check
+      - name: unit tests
+        run: bun test
+      - name: theme contract (L-3, L-5, L-8, L-21)
+        run: bun run theme:validate
+      - name: DDL states charset & collation explicitly (§4.3)
+        run: bun run ci:ddl-guard
+      - name: modules:sync never touches tracked core files (G-6, basic)
+        run: bun run ci:sync-pure
+      - name: dependency audit (§8 #7)
+        run: bun audit --audit-level=high
+
+  db-matrix:
+    name: migrate + smoke · ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dialect: mysql
+            image: mysql:8
+            port: 3306
+            url: mysql://app:app@127.0.0.1:3306/app
+            health: mysqladmin ping -h 127.0.0.1 -uroot -proot
+          - dialect: mariadb
+            image: mariadb:11
+            port: 3306
+            url: mysql://app:app@127.0.0.1:3306/app
+            health: healthcheck.sh --connect --innodb_initialized
+          - dialect: postgres
+            image: postgres:16
+            port: 5432
+            url: postgres://app:app@127.0.0.1:5432/app
+            health: pg_isready -h 127.0.0.1 -U app -d app
+    services:
+      db:
+        image: ${{ matrix.image }}
+        ports:
+          - ${{ matrix.port }}:${{ matrix.port }}
+        # Every image ignores the other images' variables.
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app
+          MYSQL_USER: app
+          MYSQL_PASSWORD: app
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: app
+          MARIADB_USER: app
+          MARIADB_PASSWORD: app
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        options: >-
+          --health-cmd "${{ matrix.health }}"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 40
+    env:
+      MATRIX_MYSQL_URL: ${{ matrix.url }}
+      MATRIX_MARIADB_URL: ${{ matrix.url }}
+      MATRIX_POSTGRES_URL: ${{ matrix.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - run: bun run modules:sync
+      - name: codegen → migrate → migrate again → smoke
+        run: bun run scripts/db-matrix.ts ${{ matrix.dialect }}

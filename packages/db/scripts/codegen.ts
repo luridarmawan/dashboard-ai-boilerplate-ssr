@@ -35,9 +35,22 @@ export const activeDialect = '${rawDialect}' as const;
 `;
 
 await mkdir(OUT, { recursive: true });
+
+// Module tables arrive through `modules:sync` (G-2). When sync has not run yet (a fresh
+// checkout typechecking only core) an empty registry keeps the import resolvable.
+const moduleTablesFile = join(OUT, 'module-tables.ts');
+if (!(await Bun.file(moduleTablesFile).exists())) {
+  await Bun.write(
+    moduleTablesFile,
+    `// GENERATED placeholder — run \`bun modules:sync\` to populate.\n/* biome-ignore-all lint: generated file */\nimport type { TableDef } from '../descriptor.ts';\nexport const moduleTables: readonly TableDef[] = [];\n`,
+  );
+}
+const { moduleTables } = await import('../src/generated/module-tables.ts');
+const allTables = [...tables, ...moduleTables];
+
 const files: Array<[string, string]> = [
-  ['schema.mysql.ts', emitMysql(tables)],
-  ['schema.pg.ts', emitPg(tables)],
+  ['schema.mysql.ts', emitMysql(allTables)],
+  ['schema.pg.ts', emitPg(allTables)],
   ['active.ts', activeSource],
 ];
 for (const [name, content] of files) {
@@ -45,5 +58,5 @@ for (const [name, content] of files) {
 }
 
 console.log(
-  `db:codegen: ${tables.length} tabel → ${files.map(([n]) => n).join(', ')} (aktif: ${rawDialect})`,
+  `db:codegen: ${allTables.length} tabel (${tables.length} core + ${moduleTables.length} modul) → ${files.map(([n]) => n).join(', ')} (aktif: ${rawDialect})`,
 );

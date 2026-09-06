@@ -1,0 +1,8 @@
+{
+  "modules": [
+    { "name": "Naughty", "source": "local", "path": "modules/Naughty" },
+    { "name": "Old", "source": "local", "path": "modules/Old" },
+    { "name": "Ghost", "source": "local", "path": "modules/Ghost" },
+    { "name": "Old", "source": "local", "path": "modules/Old" }
+  ]
+}
