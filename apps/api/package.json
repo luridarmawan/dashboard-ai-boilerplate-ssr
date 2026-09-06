@@ -1,0 +1,23 @@
+{
+  "name": "@app/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Elysia API — the product's source of truth; SvelteKit is its first consumer (Decision A)",
+  "exports": {
+    "./app": "./src/app.ts"
+  },
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@core/config": "workspace:*",
+    "@core/contracts": "workspace:*",
+    "@core/db": "workspace:*",
+    "@core/module-kit": "workspace:*",
+    "@elysiajs/openapi": "^1.4.0",
+    "elysia": "^1.4.0"
+  }
+}

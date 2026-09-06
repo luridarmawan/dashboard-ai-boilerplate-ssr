@@ -38,6 +38,11 @@ const envSchema = z
     RATELIMIT_DRIVER: driver,
     REDIS_URL: z.url().optional(),
 
+    /** Port the Elysia process listens on; the reverse proxy fronts it in production (§4.4). */
+    API_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+    /** Where SvelteKit's server-side code reaches the API — internal hop, same host by default. */
+    API_URL: z.url().default('http://127.0.0.1:3001'),
+
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
     LANDING_ROUTE: z.string().startsWith('/').default('/m/example'),
   })
