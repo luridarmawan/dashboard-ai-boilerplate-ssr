@@ -176,6 +176,8 @@ Aturan yang berlaku:
 - **Tabel Anda tersedia sebagai `schema.<camelCase>`** — `billing_invoices` → `schema.billingInvoices`.
 - `getDb()` adalah satu-satunya koneksi (P-6). **Penjaga tenant di lapisan data [menyusul di M1]** — sampai saat itu, query Anda belum difilter `client_id` otomatis; jangan bangun fitur multi-tenant di atasnya dulu.
 
+**Tenant dan izin di route modul (sejak M1).** Handler modul menerima `auth` (sesi) dan `tenantState` (`{ clientId, tenant, perms, can }`) dari plugin global; `tenantState.tenant` adalah fasad `forTenant()` yang menyuntikkan `client_id` ke setiap query (B-3). Jaga route dengan `beforeHandle: permission('billing.invoice.read')` dari `apps/api/src/plugins/tenancy.ts` — 401 tanpa sesi, 403 tanpa izin, superadmin lolos (C-5). Query lintas-tenant hanya lewat `unsafeAcrossTenants()` yang mudah di-grep saat audit.
+
 ### `web/routes/**` — halaman (titik perluasan 3)
 
 Struktur folder persis SvelteKit; sync mencerminkannya ke `apps/web/src/routes/m/billing/**` sebagai *shim* tipis (Anda tidak pernah menyentuh direktori itu — ia hasil generate, di-gitignore, dan dibersihkan setiap sync).
@@ -201,7 +203,28 @@ export const load: ServerLoad = async () => ({ title: 'Faktur' });
 <h1>{data.title}</h1>
 ```
 
-Yang berlaku hari ini: halaman ter-SSR di `/m/billing/invoices`, `+layout.svelte` dan `+error.svelte` di dalam modul juga dicerminkan. **[Menyusul di M1/M2]:** klien API bertipe untuk `load` modul, layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
+Yang berlaku hari ini: halaman ter-SSR di `/m/billing/invoices`, `+layout.svelte` dan `+error.svelte` di dalam modul juga dicerminkan.
+
+**Sesi dan klien API (sejak M1).** `load` dan `actions` modul menerima `event` SvelteKit yang sama dengan halaman core:
+
+```ts
+// +page.server.ts
+import type { ServerLoad } from '@sveltejs/kit';
+import { apiFor } from '$lib/server/session';
+
+export const load: ServerLoad = async (event) => {
+  const s = event.locals.session;           // null bila belum login; layout (app) sudah mengalihkan ke /auth/login
+  if (!s?.can('billing.invoice.read')) return { invoices: [], denied: true };   // kosmetik (C-6b)
+  const res = await apiFor(event).v1.m.billing.invoices.get();  // membawa cookie sesi + CSRF + tenant aktif
+  return { invoices: res.data?.success ? res.data.data : [] };
+};
+```
+
+- `event.locals.session` — `{ user, clientId, tenants, permissions, can(p) }`, diresolusi server-side sekali per request (C-7). `can()` hanya untuk menyembunyikan tombol; API tetap menolak sendiri (C-6a).
+- `apiFor(event)` — klien Eden bertipe yang meneruskan cookie sesi, pasangan CSRF, origin publik, dan `X-Client-ID`. Route Anda muncul di `api.v1.m.<ns>.…` begitu `modules:sync` berjalan.
+- Form: kirim `<input type="hidden" name="_csrf" value={data.csrf}>` (tersedia dari layout `(app)`) dan panggil `checkCsrf(event, form)` di awal action — persis seperti halaman core (A-10).
+
+**[Menyusul di M2]:** layout & tema core yang membungkus halaman Anda (halaman hanya mengisi region `content`, §4.8), komponen `@core/ui`, dan `$types` untuk berkas modul — untuk sekarang pakai `ServerLoad`/`PageLoad` generik dari `@sveltejs/kit`.
 
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 
@@ -278,7 +301,7 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 | Titik perluasan | Status |
 |---|---|
 | 1 tabel · 2 route API · 3 halaman · 4 menu · 5 izin · 9 event hook · 12 job terjadwal | **Tersedia (M0)** — dokumen ini |
-| Penegakan izin & penjaga tenant di data layer | M1 (B-3, C-6) |
+| Penegakan izin (`permission()` / `requirePermission()` di API, `locals.session.can()` di web) & penjaga tenant di data layer (`forTenant`, B-3) | **Tersedia (M1)** — lihat §3 halaman dan route API |
 | 6 konfigurasi · 7 i18n · layout/tema membungkus halaman modul · `@core/ui` | M2–M3 |
 | 8 tool AI/MCP · 11 widget dashboard | M2/M5 |
 | 13 halaman publik · 14 tema · 15 layout · 16 set ikon | M2/M4 |

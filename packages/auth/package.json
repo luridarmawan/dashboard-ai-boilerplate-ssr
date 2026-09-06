@@ -8,10 +8,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "seed": "bun run scripts/seed.ts",
     "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
   },
   "dependencies": {
     "@core/db": "workspace:*",
-    "@core/module-kit": "workspace:*"
+    "@core/module-kit": "workspace:*",
+    "@core/config": "workspace:*"
   }
 }

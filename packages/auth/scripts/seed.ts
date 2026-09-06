@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
-/**
- * `bun db:seed` — idempotent seed (PRD O-3): default tenant, system groups, first superadmin
- * from BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD (C-5). Re-running is harmless.
- */
-import { runSeed } from '@core/auth';
 import { env } from '@core/config';
 import { unsafeAcrossTenants } from '@core/db';
+/**
+ * `bun db:seed` (root) → `bun run --cwd packages/auth seed` — idempotent seed (PRD O-3): default tenant, system groups, first superadmin
+ * from BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD (C-5). Re-running is harmless.
+ */
+import { runSeed } from '../src/index.ts';
 
 const e = env();
 // Seeding touches several tenants' worth of bootstrap rows by definition.

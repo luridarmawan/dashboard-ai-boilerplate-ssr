@@ -22,6 +22,7 @@ Target deployment adalah **satu VPS biasa** dengan Docker (PRD §4.4). Tidak ada
 - **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. `api` diresolusi lewat DNS Docker sebagai *dynamic upstream* — setiap replika `api` otomatis ikut dilayani.
 - **`api` stateless** (Keputusan F): tanpa port host, tanpa `container_name`, jadi `--scale api=N` langsung bekerja. State bersama ada di database (Keputusan M); Valkey hanya percepatan opsional (`--profile redis`).
 - **Seed idempoten** (O-3): service `seed` membuat tenant `default`, grup `admin` (`*.*`) dan `user`, serta superadmin pertama dari `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` di `.env.prod`. Aman dijalankan ulang setiap deploy; baris yang sudah ada (termasuk kata sandi) tidak disentuh.
+- **Tanpa sticky session** (gate M1 #4): `bun run proof:m1:scale` membangun image, menyalakan stack dengan `--scale api=3` tanpa Redis, lalu menjalankan alur login → CRUD → ganti tenant lewat Caddy dan memastikan lebih dari satu replika melayani request. `APP_ORIGIN=https://DOMAIN` diturunkan otomatis di compose agar pemeriksaan CSRF membandingkan origin publik yang benar.
 - **Migrasi adalah langkah eksplisit** (Q-4): service `migrate` (profil `ops`) dijalankan operator, tidak pernah otomatis saat container start — dua instance yang menyala bersamaan tidak berebut migrasi.
 
 ## 2. Menjalankan

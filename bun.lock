@@ -63,6 +63,7 @@
       "name": "@core/auth",
       "version": "0.0.0",
       "dependencies": {
+        "@core/config": "workspace:*",
         "@core/db": "workspace:*",
         "@core/module-kit": "workspace:*",
       },
