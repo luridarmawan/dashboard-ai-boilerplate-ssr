@@ -12,7 +12,16 @@
  * missing, `bun install`, `bun modules:sync`, `tsc`, `biome check`, `db:generate`, tests. Nothing
  * else in the core checkout is modified — that is the whole point of the module contract (G-6).
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const here = resolve(import.meta.dir);
@@ -65,14 +74,18 @@ if (!existsSync(join(coreDir, 'modules.json'))) {
 // ---- 2. copy this module into <core>/modules/<Name> and register it ----
 const target = join(coreDir, 'modules', NAME);
 rmSync(target, { recursive: true, force: true });
-mkdirSync(target, { recursive: true });
-cpSync(here, target, {
-  recursive: true,
-  filter: (src) => {
-    const rel = src.slice(here.length + 1);
-    return !/^(\.git|node_modules|\.core)(\/|$)/.test(rel);
-  },
-});
+/** Copy this module into core, skipping .git, node_modules and .core (which may live inside this folder). */
+function copyModule(src: string, dst: string): void {
+  mkdirSync(dst, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    if (/^(\.git|node_modules|\.core)$/.test(entry)) continue;
+    const from = join(src, entry);
+    const to = join(dst, entry);
+    if (statSync(from).isDirectory()) copyModule(from, to);
+    else copyFileSync(from, to);
+  }
+}
+copyModule(here, target);
 const modulesFile = join(coreDir, 'modules.json');
 const modules = JSON.parse(readFileSync(modulesFile, 'utf8')) as {
   modules: { name: string; source: string; path: string }[];
