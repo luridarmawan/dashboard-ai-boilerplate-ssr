@@ -3,6 +3,7 @@ import baseCss from '@core/ui-theme/themes/base/tokens.css?raw';
 import contrastCss from '@core/ui-theme/themes/contrast/tokens.css?raw';
 import corporateCss from '@core/ui-theme/themes/corporate/tokens.css?raw';
 import warmCss from '@core/ui-theme/themes/warm/tokens.css?raw';
+import { moduleThemeTokens } from '$lib/../generated/theme-tokens';
 
 /**
  * Theme previews for the picker (PRD L-3, L-13), generated from the theme's OWN tokens and
@@ -15,6 +16,7 @@ const TOKEN_SOURCES: Record<string, string> = {
   corporate: corporateCss,
   warm: warmCss,
   contrast: contrastCss,
+  ...moduleThemeTokens,
 };
 
 export interface Palette {

@@ -8,7 +8,10 @@
  *   L-21 WCAG AA contrast on EVERY theme, light and dark
  *
  * Exits with code 1 on any failure so CI rejects the merge.
- * Usage: node packages/ui-theme/validate.mjs
+ * Usage: node packages/ui-theme/validate.mjs [--themes-from <dir> ...]
+ *   --themes-from  extra directories holding <id>/theme.json (module themes, extension point 14)
+ *   THEME_EXTRA_LAYOUTS / THEME_EXTRA_ICON_SETS: JSON arrays of module-contributed ids, so a
+ *   module theme may reference a module layout or icon set (extension points 15, 16)
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -86,14 +89,31 @@ const iconRegistry = JSON.parse(readFileSync(join(root, 'icons/registry.json'), 
 const layoutRegistry = JSON.parse(readFileSync(join(root, 'layouts/registry.json'), 'utf8'));
 const layoutById = new Map(layoutRegistry.layouts.map((l) => [l.id, l]));
 const knownIconSets = new Set(Object.keys(iconRegistry.sets));
+for (const l of JSON.parse(process.env.THEME_EXTRA_LAYOUTS ?? '[]')) layoutById.set(l.id, l);
+for (const id of JSON.parse(process.env.THEME_EXTRA_ICON_SETS ?? '[]')) knownIconSets.add(id);
+const EXTRA_THEME_DIRS = [];
+for (let i = 0; i < process.argv.length; i++) {
+  if (process.argv[i] === '--themes-from' && process.argv[i + 1])
+    EXTRA_THEME_DIRS.push(process.argv[++i]);
+}
 
 /* ---------- run ---------- */
 const problems = [];
 const rows = [];
-const themeDirs = readdirSync(THEMES, { withFileTypes: true })
-  .filter((d) => d.isDirectory())
-  .map((d) => d.name)
-  .sort();
+const listThemes = (base) =>
+  existsSync(base)
+    ? readdirSync(base, { withFileTypes: true })
+        .filter((d) => d.isDirectory() && existsSync(join(base, d.name, 'theme.json')))
+        .map((d) => ({
+          id: JSON.parse(readFileSync(join(base, d.name, 'theme.json'), 'utf8')).id ?? d.name,
+          dir: join(base, d.name),
+          core: base === THEMES,
+        }))
+    : [];
+const allThemes = [...listThemes(THEMES), ...EXTRA_THEME_DIRS.flatMap(listThemes)].sort((a, b) =>
+  a.id.localeCompare(b.id),
+);
+const themeDirs = allThemes.filter((t) => t.core).map((t) => t.id);
 
 if (themeDirs.length < 4) {
   problems.push(`L-3: butuh minimal 4 tema bawaan, ditemukan ${themeDirs.length}`);
@@ -102,16 +122,12 @@ if (themeDirs.length < 4) {
 const layoutsUsed = new Set();
 const iconSetsUsed = new Set();
 
-for (const id of themeDirs) {
-  const dir = join(THEMES, id);
+for (const { id, dir, core } of allThemes) {
   const manifestPath = join(dir, 'theme.json');
-  if (!existsSync(manifestPath)) {
-    problems.push(`${id}: theme.json tidak ada`);
-    continue;
-  }
-
   const theme = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  if (theme.id !== id) problems.push(`${id}: field id "${theme.id}" tidak cocok nama folder`);
+  // Core themes: folder name = id. Module themes: id carries the module namespace (`<ns>.<name>`).
+  if (core && theme.id !== id)
+    problems.push(`${id}: field id "${theme.id}" tidak cocok nama folder`);
 
   // L-5 — icon set is registered
   if (!knownIconSets.has(theme.icons)) {
@@ -182,7 +198,7 @@ if (iconSetsUsed.size < 2)
   );
 
 /* ---------- report ---------- */
-console.log(`\nTema diperiksa: ${themeDirs.join(', ')}`);
+console.log(`\nTema diperiksa: ${allThemes.map((t) => t.id).join(', ')}`);
 console.log(`Layout dipakai: ${[...layoutsUsed].join(', ')}`);
 console.log(`Set ikon dipakai: ${[...iconSetsUsed].join(', ')}\n`);
 console.log('Rasio kontras terendah per tema/mode:');

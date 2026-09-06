@@ -1,0 +1,4 @@
+{
+  "core": ["menu", "edit", "save"],
+  "sets": { "outline-24": { "name": { "id": "Garis", "en": "Outline" }, "style": "stroke" } }
+}

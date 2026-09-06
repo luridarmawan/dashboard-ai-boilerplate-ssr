@@ -62,9 +62,9 @@ async function post(jar: Jar, path: string, fields: Record<string, string>) {
 const csrfOf = (html: string) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
 const htmlAttr = (html: string, attr: string) =>
   new RegExp(`<html[^>]*\\s${attr}="([^"]*)"`).exec(html)?.[1] ?? '';
-const footerLayout = (html: string) => /layout <code>([a-z-]+)<\/code>/.exec(html)?.[1] ?? '';
+const footerLayout = (html: string) => /layout <code>([a-z.-]+)<\/code>/.exec(html)?.[1] ?? '';
 const footerVariant = (html: string) =>
-  /varian <code>([a-z-]+)<\/code>/.exec(html)?.[1] ?? 'default';
+  /varian <code>([a-z.-]+)<\/code>/.exec(html)?.[1] ?? 'default';
 /** Which glyph library rendered the icons: Lucide draws `<svg class="lucide …`, Phosphor draws `<svg … viewBox="0 0 256 256"`. */
 const iconFamily = (html: string) =>
   html.includes('viewBox="0 0 256 256"') ? 'phosphor' : html.includes('lucide') ? 'lucide' : 'none';
@@ -339,7 +339,52 @@ const admin = new Jar();
   );
 }
 
+// ---- #5: a layout registered from OUTSIDE core is used, without changing any page ----
+{
+  const picker = await get(admin, '/theme');
+  check(
+    '#5 the picker lists the module theme dummy.ocean (extension point 14)',
+    picker.html.includes('name="theme" value="dummy.ocean"'),
+  );
+  await post(admin, '/theme', {
+    _csrf: csrfOf(picker.html),
+    theme: 'dummy.ocean',
+    mode: 'light',
+    back: '/dashboard',
+  });
+  const dash = await get(admin, '/dashboard');
+  check(
+    '#5 dashboard renders the module layout dummy.two-column (extension point 15)',
+    footerLayout(dash.html) === 'dummy.two-column' &&
+      dash.html.includes('data-layout="dummy.two-column"') &&
+      htmlAttr(dash.html, 'data-app-theme') === 'dummy.ocean',
+    `${footerLayout(dash.html)}`,
+  );
+  check(
+    '#5 the same pages: menu, users link and content region are all there',
+    dash.html.includes('href="/users"') && dash.html.includes('id="content"'),
+  );
+  const users = await get(admin, '/users');
+  check(
+    '#5 module theme maps `wide` to a core layout (topnav-compact) — mixing is free',
+    footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'topnav-compact',
+  );
+  check(
+    '#5 icons come from the module icon set dummy.rounded-24 (Lucide, stroke 2.25)',
+    /stroke-width="2.25"/.test(dash.html),
+  );
+  // back to base for whatever runs next
+  await post(admin, '/theme', {
+    _csrf: csrfOf((await get(admin, '/theme')).html),
+    theme: 'base',
+    mode: 'light',
+    back: '/dashboard',
+  });
+}
+
 console.log(
-  failures === 0 ? '\nGATE M2 #1 #2 #3 #6 + G-19 + L-19: LOLOS' : `\nGATE M2: GAGAL (${failures})`,
+  failures === 0
+    ? '\nGATE M2 #1 #2 #3 #5 #6 + G-19 + L-19: LOLOS'
+    : `\nGATE M2: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);

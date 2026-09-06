@@ -48,6 +48,19 @@ describe('syncModules — happy path (G-2, G-9, G-11)', () => {
     expect(r.warnings.some((w) => w.includes('i18n/en.json') && w.includes('1 kunci'))).toBe(true);
   });
 
+  test('collects a module layout, icon set and theme that reference each other (extension points 14–16)', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.layoutsContrib.map((l) => l.id)).toEqual(['alpha.stack']);
+    expect(r.layoutsContrib[0]?.kind).toBe('auth');
+    expect(r.iconSetsContrib.map((s) => s.id)).toEqual(['alpha.dots']);
+    expect(r.themesContrib.map((t) => t.manifest.id)).toEqual(['alpha.night']);
+    expect(r.themesContrib[0]?.tokensPath).toBe('modules/Alpha/themes/night/tokens.css');
+  });
+
   test('module-namespaced icon (`beta.rocket`) is accepted without being a core icon', async () => {
     const r = await syncModules({
       root: join(fixtures, 'good'),
@@ -94,6 +107,7 @@ describe('syncModules — every violation reported at once, naming the module', 
     has(/Naughty.*href menu "naughty\.a" harus di bawah \/m\/naughty/);
     has(/Naughty.*widget "naughty\.ghost": komponen web\/widgets\/Missing\.svelte tidak ada/);
     has(/Naughty.*id widget "other\.widget" harus diawali "naughty\."/);
+    has(/Naughty.*layout "naughty\.holey" \(auth\) belum mengisi region: brand, footer \(L-8\)/);
     // Nothing valid slipped through.
     expect(p.length).toBeGreaterThanOrEqual(6);
   });

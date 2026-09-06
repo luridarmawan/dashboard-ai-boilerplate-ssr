@@ -12,6 +12,8 @@
 @import "@core/ui-theme/themes/corporate/tokens.css";
 @import "@core/ui-theme/themes/warm/tokens.css";
 @import "@core/ui-theme/themes/contrast/tokens.css";
+/* Module themes (extension point 14) — written by modules:sync. */
+@import "./generated/themes.css";
 
 /* Self-hosted fonts referenced by the four built-in themes' --font-sans / --font-mono. */
 @import "@fontsource/inter/400.css";

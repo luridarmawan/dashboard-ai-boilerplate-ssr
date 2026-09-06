@@ -72,6 +72,7 @@
         "@core/contracts": "workspace:*",
         "@core/db": "workspace:*",
         "@core/module-kit": "workspace:*",
+        "@lucide/svelte": "^1.41.0",
         "elysia": "^1.4.0",
       },
       "devDependencies": {

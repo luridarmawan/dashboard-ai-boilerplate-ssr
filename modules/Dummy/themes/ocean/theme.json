@@ -1,0 +1,21 @@
+{
+  "id": "dummy.ocean",
+  "name": { "id": "Samudra (modul Dummy)", "en": "Ocean (Dummy module)" },
+  "description": {
+    "id": "Tema dari modul: biru laut, memakai layout dua kolom milik modul dan set ikon bulatnya.",
+    "en": "A module theme: sea blue, using the module's two-column layout and its rounded icon set."
+  },
+  "tokens": "./tokens.css",
+  "icons": "dummy.rounded-24",
+  "layouts": {
+    "dashboard": {
+      "default": "dummy.two-column",
+      "wide": "topnav-compact",
+      "focused": "centered-narrow"
+    },
+    "public": { "default": "marketing-wide" },
+    "auth": { "default": "centered-card" }
+  },
+  "assets": { "logo": "./logo.svg", "favicon": "./favicon.svg" },
+  "preview": "./preview.png"
+}

@@ -3,7 +3,13 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
-import type { MenuEntryDef, PermissionDef, WidgetDef } from './contract.ts';
+import type {
+  IconSetContribDef,
+  LayoutContribDef,
+  MenuEntryDef,
+  PermissionDef,
+  WidgetDef,
+} from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
 import { parseEvery } from './jobs.ts';
 import {
@@ -92,6 +98,26 @@ export interface SyncResult {
   /** Module translation keys merged into the catalogue (K-6). */
   readonly i18nKeys: number;
   readonly widgets: readonly (WidgetDef & { module: string; path: string })[];
+  readonly layoutsContrib: readonly (LayoutContribDef & { module: string; path: string })[];
+  readonly iconSetsContrib: readonly (IconSetContribDef & { module: string; path: string })[];
+  readonly themesContrib: readonly ThemeContrib[];
+}
+
+/** A theme folder contributed by a module (extension point 14). */
+export interface ThemeContrib {
+  readonly manifest: {
+    id: string;
+    name: { id: string; en: string };
+    description?: { id: string; en: string };
+    tokens?: string;
+    icons: string;
+    layouts?: Record<string, Record<string, string>>;
+    assets?: Record<string, string>;
+    preview?: string;
+  };
+  readonly module: string;
+  readonly dir: string;
+  readonly tokensPath: string;
 }
 
 export class SyncError extends Error {
@@ -165,6 +191,12 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   let i18nKeys = 0;
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
+  // Extension points 14–16 (§4.8, L-7, L-14): themes, layouts, icon sets from modules.
+  const layoutsContrib: (LayoutContribDef & { module: string; path: string })[] = [];
+  const iconSetsContrib: (IconSetContribDef & { module: string; path: string })[] = [];
+  const themesContrib: ThemeContrib[] = [];
+  const coreLayouts = readCoreLayouts(root);
+  const coreIconSets = readCoreIconSets(root);
 
   const tableOwner = new Map<string, string>();
   const permOwner = new Map<string, string>();
@@ -438,6 +470,121 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- layouts.ts (extension point 15, L-7/L-8) ----
+    const lay = await loadDefault<readonly LayoutContribDef[]>(
+      join(dir, 'layouts.ts'),
+      problems,
+      tag,
+    );
+    if (lay) {
+      if (!Array.isArray(lay))
+        problems.push(`${tag}: layouts.ts harus meng-export default array (pakai defineLayouts)`);
+      else {
+        for (const l of lay) {
+          if (!l?.id?.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: id layout "${l?.id}" harus diawali "${ns}." (G-9)`);
+            continue;
+          }
+          const file = join(dir, l.component);
+          if (!existsSync(file)) {
+            problems.push(`${tag}: layout "${l.id}": komponen ${l.component} tidak ada`);
+            continue;
+          }
+          const regions = coreLayouts.regions[l.kind];
+          if (!regions) {
+            problems.push(`${tag}: layout "${l.id}": kind "${l.kind}" tidak dikenal`);
+            continue;
+          }
+          const src = readFileSync(file, 'utf8');
+          const missing = regions.filter((r) => !new RegExp(`\\{@render\\s+${r}\\s*\\(`).test(src));
+          if (missing.length) {
+            problems.push(
+              `${tag}: layout "${l.id}" (${l.kind}) belum mengisi region: ${missing.join(', ')} (L-8)`,
+            );
+            continue;
+          }
+          if (coreLayouts.ids.has(l.id) || layoutsContrib.some((x) => x.id === l.id)) {
+            problems.push(`${tag}: layout "${l.id}" sudah ada`);
+            continue;
+          }
+          layoutsContrib.push({ ...l, module: manifest.name, path: `${rel}/${l.component}` });
+        }
+      }
+    }
+
+    // ---- icons.ts (extension point 16, L-5) ----
+    const ic = await loadDefault<readonly IconSetContribDef[]>(
+      join(dir, 'icons.ts'),
+      problems,
+      tag,
+    );
+    if (ic) {
+      if (!Array.isArray(ic))
+        problems.push(`${tag}: icons.ts harus meng-export default array (pakai defineIconSets)`);
+      else {
+        for (const s of ic) {
+          if (!s?.id?.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: id set ikon "${s?.id}" harus diawali "${ns}." (G-9)`);
+            continue;
+          }
+          const file = join(dir, s.glyphs);
+          if (!existsSync(file)) {
+            problems.push(`${tag}: set ikon "${s.id}": berkas glyph ${s.glyphs} tidak ada`);
+            continue;
+          }
+          const src = readFileSync(file, 'utf8');
+          const keys = new Set([...src.matchAll(/^\s+'?([a-z0-9-]+)'?:/gm)].map((m) => m[1]));
+          const missing = [...coreIcons].filter((n) => !keys.has(n));
+          if (missing.length) {
+            problems.push(
+              `${tag}: set ikon "${s.id}" tidak memetakan ${missing.length} nama core (mis. ${missing.slice(0, 3).join(', ')}) (L-5)`,
+            );
+            continue;
+          }
+          if (coreIconSets.has(s.id) || iconSetsContrib.some((x) => x.id === s.id)) {
+            problems.push(`${tag}: set ikon "${s.id}" sudah ada`);
+            continue;
+          }
+          iconSetsContrib.push({ ...s, module: manifest.name, path: `${rel}/${s.glyphs}` });
+        }
+      }
+    }
+
+    // ---- themes/<id>/theme.json (extension point 14) ----
+    const themesDir = join(dir, 'themes');
+    if (existsSync(themesDir)) {
+      for (const entry of readdirSync(themesDir, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const tdir = join(themesDir, entry.name);
+        const mf = join(tdir, 'theme.json');
+        if (!existsSync(mf)) continue;
+        let theme: ThemeContrib['manifest'];
+        try {
+          theme = JSON.parse(readFileSync(mf, 'utf8'));
+        } catch (e) {
+          problems.push(
+            `${tag}: themes/${entry.name}/theme.json tidak bisa dibaca — ${(e as Error).message}`,
+          );
+          continue;
+        }
+        if (!theme?.id?.startsWith(`${ns}.`)) {
+          problems.push(`${tag}: id tema "${theme?.id}" harus diawali "${ns}." (G-9)`);
+          continue;
+        }
+        const tokens = join(tdir, (theme.tokens ?? './tokens.css').replace(/^\.\//, ''));
+        if (!existsSync(tokens)) {
+          problems.push(`${tag}: tema "${theme.id}": berkas token ${theme.tokens} tidak ada`);
+          continue;
+        }
+        themesContrib.push({
+          manifest: theme,
+          module: manifest.name,
+          dir: `${rel}/themes/${entry.name}`,
+          tokensPath: `${rel}/themes/${entry.name}/${(theme.tokens ?? './tokens.css').replace(/^\.\//, '')}`,
+        });
+      }
+    }
+
     // ---- i18n/<locale>.json (extension point 7, K-6) ----
     const i18nDir = join(dir, 'i18n');
     if (existsSync(i18nDir)) {
@@ -525,6 +672,29 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         problems.push(`modul ${m.name}: bergantung pada "${dep}" yang tidak terpasang`);
     }
   }
+  // Themes may reference core OR module layouts / icon sets — but only ones that exist (L-8, L-5).
+  const knownLayouts = new Map<string, string>([...coreLayouts.kinds]);
+  for (const l of layoutsContrib) knownLayouts.set(l.id, l.kind);
+  const knownIconSets = new Set([...coreIconSets, ...iconSetsContrib.map((s) => s.id)]);
+  for (const th of themesContrib) {
+    const m = th.manifest;
+    if (!knownIconSets.has(m.icons))
+      problems.push(`tema "${m.id}": set ikon "${m.icons}" tidak terdaftar (L-5)`);
+    for (const [kind, variants] of Object.entries(m.layouts ?? {})) {
+      if (!variants?.default)
+        problems.push(`tema "${m.id}"/${kind}: varian "default" wajib ada (Keputusan K)`);
+      for (const [variant, layoutId] of Object.entries(variants ?? {})) {
+        const k = knownLayouts.get(layoutId);
+        if (!k)
+          problems.push(
+            `tema "${m.id}"/${kind}/${variant}: layout "${layoutId}" tidak terdaftar (L-8)`,
+          );
+        else if (k !== kind)
+          problems.push(`tema "${m.id}"/${kind}/${variant}: layout "${layoutId}" ber-kind "${k}"`);
+      }
+    }
+  }
+
   const ordered = topoSort(modules, problems);
 
   if (problems.length) throw new SyncError(problems);
@@ -559,7 +729,21 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         ),
       );
     }
+    files.push(
+      await writeFile(
+        join(root, 'packages/ui-theme/src/generated/contrib.ts'),
+        emitThemeContrib(themesContrib, layoutsContrib, iconSetsContrib),
+      ),
+    );
     if (existsSync(join(root, 'apps/web/src/routes'))) {
+      const lOut = join(root, 'apps/web/src/generated/layouts.ts');
+      files.push(await writeFile(lOut, emitLayouts(layoutsContrib, root, lOut)));
+      const iOut = join(root, 'apps/web/src/generated/icon-sets.ts');
+      files.push(await writeFile(iOut, emitIconSets(iconSetsContrib, root, iOut)));
+      const cOut = join(root, 'apps/web/src/generated/themes.css');
+      files.push(await writeFile(cOut, emitThemesCss(themesContrib, root, cOut)));
+      const tOut = join(root, 'apps/web/src/generated/theme-tokens.ts');
+      files.push(await writeFile(tOut, emitThemeTokens(themesContrib, root, tOut)));
       const wOut = join(root, 'apps/web/src/generated/widgets.ts');
       files.push(await writeFile(wOut, emitWidgets(widgets, root, wOut)));
       const mDir = join(root, 'apps/web/src/routes/m');
@@ -577,6 +761,9 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   return {
     i18nKeys,
     widgets,
+    layoutsContrib,
+    iconSetsContrib,
+    themesContrib,
     modules: ordered,
     tables,
     permissions,
@@ -907,5 +1094,137 @@ export interface WidgetEntry {
 export const moduleWidgets: readonly WidgetEntry[] = [
 ${entries.join('\n')}
 ];
+`;
+}
+
+function readCoreLayouts(root: string): {
+  ids: Set<string>;
+  kinds: Map<string, string>;
+  regions: Record<string, string[]>;
+} {
+  const file = join(root, 'packages/ui-theme/layouts/registry.json');
+  if (!existsSync(file)) return { ids: new Set(), kinds: new Map(), regions: {} };
+  const reg = JSON.parse(readFileSync(file, 'utf8')) as {
+    regions: Record<string, string[]>;
+    layouts: { id: string; kind: string }[];
+  };
+  return {
+    ids: new Set(reg.layouts.map((l) => l.id)),
+    kinds: new Map(reg.layouts.map((l) => [l.id, l.kind])),
+    regions: reg.regions,
+  };
+}
+
+function readCoreIconSets(root: string): Set<string> {
+  const file = join(root, 'packages/ui-theme/icons/registry.json');
+  if (!existsSync(file)) return new Set();
+  return new Set(Object.keys((JSON.parse(readFileSync(file, 'utf8')) as { sets: object }).sets));
+}
+
+/** Metadata for the @core/ui-theme registry: module themes, layouts and icon sets (L-14). */
+function emitThemeContrib(
+  themes: readonly ThemeContrib[],
+  layouts: readonly (LayoutContribDef & { module: string })[],
+  iconSets: readonly (IconSetContribDef & { module: string })[],
+): string {
+  return `${GEN_HEADER}
+/** Themes contributed by modules (extension point 14). */
+export const moduleThemes = ${JSON.stringify(
+    themes.map((t) => ({ ...t.manifest, module: t.module })),
+    null,
+    2,
+  )};
+
+/** Layouts contributed by modules (extension point 15). */
+export const moduleLayouts = ${JSON.stringify(
+    layouts.map(({ id, kind, name, description, module }) => ({
+      id,
+      kind,
+      name,
+      description,
+      module,
+    })),
+    null,
+    2,
+  )};
+
+/** Icon sets contributed by modules (extension point 16). */
+export const moduleIconSets = ${JSON.stringify(
+    iconSets.map(({ id, name, style, strokeWidth, grid, source, license, module }) => ({
+      id,
+      name,
+      style,
+      strokeWidth,
+      grid: grid ?? 24,
+      source: source ?? module,
+      license: license ?? '',
+      module,
+    })),
+    null,
+    2,
+  )};
+`;
+}
+
+/** Lazy component per module layout, grouped by kind — merged into the web layout registry. */
+function emitLayouts(
+  layouts: readonly (LayoutContribDef & { module: string; path: string })[],
+  root: string,
+  out: string,
+): string {
+  const byKind = (kind: string) =>
+    layouts
+      .filter((l) => l.kind === kind)
+      .map((l) => `  '${l.id}': () => import('${importPath(join(root, l.path), out)}'),`)
+      .join('\n');
+  return `${GEN_HEADER}
+/** Module layouts (extension point 15), keyed by id. Only the resolved layout is downloaded. */
+export const moduleDashboardLayouts = {
+${byKind('dashboard')}
+} as const;
+export const modulePublicLayouts = {
+${byKind('public')}
+} as const;
+export const moduleAuthLayouts = {
+${byKind('auth')}
+} as const;
+`;
+}
+
+/** Glyph maps of module icon sets, imported statically so `<Icon>` can resolve them. */
+function emitIconSets(
+  sets: readonly (IconSetContribDef & { module: string; path: string })[],
+  root: string,
+  out: string,
+): string {
+  const imports = sets
+    .map((s, i) => `import { glyphs as set${i} } from '${importPath(join(root, s.path), out)}';`)
+    .join('\n');
+  const entries = sets.map((s, i) => `  '${s.id}': set${i},`).join('\n');
+  return `${GEN_HEADER}${imports ? `${imports}\n` : ''}
+/** Module icon sets (extension point 16): id → glyph map. */
+export const moduleIconGlyphs = {
+${entries}
+} as const;
+`;
+}
+
+/** One @import per module theme token file, pulled into app.css. */
+function emitThemesCss(themes: readonly ThemeContrib[], root: string, out: string): string {
+  const lines = themes.map((t) => `@import '${importPath(join(root, t.tokensPath), out)}';`);
+  return `/* GENERATED by \`bun modules:sync\` — module theme tokens (extension point 14). DO NOT edit. */\n${lines.join('\n')}\n`;
+}
+
+/** Raw token CSS per module theme, for the picker's generated previews. */
+function emitThemeTokens(themes: readonly ThemeContrib[], root: string, out: string): string {
+  const imports = themes
+    .map((t, i) => `import tokens${i} from '${importPath(join(root, t.tokensPath), out)}?raw';`)
+    .join('\n');
+  const entries = themes.map((t, i) => `  '${t.manifest.id}': tokens${i},`).join('\n');
+  return `${GEN_HEADER}${imports ? `${imports}\n` : ''}
+/** Module theme id → its tokens.css source (extension point 14). */
+export const moduleThemeTokens: Readonly<Record<string, string>> = {
+${entries}
+};
 `;
 }

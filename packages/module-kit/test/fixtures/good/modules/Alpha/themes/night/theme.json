@@ -1,0 +1,7 @@
+{
+  "id": "alpha.night",
+  "name": { "id": "Malam", "en": "Night" },
+  "tokens": "./tokens.css",
+  "icons": "alpha.dots",
+  "layouts": { "auth": { "default": "alpha.stack" } }
+}

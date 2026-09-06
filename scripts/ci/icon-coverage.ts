@@ -9,12 +9,13 @@ import { CORE_ICONS, ICON_SETS } from '@core/ui-theme';
 
 const root = new URL('../..', import.meta.url).pathname;
 let failures = 0;
-for (const set of Object.keys(ICON_SETS)) {
+// Module sets (`<ns>.<id>`) are verified by modules:sync against their own glyph map.
+for (const set of Object.keys(ICON_SETS).filter((id) => !id.includes('.'))) {
   const file = `${root}apps/web/src/lib/icons/${set}.ts`;
   let src = readFileSync(file, 'utf8');
   const reexport = /export \{ glyphs \} from '\.\/([\w-]+)\.ts'/.exec(src);
   if (reexport) src = readFileSync(`${root}apps/web/src/lib/icons/${reexport[1]}.ts`, 'utf8');
-  const keys = new Set([...src.matchAll(/^\s+'([a-z0-9-]+)':/gm)].map((m) => m[1]));
+  const keys = new Set([...src.matchAll(/^\s+'?([a-z0-9-]+)'?:/gm)].map((m) => m[1]));
   const missing = CORE_ICONS.filter((n) => !keys.has(n));
   if (missing.length) {
     failures++;

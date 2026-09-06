@@ -1,0 +1,78 @@
+/* Theme: dummy.ocean — contributed by the Dummy module (extension point 14). Same file shape as a
+ * core theme; validated for contrast like any other (L-21). */
+[data-app-theme="dummy.ocean"] {
+  --radius: 0.625rem;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --background: #f4f9fb;
+  --foreground: #0c2a3a;
+  --card: #ffffff;
+  --card-foreground: #0c2a3a;
+  --popover: #ffffff;
+  --popover-foreground: #0c2a3a;
+
+  --primary: #0e6e8e;
+  --primary-foreground: #ffffff;
+  --secondary: #dcedf3;
+  --secondary-foreground: #0c2a3a;
+  --accent: #d5f0f7;
+  --accent-foreground: #0a4f66;
+
+  --muted: #e3eef3;
+  --muted-foreground: #3f5d6b;
+
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --success: #15704b;
+  --success-foreground: #ffffff;
+  --warning: #8a5a00;
+  --warning-foreground: #ffffff;
+
+  --border: #cfe0e8;
+  --input: #6a8794;
+  --ring: #0e6e8e;
+
+  --chart-1: #0e6e8e;
+  --chart-2: #14919b;
+  --chart-3: #8a5a00;
+  --chart-4: #5b5bd6;
+  --chart-5: #b42318;
+}
+
+[data-app-theme="dummy.ocean"][data-mode="dark"],
+[data-app-theme="dummy.ocean"] :is([data-mode="dark"]) {
+  --background: #071a24;
+  --foreground: #dbeaf1;
+  --card: #0d2532;
+  --card-foreground: #dbeaf1;
+  --popover: #0d2532;
+  --popover-foreground: #dbeaf1;
+
+  --primary: #4cb3d4;
+  --primary-foreground: #071a24;
+  --secondary: #163646;
+  --secondary-foreground: #dbeaf1;
+  --accent: #0f3d50;
+  --accent-foreground: #bfe6f2;
+
+  --muted: #163646;
+  --muted-foreground: #9dbccb;
+
+  --destructive: #f2705f;
+  --destructive-foreground: #071a24;
+  --success: #5fd39b;
+  --success-foreground: #071a24;
+  --warning: #f0b84a;
+  --warning-foreground: #071a24;
+
+  --border: #234a5c;
+  --input: #7a9cab;
+  --ring: #4cb3d4;
+
+  --chart-1: #4cb3d4;
+  --chart-2: #3ecfd6;
+  --chart-3: #f0b84a;
+  --chart-4: #a7a7ff;
+  --chart-5: #f2705f;
+}

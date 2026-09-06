@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Theme contract: tokens, icon & layout registries, resolution chain, validator (PRD §4.8, FR-L)",
+  "description": "Theme contract: tokens, icon & layout registries, resolution chain, validator (PRD \u00a74.8, FR-L)",
   "exports": {
     ".": "./src/index.ts",
     "./themes/*": "./themes/*",
     "./icons/registry.json": "./icons/registry.json",
-    "./layouts/registry.json": "./layouts/registry.json"
+    "./layouts/registry.json": "./layouts/registry.json",
+    "./generated": "./src/generated/contrib.ts"
   },
   "files": [
     "src",

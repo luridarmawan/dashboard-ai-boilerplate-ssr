@@ -1,0 +1,8 @@
+{
+  "regions": {
+    "dashboard": ["brand", "nav", "header", "breadcrumb", "content", "aside", "footer"],
+    "public": ["brand", "nav", "content", "footer"],
+    "auth": ["brand", "content", "footer"]
+  },
+  "layouts": [{ "id": "centered-card", "kind": "auth", "name": { "id": "Kartu", "en": "Card" } }]
+}

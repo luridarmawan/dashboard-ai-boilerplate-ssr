@@ -249,6 +249,24 @@ export default defineWidgets('Billing', [
 
 Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core. Widget **tidak mengambil data saat SSR**; angka yang butuh API diambil halaman modul sendiri (hook data widget menyusul).
 
+### `themes/<id>/`, `layouts.ts`, `icons.ts` — tema, layout, set ikon (titik perluasan 14–16)
+
+Modul bisa menyumbang ketiganya (§4.8, L-7, L-14). Semuanya divalidasi `modules:sync` dan `bun run theme:validate`, lalu **otomatis muncul di pemilih tema**; tidak ada berkas core yang disentuh.
+
+```
+modules/Billing/
+├── themes/ocean/theme.json      # id "billing.ocean"; bentuk folder = tema core (tokens.css light+dark)
+├── layouts.ts                   # defineLayouts('Billing', [{ id: 'billing.two-column', kind: 'dashboard', component: 'web/layouts/TwoColumn.svelte', … }])
+├── icons.ts                     # defineIconSets('Billing', [{ id: 'billing.rounded-24', style: 'stroke', glyphs: 'web/icons/rounded-24.ts', … }])
+└── web/{layouts,icons}/…
+```
+
+- **Layout** (15): komponen Svelte yang hanya menyusun region — sync menolak yang region-nya bolong dengan menyebut region mana (L-8). Begitu terdaftar, tema **mana pun** (termasuk tema core) boleh memetakan varian ke id itu.
+- **Tema** (14): `theme.json` boleh merujuk layout & set ikon core maupun modul; kontras WCAG AA diperiksa sama seperti tema core (L-21). Token CSS-nya digabung ke bundel lewat berkas generate.
+- **Set ikon** (16): berkas glyph mengekspor `glyphs` yang **menutup seluruh nama ikon core** — yang bolong menggagalkan sync (L-5). Modul yang memakai pustaka ikon menyatakannya sebagai dependensi sendiri (mis. `@lucide/svelte`).
+
+Modul `Dummy` memuat ketiganya sebagai contoh nyata: tema `dummy.ocean` memakai layout `dummy.two-column` dan set ikon `dummy.rounded-24` — bukti gate M2 #5.
+
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 
 ```ts
@@ -328,7 +346,8 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 | 6 konfigurasi · 7 i18n · layout/tema membungkus halaman modul · `@core/ui` | M2–M3 |
 | 11 widget dashboard (`widgets.ts`, terfilter izin, SSR) | **Tersedia (M2)** |
 | 8 tool AI/MCP | M5 |
-| 13 halaman publik · 14 tema · 15 layout · 16 set ikon | M2/M4 |
+| 14 tema · 15 layout · 16 set ikon (`themes/`, `layouts.ts`, `icons.ts`) | **Tersedia (M2)** |
+| 13 halaman publik | M4 |
 | Modul dari **repositori git terpisah** (`bun modules:add <url> --ref <tag>`, `source: "submodule"`) | **Tersedia (M0)** — lihat §7 |
 | Modul sebagai paket npm (`source: "package"`) | M6 |
 | `bun modgen` (generator CRUD) · starter repo modul | M6 |

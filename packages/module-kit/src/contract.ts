@@ -166,6 +166,87 @@ export function defineWidgets(
   return list;
 }
 
+/**
+ * A shell layout contributed by a module (extension point 15, PRD L-7). The component fills the
+ * named regions of its `kind` (checked by `modules:sync`, L-8) and may then be chosen by ANY
+ * theme — including core themes — without touching core or any page.
+ */
+export interface LayoutContribDef {
+  /** `<ns>.<id>` */
+  readonly id: string;
+  readonly kind: 'dashboard' | 'public' | 'auth';
+  readonly name: LocalizedText;
+  readonly description?: LocalizedText;
+  /** Svelte component path relative to the module folder, e.g. `web/layouts/TwoColumn.svelte`. */
+  readonly component: string;
+}
+
+/** Declare the layouts a module contributes (extension point 15). */
+export function defineLayouts(
+  moduleName: string,
+  list: readonly LayoutContribDef[],
+): readonly LayoutContribDef[] {
+  const ns = namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const l of list) {
+    if (!ID_RE.test(l.id)) throw new ModuleContractError(`id layout "${l.id}" tidak valid`);
+    requirePrefix('id layout', l.id, `${ns}.`);
+    if (seen.has(l.id)) throw new ModuleContractError(`id layout "${l.id}" duplikat`);
+    seen.add(l.id);
+    if (!['dashboard', 'public', 'auth'].includes(l.kind)) {
+      throw new ModuleContractError(`layout "${l.id}": kind harus dashboard | public | auth`);
+    }
+    if (
+      !l.component.startsWith('web/') ||
+      !l.component.endsWith('.svelte') ||
+      l.component.includes('..')
+    ) {
+      throw new ModuleContractError(
+        `layout "${l.id}": component harus berkas .svelte di dalam web/ modul`,
+      );
+    }
+  }
+  return list;
+}
+
+/**
+ * An icon set contributed by a module (extension point 16, PRD L-5, L-14): a glyph map
+ * (`web/icons/<set>.ts` exporting `glyphs`) that must cover every core semantic name.
+ */
+export interface IconSetContribDef {
+  /** `<ns>.<id>` */
+  readonly id: string;
+  readonly name: LocalizedText;
+  readonly style: 'stroke' | 'fill';
+  readonly strokeWidth?: number;
+  readonly grid?: number;
+  readonly source?: string;
+  readonly license?: string;
+  /** Path to the glyph map module, relative to the module folder. */
+  readonly glyphs: string;
+}
+
+/** Declare the icon sets a module contributes (extension point 16). */
+export function defineIconSets(
+  moduleName: string,
+  list: readonly IconSetContribDef[],
+): readonly IconSetContribDef[] {
+  const ns = namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const s of list) {
+    if (!ID_RE.test(s.id)) throw new ModuleContractError(`id set ikon "${s.id}" tidak valid`);
+    requirePrefix('id set ikon', s.id, `${ns}.`);
+    if (seen.has(s.id)) throw new ModuleContractError(`id set ikon "${s.id}" duplikat`);
+    seen.add(s.id);
+    if (!s.glyphs.startsWith('web/') || !s.glyphs.endsWith('.ts') || s.glyphs.includes('..')) {
+      throw new ModuleContractError(
+        `set ikon "${s.id}": glyphs harus berkas .ts di dalam web/ modul`,
+      );
+    }
+  }
+  return list;
+}
+
 /** Resource owners that belong to core; a module may reference these permissions in its menu. */
 export const CORE_PERMISSION_OWNERS: ReadonlySet<string> = new Set([
   'user',

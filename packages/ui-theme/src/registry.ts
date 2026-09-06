@@ -4,6 +4,7 @@ import baseTheme from '../themes/base/theme.json';
 import contrastTheme from '../themes/contrast/theme.json';
 import corporateTheme from '../themes/corporate/theme.json';
 import warmTheme from '../themes/warm/theme.json';
+import { moduleIconSets, moduleLayouts, moduleThemes } from './generated/contrib.ts';
 
 /**
  * The theme registry (PRD §4.8, L-3…L-9). Everything here is static data shared by the web
@@ -59,18 +60,30 @@ export interface IconSetDef {
 export const REGIONS: Readonly<Record<ShellKind, readonly string[]>> = layoutsJson.regions;
 export const CORE_VARIANTS: readonly CoreVariant[] = ['default', 'wide', 'focused', 'split'];
 export const CORE_ICONS: readonly string[] = iconsJson.core;
-export const ICON_SETS: Readonly<Record<string, IconSetDef>> = iconsJson.sets as Record<
-  string,
-  IconSetDef
->;
+export const ICON_SETS: Readonly<Record<string, IconSetDef>> = {
+  ...(iconsJson.sets as Record<string, IconSetDef>),
+  // Icon sets contributed by modules (extension point 16), appended by modules:sync.
+  ...Object.fromEntries(
+    (moduleIconSets as readonly (IconSetDef & { id: string })[]).map(({ id, ...meta }) => [
+      id,
+      meta,
+    ]),
+  ),
+};
 
-const themeList: ThemeManifest[] = [baseTheme, corporateTheme, warmTheme, contrastTheme].map(
-  (t) => ({ ...(t as ThemeManifest), module: 'core' }),
-);
-const layoutList: LayoutDef[] = layoutsJson.layouts.map((l) => ({
-  ...(l as LayoutDef),
-  module: 'core',
-}));
+const themeList: ThemeManifest[] = [
+  ...[baseTheme, corporateTheme, warmTheme, contrastTheme].map((t) => ({
+    ...(t as ThemeManifest),
+    module: 'core',
+  })),
+  // Themes contributed by modules (extension point 14), validated and appended by modules:sync.
+  ...(moduleThemes as readonly ThemeManifest[]),
+];
+const layoutList: LayoutDef[] = [
+  ...layoutsJson.layouts.map((l) => ({ ...(l as LayoutDef), module: 'core' })),
+  // Layouts contributed by modules (extension point 15).
+  ...(moduleLayouts as readonly LayoutDef[]),
+];
 
 /** Built-in default when nothing else decides (L-12 step 5). */
 export const FALLBACK_THEME = 'base';

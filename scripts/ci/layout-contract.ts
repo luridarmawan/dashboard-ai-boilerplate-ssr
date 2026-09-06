@@ -9,7 +9,8 @@ import { layouts, REGIONS } from '@core/ui-theme';
 
 const root = new URL('../..', import.meta.url).pathname;
 let failures = 0;
-for (const l of layouts()) {
+// Module layouts (`<ns>.<id>`) are verified by modules:sync against their own component.
+for (const l of layouts().filter((x) => !x.id.includes('.'))) {
   const file = `${root}apps/web/src/lib/layouts/${l.id}/Layout.svelte`;
   if (!existsSync(file)) {
     failures++;

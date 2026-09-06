@@ -122,7 +122,13 @@ Modul menyumbang tema lewat titik perluasan 14 dengan bentuk folder yang sama pe
 
 ---
 
-## 6. Yang belum dikerjakan
+## 6. Status implementasi
+
+**Tersedia sejak M2:** komponen enam layout terdaftar (`apps/web/src/lib/layouts/*`), pemetaan tiga set ikon (`apps/web/src/lib/icons/*`), font self-hosted lewat `@fontsource`, resolusi tema/mode/layout saat SSR, pemilih tema tanpa JavaScript (`/theme`) dengan pratinjau SVG yang dihasilkan dari token + layout tema, dan tema/layout/set ikon dari modul (lihat `docs/MODULES.md`). `bun run theme:validate` memeriksa tema core **dan** modul, cakupan set ikon, serta kontrak region layout.
+
+**Belum:** aset merek per tema (`logo.svg`, `favicon.svg`, `preview.png` — pratinjau saat ini digenerate), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle), tema/bahasa baku per tenant dari konfigurasi (M3).
+
+## 7. Catatan lama
 
 Token, manifest, registry, dan validator sudah lengkap dan terverifikasi. Yang menunggu kerangka aplikasi ada:
 
