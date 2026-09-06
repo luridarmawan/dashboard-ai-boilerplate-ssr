@@ -18,7 +18,8 @@ import { type Db, tenantTables } from './generated/active.ts';
 // biome-ignore lint/suspicious/noExplicitAny: dialect-generic facade — the concrete Db type is chosen at codegen time
 type AnyDb = any;
 type Row<T extends Table> = T['$inferSelect'];
-type Insert<T extends Table> = T['$inferInsert'];
+/** Callers never supply `client_id` — the facade fills it (and rejects a foreign one). */
+type Insert<T extends Table> = Omit<T['$inferInsert'], 'client_id'> & { client_id?: string };
 
 export class TenantGuardError extends Error {
   override name = 'TenantGuardError';
@@ -33,9 +34,13 @@ export interface TenantDb {
   /** Insert with `client_id` filled in; a different `client_id` in `values` is an error. */
   insert<T extends Table>(table: T, values: Insert<T> | Insert<T>[]): Promise<void>;
   /** Update rows of this tenant only. `where` is required — an unbounded update is never intended. */
-  update<T extends Table>(table: T, set: Partial<Insert<T>>, where: SQL): Promise<number>;
+  update<T extends Table>(
+    table: T,
+    set: Partial<Insert<T>>,
+    where: SQL | undefined,
+  ): Promise<number>;
   /** Delete rows of this tenant only. `where` is required. */
-  delete<T extends Table>(table: T, where: SQL): Promise<number>;
+  delete<T extends Table>(table: T, where: SQL | undefined): Promise<number>;
   /** The tenant condition for hand-built queries (joins, aggregates). Null for global tables. */
   scope<T extends Table>(table: T): SQL | null;
 }
@@ -101,7 +106,7 @@ export function tenantScope(db: Db, clientId: string): TenantDb {
           v.client_id = clientId;
         }
       }
-      await raw.insert(table).values(list);
+      await raw.insert(table).values(list as Record<string, unknown>[]);
     },
     async update(table, set, where) {
       if (!where) throw new TenantGuardError(`update ${getTableName(table)} tanpa kondisi`);

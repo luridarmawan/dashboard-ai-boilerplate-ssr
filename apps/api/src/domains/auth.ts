@@ -21,6 +21,7 @@ import { env } from '@core/config';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
+import { deliverLink } from '../lib/dev-mail.ts';
 import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '../plugins/auth.ts';
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
@@ -55,20 +56,8 @@ const Password = t.String({ minLength: 1, maxLength: 256 });
 const VERIFY_TTL_MS = 24 * 3600_000;
 const RESET_TTL_MS = 3600_000;
 
-function log(entry: Record<string, unknown>): void {
+function _log(entry: Record<string, unknown>): void {
   console.log(JSON.stringify({ t: new Date().toISOString(), ...entry }));
-}
-
-/** Stand-in for the outbox (M4): make the link visible to the developer, never in production. */
-function deliverLink(kind: 'verify-email' | 'reset-password', email: string, token: string): void {
-  const origin = env().APP_ORIGIN ?? 'http://127.0.0.1:5173';
-  const path =
-    kind === 'verify-email' ? `/auth/verify?token=${token}` : `/auth/reset?token=${token}`;
-  if (env().NODE_ENV === 'production') {
-    log({ level: 'warn', msg: 'email not delivered — outbox arrives in M4', kind, to: email });
-    return;
-  }
-  log({ level: 'warn', msg: 'DEV ONLY: email link', kind, to: email, link: `${origin}${path}` });
 }
 
 async function defaultTenantFor(userId: string): Promise<string | null> {

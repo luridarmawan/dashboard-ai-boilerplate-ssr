@@ -1,4 +1,4 @@
-import { and, type Db, eq, gt, isNull, lt, newId, or, schema } from '@core/db';
+import { and, type Db, eq, gt, isNull, lt, newId, or, STATUS, schema } from '@core/db';
 import { hashToken, randomToken } from './tokens.ts';
 
 /**
@@ -64,6 +64,7 @@ export async function findSession(
         gt(schema.sessions.expires_at, now),
         isNull(schema.sessions.revoked_at),
         isNull(schema.users.deleted_at),
+        eq(schema.users.status_id, STATUS.ACTIVE), // deactivation takes effect on the next request
       ),
     )
     .limit(1);

@@ -11,6 +11,7 @@
 import { env } from '@core/config';
 import { activeDialect, createDb, type Db } from './generated/active.ts';
 
+export type { SQL, Table } from 'drizzle-orm';
 /**
  * Query operators, re-exported so core and modules import them from ONE place. Modules never
  * depend on drizzle-orm directly: one ORM version across the workspace, and swapping the

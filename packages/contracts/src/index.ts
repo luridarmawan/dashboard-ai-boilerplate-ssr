@@ -78,6 +78,17 @@ export function fail(code: ErrorCode, message: string, requestId: string, detail
 }
 
 /** Pagination meta for `?page`/`?limit` lists (N-5). */
+export interface Page<T> {
+  readonly success: true;
+  readonly data: T[];
+  readonly meta: PageMeta;
+}
+
+/** A paginated success envelope — `meta` is required here, unlike `ok()` (N-5). */
+export function page<T>(data: T[], meta: PageMeta): Page<T> {
+  return { success: true, data, meta };
+}
+
 export function pageMeta(page: number, limit: number, total: number): PageMeta {
   return { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
 }

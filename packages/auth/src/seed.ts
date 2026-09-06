@@ -31,6 +31,63 @@ export const SYSTEM_GROUPS = [
   { code: 'user', name: 'Regular User', permissions: ['user.read'] },
 ] as const;
 
+/**
+ * Groups are per tenant (C-3): every tenant — seeded or created later through the API — gets the
+ * same two system groups. Idempotent; returns `{ admin, user }` group ids.
+ */
+export async function seedTenantGroups(
+  db: Db,
+  tenantId: string,
+  opts: { log?: (m: string) => void; created?: string[] } = {},
+): Promise<Record<string, string>> {
+  const log = opts.log ?? (() => {});
+  const created = opts.created ?? [];
+  const groupIds: Record<string, string> = {};
+  for (const g of SYSTEM_GROUPS) {
+    let [row] = await db
+      .select()
+      .from(schema.groups)
+      .where(and(eq(schema.groups.client_id, tenantId), eq(schema.groups.code, g.code)))
+      .limit(1);
+    if (!row) {
+      const id = newId();
+      await db.insert(schema.groups).values({
+        id,
+        client_id: tenantId,
+        code: g.code,
+        name: g.name,
+        is_system: true,
+      });
+      [row] = await db.select().from(schema.groups).where(eq(schema.groups.id, id)).limit(1);
+      created.push(`group:${g.code}`);
+      log(`grup ${g.code} dibuat`);
+    }
+    if (!row) throw new Error(`seed: grup ${g.code} gagal dibuat`);
+    groupIds[g.code] = row.id;
+    const existing = await db
+      .select({ permission: schema.groupPermissions.permission })
+      .from(schema.groupPermissions)
+      .where(
+        and(
+          eq(schema.groupPermissions.client_id, tenantId),
+          eq(schema.groupPermissions.group_id, row.id),
+        ),
+      );
+    const have = new Set(existing.map((e) => e.permission));
+    for (const p of g.permissions) {
+      if (have.has(p)) continue;
+      await db.insert(schema.groupPermissions).values({
+        id: newId(),
+        client_id: tenantId,
+        group_id: row.id,
+        permission: p,
+      });
+      created.push(`permission:${g.code}:${p}`);
+    }
+  }
+  return groupIds;
+}
+
 export async function runSeed(db: Db, opts: SeedOptions = {}): Promise<SeedResult> {
   const log = opts.log ?? (() => {});
   const created: string[] = [];
@@ -59,43 +116,7 @@ export async function runSeed(db: Db, opts: SeedOptions = {}): Promise<SeedResul
   if (!tenant) throw new Error('seed: tenant default gagal dibuat');
   const tenantId = tenant.id;
 
-  // ---- groups + permissions ----
-  const groupIds: Record<string, string> = {};
-  for (const g of SYSTEM_GROUPS) {
-    let [row] = await db
-      .select()
-      .from(schema.groups)
-      .where(and(eq(schema.groups.client_id, tenantId), eq(schema.groups.code, g.code)))
-      .limit(1);
-    if (!row) {
-      const id = newId();
-      await db
-        .insert(schema.groups)
-        .values({ id, client_id: tenantId, code: g.code, name: g.name, is_system: true });
-      [row] = await db.select().from(schema.groups).where(eq(schema.groups.id, id)).limit(1);
-      created.push(`group:${g.code}`);
-      log(`grup ${g.code} dibuat`);
-    }
-    if (!row) throw new Error(`seed: grup ${g.code} gagal dibuat`);
-    groupIds[g.code] = row.id;
-    const existing = await db
-      .select({ permission: schema.groupPermissions.permission })
-      .from(schema.groupPermissions)
-      .where(
-        and(
-          eq(schema.groupPermissions.client_id, tenantId),
-          eq(schema.groupPermissions.group_id, row.id),
-        ),
-      );
-    const have = new Set(existing.map((e) => e.permission));
-    for (const p of g.permissions) {
-      if (have.has(p)) continue;
-      await db
-        .insert(schema.groupPermissions)
-        .values({ id: newId(), client_id: tenantId, group_id: row.id, permission: p });
-      created.push(`permission:${g.code}:${p}`);
-    }
-  }
+  const groupIds = await seedTenantGroups(db, tenantId, { log, created });
   const adminGroupId = groupIds.admin as string;
   const userGroupId = groupIds.user as string;
 

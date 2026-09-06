@@ -1,7 +1,10 @@
 import { openapi } from '@elysiajs/openapi';
 import { Elysia } from 'elysia';
 import { auth } from './domains/auth.ts';
+import { clients } from './domains/clients.ts';
+import { groups } from './domains/groups.ts';
 import { system } from './domains/system.ts';
+import { users } from './domains/users.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { csrf } from './plugins/csrf.ts';
 import { requestContext } from './plugins/request-context.ts';
@@ -31,10 +34,18 @@ export const app = new Elysia()
             'API-first: this document is generated from the route schemas at runtime (PRD N-1, N-2). ' +
             'Every response uses the envelope `{ success, data | error, requestId }` (N-4).',
         },
-        tags: [{ name: 'system', description: 'Liveness, readiness, build identity' }],
+        tags: [
+          { name: 'system', description: 'Liveness, readiness, build identity' },
+          { name: 'auth', description: 'Sessions, registration, password flows, tenant switch' },
+          { name: 'user', description: 'Users of the active tenant; own profile' },
+          { name: 'groups', description: 'Groups, their permissions and members (per tenant)' },
+          { name: 'client', description: 'Tenants' },
+        ],
       },
     }),
   )
-  .group('/v1', (v1) => v1.use(system).use(auth).use(modulesPlugin));
+  .group('/v1', (v1) =>
+    v1.use(system).use(auth).use(users).use(groups).use(clients).use(modulesPlugin),
+  );
 
 export type App = typeof app;

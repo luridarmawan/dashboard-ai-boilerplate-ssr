@@ -90,3 +90,31 @@ export function requirePermission(permission: string) {
       }
     });
 }
+
+interface GuardCtx {
+  auth: { user: { is_superadmin: boolean } } | null;
+  tenantState?: TenantState;
+  set: { status?: number | string; headers: Record<string, string | number | undefined> };
+  request: Request;
+}
+
+/**
+ * Route-local form of the guard, for `beforeHandle` on ONE route when sibling routes need
+ * different permissions (a plugin-level guard would stack on every route registered after it).
+ */
+export function permission(required: string) {
+  return ({ auth, tenantState, set, request }: GuardCtx) => {
+    const rid = String(
+      set.headers['x-request-id'] ?? request.headers.get('x-request-id') ?? newId(),
+    );
+    if (!auth) {
+      set.status = 401;
+      return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', rid);
+    }
+    if (!tenantState?.can(required)) {
+      set.status = 403;
+      return fail('forbidden', `Anda tidak punya izin ${required}`, rid, { permission: required });
+    }
+    return undefined;
+  };
+}

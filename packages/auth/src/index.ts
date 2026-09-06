@@ -30,7 +30,13 @@ export {
   permissionRegistry,
   type RegistryEntry,
 } from './registry.ts';
-export { runSeed, type SeedOptions, type SeedResult, SYSTEM_GROUPS } from './seed.ts';
+export {
+  runSeed,
+  type SeedOptions,
+  type SeedResult,
+  SYSTEM_GROUPS,
+  seedTenantGroups,
+} from './seed.ts';
 export {
   type CreatedSession,
   cleanupExpiredSessions,
