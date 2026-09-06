@@ -46,8 +46,14 @@
       "name": "@modules/dummy",
       "version": "0.1.0",
       "dependencies": {
+        "@core/contracts": "workspace:*",
         "@core/db": "workspace:*",
         "@core/module-kit": "workspace:*",
+        "elysia": "^1.4.0",
+      },
+      "devDependencies": {
+        "@sveltejs/kit": "^2.70.0",
+        "svelte": "^5.40.0",
       },
     },
     "packages/config": {

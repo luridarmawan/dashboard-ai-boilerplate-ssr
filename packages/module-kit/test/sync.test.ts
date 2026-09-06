@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { satisfiesCore } from '../src/manifest.ts';
-import { SyncError, syncModules } from '../src/sync.ts';
+import { emitApiModules, SyncError, svelteShim, syncModules, tsShim } from '../src/sync.ts';
 
 const fixtures = join(import.meta.dir, 'fixtures');
 const CORE_ICONS = ['menu', 'edit', 'save'];
@@ -123,5 +123,98 @@ describe('satisfiesCore — the four range shapes modules use', () => {
     expect(satisfiesCore('1.5.0', '>=1.0.0 <2.0.0')).toBe(true);
     expect(satisfiesCore('2.0.0', '>=1.0.0 <2.0.0')).toBe(false);
     expect(satisfiesCore('garbage', '^1.0.0')).toBe(false);
+  });
+});
+
+describe('syncModules — API routes & web pages (extension points 2 & 3)', () => {
+  test('api/routes.ts with an Elysia-shaped default export is registered under its namespace', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.apiModules).toEqual([{ name: 'Alpha', ns: 'alpha', file: 'api/routes.ts' }]);
+  });
+
+  test('a non-Elysia default export is rejected, naming the module', async () => {
+    let err: SyncError | undefined;
+    try {
+      await syncModules({ root: join(fixtures, 'bad'), write: false, coreIcons: CORE_ICONS });
+    } catch (e) {
+      err = e as SyncError;
+    }
+    expect(
+      err?.problems.some((x) =>
+        /Naughty.*api\/routes\.ts harus meng-export default instance Elysia/.test(x),
+      ),
+    ).toBe(true);
+  });
+
+  test('web/routes/** is mirrored to apps/web/src/routes/m/<ns>/** with the right shim kind', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.webRoutes).toEqual([
+      {
+        module: 'Alpha',
+        ns: 'alpha',
+        from: 'modules/Alpha/web/routes/items/+page.server.ts',
+        to: 'apps/web/src/routes/m/alpha/items/+page.server.ts',
+        kind: 'ts',
+      },
+      {
+        module: 'Alpha',
+        ns: 'alpha',
+        from: 'modules/Alpha/web/routes/items/+page.svelte',
+        to: 'apps/web/src/routes/m/alpha/items/+page.svelte',
+        kind: 'svelte',
+      },
+    ]);
+  });
+
+  test('emitApiModules mounts each module under /v1/m/<ns> with a relative import', () => {
+    const out = emitApiModules(
+      [{ name: 'Alpha', ns: 'alpha', file: 'api/routes.ts' }],
+      [
+        {
+          name: 'Alpha',
+          ns: 'alpha',
+          version: '0.1.0',
+          source: 'local',
+          path: 'modules/Alpha',
+          manifest: { name: 'Alpha', version: '0.1.0', engines: { core: '*' }, dependencies: [] },
+        },
+      ],
+      '/repo',
+      '/repo/apps/api/src/generated/modules.ts',
+    );
+    expect(out).toContain("import mod_alpha from '../../../../modules/Alpha/api/routes.ts';");
+    expect(out).toContain(".group('/m/alpha', (g) => g.use(mod_alpha))");
+    expect(out).toContain('export const mountedModules = ["alpha"] as const;');
+  });
+
+  test('shims import the module file relatively and forward props / re-export load', () => {
+    const s = svelteShim(
+      '/repo/modules/Alpha/web/routes/items/+page.svelte',
+      '/repo/apps/web/src/routes/m/alpha/items/+page.svelte',
+    );
+    expect(s).toContain(
+      "import Component from '../../../../../../../modules/Alpha/web/routes/items/+page.svelte';",
+    );
+    expect(s).toContain('<Component {...props} />');
+    const l = svelteShim(
+      '/repo/modules/Alpha/web/routes/+layout.svelte',
+      '/repo/apps/web/src/routes/m/alpha/+layout.svelte',
+    );
+    expect(l).toContain('{@render props.children?.()}');
+    const ts = tsShim(
+      '/repo/modules/Alpha/web/routes/items/+page.server.ts',
+      '/repo/apps/web/src/routes/m/alpha/items/+page.server.ts',
+    );
+    expect(ts).toContain(
+      "export * from '../../../../../../../modules/Alpha/web/routes/items/+page.server.ts';",
+    );
   });
 });

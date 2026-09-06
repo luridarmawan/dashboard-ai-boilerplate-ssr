@@ -9,6 +9,8 @@ build/
 # generated output — the descriptors and modules.json are the source of truth (Decision G)
 packages/db/src/generated/
 apps/*/src/generated/
+# module pages are mirrored here as shims by modules:sync (Decision C)
+apps/web/src/routes/m/
 # local harness files
 .claude/settings.local.json
 packages/module-kit/src/generated/

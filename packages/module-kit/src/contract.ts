@@ -130,3 +130,22 @@ export function defineTables(moduleName: string, list: readonly TableDef[]): rea
   for (const t of list) requirePrefix('nama tabel', t.name, `${ns}_`);
   return list;
 }
+
+/** Structural stand-in for an Elysia instance, so this package needs no elysia dependency. */
+export interface ApiRoutesLike {
+  readonly routes: readonly unknown[];
+  readonly handle: (request: Request) => unknown;
+}
+
+/**
+ * Declare a module's API (extension point 2). Pass the module's Elysia instance; `modules:sync`
+ * mounts it under `/v1/m/<ns>` — the module never chooses (or escapes) its prefix (G-9).
+ * Route paths inside are therefore relative: `.get('/notes', …)` becomes `/v1/m/<ns>/notes`.
+ */
+export function defineApiRoutes<T extends ApiRoutesLike>(moduleName: string, plugin: T): T {
+  namespaceOf(moduleName); // validates shape; the prefix is applied by sync
+  if (!plugin || !Array.isArray(plugin.routes) || typeof plugin.handle !== 'function') {
+    throw new ModuleContractError(`modul ${moduleName}: defineApiRoutes butuh instance Elysia`);
+  }
+  return plugin;
+}

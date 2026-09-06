@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "bun run --cwd ../.. modules:sync >/dev/null && tsc -p tsconfig.json"
   },
   "dependencies": {
     "@core/config": "workspace:*",

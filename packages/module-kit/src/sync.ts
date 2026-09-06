@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type { MenuEntryDef, PermissionDef } from './contract.ts';
@@ -46,11 +46,32 @@ export interface ModuleRecord {
   readonly manifest: ModuleManifest;
 }
 
+/** A module that ships `api/routes.ts` — mounted under `/v1/m/<ns>` (extension point 2). */
+export interface ApiModuleRecord {
+  readonly name: string;
+  readonly ns: string;
+  /** Module-relative path of the routes file, POSIX. */
+  readonly file: string;
+}
+
+/** One file under a module's `web/routes/**`, mirrored as a shim into the web app (extension point 3). */
+export interface WebRouteRecord {
+  readonly module: string;
+  readonly ns: string;
+  /** Path relative to root of the module's original file. */
+  readonly from: string;
+  /** Path relative to root of the generated shim. */
+  readonly to: string;
+  readonly kind: 'svelte' | 'ts';
+}
+
 export interface SyncResult {
   readonly modules: readonly ModuleRecord[];
   readonly tables: readonly TableDef[];
   readonly permissions: readonly (PermissionDef & { module: string })[];
   readonly menu: readonly (MenuEntryDef & { module: string })[];
+  readonly apiModules: readonly ApiModuleRecord[];
+  readonly webRoutes: readonly WebRouteRecord[];
   readonly files: readonly string[];
 }
 
@@ -60,6 +81,20 @@ export class SyncError extends Error {
     this.name = 'SyncError';
   }
 }
+
+const WEB_ROUTE_FILES = new Set([
+  '+page.svelte',
+  '+page.ts',
+  '+page.server.ts',
+  '+layout.svelte',
+  '+layout.ts',
+  '+layout.server.ts',
+  '+error.svelte',
+  '+server.ts',
+]);
+
+/** Written into the generated web route dir; sync refuses to wipe a dir that lacks it. */
+const WEB_MARKER = '.generated-by-modules-sync';
 
 export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const root = resolve(opts.root);
@@ -96,6 +131,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const tables: TableDef[] = [];
   const permissions: (PermissionDef & { module: string })[] = [];
   const menu: (MenuEntryDef & { module: string })[] = [];
+  const apiModules: ApiModuleRecord[] = [];
+  const webRoutes: WebRouteRecord[] = [];
 
   const tableOwner = new Map<string, string>();
   const permOwner = new Map<string, string>();
@@ -153,7 +190,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       manifest,
     });
 
-    // ---- db/tables.ts ----
+    // ---- db/tables.ts (extension point 1) ----
     const t = await loadDefault<readonly TableDef[]>(join(dir, 'db', 'tables.ts'), problems, tag);
     if (t) {
       if (!Array.isArray(t))
@@ -181,7 +218,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
-    // ---- permissions.ts ----
+    // ---- permissions.ts (extension point 5) ----
     const p = await loadDefault<readonly PermissionDef[]>(
       join(dir, 'permissions.ts'),
       problems,
@@ -207,7 +244,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
-    // ---- menu.ts ----
+    // ---- menu.ts (extension point 4) ----
     const m = await loadDefault<readonly MenuEntryDef[]>(join(dir, 'menu.ts'), problems, tag);
     if (m) {
       if (!Array.isArray(m)) problems.push(`${tag}: menu.ts harus meng-export default array`);
@@ -244,6 +281,36 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
       }
     }
+
+    // ---- api/routes.ts (extension point 2) ----
+    const routesFile = join(dir, 'api', 'routes.ts');
+    const r = await loadDefault<unknown>(routesFile, problems, tag);
+    if (r !== undefined) {
+      if (!looksLikeElysia(r)) {
+        problems.push(
+          `${tag}: api/routes.ts harus meng-export default instance Elysia (pakai defineApiRoutes)`,
+        );
+      } else {
+        apiModules.push({ name: manifest.name, ns, file: 'api/routes.ts' });
+      }
+    }
+
+    // ---- web/routes/** (extension point 3) ----
+    const webDir = join(dir, 'web', 'routes');
+    if (existsSync(webDir)) {
+      for (const file of walk(webDir)) {
+        const base = file.split('/').pop() ?? '';
+        if (!WEB_ROUTE_FILES.has(base)) continue;
+        const relInRoutes = relative(webDir, file).split('\\').join('/');
+        webRoutes.push({
+          module: manifest.name,
+          ns,
+          from: relative(root, file).split('\\').join('/'),
+          to: `apps/web/src/routes/m/${ns}/${relInRoutes}`,
+          kind: base.endsWith('.svelte') ? 'svelte' : 'ts',
+        });
+      }
+    }
   }
 
   // ---- inter-module dependencies (G-11): must exist; order by dependency ----
@@ -273,9 +340,24 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         emitRegistry(ordered, permissions, menu),
       ),
     );
+    if (existsSync(join(root, 'apps/api'))) {
+      const out = join(root, 'apps/api/src/generated/modules.ts');
+      files.push(await writeFile(out, emitApiModules(apiModules, ordered, root, out)));
+    }
+    if (existsSync(join(root, 'apps/web/src/routes'))) {
+      const mDir = join(root, 'apps/web/src/routes/m');
+      resetGeneratedDir(mDir);
+      for (const wr of webRoutes) {
+        const to = join(root, wr.to);
+        const from = join(root, wr.from);
+        files.push(
+          await writeFile(to, wr.kind === 'svelte' ? svelteShim(from, to) : tsShim(from, to)),
+        );
+      }
+    }
   }
 
-  return { modules: ordered, tables, permissions, menu, files };
+  return { modules: ordered, tables, permissions, menu, apiModules, webRoutes, files };
 }
 
 // ---------------------------------------------------------------------------
@@ -331,6 +413,23 @@ async function loadDefault<T>(
   }
 }
 
+/** Duck-typed so module-kit does not depend on elysia: an instance has `routes[]` and `handle()`. */
+function looksLikeElysia(v: unknown): boolean {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as { routes?: unknown; handle?: unknown };
+  return Array.isArray(o.routes) && typeof o.handle === 'function';
+}
+
+function walk(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir).sort()) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...walk(full));
+    else out.push(full);
+  }
+  return out;
+}
+
 function relativeName(file: string): string {
   return file.split('/').slice(-2).join('/');
 }
@@ -359,9 +458,30 @@ function topoSort(modules: ModuleRecord[], problems: string[]): ModuleRecord[] {
 }
 
 async function writeFile(path: string, content: string): Promise<string> {
-  await mkdir(join(path, '..'), { recursive: true });
+  await mkdir(dirname(path), { recursive: true });
   await Bun.write(path, content);
   return path;
+}
+
+/**
+ * The generated web route dir is wiped on every sync so removed modules leave no orphan
+ * routes (§8 #14). It is only ever wiped when it carries the marker — a hand-made `m/`
+ * dir is never touched.
+ */
+function resetGeneratedDir(dir: string): void {
+  if (existsSync(dir)) {
+    if (!existsSync(join(dir, WEB_MARKER))) {
+      throw new SyncError([
+        `${dir} ada tapi bukan hasil generate (tanpa ${WEB_MARKER}) — pindahkan dulu; direktori ini milik modules:sync`,
+      ]);
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
+  // Marker written even when there are no web routes, so the next sync may wipe it again.
+  Bun.write(
+    join(dir, WEB_MARKER),
+    'Generated by `bun modules:sync`. Do not edit; do not commit.\n',
+  );
 }
 
 const GEN_HEADER = `// GENERATED by \`bun modules:sync\` from modules.json — DO NOT edit by hand.
@@ -399,4 +519,66 @@ export const modulePermissions: readonly (PermissionDef & { module: string })[] 
 /** Menu entries contributed by modules — merged with core menu and filtered by permission (F-1). */
 export const moduleMenu: readonly (MenuEntryDef & { module: string })[] = ${JSON.stringify(menu, null, 2)};
 `;
+}
+
+/**
+ * Static composition: every module plugin is mounted under `/v1/m/<ns>` at build time, so
+ * module routes are typed end-to-end (Eden, N-3) and appear in OpenAPI (N-2). A module can
+ * never escape its prefix — the mount point is decided here, not in the module.
+ */
+export function emitApiModules(
+  apiModules: readonly ApiModuleRecord[],
+  ordered: readonly ModuleRecord[],
+  root: string,
+  outFile: string,
+): string {
+  const byName = new Map(ordered.map((m) => [m.name, m]));
+  const imports: string[] = [];
+  const mounts: string[] = [];
+  for (const am of apiModules) {
+    const mod = byName.get(am.name);
+    if (!mod) continue;
+    const abs = join(root, mod.path, am.file);
+    let rel = relative(dirname(outFile), abs).split('\\').join('/');
+    if (!rel.startsWith('.')) rel = `./${rel}`;
+    const ident = `mod_${am.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${rel}';`);
+    mounts.push(`  .group('/m/${am.ns}', (g) => g.use(${ident}))`);
+  }
+  return `${GEN_HEADER}import { Elysia } from 'elysia';
+${imports.join('\n')}
+
+/** All module APIs, each under /v1/m/<ns> (G-9). Mounted by apps/api inside the /v1 group. */
+export const modulesPlugin = new Elysia({ name: 'modules' })
+${mounts.join('\n')};
+
+export const mountedModules = ${JSON.stringify(apiModules.map((a) => a.ns))} as const;
+`;
+}
+
+/** `+page.svelte` / `+layout.svelte` / `+error.svelte` shim: render the module's component. */
+export function svelteShim(from: string, to: string): string {
+  const rel = importPath(from, to);
+  const isLayout = from.endsWith('+layout.svelte');
+  return `<!-- GENERATED by \`bun modules:sync\` — DO NOT edit; the source is ${rel} -->
+<script lang="ts">
+  import Component from '${rel}';
+  let props = $props();
+</script>
+
+${isLayout ? '<Component {...props}>{@render props.children?.()}</Component>' : '<Component {...props} />'}
+`;
+}
+
+/** `+page.server.ts` / `+page.ts` / `+server.ts` shim: re-export load, actions, handlers. */
+export function tsShim(from: string, to: string): string {
+  const rel = importPath(from, to);
+  return `${GEN_HEADER}export * from '${rel}';
+`;
+}
+
+function importPath(from: string, to: string): string {
+  let rel = relative(dirname(to), from).split('\\').join('/');
+  if (!rel.startsWith('.')) rel = `./${rel}`;
+  return rel;
 }

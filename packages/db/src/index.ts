@@ -11,6 +11,38 @@
 import { env } from '@core/config';
 import { createDb, type Db } from './generated/active.ts';
 
+/**
+ * Query operators, re-exported so core and modules import them from ONE place. Modules never
+ * depend on drizzle-orm directly: one ORM version across the workspace, and swapping the
+ * query layer later (§10 names Kysely as the fallback) touches this file, not every module.
+ */
+export {
+  and,
+  asc,
+  avg,
+  between,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  lte,
+  max,
+  min,
+  ne,
+  not,
+  notInArray,
+  or,
+  sql,
+  sum,
+} from 'drizzle-orm';
 export {
   Col,
   type ColumnDef,

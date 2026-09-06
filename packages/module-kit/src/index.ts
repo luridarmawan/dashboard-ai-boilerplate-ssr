@@ -5,9 +5,11 @@
  * this package and on `@core/db` as real packages — never on relative paths into core.
  */
 export {
+  type ApiRoutesLike,
   CORE_ACTIONS,
   CORE_PERMISSION_OWNERS,
   type CoreAction,
+  defineApiRoutes,
   defineMenu,
   definePermissions,
   defineTables,
