@@ -6,7 +6,7 @@
 | **Dokumen terkait** | [`THEMES.md`](./THEMES.md) — tema bawaan (sudah selesai, lihat M2) |
 | **Asumsi tim** | **2 developer** yang bisa mengerjakan backend maupun frontend, penuh waktu |
 | **Estimasi** | Dalam **person-week (pw)** dan rentang, bukan tanggal. Kalibrasi ulang setelah M0 selesai — M0 adalah pengukur kecepatan tim yang sesungguhnya |
-| **Total kasar** | 32–44 pw ≈ **17–23 minggu kalender** dengan 2 developer |
+| **Total kasar** | 31–42 pw ≈ **16–22 minggu kalender** dengan 2 developer |
 
 Estimasi di sini adalah dugaan terdidik, bukan komitmen. Yang bisa dipegang adalah **urutannya** dan **gate keluarnya** — keduanya diturunkan dari risiko, bukan dari kenyamanan.
 
@@ -73,11 +73,13 @@ M1∥M2 dan M4∥M5 adalah satu-satunya paralelisasi yang aman. Memaksakan lebih
 
 Setiap milestone punya **gate keluar** — pernyataan yang bisa dijawab ya/tidak, bukan "kira-kira sudah". Milestone tidak dinyatakan selesai sebelum seluruh gate-nya hijau.
 
+**Invarian cakupan:** M0–M7 memuat kebutuhan **P0 saja**. Setiap item P1/P2 hidup di §8, dan hanya di sana. Sebuah item yang muncul di keduanya bukan penekanan — itu sinyal cakupan sedang membengkak (§10 PRD), dan yang dihapus adalah salinannya di milestone. Rujukan grup (`FR-X`) tidak dipakai di milestone karena ia diam-diam menyapu anggota P1/P2; yang ditulis adalah rentang eksplisit.
+
 ### M0 — Fondasi & Kontrak Modul · 5–7 pw
 
 Gerbang risiko. Tidak ada fitur bisnis di sini; yang dibangun adalah hal-hal yang mahal diubah nanti.
 
-**Isi:** struktur monorepo · `packages/db` dengan deskriptor netral + codegen per dialect (§4.3) · generator UUIDv7 tunggal, monotonik dalam milidetik (§4.3.1, O-6) · `packages/config` loader env tervalidasi (P-4) · `packages/module-kit` **sebagai paket nyata, bukan alias tsconfig** (§4.9 poin 1) · Elysia + SvelteKit tersambung lewat Eden Treaty · `modules:sync` + `modules.json` (G-2, G-10) · **event bus + penjadwal core aman multi-instance (G-17, G-18)** · migrasi & seed (O-1…O-6) · **CI matriks tiga dialect: MySQL 8 + MariaDB 11 + PostgreSQL 16** (P-9) · kerangka Docker Compose dev + prod (Q-1…Q-5) · **dokumen kontrak modul** untuk developer (G-13, versi pertama)
+**Isi:** struktur monorepo · `packages/db` dengan deskriptor netral + codegen per dialect (§4.3) · generator UUIDv7 tunggal, monotonik dalam milidetik (§4.3.1, O-6) · `packages/config` loader env tervalidasi (P-4) · `packages/module-kit` **sebagai paket nyata, bukan alias tsconfig** (§4.9 poin 1) · Elysia + SvelteKit tersambung lewat Eden Treaty · `modules:sync` + `modules.json` (G-2, G-10) · bentuk modul, impor lewat paket, isolasi kegagalan modul, validasi namespace (G-1, G-3, G-7, G-9) · **event bus + penjadwal core aman multi-instance (G-17, G-18)** · migrasi & seed (O-1…O-6) · **CI matriks tiga dialect: MySQL 8 + MariaDB 11 + PostgreSQL 16** (P-9) · harness test unit + integrasi dengan DB nyata via testcontainer (P-8 bagian pertama — rantai E2E penuh menyusul di M5) · kerangka Docker Compose dev + prod, termasuk restart otomatis, rotasi log, dan volume unggahan (Q-1…Q-7, Q-9) · **dokumen kontrak modul** untuk developer (G-13, versi pertama)
 
 **Gate keluar:**
 1. `bun dev` menyalakan web + API; halaman kosong ter-SSR
@@ -98,7 +100,7 @@ Gerbang risiko. Tidak ada fitur bisnis di sini; yang dibangun adalah hal-hal yan
 
 ### M1 — Identitas · 5–7 pw
 
-**Isi:** auth (A-1…A-7, A-10, A-12) — Argon2id, sesi cookie `httpOnly`, CSRF menyeluruh, verifikasi email, reset password · tenancy (B-0…B-5) · RBAC (C-1…C-7) · CRUD user/group/client + profil (FR-D) · adapter sesi & rate limit versi `database` (Keputusan M)
+**Isi:** auth (A-1…A-7, A-10, A-12) — Argon2id, sesi cookie `httpOnly`, CSRF menyeluruh, verifikasi email, reset password · tenancy (B-0…B-5) · RBAC (C-1…C-7) · CRUD user/group/client + profil (D-1…D-4) · adapter sesi & rate limit versi `database` (Keputusan M)
 
 **Gate keluar:**
 1. Login → kelola user → atur izin group → ganti tenant, seluruhnya berfungsi
@@ -130,7 +132,7 @@ Bisa berjalan paralel dengan M1 setelah M0 selesai.
 
 ### M3 — Konfigurasi, Kontrak API, & Halaman Baku · 3–4 pw
 
-**Isi:** konfigurasi runtime + form ter-generate (FR-E) · adapter cache versi `database` (E-5) · resolusi landing/home route (F-5…F-7, §4.7) · OpenAPI runtime + typed client (FR-N) · observability dasar (M-1, M-4, M-5) · **penyamaran data sensitif di logger (M-7)** · audit log (M-2)
+**Isi:** konfigurasi runtime + form ter-generate (E-1…E-8) · adapter cache versi `database` (E-5) · resolusi landing/home route (F-5…F-7, §4.7) · OpenAPI runtime + typed client (N-1…N-7) · observability dasar (M-1, M-4, M-5) · **penyamaran data sensitif di logger (M-7)** · audit log (M-2) · aktif/nonaktif modul per tenant (G-8) — gate M5 #3 bergantung padanya
 
 **Gate keluar:**
 1. Admin mengubah setelan, tema baku, dan landing page dari UI — berlaku **tanpa restart**, dan terlihat oleh ketiga instance
@@ -143,7 +145,7 @@ Bisa berjalan paralel dengan M1 setelah M0 selesai.
 
 Bisa paralel dengan M5.
 
-**Isi:** modul `Example` (FR-R) · landing komersil dengan data dari DB (§4.6) · SEO per halaman + sitemap (R-4) · form kontak tanpa JavaScript (R-5) · email + outbox (FR-J)
+**Isi:** modul `Example` (R-1…R-8) · landing komersil dengan data dari DB (§4.6) · SEO per halaman + sitemap (R-4) · form kontak tanpa JavaScript (R-5) · email + outbox (J-1…J-3)
 
 **Gate keluar:**
 1. `/` menyajikan landing komersil ter-SSR pada instalasi bersih
@@ -159,7 +161,7 @@ Bisa paralel dengan M5.
 
 Bisa paralel dengan M4.
 
-**Isi:** chat streaming end-to-end (H-1…H-9) · riwayat percakapan · render markdown tersanitasi · log AI asinkron · **dibangun sebagai modul**, bukan bagian core
+**Isi:** chat streaming end-to-end (H-1…H-9) · riwayat percakapan · render markdown tersanitasi · log AI asinkron · **dibangun sebagai modul**, bukan bagian core · **E2E penuh landing → login → CRUD → chat (P-8)** — baru bisa ditulis di sini karena chat-nya baru ada
 
 **Gate keluar:**
 1. Streaming berjalan provider → API → SvelteKit → UI, dengan pembatalan yang benar saat tab ditutup
@@ -175,7 +177,7 @@ Bisa paralel dengan M4.
 
 Gerbang janji produk. Setelah ini, "developer bisa membangun modul sendiri" berhenti jadi klaim.
 
-**Isi:** `bun modgen` lengkap (G-4) · starter modul standalone (G-12) · `modules:add` + penguncian `ref` (G-10) · pemeriksaan `engines.core` (G-11) · **penjaga CI "tanpa ubah core"** (G-6) · UI admin modul (G-14) · dokumen "Membangun Modul Pertama Anda" (G-13, versi final)
+**Isi:** `bun modgen` lengkap (G-4) · starter modul standalone (G-12) · `modules:add` + penguncian `ref` (G-10) · pemeriksaan `engines.core` (G-11) · **penjaga CI "tanpa ubah core"** (G-6) · **16 titik perluasan tersedia seluruhnya, masing-masing dengan contoh yang jalan (G-5)** · dokumen "Membangun Modul Pertama Anda" (G-13, versi final)
 
 **Gate keluar:**
 1. Modul dibuat lewat `bun modgen` dan langsung berfungsi — tabel, menu, izin, CRUD, terjemahan
@@ -188,11 +190,13 @@ Gerbang janji produk. Setelah ini, "developer bisa membangun modul sendiri" berh
 
 ---
 
-### M7 — Pengerasan & Operasi · 4–6 pw
+### M7 — Pengerasan & Operasi · 3–4 pw
 
-**Isi:** MCP server & client (FR-I) · rate limit terdistribusi (adapter Redis) · **retensi log & audit (M-3)** — fasilitas audit log-nya sendiri sudah ada sejak M3, yang tersisa di sini kebijakan retensinya · backup/restore teruji (O-7, Q-8) · deploy tanpa downtime (Q-12) · preflight (Q-13) · adapter Redis opsional · panduan deploy VPS (Q-10) · dokumentasi (P-10)
+**Isi:** **retensi log & audit (M-3)** — fasilitas audit log-nya sendiri sudah ada sejak M3, yang tersisa di sini kebijakan retensinya · backup/restore teruji (O-7, Q-8) · panduan deploy VPS (Q-10) · dokumentasi (P-10) · **pembuktian manual kriteria §8** — VPS bersih, restore, stabilitas 2 vCPU / 4 GB
 
-**Gate keluar:** seluruh 25 kriteria terima §8 hijau, termasuk yang hanya bisa diuji manual:
+Yang **tidak** ada di sini, dan sengaja: MCP, systemd, deploy tanpa downtime, preflight, resource limit, CD contoh, dan adapter Redis. Semuanya P1/P2 — rumahnya §8 (butir 2, 3, dan 7), dan ID-nya sengaja tidak ditulis ulang di sini supaya milestone ini tetap terbaca P0-saja oleh pemeriksaan otomatis. Estimasinya turun dari 4–6 pw menjadi 3–4 pw karena itu.
+
+**Gate keluar — ini titik rilis MVP:** seluruh 25 kriteria terima §8 hijau, termasuk yang hanya bisa diuji manual:
 1. Dari VPS bersih ke HTTPS dalam < 15 menit mengikuti panduan, **tanpa langkah tak tertulis**
 2. Backup diambil → database dihapus → restore → aplikasi utuh. Dijalankan, bukan diasumsikan
 3. Stack stabil di 2 vCPU / 4 GB dengan RAM idle < 1,5 GB
@@ -211,8 +215,8 @@ Gerbang janji produk. Setelah ini, "developer bisa membangun modul sendiri" berh
 | 3 | M1 — CRUD user/group/client | M2 — tema, layout, ikon, i18n |
 | 4 | M3 — konfigurasi, OpenAPI, observability | M3 — form ter-generate, resolusi route |
 | 5 | M5 — modul AI | M4 — modul Example, landing, SEO, email |
-| 6 | M6 — modgen, starter, CI guard | M6 — UI admin modul, dokumen |
-| 7 | M7 — MCP, rate limit, audit | M7 — backup, deploy, preflight, panduan |
+| 6 | M6 — modgen, starter, CI guard | M6 — contoh 16 titik perluasan (G-5), dokumen |
+| 7 | M7 — retensi log, uji stabilitas & VPS bersih | M7 — backup/restore teruji, panduan deploy |
 
 Dengan **1 developer**, kalikan kalender ±1,8× (bukan 2× — hilangnya biaya koordinasi menutup sebagian). Dengan **3 developer**, jalur kritis tidak banyak berubah; yang bertambah adalah kemampuan menyerap P1 lebih awal.
 
@@ -276,13 +280,16 @@ Sebuah perubahan dianggap selesai bila:
 
 ## 8. Sesudah MVP
 
-Urutan yang disarankan untuk P1, berdasarkan apa yang paling cepat terasa oleh pemakai template:
+Ini **satu-satunya rumah** untuk P1/P2 (invarian §3). Urutan yang disarankan, berdasarkan apa yang paling cepat terasa oleh pemakai template:
 
 1. **UI admin modul + editor tema** (G-14, L-24) — dua hal yang paling sering diminta setelah orang mulai memakai
-2. **Notifikasi dalam aplikasi** (J-4) — backend-nya sudah ada sebagian lewat outbox
-3. **Fitur unggah berkas + adapter S3** (Q-16) — volume & path-nya sudah disiapkan di MVP lewat Q-9
-4. **Multi-provider AI + dashboard biaya** (H-10, H-15)
-5. **Metrik Prometheus** (M-6)
+2. **MCP server & client** (FR-I) — janji tujuan produk 7 yang sengaja belum ditepati MVP; kontrak tool-nya (titik perluasan 8, I-3) sudah disiapkan sejak M0, jadi ini pekerjaan mengisi, bukan mengubah. **Prasyarat selesai:** I-6 terbukti test — endpoint terautentikasi dan tunduk tenancy — sebelum MCP dinyatakan jadi
+3. **Preflight + deploy tanpa downtime** (Q-13, Q-12) — yang pertama terasa begitu ada instalasi produksi kedua; systemd (Q-11) dan resource limit (Q-14) menyusul
+4. **Notifikasi dalam aplikasi** (J-4) — backend-nya sudah ada sebagian lewat outbox
+5. **Fitur unggah berkas + adapter S3** (Q-16) — volume & path-nya sudah disiapkan di MVP lewat Q-9
+6. **Multi-provider AI + dashboard biaya** (H-10, H-15)
+7. **Adapter Redis** untuk sesi, cache, dan rate limit — hanya bila database mulai jadi titik tekan (Keputusan M butir 4 memberi ambangnya)
+8. **Metrik Prometheus** (M-6)
 
 P2 (2FA, SSO tambahan, impersonasi, job queue, marketplace modul) sebaiknya menunggu pemakaian nyata. Menambahkannya lebih awal berarti menebak kebutuhan yang belum ada — persis risiko "cakupan membengkak" di §10 PRD.
 
