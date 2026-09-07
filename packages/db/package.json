@@ -7,11 +7,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./descriptor": "./src/descriptor.ts",
-    "./id": "./src/id.ts"
+    "./id": "./src/id.ts",
+    "./migrate": "./src/migrate.ts"
   },
   "scripts": {
     "codegen": "bun run scripts/codegen.ts",
-    "generate": "bun run scripts/codegen.ts && drizzle-kit generate --config drizzle.mysql.config.ts && drizzle-kit generate --config drizzle.pg.config.ts",
+    "generate": "bun run scripts/codegen.ts && drizzle-kit generate --config drizzle.mysql.config.ts && drizzle-kit generate --config drizzle.pg.config.ts && bun run scripts/codegen.ts",
     "typecheck": "bun run typecheck:mysql && bun run typecheck:postgres",
     "typecheck:mysql": "DB_DIALECT=mysql bun run scripts/codegen.ts && tsc -p tsconfig.json",
     "typecheck:postgres": "DB_DIALECT=postgres bun run scripts/codegen.ts && tsc -p tsconfig.json",

@@ -98,7 +98,7 @@ Pengujian, semuanya tanpa container:
 | `bun run ci:bundle-secrets` | tidak ada | tidak ada rahasia di bundle klien |
 | `bun run check` · `bun run theme:validate` · `bun run ci:modgen-guard` · `bun run ci:cross-repo` | tidak ada (cross-repo butuh jaringan untuk `bun install` di clone) | lint, typecheck dua dialect, kontrak tema, penjaga modularitas |
 
-Ini persis yang dijalankan job CI (`.github/workflows/ci.yml`) — di runner GitHub database berjalan sebagai service, sisanya `bun` native. Menjalankan **produksi** tanpa Docker (proses `bun apps/api/src/index.ts` dan `bun apps/web/build/index.js` di bawah systemd, Apache/Nginx di depan) dimungkinkan dengan env yang sama seperti `compose.prod.yml`, tetapi unit systemd dan `preflight`-nya adalah pekerjaan P1 (Q-11, Q-13) yang belum disediakan.
+Ini persis yang dijalankan job CI (`.github/workflows/ci.yml`) — di runner GitHub database berjalan sebagai service, sisanya `bun` native. Menjalankan **produksi** tanpa Docker (proses `bun apps/api/src/index.ts` — atau binary hasil `bun build --compile apps/api/src/index.ts --outfile api`, lihat `docs/DEPLOY.md` §5 — dan `bun apps/web/build/index.js` di bawah systemd, Apache/Nginx di depan) dimungkinkan dengan env yang sama seperti `compose.prod.yml`, tetapi unit systemd dan `preflight`-nya adalah pekerjaan P1 (Q-11, Q-13) yang belum disediakan.
 
 ## Prinsip yang dijaga CI
 
