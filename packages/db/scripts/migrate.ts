@@ -27,20 +27,48 @@ if (family(e.DB_DIALECT) !== family(activeDialect)) {
 const migrationsFolder = join(import.meta.dir, '..', 'migrations', family(e.DB_DIALECT));
 const started = performance.now();
 
+/** Rows in Drizzle's journal table = migrations applied so far; 0 when the table does not exist yet. */
+async function journalCount(run: (sqlText: string) => Promise<unknown>): Promise<number> {
+  try {
+    const rows = (await run(
+      family(e.DB_DIALECT) === 'pg'
+        ? 'select count(*)::int as n from drizzle.__drizzle_migrations'
+        : 'select count(*) as n from __drizzle_migrations',
+    )) as unknown;
+    const first = Array.isArray(rows)
+      ? Array.isArray(rows[0])
+        ? (rows[0] as Record<string, unknown>[])[0]
+        : (rows[0] as Record<string, unknown>)
+      : (rows as { rows?: Record<string, unknown>[] }).rows?.[0];
+    return Number(first?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+let before = 0;
+let after = 0;
 if (family(e.DB_DIALECT) === 'pg') {
   const { createDb } = await import('../src/dialect/pg-client.ts');
   const { migrate } = await import('drizzle-orm/postgres-js/migrator');
   const db = createDb(e.DATABASE_URL);
+  const raw = (q: string) => db.$client.unsafe(q);
+  before = await journalCount(raw);
   await migrate(db, { migrationsFolder });
+  after = await journalCount(raw);
   await db.$client.end();
 } else {
   const { createDb } = await import('../src/dialect/mysql-client.ts');
   const { migrate } = await import('drizzle-orm/mysql2/migrator');
   const db = createDb(e.DATABASE_URL);
+  const raw = (q: string) => db.$client.query(q);
+  before = await journalCount(raw);
   await migrate(db, { migrationsFolder });
+  after = await journalCount(raw);
   await db.$client.end();
 }
 
+const applied = Math.max(0, after - before);
 console.log(
-  `db:migrate: ${e.DB_DIALECT} mutakhir (${migrationsFolder.split('/').slice(-2).join('/')}, ${Math.round(performance.now() - started)} ms)`,
+  `db:migrate: ${e.DB_DIALECT} mutakhir — ${applied} migrasi diterapkan sekarang, ${after} total (${migrationsFolder.split('/').slice(-2).join('/')}, ${Math.round(performance.now() - started)} ms)`,
 );
