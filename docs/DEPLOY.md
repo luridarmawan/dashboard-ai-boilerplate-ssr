@@ -83,7 +83,9 @@ curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/ready            # 
 curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/version          # commit & modul terpasang
 
 # 9. Masuk di browser: https://DOMAIN/auth/login dengan BOOTSTRAP_ADMIN_*; landing ada di https://DOMAIN/
-#    Lalu di Pengaturan: ganti kata sandi admin (Profil), isi SMTP, dan (opsional) hapus BOOTSTRAP_* dari .env.prod.
+#    Lalu di Pengaturan: ganti kata sandi admin (Profil) dan (opsional) hapus BOOTSTRAP_* dari .env.prod.
+#    Email: isi SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/MAIL_FROM_ADDRESS di .env.prod (lalu `dc up -d`),
+#    atau lewat Pengaturan → Email; nilai di Pengaturan menang per kolom. Uji: minta reset kata sandi dari /auth/forgot.
 ```
 
 Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump segera lalu tiap 24 jam ke `./backups/`).

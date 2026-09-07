@@ -86,6 +86,21 @@ const envSchema = z
         message:
           'daftar origin dipisah koma, mis. https://app.example.com,localhost — setiap entri harus host atau URL yang valid',
       }),
+    /**
+     * SMTP bootstrap (J-1). Used when the matching `mail.*` setting is EMPTY in the database, so an
+     * operator can wire email from .env at deploy time and an admin can still override it from
+     * Settings later (E-6). SMTP_SECURE defaults to "port 465 = implicit TLS, otherwise STARTTLS".
+     */
+    SMTP_HOST: z.string().min(1).optional(),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    SMTP_USER: z.string().min(1).optional(),
+    SMTP_PASSWORD: z.string().min(1).optional(),
+    SMTP_SECURE: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === 'true')),
+    MAIL_FROM_ADDRESS: z.email().optional(),
+    MAIL_FROM_NAME: z.string().min(1).max(120).optional(),
     /** Login attempts per window, per IP and per email (A-2): `<limit>/<seconds>`. */
     LOGIN_RATE_LIMIT: z
       .string()

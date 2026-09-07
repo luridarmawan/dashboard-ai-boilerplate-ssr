@@ -28,18 +28,65 @@ export async function brandFor(clientId: string | null): Promise<Brand> {
   };
 }
 
-export async function smtpFor(clientId: string | null): Promise<SmtpConfig | null> {
-  const host = await settings.get<string | null>(clientId, 'mail.smtp_host');
-  const fromAddress = await settings.get<string | null>(clientId, 'mail.from_address');
+/** What the database holds for `mail.*` (null = empty) and what .env offers as bootstrap. */
+export interface SmtpSources {
+  readonly setting: {
+    readonly host: string | null;
+    readonly port: number | null;
+    readonly user: string | null;
+    readonly password: string | null;
+    readonly fromName: string | null;
+    readonly fromAddress: string | null;
+  };
+  readonly env: {
+    readonly SMTP_HOST?: string | undefined;
+    readonly SMTP_PORT?: number | undefined;
+    readonly SMTP_USER?: string | undefined;
+    readonly SMTP_PASSWORD?: string | undefined;
+    readonly SMTP_SECURE?: boolean | undefined;
+    readonly MAIL_FROM_ADDRESS?: string | undefined;
+    readonly MAIL_FROM_NAME?: string | undefined;
+  };
+  readonly appName: string;
+}
+
+/**
+ * Per field: database setting when filled, else .env (J-1, E-6). Host and from-address are the
+ * minimum; without both there is no SMTP and the outbox keeps rows pending (or logs them outside
+ * production). SMTP_SECURE only applies when the host itself comes from .env — a host configured
+ * in Settings follows the port rule (465 = implicit TLS).
+ */
+export function resolveSmtp(src: SmtpSources): SmtpConfig | null {
+  const { setting, env: e } = src;
+  const host = setting.host ?? e.SMTP_HOST ?? null;
+  const fromAddress = setting.fromAddress ?? e.MAIL_FROM_ADDRESS ?? null;
   if (!host || !fromAddress) return null;
+  const hostFromEnv = setting.host === null;
   return {
     host,
-    port: (await settings.get<number | null>(clientId, 'mail.smtp_port')) ?? 587,
-    user: await settings.get<string | null>(clientId, 'mail.smtp_user'),
-    password: await settings.get<string | null>(clientId, 'mail.smtp_password'),
-    fromName: (await settings.get<string | null>(clientId, 'mail.from_name')) ?? 'Dashboard',
+    port: setting.port ?? e.SMTP_PORT ?? 587,
+    user: setting.user ?? e.SMTP_USER ?? null,
+    password: setting.password ?? e.SMTP_PASSWORD ?? null,
+    fromName: setting.fromName ?? e.MAIL_FROM_NAME ?? src.appName,
     fromAddress,
+    ...(hostFromEnv && e.SMTP_SECURE !== undefined ? { secure: e.SMTP_SECURE } : {}),
   };
+}
+
+export async function smtpFor(clientId: string | null): Promise<SmtpConfig | null> {
+  const e = env();
+  return resolveSmtp({
+    setting: {
+      host: await settings.get<string | null>(clientId, 'mail.smtp_host'),
+      port: await settings.get<number | null>(clientId, 'mail.smtp_port'),
+      user: await settings.get<string | null>(clientId, 'mail.smtp_user'),
+      password: await settings.get<string | null>(clientId, 'mail.smtp_password'),
+      fromName: await settings.get<string | null>(clientId, 'mail.from_name'),
+      fromAddress: await settings.get<string | null>(clientId, 'mail.from_address'),
+    },
+    env: e,
+    appName: (await settings.get<string | null>(clientId, 'app.name')) ?? 'Dashboard',
+  });
 }
 
 /** One worker pass — called by the scheduler job `core.outbox.deliver`. */

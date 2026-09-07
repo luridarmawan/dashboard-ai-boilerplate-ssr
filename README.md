@@ -60,7 +60,8 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 - **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema baku dan allowlist diatur admin di **Pengaturan → Aplikasi**.
 - **Mengganti landing page** — **Pengaturan → Aplikasi → Route landing** (`app.landing_route`), berlaku seketika tanpa restart; route yang tidak ada ditolak saat disimpan. Modul mana pun boleh menyumbang halaman publik (`public.ts`).
 - **Mengganti provider AI** — **Pengaturan → AI**: base URL OpenAI-compatible, kunci API (disimpan terenkripsi, tidak pernah dikirim ke klien), model. Rincian di [`docs/AI.md`](./docs/AI.md). Provider tiruan untuk pengembangan: `bun run ai:mock`.
-- **Konfigurasi runtime lain** (SMTP, bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
+- **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log.
+- **Konfigurasi runtime lain** (bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
 - **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah.
 
 ## Menjalankan dan menguji tanpa Docker

@@ -182,8 +182,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     section: 'mail',
     title: { id: 'Email', en: 'Email' },
     note: {
-      id: 'Pengiriman lewat outbox: job core.outbox.deliver mengirim tiap menit; tanpa SMTP, transport log dipakai.',
-      en: 'Delivery goes through the outbox: core.outbox.deliver sends every minute; without SMTP the log transport is used.',
+      id: 'Pengiriman lewat outbox: job core.outbox.deliver mengirim tiap menit. Kolom yang kosong memakai SMTP_* / MAIL_* dari .env; tanpa keduanya, di luar production transport log dipakai.',
+      en: 'Delivery goes through the outbox: core.outbox.deliver sends every minute. Empty fields fall back to SMTP_* / MAIL_* from .env; without either, outside production the log transport is used.',
     },
     order: 20,
     fields: [
@@ -191,7 +191,11 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'mail.from_name',
         type: 'string',
         title: { id: 'Nama pengirim', en: 'From name' },
-        default: 'Dashboard',
+        note: {
+          id: 'Kosong = MAIL_FROM_NAME, lalu nama aplikasi.',
+          en: 'Empty = MAIL_FROM_NAME, then the app name.',
+        },
+        default: null,
         max: 120,
         order: 0,
       },
@@ -215,7 +219,11 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'mail.smtp_port',
         type: 'number',
         title: { id: 'SMTP port', en: 'SMTP port' },
-        default: 587,
+        note: {
+          id: 'Kosong = SMTP_PORT, lalu 587 (STARTTLS); 465 = TLS implisit.',
+          en: 'Empty = SMTP_PORT, then 587 (STARTTLS); 465 = implicit TLS.',
+        },
+        default: null,
         min: 1,
         max: 65535,
         order: 3,

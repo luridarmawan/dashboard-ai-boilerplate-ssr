@@ -32,6 +32,14 @@ x-app-env: &app-env
   RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
   REDIS_URL: ${REDIS_URL:-}
   LANDING_ROUTE: ${LANDING_ROUTE:-/example}
+  # Email bootstrap (J-1): used when the matching mail.* setting is empty; admins can override in Settings
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_SECURE: ${SMTP_SECURE:-}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
   # Public origin(s) the CSRF check accepts (A-10, Decision E): comma-separated, e.g.
   # `https://apps.example.com,https://other.example.id,localhost` (bare host = http and https).
   # The first https entry is used for absolute links in emails. Defaults to https://DOMAIN.

@@ -49,6 +49,8 @@ export interface SmtpConfig {
   readonly password?: string | null;
   readonly fromName: string;
   readonly fromAddress: string;
+  /** Implicit TLS (SMTPS). Default: true on port 465, STARTTLS otherwise. */
+  readonly secure?: boolean;
 }
 
 export interface DeliverOptions {
@@ -102,7 +104,7 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
     ? nodemailer.createTransport({
         host: opts.smtp.host,
         port: opts.smtp.port,
-        secure: opts.smtp.port === 465,
+        secure: opts.smtp.secure ?? opts.smtp.port === 465,
         ...(opts.smtp.user
           ? { auth: { user: opts.smtp.user, pass: opts.smtp.password ?? '' } }
           : {}),
