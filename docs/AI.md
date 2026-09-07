@@ -28,7 +28,7 @@ Tanpa API key, permintaan dijawab **422** dengan alasan `no_api_key` dan tautan 
 
 ## Streaming end-to-end (H-3)
 
-`POST /v1/m/ai/chat/completions` dengan `stream: true` meneruskan byte SSE provider apa adanya: **provider → API → SvelteKit (`/m/ai/chat/stream`) → UI**. Pembatalan mengalir balik: menutup tab atau menekan *Berhenti* membatalkan request browser → SvelteKit membatalkan request ke API → API membatalkan request ke provider; panggilan dicatat dengan status `cancelled`.
+`POST /v1/m/ai/chat/completions` dengan `stream: true` meneruskan byte SSE provider apa adanya: **provider → API → SvelteKit (`/m/ai/chat/stream`) → UI**. Pembatalan mengalir balik: menutup tab atau menekan *Berhenti* membatalkan request browser → SvelteKit membatalkan request ke API → API membatalkan request ke provider; panggilan dicatat dengan status `cancelled`. Pesan pertama sebuah chat baru lewat jalur streaming membuat percakapannya lebih dulu (jembatan memanggil `POST /v1/m/ai/conversations`, mengembalikan id di header `x-conversation-id`), lalu halaman mendarat di `?c=<id>` — sehingga pertukaran pertama pun tersimpan (H-6), sama seperti jalur tanpa JavaScript.
 
 Tanpa JavaScript, form chat tetap bekerja: jawaban diambil utuh lalu halaman dirender ulang dengan riwayat.
 

@@ -21,3 +21,5 @@ packages/ui-theme/src/generated/
 packages/settings/src/generated/
 .proof-logs/
 backups/
+test-results/
+playwright-report/

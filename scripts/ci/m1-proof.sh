@@ -43,3 +43,7 @@ if [ -d "modules/${MODGEN_GUARD_NAME:-CiProbe}" ] && wants M6; then
 elif wants M6; then
   echo "== proof M6 dilewati (tidak ada modules/${MODGEN_GUARD_NAME:-CiProbe} — jalankan: bun run modgen:ci)"
 fi
+if [ "${E2E:-}" = "1" ] && wants E2E; then
+  echo "== E2E Playwright (P-8): landing → login → CRUD → chat, JavaScript aktif"
+  (cd apps/web && bun x playwright test)
+fi

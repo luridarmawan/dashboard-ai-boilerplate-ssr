@@ -80,6 +80,7 @@ async function streamSend(e: SubmitEvent) {
   scrollDown();
   streaming = true;
   controller = new AbortController();
+  let createdId = '';
   try {
     const res = await fetch(formEl.dataset.stream ?? '', {
       method: 'POST',
@@ -87,6 +88,7 @@ async function streamSend(e: SubmitEvent) {
       signal: controller.signal,
       headers: { accept: 'text/event-stream' },
     });
+    createdId = res.headers.get('x-conversation-id') ?? '';
     if (!res.ok || !res.body) {
       const body = await res.text();
       let reason = 'failed';
@@ -144,8 +146,9 @@ async function streamSend(e: SubmitEvent) {
   } finally {
     streaming = false;
     controller = null;
-    // A new conversation was created server-side on first send: reload so the URL and sidebar catch up.
-    if (!data.conversation) location.href = '/m/ai/chat';
+    // A new conversation was created server-side on first send: reload ON it so the URL, the
+    // sidebar and the persisted history line up (H-6).
+    if (!data.conversation) location.href = createdId ? `/m/ai/chat?c=${createdId}` : '/m/ai/chat';
   }
 }
 function stop() {

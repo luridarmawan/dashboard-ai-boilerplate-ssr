@@ -1,12 +1,13 @@
-# Deployment Single-VPS
+# Deployment Single-VPS — dari VPS kosong sampai HTTPS
 
 | | |
 |---|---|
-| **Status** | Versi 1 — paket M0 (gate 7). Panduan langkah-demi-langkah dari VPS kosong (Q-10) dan backup/restore (Q-8) menyusul di M7 |
-| **Berkas** | [`compose.prod.yml`](../compose.prod.yml) · [`Dockerfile`](../Dockerfile) · [`deploy/Caddyfile`](../deploy/Caddyfile) · [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) · [`.env.prod.example`](../.env.prod.example) |
-| **Kontrak** | [`PRD.md` §4.4](./PRD.md) (Keputusan D, E, F, M), FR-Q |
+| **Status** | Versi 2 — M7. Panduan berurutan (Q-10), backup terjadwal + restore teruji (Q-8, O-7), operasi harian |
+| **Berkas** | [`compose.prod.yml`](../compose.prod.yml) · [`Dockerfile`](../Dockerfile) · [`deploy/Caddyfile`](../deploy/Caddyfile) · [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) · [`deploy/backup.sh`](../deploy/backup.sh) · [`deploy/restore.sh`](../deploy/restore.sh) · [`.env.prod.example`](../.env.prod.example) |
+| **Kontrak** | [`PRD.md` §4.4](./PRD.md) (Keputusan D, E, F, M), FR-Q; kriteria terima §8 #23–#25 |
+| **Target** | Satu VPS **2 vCPU / 4 GB**, Ubuntu LTS, hanya Docker terpasang. Tidak ada layanan vendor, tidak ada serverless |
 
-Target deployment adalah **satu VPS biasa** dengan Docker (PRD §4.4). Tidak ada layanan berbayar milik vendor, tidak ada serverless.
+Ikuti §2 **secara berurutan**; setiap langkah menyebut apa yang harus terlihat sebelum lanjut. Kalau Anda menemukan langkah yang tidak tertulis, itu cacat dokumen — laporkan.
 
 ---
 
@@ -16,65 +17,140 @@ Target deployment adalah **satu VPS biasa** dengan Docker (PRD §4.4). Tidak ada
 :80/:443 ─► caddy ──► /            ─► web  (SvelteKit SSR, adapter-node di atas Bun)
                   └─► /v1/*, /docs, /openapi.json ─► api (Elysia) ×N ──► mysql
                                                                    └──► valkey (opsional)
+backup ──► mysqldump harian ──► ./backups (host)
 ```
 
-- **Satu origin** (Keputusan E): web dan API disajikan dari domain yang sama lewat path. Tidak ada CORS, tidak ada cookie lintas-domain.
-- **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. `api` diresolusi lewat DNS Docker sebagai *dynamic upstream* — setiap replika `api` otomatis ikut dilayani.
-- **`api` stateless** (Keputusan F): tanpa port host, tanpa `container_name`, jadi `--scale api=N` langsung bekerja. State bersama ada di database (Keputusan M); Valkey hanya percepatan opsional (`--profile redis`).
-- **Seed idempoten** (O-3): service `seed` membuat tenant `default`, grup `admin` (`*.*`) dan `user`, serta superadmin pertama dari `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` di `.env.prod`. Aman dijalankan ulang setiap deploy; baris yang sudah ada (termasuk kata sandi) tidak disentuh.
-- **Tanpa sticky session** (gate M1 #4): `bun run proof:m1:scale` membangun image, menyalakan stack dengan `--scale api=3` tanpa Redis, lalu menjalankan alur login → CRUD → ganti tenant lewat Caddy dan memastikan lebih dari satu replika melayani request. `APP_ORIGIN=https://DOMAIN` diturunkan otomatis di compose agar pemeriksaan CSRF membandingkan origin publik yang benar.
-- **Identitas build** (M-5): `docker compose build` menerima `APP_COMMIT` dan `APP_BUILT_AT` (CI mengisinya dari `GITHUB_SHA` dan waktu build); `GET /v1/version` melaporkannya bersama daftar modul.
-- **Konfigurasi runtime bukan di `.env`** (E-6): tema baku, allowlist tema, bahasa, landing/home route, SMTP, dan pengaturan modul diubah dari halaman **Pengaturan** dan tersimpan di database per tenant dengan fallback global. Perubahan terlihat oleh semua replika pada request berikutnya lewat cache berversi di tabel `cache_versions` — tanpa Redis, tanpa restart. `DEMO_MODE=true` (E-7) menolak semua penulisan kecuali masuk/keluar.
-- **Migrasi adalah langkah eksplisit** (Q-4): service `migrate` (profil `ops`) dijalankan operator, tidak pernah otomatis saat container start — dua instance yang menyala bersamaan tidak berebut migrasi.
+- **Satu origin** (Keputusan E): web dan API dari domain yang sama lewat path. Tidak ada CORS, tidak ada cookie lintas-domain.
+- **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. Replika `api` diresolusi lewat DNS Docker (*dynamic upstream*).
+- **`api` stateless** (Keputusan F): `--scale api=N` langsung bekerja; state bersama di database, Valkey hanya percepatan opsional (`--profile redis`).
+- **Migrasi eksplisit** (Q-4): service `migrate` dijalankan operator, tidak pernah otomatis saat container start.
+- **Konfigurasi runtime di database** (E-6): tema, bahasa, landing, SMTP, retensi log, modul — dari halaman **Pengaturan**, berlaku ke semua replika tanpa restart.
 
-## 2. Menjalankan
+## 2. Dari VPS kosong ke HTTPS — 9 langkah, < 15 menit
+
+Prasyarat yang harus sudah ada **sebelum** mulai (tidak dihitung): VPS Ubuntu 22.04/24.04 dengan Docker Engine + plugin Compose (`docker compose version` menjawab), akses `sudo`, sebuah domain dengan **record A** menunjuk ke IP VPS (cek `dig +short app.example.com`), dan port **80 + 443** terbuka di firewall penyedia.
 
 ```bash
-cp .env.prod.example .env.prod          # isi DOMAIN, ACME_EMAIL, MYSQL_*_PASSWORD
+# 1. Ambil kode (≈ 30 dtk)
+sudo apt-get install -y git   # bila belum ada
+git clone --recurse-submodules https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git app && cd app
+
+# 2. Buat .env.prod dari contoh dan isi EMPAT nilai (≈ 1 mnt)
+cp .env.prod.example .env.prod
+nano .env.prod
+#   DOMAIN=app.example.com            ← domain Anda (record A sudah mengarah ke sini)
+#   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
+#   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
+#   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
+#   (jangan pakai @ : / ? # di kata sandi database — DATABASE_URL diparse oleh skrip backup)
+
+# 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)
+export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
 docker compose --env-file .env.prod -f compose.prod.yml build
-docker compose --env-file .env.prod -f compose.prod.yml up -d
+#   → terlihat: "dab/api" dan "dab/web" di `docker image ls`
+
+# 4. Nyalakan database dan tunggu sehat (≈ 30 dtk)
+docker compose --env-file .env.prod -f compose.prod.yml up -d --wait mysql
+#   → terlihat: "Container dab-prod-mysql-1 Healthy"
+
+# 5. Migrasi skema — langkah eksplisit, bukan otomatis (≈ 10 dtk)
 docker compose --env-file .env.prod -f compose.prod.yml run --rm migrate
-docker compose --env-file .env.prod -f compose.prod.yml run --rm seed     # tenant default, grup sistem, superadmin pertama
-docker compose --env-file .env.prod -f compose.prod.yml up -d --scale api=3
+#   → baris terakhir menyebut jumlah migrasi yang diterapkan; tidak ada "error"
+
+# 6. Seed: tenant default, grup sistem, superadmin pertama (≈ 5 dtk, idempoten)
+docker compose --env-file .env.prod -f compose.prod.yml run --rm seed
+#   → "db:seed: selesai — tenant …"
+
+# 7. Nyalakan seluruh stack: 3 replika api, web, caddy, backup harian (≈ 30 dtk)
+docker compose --env-file .env.prod -f compose.prod.yml up -d --wait --scale api=3
+#   → semua service "Healthy"/"Started"; Caddy mengambil sertifikat dalam ± 10–30 dtk
+
+# 8. Verifikasi HTTPS (ulangi bila sertifikat belum keluar)
+curl -sI https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/ | head -1        # HTTP/2 200
+curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/ready            # {"success":true,…}
+curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/version          # commit & modul terpasang
+
+# 9. Masuk di browser: https://DOMAIN/auth/login dengan BOOTSTRAP_ADMIN_*; landing ada di https://DOMAIN/
+#    Lalu di Pengaturan: ganti kata sandi admin (Profil), isi SMTP, dan (opsional) hapus BOOTSTRAP_* dari .env.prod.
 ```
 
-Pemeriksaan cepat:
+Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump segera lalu tiap 24 jam ke `./backups/`).
+
+**Bila langkah 8 gagal:**
+
+| Gejala | Penyebab umum | Periksa |
+|---|---|---|
+| `curl: (60) SSL certificate problem` / sertifikat internal | DNS belum mengarah ke VPS atau port 80 tertutup (tantangan ACME gagal) | `docker compose … logs caddy \| tail`, `dig +short DOMAIN` |
+| `502` | `api`/`web` belum sehat | `docker compose … ps`, `docker compose … logs api --tail 50` |
+| `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
+| `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
+
+## 3. Operasi harian
 
 ```bash
-curl -s https://DOMAIN/v1/health      # {"success":true,"data":{"status":"ok","uptime":…,"instance":"…"}}
-curl -s https://DOMAIN/v1/ready       # database (dan Redis bila aktif) menjawab
-curl -sI https://DOMAIN/ | head -1    # HTTP/2 200 — halaman ter-SSR
+DC="docker compose --env-file .env.prod -f compose.prod.yml"
+
+# Upgrade versi
+git pull --recurse-submodules
+export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
+$DC run --rm backup-once                       # dump sebelum menyentuh apa pun
+$DC build && $DC run --rm migrate && $DC run --rm seed
+$DC up -d --wait --scale api=3                 # replika lama diganti satu per satu oleh compose
+
+# Skala / status / log
+$DC up -d --scale api=5                        # SELALU sertakan --scale pada setiap `up`, kalau tidak api kembali ke 1
+$DC ps && $DC logs -f --tail 100 api           # log JSON, request id ikut mengalir (M-1)
+docker stats --no-stream                        # RAM per container (§8 #25: total idle < 1,5 GB)
+
+# Backup & restore (Q-8, O-7) — lihat §4
+$DC run --rm backup-once
+$DC run --rm -e CONFIRM_RESTORE=yes restore latest
+
+# Redis/Valkey opsional (Keputusan M) — percepatan cache konfigurasi, bukan kebutuhan
+#   di .env.prod: CACHE_DRIVER=redis, REDIS_URL=redis://valkey:6379
+$DC --profile redis up -d --wait --scale api=3
 ```
 
-`instance` di `/v1/health` menyebut replika yang menjawab; dengan `--scale api=3`, beberapa panggilan berturut-turut menunjukkan tiga nilai berbeda.
+**Rotasi log (Q-7):** semua service memakai driver `json-file` dengan `max-size 10m`, `max-file 5` — maksimum ±50 MB per container. Log audit dan log aplikasi di database dipangkas job `core.logs.retention` sesuai **Pengaturan → Log & retensi** (M-3).
 
-**Peringatan operasional saat mengubah satu service:** `docker compose up -d caddy` (tanpa `--scale`) **mengembalikan `api` ke satu replika**. Selalu sertakan `--scale api=N` pada setiap `up`, atau tulis `deploy.replicas` di override lokal Anda.
+**Restart otomatis (Q-6):** `restart: unless-stopped` di semua service; Docker menyalakannya kembali saat proses mati dan saat host reboot (pastikan `systemctl is-enabled docker` = `enabled`).
 
-## 3. Image
+**Berkas unggahan (Q-9):** volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`). Sertakan dalam backup host bila modul Anda menyimpan berkas: `docker run --rm -v dab-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
 
-Satu `Dockerfile`, dua target dari satu stage build: install penuh → `bun run bootstrap` + build web → **install produksi bersih** (semua `node_modules` dihapus dulu, karena pemangkasan di tempat meninggalkan paket dev di *store* Bun dan menggandakan ukuran image tiga kali lipat) → runtime `oven/bun:alpine`, user `bun`, `HEALTHCHECK`.
+## 4. Backup & restore
 
-| Image | Ukuran (M0) | Isi utama |
-|---|---|---|
-| `dab/api` | **212 MB** | bun 70 MB · `node_modules` produksi 67 MB (`typescript` 23 MB — dependensi runtime `elysia`, bukan sisa devDeps; `drizzle-orm` 17 MB) · base alpine · kode < 1 MB |
-| `dab/web` | **213 MB** | serupa; `build/` adapter-node 1,8 MB |
-
-PRD Q-2 menargetkan **< 150 MB**. Dengan runtime Bun (70 MB) dan `typescript` yang dibawa `elysia`, lantai realistisnya ±190 MB. Pilihan yang tersedia — dan ini keputusan produk, bukan teknis semata: menerima ±200 MB dan merevisi Q-2, atau `bun build --compile` menjadi satu binary (menghilangkan `node_modules` tapi binary-nya sendiri ±90 MB). Dialect dipilih saat build (`--build-arg DB_DIALECT=postgres`) karena skema ter-generate mengikat satu driver (§4.3).
-
-## 4. Yang dijaga compose
-
-| Kebutuhan | Cara |
+| Apa | Bagaimana |
 |---|---|
-| Restart otomatis saat proses mati & saat host reboot (Q-6) | `restart: unless-stopped` di setiap service |
-| Log tidak memenuhi disk (Q-7) | driver `json-file`, `max-size 10m`, `max-file 5` |
-| Berkas unggahan (Q-9) | volume `uploads` → `/data/uploads`, `UPLOADS_DIR` |
-| Header keamanan (§7) | HSTS, `nosniff`, `X-Frame-Options DENY`, `Referrer-Policy` di Caddy; `Server` disembunyikan |
-| Port host bisa dipindah | `HTTP_PORT` / `HTTPS_PORT` bila 80/443 sudah dipakai |
+| Terjadwal | service `backup` (selalu hidup): `mysqldump --single-transaction` (atau `pg_dump`) → `./backups/app-<dialect>-<UTC>.sql.gz` + symlink `latest.sql.gz`, segera saat start lalu tiap `BACKUP_INTERVAL_SECONDS` (baku 24 jam) |
+| Retensi | dump lebih tua dari `BACKUP_KEEP_DAYS` (baku 14) dihapus setelah setiap dump |
+| Sekarang juga | `$DC run --rm backup-once` |
+| Restore | `$DC run --rm -e CONFIRM_RESTORE=yes restore latest` atau nama berkas di `./backups`. **Destruktif**: database dikosongkan lalu dump dimuat; tanpa `CONFIRM_RESTORE=yes` perintah menolak dan menjelaskan. Hentikan `api`/`web` dulu bila tidak ingin ada request gagal selama beberapa detik |
+| Off-site | salin `./backups` keluar VPS (rclone/rsync/objek storage) — ini di luar cakupan stack |
+| PostgreSQL | `DB_DIALECT=postgres`, `BACKUP_IMAGE=postgres:16`, `DATABASE_URL` eksternal; skrip yang sama memakai `pg_dump`/`psql` |
 
-## 5. Nginx
+Alur "backup → hapus database → restore → aplikasi utuh" dijalankan CI pada setiap push (`scripts/ci/backup-restore-proof.sh`, kriteria §8 #24) dan bisa diulang lokal dengan `bun run proof:backup:docker`. Di VPS, ulangi sekali sebelum rilis mengikuti [`RELEASE-CHECKLIST.md`](./RELEASE-CHECKLIST.md).
 
-Bagi yang punya standar Nginx sendiri: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) memetakan aturan yang sama (`/v1`, `/docs`, `/openapi.json` → api; sisanya → web; `proxy_buffering off` untuk streaming AI). TLS diserahkan ke certbot Anda.
+## 5. Image
 
-## 6. Belum ada di sini
+Satu `Dockerfile`, dua target: install penuh → `bun run bootstrap` + build web → install produksi bersih → runtime `oven/bun:alpine`, user `bun`, `HEALTHCHECK`. Dialect dipilih saat build (`--build-arg DB_DIALECT=postgres`) karena skema ter-generate mengikat satu driver (§4.3).
 
-Panduan VPS-kosong-ke-HTTPS < 15 menit (Q-10), backup terjadwal + restore teruji (Q-8, O-7), deploy tanpa downtime (Q-12), `preflight` (Q-13), batas sumber daya per service (Q-14), unit systemd tanpa Docker (Q-11) — semuanya M7 / §8 ROADMAP.
+| Image | Ukuran | Isi utama |
+|---|---|---|
+| `dab/api` | ±212 MB | bun 70 MB · `node_modules` produksi 67 MB (`typescript` 23 MB adalah dependensi runtime `elysia`) · alpine · kode < 1 MB |
+| `dab/web` | ±213 MB | serupa; `build/` adapter-node 1,8 MB |
+
+PRD Q-2 menargetkan < 150 MB; lantai realistis dengan runtime Bun ±190 MB. Ini keputusan produk yang masih terbuka: merevisi Q-2, atau `bun build --compile` (binary ±90 MB tanpa `node_modules`).
+
+## 6. Nginx
+
+Bagi yang punya standar Nginx sendiri: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) memetakan aturan yang sama (`/v1`, `/docs`, `/openapi.json` → api; sisanya → web; `proxy_buffering off` untuk streaming AI). TLS diserahkan ke certbot Anda; matikan service `caddy` dengan override compose.
+
+## 7. Batas sumber daya & pengukuran (§8 #25)
+
+Stack baku (caddy + web + 3×api + mysql + backup) idle di sekitar 600–900 MB pada mesin CI; anggaran §8 adalah **< 1,5 GB**. Ukur di VPS setelah 10 menit idle:
+
+```bash
+docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
+```
+
+CI menjalankan pengukuran yang sama pada stack `--scale api=3` (`scripts/ci/idle-memory.sh`). Batas per service (`deploy.resources`), systemd tanpa Docker, deploy tanpa downtime, dan `preflight` (Q-11…Q-14) adalah P1 — lihat ROADMAP §8.
