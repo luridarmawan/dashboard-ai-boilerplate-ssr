@@ -125,7 +125,7 @@ Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy me
 ## 3. Operasi harian
 
 ```bash
-DC="docker compose --env-file .env.prod -f compose.prod.yml"
+DC="docker compose --env-file .env.prod -f compose.prod.yml"   # bash. Di zsh pakai: alias DC='docker compose …' lalu `DC ps`, atau `${=DC} ps`
 
 # Upgrade versi
 git pull --recurse-submodules
