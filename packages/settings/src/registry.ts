@@ -130,11 +130,60 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     ],
   },
   {
+    section: 'logs',
+    title: { id: 'Log & retensi', en: 'Logs & retention' },
+    note: {
+      id: 'Tabel log tidak boleh tumbuh tanpa batas (M-3). Job core.logs.retention memangkasnya setiap hari; kebijakan berlaku global.',
+      en: 'Log tables must not grow without bound (M-3). The core.logs.retention job prunes them daily; the policy is global.',
+    },
+    order: 15,
+    fields: [
+      {
+        key: 'logs.audit_retention_days',
+        type: 'number',
+        title: { id: 'Retensi audit log (hari)', en: 'Audit log retention (days)' },
+        note: {
+          id: 'Aksi sensitif (login, izin, konfigurasi, CRUD). Minimal 30 hari.',
+          en: 'Sensitive actions (login, permissions, configuration, CRUD). At least 30 days.',
+        },
+        default: 365,
+        min: 30,
+        max: 3650,
+        order: 0,
+      },
+      {
+        key: 'logs.scheduler_runs_retention_days',
+        type: 'number',
+        title: { id: 'Retensi riwayat job (hari)', en: 'Job run history retention (days)' },
+        default: 14,
+        min: 1,
+        max: 365,
+        order: 1,
+      },
+      {
+        key: 'logs.outbox_retention_days',
+        type: 'number',
+        title: {
+          id: 'Retensi email terkirim/gagal (hari)',
+          en: 'Sent/failed email retention (days)',
+        },
+        note: {
+          id: 'Hanya baris berstatus sent atau failed; yang masih pending tidak pernah dihapus.',
+          en: 'Only rows in status sent or failed; pending rows are never removed.',
+        },
+        default: 30,
+        min: 1,
+        max: 3650,
+        order: 2,
+      },
+    ],
+  },
+  {
     section: 'mail',
     title: { id: 'Email', en: 'Email' },
     note: {
-      id: 'Pengiriman lewat outbox hadir di M4; nilai di sini sudah tersimpan dengan aman.',
-      en: 'Delivery through the outbox arrives in M4; values here are stored safely already.',
+      id: 'Pengiriman lewat outbox: job core.outbox.deliver mengirim tiap menit; tanpa SMTP, transport log dipakai.',
+      en: 'Delivery goes through the outbox: core.outbox.deliver sends every minute; without SMTP the log transport is used.',
     },
     order: 20,
     fields: [

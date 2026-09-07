@@ -5,6 +5,7 @@ import { createEventBus, createScheduler, type EventBus, type Scheduler } from '
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
 import { runOutboxOnce } from './mail.ts';
+import { runLogRetentionOnce } from './retention.ts';
 
 /**
  * Process-level runtime services, assembled once per API process:
@@ -29,7 +30,7 @@ export function createRuntime(): Runtime {
   for (const hooks of moduleHooks) bus.register(hooks);
 
   const scheduler = createScheduler({ db: getDb(), instanceId });
-  // Core jobs. Outbox delivery (M4) and log retention (M7) join this list with their features.
+  // Core jobs: outbox delivery (M4), session cleanup, log retention (M7).
   scheduler.register({
     name: 'core.outbox.deliver',
     every: '1m',
@@ -59,6 +60,18 @@ export function createRuntime(): Runtime {
         console.log(
           JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'sessions purged', n }),
         );
+    },
+  });
+  scheduler.register({
+    name: 'core.logs.retention',
+    every: '1d',
+    lease: 900,
+    description: {
+      id: 'Pangkas audit log, riwayat job, dan outbox sesuai retensi (M-3)',
+      en: 'Prune audit log, job history and outbox per retention policy (M-3)',
+    },
+    run: async () => {
+      await runLogRetentionOnce();
     },
   });
   for (const { module, jobs } of moduleJobs)

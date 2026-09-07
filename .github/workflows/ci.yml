@@ -208,6 +208,44 @@ jobs:
       - name: gate M6 #2 · modul dari repositori lain (bun create module → harness → modules:add dari URL git → cabut bersih)
         run: bun run ci:cross-repo
 
+  backup-restore:
+    name: §8 #24 · backup → hapus database → restore → aplikasi utuh (O-7, Q-8)
+    runs-on: ubuntu-latest
+    needs: check
+    services:
+      db:
+        image: mysql:8
+        ports: ['3306:3306']
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: app
+          MYSQL_USER: app
+          MYSQL_PASSWORD: app
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 40
+    env:
+      DB_DIALECT: mysql
+      DATABASE_URL: mysql://app:app@127.0.0.1:3306/app
+      BOOTSTRAP_ADMIN_EMAIL: admin@example.test
+      BOOTSTRAP_ADMIN_PASSWORD: bootstrap admin password
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - name: klien mysql (mysqldump/mysql) — sama seperti image mysql:8 yang dipakai service backup
+        run: command -v mysqldump >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client)
+      - run: bun install --frozen-lockfile
+      - run: bun run bootstrap
+      - run: bun run --cwd packages/db migrate
+      - run: bun run db:seed
+      - run: PROOF_MODE=native sh scripts/ci/backup-restore-proof.sh
+
   scale-proof:
     name: gate M1 #4 · --scale api=3 tanpa Redis lewat Caddy
     runs-on: ubuntu-latest

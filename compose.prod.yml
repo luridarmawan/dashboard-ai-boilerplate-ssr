@@ -6,6 +6,8 @@
 #   docker compose -f compose.prod.yml run --rm migrate      # explicit, never automatic (Q-4)
 #   docker compose -f compose.prod.yml run --rm seed         # idempotent bootstrap (O-3)
 #   docker compose -f compose.prod.yml up -d --scale api=3   # stateless: scale freely (Decision F)
+#   docker compose -f compose.prod.yml run --rm backup-once  # dump now; `backup` does it daily (Q-8)
+#   docker compose -f compose.prod.yml run --rm -e CONFIRM_RESTORE=yes restore latest
 #
 # One origin: Caddy terminates TLS and routes / → web, /v1/* /docs /openapi.json → api (Decisions D, E).
 # Valkey is optional (Decision M): `--profile redis`. Everything restarts on crash and on reboot (Q-6).
@@ -127,6 +129,61 @@ services:
       mysql:
         condition: service_healthy
     <<: *logging
+
+  backup:
+    # Scheduled logical dumps (O-7, Q-8) into ./backups on the host — copy that folder off-site.
+    # BACKUP_IMAGE must carry the client tools of your dialect: mysql:8 (default) or postgres:16.
+    image: ${BACKUP_IMAGE:-mysql:8}
+    restart: unless-stopped
+    entrypoint: ['sh', '/deploy/backup-loop.sh']
+    environment:
+      DB_DIALECT: ${DB_DIALECT:-mysql}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - ./deploy:/deploy:ro
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+    <<: *logging
+
+  backup-once:
+    # `run --rm backup-once` — one dump right now (before a migration, before an upgrade).
+    image: ${BACKUP_IMAGE:-mysql:8}
+    profiles: ['ops']
+    entrypoint: ['sh', '/deploy/backup.sh']
+    environment:
+      DB_DIALECT: ${DB_DIALECT:-mysql}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      BACKUP_DIR: /backups
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ./deploy:/deploy:ro
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  restore:
+    # `run --rm restore latest` (or a file name in ./backups). Destructive; asks for CONFIRM_RESTORE=yes:
+    #   docker compose --env-file .env.prod -f compose.prod.yml run --rm -e CONFIRM_RESTORE=yes restore latest
+    image: ${BACKUP_IMAGE:-mysql:8}
+    profiles: ['ops']
+    entrypoint: ['sh', '/deploy/restore.sh']
+    command: ['latest']
+    environment:
+      DB_DIALECT: ${DB_DIALECT:-mysql}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./deploy:/deploy:ro
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   mysql:
     image: mysql:8
