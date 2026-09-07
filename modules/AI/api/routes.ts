@@ -3,6 +3,13 @@ import { type AuthState, clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
 import { settings } from '@app/api/services';
+import {
+  callTool,
+  listTools,
+  type ToolCaller,
+  toOpenAiTools,
+  toolResultText,
+} from '@app/api/tools';
 import { writeAudit } from '@core/auth';
 import {
   errorResponses,
@@ -16,16 +23,49 @@ import {
 } from '@core/contracts';
 import { and, count, desc, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
-import { defineApiRoutes } from '@core/module-kit';
+import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 import { ChatCompletionBody, ConversationPatch } from './schemas.ts';
+
+/** Provider-side message: OpenAI shape, including the tool round-trip (I-3). */
+interface ProviderMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+interface Usage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+}
+/** What the UI is told about each tool call (`dab.tool` frames in the stream, `x_tools` in JSON). */
+interface ToolTrace {
+  name: string;
+  ok: boolean;
+  ms: number;
+}
+/** Rounds = provider calls per user turn; the last one is issued without tools so it must answer. */
+const MAX_TOOL_ROUNDS = 5;
+/** A tool result longer than this is truncated before it reaches the model's context. */
+const TOOL_RESULT_MAX = 32_000;
 
 /**
  * AI module API (H-1…H-9), mounted at /v1/m/ai. The provider is configuration (`ai.baseurl`,
  * `ai.key`, `ai.model`) — any OpenAI-compatible endpoint. `POST /chat/completions` proxies the
- * request; with `stream: true` the provider's SSE bytes flow straight through (provider → API →
- * SvelteKit → UI) and the upstream request is aborted when the client goes away (H-3). Every call
- * is logged AFTER the response is done, never on the hot path (H-9).
+ * request; with `stream: true` the provider's SSE frames flow through (provider → API → SvelteKit
+ * → UI) and the upstream request is aborted when the client goes away (H-3). Every call is logged
+ * AFTER the response is done, never on the hot path (H-9).
+ *
+ * Tools (extension point 8, I-3): the tools the caller may see — module enabled for the tenant,
+ * permission held — are offered to the model; a `tool_calls` reply is executed through the core
+ * registry (`callTool`: permission + tenancy + schema, audited), the results are appended as
+ * `tool` messages and the provider is called again, at most MAX_TOOL_ROUNDS times. Streaming
+ * hides the intermediate `[DONE]`s and adds `dab.tool` frames so the UI can show what ran.
  */
 
 type Row = typeof schema.aiConversations.$inferSelect;
@@ -136,7 +176,7 @@ export default defineApiRoutes(
     // ---- chat (H-2, H-3, H-4, H-5, H-6, H-9) ----
     .post(
       '/chat/completions',
-      async ({ auth, body, set, request, requestId, tenantState }) => {
+      async ({ auth, body, set, request, server, requestId, tenantState }) => {
         const a = auth as AuthState;
         const clientId = tenantState?.clientId ?? null;
         if (!clientId) {
@@ -208,103 +248,64 @@ export default defineApiRoutes(
           }
         }
 
+        // ---- tools the caller may use (extension point 8, I-3) ----
+        const toolsWanted =
+          body.tools ?? (await settings.get<boolean | null>(clientId, 'ai.tools_enable')) !== false;
+        const caller: ToolCaller = {
+          clientId,
+          userId: a.user.id,
+          can: (perm) => tenantState?.can(perm) ?? false,
+          locale: a.user.locale ?? 'id',
+          requestId,
+          signal: request.signal,
+          ip: clientIp(request, server),
+        };
+        const tools = toolsWanted ? await listTools(caller) : [];
+        const openAiTools = tools.length ? toOpenAiTools(tools, caller.locale) : null;
+        const convo: ProviderMessage[] = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        const traces: ToolTrace[] = [];
+
         const started = performance.now();
         const upstream = new AbortController();
         // H-3: when the browser goes away, the upstream request goes away.
         request.signal.addEventListener('abort', () => upstream.abort(), { once: true });
-        let res: Response;
-        try {
-          res = await fetch(`${p.baseurl}/chat/completions`, {
+
+        const callProvider = (stream: boolean, withTools: boolean) =>
+          fetch(`${p.baseurl}/chat/completions`, {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
               authorization: `Bearer ${p.key}`,
-              accept: body.stream ? 'text/event-stream' : 'application/json',
+              accept: stream ? 'text/event-stream' : 'application/json',
             },
             body: JSON.stringify({
               model,
-              messages,
-              stream: !!body.stream,
+              messages: convo,
+              stream,
               temperature: body.temperature,
               max_tokens: body.max_tokens ?? p.maxTokens,
-              ...(body.stream ? { stream_options: { include_usage: true } } : {}),
+              ...(withTools && openAiTools ? { tools: openAiTools } : {}),
+              ...(stream ? { stream_options: { include_usage: true } } : {}),
             }),
             signal: upstream.signal,
           });
-        } catch (err) {
-          const cancelled = upstream.signal.aborted;
-          logCall({
-            clientId,
-            userId: a.user.id,
-            conversationId,
-            endpoint: 'chat.completions',
-            model,
-            tokensIn: null,
-            tokensOut: null,
-            latencyMs: Math.round(performance.now() - started),
-            firstTokenMs: null,
-            status: cancelled ? 'cancelled' : 'error',
-            error: err instanceof Error ? err.message : String(err),
-            streamed: !!body.stream,
-            priceIn: p.priceIn,
-            priceOut: p.priceOut,
-          });
-          set.status = 502;
-          return fail(
-            'service_unavailable',
-            `Penyedia AI tidak terjangkau (${p.baseurl})`,
-            requestId,
-          );
-        }
-        if (!res.ok) {
-          const text = await res.text().catch(() => '');
-          logCall({
-            clientId,
-            userId: a.user.id,
-            conversationId,
-            endpoint: 'chat.completions',
-            model,
-            tokensIn: null,
-            tokensOut: null,
-            latencyMs: Math.round(performance.now() - started),
-            firstTokenMs: null,
-            status: 'error',
-            error: `${res.status} ${text.slice(0, 500)}`,
-            streamed: !!body.stream,
-            priceIn: p.priceIn,
-            priceOut: p.priceOut,
-          });
-          set.status = res.status === 401 || res.status === 403 ? 422 : 502;
-          return fail(
-            res.status === 401 || res.status === 403 ? 'validation_failed' : 'service_unavailable',
-            res.status === 401 || res.status === 403
-              ? 'API key AI ditolak penyedia — periksa ai.key'
-              : `Penyedia AI menjawab ${res.status}`,
-            requestId,
-            { upstream: text.slice(0, 300) },
-          );
-        }
 
-        const finish = async (
+        const log = (
+          roundStart: number,
+          usage: Usage | null,
           assistant: string,
-          usage: { prompt_tokens?: number; completion_tokens?: number } | null,
-          status: 'ok' | 'cancelled',
+          status: 'ok' | 'error' | 'cancelled',
           firstTokenMs: number | null,
+          error?: string,
         ) => {
           const tokensIn =
-            usage?.prompt_tokens ?? estimateTokens(messages.map((m) => m.content).join('\n'));
-          const tokensOut = usage?.completion_tokens ?? estimateTokens(assistant);
-          if (conversationId && tenant && assistant) {
-            await tenant
-              .insert(schema.aiMessages, {
-                id: newId(),
-                conversation_id: conversationId,
-                role: 'assistant',
-                content: assistant,
-                tokens_out: tokensOut,
-              })
-              .catch((err) => logger.warn('ai: persist reply failed', { error: String(err) }));
-          }
+            usage?.prompt_tokens ??
+            (status === 'ok' ? estimateTokens(convo.map((m) => m.content ?? '').join('\n')) : null);
+          const tokensOut =
+            usage?.completion_tokens ?? (status === 'ok' ? estimateTokens(assistant) : null);
           logCall({
             clientId,
             userId: a.user.id,
@@ -313,74 +314,285 @@ export default defineApiRoutes(
             model,
             tokensIn,
             tokensOut,
-            latencyMs: Math.round(performance.now() - started),
+            latencyMs: Math.round(performance.now() - roundStart),
             firstTokenMs,
             status,
+            error: error ?? null,
             streamed: !!body.stream,
             priceIn: p.priceIn,
             priceOut: p.priceOut,
           });
         };
 
-        if (!body.stream) {
-          const json = (await res.json()) as {
-            choices?: { message?: { content?: string } }[];
-            usage?: { prompt_tokens?: number; completion_tokens?: number };
+        /** Map a provider failure to our envelope (H-4: actionable, never generic). */
+        const providerFailure = (res: Response | null, detail: string) => {
+          const denied = res !== null && (res.status === 401 || res.status === 403);
+          return {
+            status: res === null ? 502 : denied ? 422 : 502,
+            code: denied ? ('validation_failed' as const) : ('service_unavailable' as const),
+            message:
+              res === null
+                ? `Penyedia AI tidak terjangkau (${p.baseurl})`
+                : denied
+                  ? 'API key AI ditolak penyedia — periksa ai.key'
+                  : `Penyedia AI menjawab ${res.status}`,
+            details: res === null ? undefined : { upstream: detail.slice(0, 300) },
           };
-          const content = json.choices?.[0]?.message?.content ?? '';
-          void finish(content, json.usage ?? null, 'ok', null);
-          return json as unknown as Record<string, unknown>;
+        };
+
+        /** Run the model's tool calls through the core registry and produce the `tool` messages. */
+        const runToolCalls = async (
+          calls: readonly ToolCall[],
+          onTrace?: (t: ToolTrace, phase: 'start' | 'end') => void,
+        ): Promise<ProviderMessage[]> => {
+          const out: ProviderMessage[] = [];
+          for (const c of calls) {
+            const trace: ToolTrace = {
+              name: toolNameFromWire(c.function.name) ?? c.function.name,
+              ok: false,
+              ms: 0,
+            };
+            onTrace?.(trace, 'start');
+            let args: unknown = {};
+            let parseError = false;
+            try {
+              args = c.function.arguments?.trim() ? JSON.parse(c.function.arguments) : {};
+            } catch {
+              parseError = true;
+            }
+            let content: string;
+            if (parseError) content = 'ERROR: argumen tool bukan JSON yang valid';
+            else {
+              const r = await callTool(c.function.name, args, caller);
+              trace.name = r.name;
+              trace.ok = r.ok;
+              trace.ms = r.ms;
+              content = r.ok ? toolResultText(r.result) : `ERROR: ${r.message}`;
+            }
+            if (content.length > TOOL_RESULT_MAX)
+              content = `${content.slice(0, TOOL_RESULT_MAX)}… [dipotong]`;
+            traces.push(trace);
+            onTrace?.(trace, 'end');
+            out.push({ role: 'tool', tool_call_id: c.id, content });
+          }
+          return out;
+        };
+
+        const persist = async (assistant: string, tokensOut: number) => {
+          if (!(conversationId && tenant && assistant)) return;
+          await tenant
+            .insert(schema.aiMessages, {
+              id: newId(),
+              conversation_id: conversationId,
+              role: 'assistant',
+              content: assistant,
+              tokens_out: tokensOut,
+            })
+            .catch((err) => logger.warn('ai: persist reply failed', { error: String(err) }));
+        };
+
+        // ---- non-streaming: loop until the model answers in text ----
+        if (!body.stream) {
+          let transcript = '';
+          for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
+            const roundStart = performance.now();
+            let res: Response;
+            try {
+              res = await callProvider(false, round < MAX_TOOL_ROUNDS);
+            } catch (err) {
+              const cancelled = upstream.signal.aborted;
+              log(roundStart, null, '', cancelled ? 'cancelled' : 'error', null, String(err));
+              const f = providerFailure(null, '');
+              set.status = f.status;
+              return fail(f.code, f.message, requestId);
+            }
+            if (!res.ok) {
+              const text = await res.text().catch(() => '');
+              log(roundStart, null, '', 'error', null, `${res.status} ${text.slice(0, 500)}`);
+              const f = providerFailure(res, text);
+              set.status = f.status;
+              return fail(f.code, f.message, requestId, f.details);
+            }
+            const json = (await res.json()) as {
+              choices?: { message?: { content?: string | null; tool_calls?: ToolCall[] } }[];
+              usage?: Usage;
+            };
+            const msg = json.choices?.[0]?.message;
+            const content = msg?.content ?? '';
+            log(roundStart, json.usage ?? null, content, 'ok', null);
+            const calls = (msg?.tool_calls ?? []).filter((c) => c?.type === 'function' && c.id);
+            if (calls.length && round < MAX_TOOL_ROUNDS) {
+              if (content) transcript += `${content}\n\n`;
+              convo.push({ role: 'assistant', content: msg?.content ?? null, tool_calls: calls });
+              convo.push(...(await runToolCalls(calls)));
+              continue;
+            }
+            transcript += content;
+            // Awaited on purpose: the no-JS page reloads the conversation right after this reply.
+            await persist(transcript, json.usage?.completion_tokens ?? estimateTokens(transcript));
+            return { ...json, x_tools: traces } as unknown as Record<string, unknown>;
+          }
+          // unreachable: the last round is issued without tools
+          set.status = 502;
+          return fail('service_unavailable', 'Penyedia AI tidak menjawab', requestId);
         }
 
-        // Streaming: pass the SSE bytes through untouched while tee-ing them to assemble the reply.
-        const decoder = new TextDecoder();
-        let assistant = '';
-        let usage: { prompt_tokens?: number; completion_tokens?: number } | null = null;
-        let firstTokenMs: number | null = null;
-        let buffer = '';
-        const body_ = res.body as ReadableStream<Uint8Array>;
-        const tapped = body_.pipeThrough(
-          new TransformStream<Uint8Array, Uint8Array>({
-            transform(chunk, controller) {
-              controller.enqueue(chunk);
-              buffer += decoder.decode(chunk, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() ?? '';
-              for (const line of lines) {
-                if (!line.startsWith('data:')) continue;
-                const data = line.slice(5).trim();
-                if (!data || data === '[DONE]') continue;
+        // ---- streaming: forward the provider's frames, run tools between rounds (H-3, I-3) ----
+        const encoder = new TextEncoder();
+        const out = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            const raw = (line: string) => controller.enqueue(encoder.encode(`${line}\n\n`));
+            const frame = (obj: unknown) => raw(`data: ${JSON.stringify(obj)}`);
+            let transcript = '';
+            let transcriptTokens: number | null = null;
+            try {
+              for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
+                const roundStart = performance.now();
+                let res: Response;
                 try {
-                  const j = JSON.parse(data) as {
-                    choices?: { delta?: { content?: string } }[];
-                    usage?: typeof usage;
-                  };
-                  const delta = j.choices?.[0]?.delta?.content;
-                  if (delta) {
-                    if (firstTokenMs === null)
-                      firstTokenMs = Math.round(performance.now() - started);
-                    assistant += delta;
+                  res = await callProvider(true, round < MAX_TOOL_ROUNDS);
+                } catch (err) {
+                  if (upstream.signal.aborted) {
+                    log(roundStart, null, '', 'cancelled', null);
+                    return;
                   }
-                  if (j.usage) usage = j.usage;
-                } catch {
-                  /* partial or non-JSON line */
+                  log(roundStart, null, '', 'error', null, String(err));
+                  const f = providerFailure(null, '');
+                  frame({ error: { code: f.code, message: f.message } });
+                  return;
                 }
+                if (!res.ok || !res.body) {
+                  const text = await res.text().catch(() => '');
+                  log(roundStart, null, '', 'error', null, `${res.status} ${text.slice(0, 500)}`);
+                  const f = providerFailure(res, text);
+                  frame({ error: { code: f.code, message: f.message } });
+                  return;
+                }
+                let assistant = '';
+                let usage: Usage | null = null;
+                let firstTokenMs: number | null = null;
+                const calls = new Map<number, ToolCall>();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const reader = res.body.getReader();
+                try {
+                  for (;;) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? '';
+                    for (const rawLine of lines) {
+                      const line = rawLine.replace(/\r$/, '');
+                      if (!line.startsWith('data:')) continue;
+                      const data = line.slice(5).trim();
+                      if (!data || data === '[DONE]') continue; // ours to send, once, at the end
+                      let j: {
+                        choices?: {
+                          finish_reason?: string | null;
+                          delta?: {
+                            content?: string | null;
+                            tool_calls?: {
+                              index?: number;
+                              id?: string;
+                              type?: string;
+                              function?: { name?: string; arguments?: string };
+                            }[];
+                          };
+                        }[];
+                        usage?: Usage;
+                      };
+                      try {
+                        j = JSON.parse(data);
+                      } catch {
+                        continue; // partial or non-JSON line
+                      }
+                      const delta = j.choices?.[0]?.delta;
+                      if (delta?.content) {
+                        if (firstTokenMs === null)
+                          firstTokenMs = Math.round(performance.now() - started);
+                        assistant += delta.content;
+                      }
+                      for (const tc of delta?.tool_calls ?? []) {
+                        const idx = tc.index ?? 0;
+                        const cur = calls.get(idx) ?? {
+                          id: '',
+                          type: 'function' as const,
+                          function: { name: '', arguments: '' },
+                        };
+                        if (tc.id) cur.id = tc.id;
+                        if (tc.function?.name) cur.function.name += tc.function.name;
+                        if (tc.function?.arguments) cur.function.arguments += tc.function.arguments;
+                        calls.set(idx, cur);
+                      }
+                      if (j.usage) usage = j.usage;
+                      // Tool-call deltas and the `tool_calls` finish stay server-side; everything
+                      // else reaches the client as-is.
+                      const toolOnly =
+                        (delta?.tool_calls && !delta.content) ||
+                        j.choices?.[0]?.finish_reason === 'tool_calls';
+                      if (!toolOnly) raw(line);
+                    }
+                  }
+                } catch (err) {
+                  if (upstream.signal.aborted) {
+                    transcript += assistant;
+                    log(roundStart, usage, assistant, 'cancelled', firstTokenMs);
+                    return;
+                  }
+                  throw err;
+                }
+                log(roundStart, usage, assistant, 'ok', firstTokenMs);
+                transcript += assistant;
+                transcriptTokens = usage?.completion_tokens ?? null;
+                const list = [...calls.values()].filter((c) => c.id && c.function.name);
+                if (list.length && round < MAX_TOOL_ROUNDS) {
+                  if (assistant) {
+                    transcript += '\n\n';
+                    raw('data: {"choices":[{"index":0,"delta":{"content":"\\n\\n"}}]}');
+                  }
+                  convo.push({ role: 'assistant', content: assistant || null, tool_calls: list });
+                  convo.push(
+                    ...(await runToolCalls(list, (t, phase) =>
+                      frame({
+                        choices: [{ index: 0, delta: {} }],
+                        dab: {
+                          tool:
+                            phase === 'start'
+                              ? { name: t.name, status: 'running' }
+                              : { name: t.name, status: t.ok ? 'ok' : 'error', ms: t.ms },
+                        },
+                      }),
+                    )),
+                  );
+                  continue;
+                }
+                raw('data: [DONE]');
+                return;
               }
-            },
-            flush() {
-              void finish(assistant, usage, 'ok', firstTokenMs);
-            },
-          }),
-        );
-        upstream.signal.addEventListener(
-          'abort',
-          () => void finish(assistant, usage, 'cancelled', firstTokenMs),
-          { once: true },
-        );
+            } catch (err) {
+              logger.warn('ai: stream failed', { error: String(err), requestId });
+              frame({
+                error: { code: 'service_unavailable', message: 'Aliran dari penyedia AI terputus' },
+              });
+            } finally {
+              // Before close(): when the client sees the stream end, the reply is already stored.
+              await persist(transcript, transcriptTokens ?? estimateTokens(transcript));
+              try {
+                controller.close();
+              } catch {
+                /* already closed */
+              }
+            }
+          },
+          cancel() {
+            upstream.abort();
+          },
+        });
         set.headers['content-type'] = 'text/event-stream';
         set.headers['cache-control'] = 'no-cache';
         set.headers['x-accel-buffering'] = 'no';
-        return new Response(tapped, {
+        return new Response(out, {
           headers: {
             'content-type': 'text/event-stream',
             'cache-control': 'no-cache',

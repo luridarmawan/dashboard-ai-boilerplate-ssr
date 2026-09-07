@@ -268,6 +268,39 @@ export default defineApiRoutes(
 );
 `;
 
+  files['api/tools.ts'] = `import { isNull, schema } from '@core/db';
+import { defineTools } from '@core/module-kit';
+import { t } from 'elysia';
+
+/**
+ * AI / MCP tools (extension point 8, I-3). The core registry runs them ONLY for callers holding
+ * \`permission\`, only while the module is enabled for the tenant, and with the tenant facade as
+ * \`ctx.db\` — the module never checks any of that itself. \`input\` (TypeBox → JSON Schema) validates
+ * the arguments and describes them to the model / MCP client from one declaration.
+ */
+export default defineTools('${name}', [
+  {
+    name: '${ns}.list_${plural}',
+    description: {
+      id: 'Daftar ${plural} tenant aktif, opsional difilter ${titleField?.name ?? 'name'} (q). Pakai saat pengguna bertanya ${plural} apa yang ada.',
+      en: 'List the active tenant’s ${plural}, optionally filtered by ${titleField?.name ?? 'name'} (q). Use when the user asks which ${plural} exist.',
+    },
+    permission: '${perm}.read',
+    readOnly: true,
+    input: t.Object({
+      q: t.Optional(t.String({ maxLength: 120 })),
+      limit: t.Optional(t.Integer({ minimum: 1, maximum: 50, default: 20 })),
+    }),
+    run: async (input, { db }) => {
+      const q = typeof input.q === 'string' ? input.q.trim() : '';
+      const limit = typeof input.limit === 'number' ? input.limit : 20;
+      const rows = await db.select(schema.${tableVar}, isNull(schema.${tableVar}.deleted_at));
+      const hit = q ? rows.filter((r) => String(r.${titleField?.name ?? 'name'} ?? '').toLowerCase().includes(q.toLowerCase())) : rows;
+      return { total: hit.length, ${plural}: hit.slice(0, limit).map((r) => ({ id: r.id, ${titleProp}: r.${titleField?.name ?? 'name'} })) };
+    },
+  },
+]);
+`;
   files['hooks.ts'] = `import { logger } from '@core/logger';
 import { defineHooks } from '@core/module-kit';
 
@@ -569,7 +602,7 @@ describe.skipIf(!enabled)('${name} module CRUD', () => {
   files['README.md'] = `# ${name}
 
 Modul yang dibuat \`bun modgen\`. Semua titik perluasan yang dipakai sudah berjalan: tabel, izin, menu,
-konfigurasi, i18n, API + skema bersama, halaman list/form, widget, hook, job, seed, dan tes integrasi.
+konfigurasi, i18n, API + skema bersama, tool AI/MCP, halaman list/form, widget, hook, job, seed, dan tes integrasi.
 Ubah sesuai kebutuhan — ini kode Anda, bukan kode core. Lihat \`docs/MODULES.md\` dan \`docs/FIRST-MODULE.md\`.
 `;
   return files;

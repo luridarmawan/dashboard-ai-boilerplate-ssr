@@ -9,6 +9,7 @@
     "./plugins/*": "./src/plugins/*.ts",
     "./services": "./src/services.ts",
     "./mail": "./src/mail.ts",
+    "./tools": "./src/tools.ts",
     "./lib/*": "./src/lib/*.ts"
   },
   "scripts": {
@@ -28,6 +29,7 @@
     "@core/settings": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@elysiajs/openapi": "^1.4.0",
+    "@sinclair/typebox": "^0.34.52",
     "elysia": "^1.4.0"
   }
 }

@@ -283,7 +283,7 @@ Sebuah perubahan dianggap selesai bila:
 Ini **satu-satunya rumah** untuk P1/P2 (invarian §3). Urutan yang disarankan, berdasarkan apa yang paling cepat terasa oleh pemakai template:
 
 1. **UI admin modul + editor tema** (G-14, L-24) — dua hal yang paling sering diminta setelah orang mulai memakai
-2. **MCP server & client** (FR-I) — janji tujuan produk 7 yang sengaja belum ditepati MVP; kontrak tool-nya (titik perluasan 8, I-3) sudah disiapkan sejak M0, jadi ini pekerjaan mengisi, bukan mengubah. **Prasyarat selesai:** I-6 terbukti test — endpoint terautentikasi dan tunduk tenancy — sebelum MCP dinyatakan jadi
+2. **MCP server & client** (FR-I) — janji tujuan produk 7 yang sengaja belum ditepati MVP. **Kontrak tool-nya sudah ada (2026-09-07):** titik perluasan 8 = `api/tools.ts` (`defineTools`) + registry core (`apps/api/src/tools.ts`, `GET/POST /v1/tools`), dipakai asisten AI untuk function calling, dan I-6 untuk registry itu sudah dibuktikan test (`apps/api/test/integration/tools.test.ts`). MCP server (`tools/list`, `tools/call`, SDK resmi) dan client (I-4, I-5) tinggal membungkus registry yang sama. **Prasyarat selesai:** endpoint MCP-nya lulus test I-6 yang sama — terautentikasi dan tunduk tenancy — sebelum MCP dinyatakan jadi
 3. **Preflight + deploy tanpa downtime** (Q-13, Q-12) — yang pertama terasa begitu ada instalasi produksi kedua; systemd (Q-11) dan resource limit (Q-14) menyusul
 4. **Notifikasi dalam aplikasi** (J-4) — backend-nya sudah ada sebagian lewat outbox
 5. **Fitur unggah berkas + adapter S3** (Q-16) — volume & path-nya sudah disiapkan di MVP lewat Q-9

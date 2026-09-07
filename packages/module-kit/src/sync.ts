@@ -1,4 +1,12 @@
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -22,6 +30,7 @@ import {
   namespaceOf,
   satisfiesCore,
 } from './manifest.ts';
+import { validateTool } from './tools.ts';
 
 /**
  * The `modules:sync` engine (Decision C, Decision G; G-2, G-9, G-10, G-11).
@@ -75,13 +84,13 @@ export interface WebRouteRecord {
   readonly kind: 'svelte' | 'ts';
 }
 
-/** A module that ships `hooks.ts` (extension point 9) or `jobs.ts` (extension point 12). */
+/** A module that ships `hooks.ts` (9), `jobs.ts` (12) or `api/tools.ts` (8). */
 export interface RuntimeModuleRecord {
   readonly name: string;
   readonly ns: string;
   /** Module-relative file, POSIX. */
   readonly file: string;
-  /** Event names (hooks) or job names (jobs) declared — for the registry and the admin UI. */
+  /** Event names (hooks), job names (jobs) or tool names (tools) declared — for the registry and the admin UI. */
   readonly items: readonly string[];
 }
 
@@ -94,6 +103,7 @@ export interface SyncResult {
   readonly webRoutes: readonly WebRouteRecord[];
   readonly hookModules: readonly RuntimeModuleRecord[];
   readonly jobModules: readonly RuntimeModuleRecord[];
+  readonly toolModules: readonly RuntimeModuleRecord[];
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
@@ -153,7 +163,14 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   // Fresh checkout: module files imported below (api/routes.ts → @app/api/services → the generated
   // registry) must resolve BEFORE the first sync has written anything. Placeholders break the loop;
   // the real content overwrites them at the end of this run.
-  if (write) ensureGeneratedPlaceholders(root);
+  if (write) {
+    ensureGeneratedPlaceholders(root);
+    // The tool registry is the one generated file a MODULE may (indirectly) import while we load
+    // it — `api/routes.ts` → `@app/api/tools` → `generated/tools.ts`. A stale copy naming a module
+    // that was just removed would make every routes.ts fail to load, and the sync could never
+    // recover. So it starts every run empty and is rewritten with the real content at the end.
+    resetToolsPlaceholder(root);
+  }
   const problems: string[] = [];
   const warnings: string[] = [];
 
@@ -192,6 +209,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const hookModules: RuntimeModuleRecord[] = [];
   const jobModules: RuntimeModuleRecord[] = [];
   const jobOwner = new Map<string, string>();
+  const toolModules: RuntimeModuleRecord[] = [];
+  const toolOwner = new Map<string, string>();
   // Extension point 7 (K-6): module messages, merged into one typed catalogue per locale.
   const i18n: Record<string, Record<string, string>> = {};
   for (const l of I18N_LOCALES) i18n[l] = {};
@@ -455,6 +474,51 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
         if (names.length)
           jobModules.push({ name: manifest.name, ns, file: 'jobs.ts', items: names });
+      }
+    }
+
+    // ---- api/tools.ts (extension point 8, I-3) ----
+    const tl = await loadDefault<readonly { name?: string; permission?: string }[]>(
+      join(dir, 'api/tools.ts'),
+      problems,
+      tag,
+    );
+    if (tl !== undefined) {
+      if (!Array.isArray(tl))
+        problems.push(`${tag}: api/tools.ts harus meng-export default array (pakai defineTools)`);
+      else {
+        const names: string[] = [];
+        const own = new Set(
+          permissions
+            .filter((p) => p.module === manifest.name)
+            .flatMap((p) => p.actions.map((a) => `${p.resource}.${a}`)),
+        );
+        for (const tool of tl) {
+          try {
+            validateTool(ns, tool);
+          } catch (err) {
+            problems.push(`${tag}: ${err instanceof Error ? err.message : String(err)}`);
+            continue;
+          }
+          const name = tool.name as string;
+          // A permission of the module's own must be one it declares in permissions.ts, so the
+          // tool can actually be granted (a typo would make it unreachable, silently).
+          if (tool.permission?.startsWith(`${ns}.`) && !own.has(tool.permission)) {
+            problems.push(
+              `${tag}: tool "${name}" menuntut izin "${tool.permission}" yang tidak ada di permissions.ts`,
+            );
+            continue;
+          }
+          const owner = toolOwner.get(name);
+          if (owner)
+            problems.push(`tool "${name}" didefinisikan oleh ${owner} dan ${manifest.name}`);
+          else {
+            toolOwner.set(name, manifest.name);
+            names.push(name);
+          }
+        }
+        if (names.length)
+          toolModules.push({ name: manifest.name, ns, file: 'api/tools.ts', items: names });
       }
     }
 
@@ -838,6 +902,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           emitApiModules(apiModules, ordered, root, out, hookModules, jobModules),
         ),
       );
+      const toolsOut = join(root, 'apps/api/src/generated/tools.ts');
+      files.push(await writeFile(toolsOut, emitApiTools(toolModules, ordered, root, toolsOut)));
     }
     const seedsOut = join(root, 'packages/module-kit/src/generated/seeds.ts');
     files.push(await writeFile(seedsOut, emitSeeds(seedModules, root, seedsOut)));
@@ -894,6 +960,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     webRoutes,
     hookModules,
     jobModules,
+    toolModules,
     files,
     warnings,
   };
@@ -1132,6 +1199,42 @@ export const moduleHooks = [${hookIdents.join(', ')}];
 /** Periodic jobs declared by modules (G-18); the core scheduler registers them at boot. */
 export const moduleJobs = [
 ${jobEntries.join('\n')}
+];
+`;
+}
+
+/**
+ * `apps/api/src/generated/tools.ts` — AI / MCP tools declared by modules (extension point 8, I-3).
+ * Deliberately a SEPARATE file from modules.ts: the core tool registry imports it, and a module's
+ * `api/routes.ts` may import the registry (the AI module does), so putting the tools next to the
+ * route mounts would create an import cycle routes → registry → mounts → routes.
+ */
+export function emitApiTools(
+  toolModules: readonly RuntimeModuleRecord[],
+  ordered: readonly ModuleRecord[],
+  root: string,
+  outFile: string,
+): string {
+  const byName = new Map(ordered.map((m) => [m.name, m]));
+  const imports: string[] = [];
+  const entries: string[] = [];
+  for (const tm of toolModules) {
+    const mod = byName.get(tm.name);
+    if (!mod) continue;
+    let rel = relative(dirname(outFile), join(root, mod.path, tm.file))
+      .split('\\')
+      .join('/');
+    if (!rel.startsWith('.')) rel = `./${rel}`;
+    const ident = `tools_${tm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${rel}';`);
+    entries.push(`  { module: '${tm.name}', ns: '${tm.ns}', tools: ${ident} },`);
+  }
+  return `${GEN_HEADER}import type { ToolDef } from '@core/module-kit';
+${imports.join('\n')}
+
+/** Tools declared by modules (api/tools.ts), in initialisation order; served by the core registry. */
+export const moduleTools: readonly { module: string; ns: string; tools: readonly ToolDef[] }[] = [
+${entries.join('\n')}
 ];
 `;
 }
@@ -1406,6 +1509,19 @@ export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [
 ${entries}
 ];
 `;
+}
+
+const TOOLS_PLACEHOLDER = `${GEN_HEADER}// placeholder until the first modules:sync completes
+import type { ToolDef } from '@core/module-kit';
+export const moduleTools: readonly { module: string; ns: string; tools: readonly ToolDef[] }[] = [];
+`;
+
+/** Empty tool registry — written before modules are loaded (see syncModules) and on a fresh checkout. */
+function resetToolsPlaceholder(root: string): void {
+  const file = join(root, 'apps/api/src/generated/tools.ts');
+  if (!existsSync(dirname(dirname(file)))) return; // no apps/api in this host (test fixtures)
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, TOOLS_PLACEHOLDER);
 }
 
 /** Minimal generated files so imports resolve on a fresh checkout; real content replaces them below. */

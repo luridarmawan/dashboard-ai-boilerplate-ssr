@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
 import { satisfiesCore } from '../src/manifest.ts';
-import { emitApiModules, SyncError, svelteShim, syncModules, tsShim } from '../src/sync.ts';
+import {
+  emitApiModules,
+  emitApiTools,
+  SyncError,
+  svelteShim,
+  syncModules,
+  tsShim,
+} from '../src/sync.ts';
 
 const fixtures = join(import.meta.dir, 'fixtures');
 const CORE_ICONS = ['menu', 'edit', 'save'];
@@ -262,6 +269,9 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     expect(r.jobModules).toEqual([
       { name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] },
     ]);
+    expect(r.toolModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] },
+    ]);
   });
 
   test('unknown event, unprefixed job and sub-second interval are all reported', async () => {
@@ -275,6 +285,16 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     expect(p.some((x) => /Naughty.*event "invoice\.paid" yang tidak dikenal/.test(x))).toBe(true);
     expect(p.some((x) => /Naughty.*job "cleanup" harus diawali "naughty\."/.test(x))).toBe(true);
     expect(p.some((x) => /Naughty.*job "naughty\.fast".*≥ 1 detik/.test(x))).toBe(true);
+    // api/tools.ts (extension point 8): foreign prefix, undeclared own permission, non-object input
+    expect(p.some((x) => /Naughty.*tool "other\.thing" harus diawali "naughty\."/.test(x))).toBe(
+      true,
+    );
+    expect(
+      p.some((x) =>
+        /Naughty.*tool "naughty\.ghost".*"naughty\.nothing\.read" yang tidak ada/.test(x),
+      ),
+    ).toBe(true);
+    expect(p.some((x) => /Naughty.*tool "naughty\.bare".*bertipe object/.test(x))).toBe(true);
   });
 
   test('emitApiModules exports moduleHooks and moduleJobs from the module files', () => {
@@ -300,5 +320,15 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     expect(out).toContain("import jobs_alpha from '../../../../modules/Alpha/jobs.ts';");
     expect(out).toContain('export const moduleHooks = [hooks_alpha];');
     expect(out).toContain("{ module: 'Alpha', jobs: jobs_alpha },");
+    // Tools live in their own generated file (no import cycle through the route mounts).
+    const tools = emitApiTools(
+      [{ name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] }],
+      mods,
+      '/repo',
+      '/repo/apps/api/src/generated/tools.ts',
+    );
+    expect(tools).toContain("import tools_alpha from '../../../../modules/Alpha/api/tools.ts';");
+    expect(tools).toContain("{ module: 'Alpha', ns: 'alpha', tools: tools_alpha },");
+    expect(tools).not.toContain('Elysia');
   });
 });

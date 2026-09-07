@@ -36,6 +36,10 @@ for f in $(git ls-files --others --exclude-standard packages/db/migrations | gre
   fi
 done
 
+echo "== the module's api/tools.ts is in the generated tool registry (extension point 8)"
+NS="$(echo "$NAME" | tr '[:upper:]' '[:lower:]')"
+grep -q "tools_$NS" apps/api/src/generated/tools.ts || { echo "modgen-guard: GAGAL — tool modul $NAME tidak terdaftar di apps/api/src/generated/tools.ts"; exit 1; }
+
 echo "== typecheck + lint the generated module"
 (cd "$DIR" && bunx tsc -p tsconfig.json)
 bunx biome check "$DIR"
@@ -51,8 +55,7 @@ bun run db:generate >/dev/null 2>&1
 LEFT="$(git status --porcelain --untracked-files=all)"
 if [ -n "$LEFT" ]; then echo "modgen-guard: GAGAL — sisa setelah modul dihapus:"; echo "$LEFT"; exit 1; fi
 # orphan check inside the gitignored generated output: nothing may still mention the namespace
-NS="$(echo "$NAME" | tr '[:upper:]' '[:lower:]')"
 if grep -rIl -E "(^|[^a-z])$NS([^a-z]|$)" apps/web/src/generated packages/module-kit/src/generated packages/db/src/generated apps/api/src/generated packages/i18n/src/generated packages/settings/src/generated "apps/web/src/routes/(app)/m" "apps/web/src/routes/(public)/(modules)" 2>/dev/null; then
   echo "modgen-guard: GAGAL — jejak modul $NAME tertinggal di output generate"; exit 1
 fi
-echo "GATE M6 G-6: LOLOS — modgen $NAME hanya menyentuh modules/, modules.json, bun.lock, migrasi; penghapusan bersih"
+echo "GATE M6 G-6: LOLOS — modgen $NAME hanya menyentuh modules/, modules.json, bun.lock, migrasi (tool ikut terdaftar & tercabut); penghapusan bersih"

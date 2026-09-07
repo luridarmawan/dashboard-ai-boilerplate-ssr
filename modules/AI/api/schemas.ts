@@ -13,6 +13,12 @@ export const ChatCompletionBody = t.Object({
   max_tokens: t.Optional(t.Integer({ minimum: 1, maximum: 128000 })),
   /** Our extension: persist into this conversation (H-6). Omit for a stateless call. */
   conversation_id: t.Optional(t.String({ maxLength: 36 })),
+  /**
+   * Our extension (I-3): offer the tools the caller may use to the model and run its tool calls
+   * server-side. Defaults to the `ai.tools_enable` setting. Client-supplied `tools` arrays are
+   * not accepted — tools are declared by modules, never by the request.
+   */
+  tools: t.Optional(t.Boolean()),
 });
 export const ConversationPatch = t.Object({
   title: t.Optional(t.String({ minLength: 1, maxLength: 191 })),

@@ -128,6 +128,15 @@ check('admin login', (await login(admin, ADMIN_EMAIL, ADMIN_PASSWORD)) === 303);
     logHas(`${NS}.heartbeat`),
     `not in ${API_LOG}`,
   );
+  const toolsRes = await fetch(`${process.env.API_URL ?? 'http://127.0.0.1:3001'}/v1/tools`, {
+    headers: { cookie: admin.header(), accept: 'application/json' },
+  });
+  const tools = ((await toolsRes.json()) as { data?: { name: string }[] }).data ?? [];
+  check(
+    `tool ${NS}.list_${PLURAL} registered and offered to the admin (extension point 8)`,
+    tools.some((t) => t.name === `${NS}.list_${PLURAL}`),
+    `${toolsRes.status} ${tools.map((t) => t.name).join(',')}`,
+  );
 }
 
 // ---- list page: i18n (id → en), seed row ----
@@ -281,6 +290,15 @@ let id = '';
   );
   const api = await fetch(`${process.env.API_URL ?? 'http://127.0.0.1:3001'}/v1/m/${NS}/${PLURAL}`);
   check('anonymous API call → 401', api.status === 401, `${api.status}`);
+  const memberTools = await fetch(`${process.env.API_URL ?? 'http://127.0.0.1:3001'}/v1/tools`, {
+    headers: { cookie: member.header(), accept: 'application/json' },
+  });
+  const visible = ((await memberTools.json()) as { data?: { name: string }[] }).data ?? [];
+  check(
+    `member without ${NS}.${RES}.read: tool ${NS}.list_${PLURAL} is not offered (I-3)`,
+    memberTools.status === 200 && !visible.some((t) => t.name === `${NS}.list_${PLURAL}`),
+    `${memberTools.status} ${visible.map((t) => t.name).join(',')}`,
+  );
 }
 
 // ---- public page (extension point 13) + sitemap ----

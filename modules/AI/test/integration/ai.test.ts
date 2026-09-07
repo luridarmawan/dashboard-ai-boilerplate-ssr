@@ -58,6 +58,8 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
   let tenantId = '';
   let mock: ReturnType<typeof Bun.serve> | null = null;
   let mockAborted = 0;
+  /** Wire names of the tools the last request offered to the "model" (null = no `tools` field). */
+  let mockToolsSeen: string[] | null = null;
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -78,10 +80,77 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
           return new Response('{"error":{"message":"bad key"}}', { status: 401 });
         const body = (await req.json()) as {
           stream?: boolean;
-          messages: { role: string; content: string }[];
+          messages: { role: string; content: string | null; tool_call_id?: string }[];
+          tools?: { type: string; function: { name: string; parameters: unknown } }[];
         };
         const hasSystem = body.messages.some((m) => m.role === 'system');
-        const text = `${hasSystem ? 'SYS ' : ''}echo: ${body.messages.at(-1)?.content} with **md** and \`code\``;
+        // ---- tool round-trip (I-3): offered tools must carry OpenAI-legal names; a user turn
+        // containing PING makes the "model" call dummy_ping first, then answer from its result.
+        mockToolsSeen = body.tools ? body.tools.map((t) => t.function.name) : null;
+        for (const t of body.tools ?? [])
+          if (!/^[a-zA-Z0-9_-]{1,64}$/.test(t.function.name))
+            return new Response(`{"error":{"message":"bad tool name ${t.function.name}"}}`, {
+              status: 400,
+            });
+        const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
+        const toolMsg = body.messages.find((m) => m.role === 'tool');
+        if (body.tools && lastUser?.content?.includes('PING') && !toolMsg) {
+          const args = JSON.stringify({ message: 'from-model' });
+          if (!body.stream)
+            return Response.json({
+              choices: [
+                {
+                  message: {
+                    role: 'assistant',
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'call_1',
+                        type: 'function',
+                        function: { name: 'dummy_ping', arguments: args },
+                      },
+                    ],
+                  },
+                  finish_reason: 'tool_calls',
+                },
+              ],
+              usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+            });
+          const f = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
+          // The arguments arrive split across two deltas, as real providers do.
+          const sse =
+            f({
+              choices: [
+                {
+                  delta: {
+                    role: 'assistant',
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: 'call_1',
+                        type: 'function',
+                        function: { name: 'dummy_ping', arguments: args.slice(0, 8) },
+                      },
+                    ],
+                  },
+                },
+              ],
+            }) +
+            f({
+              choices: [
+                { delta: { tool_calls: [{ index: 0, function: { arguments: args.slice(8) } }] } },
+              ],
+            }) +
+            f({
+              choices: [{ delta: {}, finish_reason: 'tool_calls' }],
+              usage: { prompt_tokens: 20, completion_tokens: 5, total_tokens: 25 },
+            }) +
+            'data: [DONE]\n\n';
+          return new Response(sse, { headers: { 'content-type': 'text/event-stream' } });
+        }
+        const text = toolMsg
+          ? `TOOL SAID ${toolMsg.content}`
+          : `${hasSystem ? 'SYS ' : ''}echo: ${body.messages.at(-1)?.content} with **md** and \`code\``;
         if (!body.stream)
           return Response.json({
             choices: [{ message: { role: 'assistant', content: text } }],
@@ -293,6 +362,120 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     );
     expect(mockAborted).toBeGreaterThan(before);
     expect(log?.status).toBe('cancelled');
+  });
+
+  test('I-3 tools, non-streaming: the model calls dummy_ping, the registry runs it, the answer uses the result', async () => {
+    const res = await call(
+      '/v1/m/ai/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'PING the tool please' }] }),
+      },
+      [admin],
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      choices: { message: { content: string } }[];
+      x_tools: { name: string; ok: boolean; ms: number }[];
+    };
+    // Every tool the superadmin may use was offered, under its wire name (no dots).
+    expect(mockToolsSeen).toEqual(
+      expect.arrayContaining(['dummy_ping', 'dummy_count_notes', 'example_list_products']),
+    );
+    expect(body.choices[0]?.message.content.startsWith('TOOL SAID ')).toBe(true);
+    expect(body.choices[0]?.message.content).toContain('"pong":"from-model"');
+    expect(body.choices[0]?.message.content).toContain(tenantId); // ran in the caller's tenant
+    expect(body.x_tools.map((t) => [t.name, t.ok])).toEqual([['dummy.ping', true]]);
+  });
+
+  test('I-3 tools, streaming: tool-call deltas stay server-side, dab.tool frames show progress, one [DONE]', async () => {
+    const res = await call(
+      '/v1/m/ai/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'PING via stream' }],
+          stream: true,
+        }),
+      },
+      [admin],
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    const raw = await res.text();
+    const frames = raw
+      .split('\n')
+      .filter((l) => l.startsWith('data:'))
+      .map((l) => l.slice(5).trim());
+    expect(frames.filter((f) => f === '[DONE]')).toHaveLength(1);
+    expect(frames.at(-1)).toBe('[DONE]');
+    expect(raw).not.toContain('tool_calls'); // the model's tool request never reaches the browser
+    const parsed = frames.filter((f) => f !== '[DONE]').map((f) => JSON.parse(f));
+    const toolFrames = parsed
+      .map((f) => (f as { dab?: { tool?: { name: string; status: string } } }).dab?.tool)
+      .filter((x): x is { name: string; status: string } => !!x);
+    expect(toolFrames.map((t) => [t.name, t.status])).toEqual([
+      ['dummy.ping', 'running'],
+      ['dummy.ping', 'ok'],
+    ]);
+    const content = parsed
+      .map(
+        (f) =>
+          (f as { choices?: { delta?: { content?: string } }[] }).choices?.[0]?.delta?.content ??
+          '',
+      )
+      .join('');
+    expect(content).toContain('TOOL SAID');
+    expect(content).toContain('"pong":"from-model"');
+  });
+
+  test('I-3 tools: `tools: false` on the request (or ai.tools_enable=false) offers nothing to the model', async () => {
+    mockToolsSeen = ['sentinel'];
+    const res = await call(
+      '/v1/m/ai/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'PING but no tools' }],
+          tools: false,
+        }),
+      },
+      [admin],
+    );
+    expect(res.status).toBe(200);
+    expect(mockToolsSeen).toBeNull();
+    const body = (await res.json()) as { choices: { message: { content: string } }[] };
+    expect(body.choices[0]?.message.content).toContain('echo: PING but no tools');
+
+    await call(
+      '/v1/configuration',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ scope: 'global', values: { 'ai.tools_enable': 'false' } }),
+      },
+      [admin],
+    );
+    try {
+      mockToolsSeen = ['sentinel'];
+      await call(
+        '/v1/m/ai/chat/completions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'PING again' }] }),
+        },
+        [admin],
+      );
+      expect(mockToolsSeen).toBeNull();
+    } finally {
+      await call(
+        '/v1/configuration',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ scope: 'global', values: { 'ai.tools_enable': 'true' } }),
+        },
+        [admin],
+      );
+    }
   });
 
   test('#3 disabling the AI module for the tenant removes its routes and menu; ai.enable=false refuses too', async () => {

@@ -93,6 +93,20 @@ export default defineConfig('AI', [
         min: 0,
         order: 8,
       },
+      {
+        key: 'ai.tools_enable',
+        type: 'boolean',
+        title: {
+          id: 'Izinkan asisten memanggil tool modul',
+          en: 'Let the assistant call module tools',
+        },
+        note: {
+          id: 'Tool dari api/tools.ts modul (titik perluasan 8) ditawarkan ke model; tetap tunduk izin user dan tenant.',
+          en: 'Tools from module api/tools.ts (extension point 8) are offered to the model; still bound by user permission and tenant.',
+        },
+        default: true,
+        order: 9,
+      },
     ],
   },
 ]);

@@ -32,6 +32,16 @@ Tanpa API key, permintaan dijawab **422** dengan alasan `no_api_key` dan tautan 
 
 Tanpa JavaScript, form chat tetap bekerja: jawaban diambil utuh lalu halaman dirender ulang dengan riwayat.
 
+## Tool modul (titik perluasan 8, I-3)
+
+Asisten bisa **memanggil tool** yang disumbangkan modul lewat `api/tools.ts` (`defineTools`, lihat [`MODULES.md` §3](./MODULES.md)). Modul AI sendiri tidak tahu tool apa yang ada — ia bertanya ke registry core:
+
+1. Sebelum memanggil provider, API mengambil tool yang **boleh dipakai user ini di tenant aktif** (modul aktif + izin dipegang) dan mengirimnya sebagai OpenAI `tools`, dengan nama kawat `<ns>_<nama>` (mis. `example_list_products`).
+2. Bila model menjawab `tool_calls`, setiap panggilan dijalankan lewat `callTool` registry — izin, tenant (`forTenant`), dan skema argumen ditegakkan **di sana**, lalu diaudit (`tool.call`) — hasilnya dikirim balik sebagai pesan `tool`, dan provider dipanggil lagi. Maksimal 5 putaran per giliran; putaran terakhir tanpa `tools` sehingga model harus menjawab dengan teks.
+3. Saat streaming, frame `tool_calls` provider **tidak** diteruskan ke browser; sebagai gantinya API menyisipkan frame `dab.tool` (`running` → `ok`/`error`) yang ditampilkan UI sebagai chip di bawah gelembung jawaban. Hanya ada satu `[DONE]`, di ujung. Tanpa streaming, respons JSON membawa `x_tools` (nama, sukses, durasi).
+
+Mematikan: `ai.tools_enable = false` (Pengaturan → AI) untuk semua, atau `tools: false` pada request. Request **tidak boleh** membawa `tools` sendiri — tool adalah deklarasi modul, bukan input klien. Setiap putaran provider tercatat sebagai satu baris `ai_calls`. Bukti: `modules/AI/test/integration/ai.test.ts` (loop tool stream & non-stream terhadap provider tiruan yang meminta `dummy_ping`) dan `apps/api/test/integration/tools.test.ts` (I-6: 401 tanpa sesi, 403 tanpa izin, isolasi tenant, modul nonaktif, audit).
+
 ## Log panggilan (H-9, M-3)
 
 Setiap panggilan dicatat ke `ai_calls` **setelah** respons selesai (`queueMicrotask`), jadi tidak menahan jalur panas: endpoint, model, token in/out/total, latensi, latensi token pertama, status (`ok`/`error`/`cancelled`), biaya estimasi. Job `ai.log_retention` (harian) menghapus baris yang lebih tua dari `ai.log_retention_days`. Halaman **Log AI** (`/m/ai/logs`) memerlukan izin `ai.log.read`.
@@ -46,4 +56,4 @@ Isi `ai.baseurl` dengan URL itu dan `ai.key` dengan nilai apa pun. Proof `bun ru
 
 ## Kompatibilitas API
 
-Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah satu field opsional `conversation_id` untuk persistensi (H-6). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`) dan tenancy.
+Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah dua field opsional: `conversation_id` untuk persistensi (H-6) dan `tools: boolean` untuk menawarkan tool modul ke model (I-3; baku mengikuti `ai.tools_enable`). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`) dan tenancy.

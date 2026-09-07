@@ -14,7 +14,8 @@ import { renderMarkdown } from '../../lib/markdown.ts';
 let { data, form } = $props();
 const t = useT();
 
-type Msg = { id: string; role: string; content: string; html: string };
+type ToolChip = { name: string; status: 'running' | 'ok' | 'error' };
+type Msg = { id: string; role: string; content: string; html: string; tools?: ToolChip[] };
 // Seeded from server data so the first HTML already carries the history (no-JS path, H-6/H-8).
 // svelte-ignore state_referenced_locally -- the $effect below re-syncs on navigation
 let messages = $state<Msg[]>(data.conversation?.messages ?? []);
@@ -123,8 +124,29 @@ async function streamSend(e: SubmitEvent) {
         const d = line.slice(5).trim();
         if (!d || d === '[DONE]') continue;
         try {
-          const delta = (JSON.parse(d) as { choices?: { delta?: { content?: string } }[] })
-            .choices?.[0]?.delta?.content;
+          const j = JSON.parse(d) as {
+            choices?: { delta?: { content?: string } }[];
+            dab?: { tool?: ToolChip };
+            error?: { message?: string };
+          };
+          if (j.error) {
+            streamError = t('ai.chat.error');
+            continue;
+          }
+          const tool = j.dab?.tool;
+          if (tool) {
+            // Tool activity (extension point 8): one chip per call, updated in place when it ends.
+            const last = messages[messages.length - 1];
+            if (last) {
+              const chips = [...(last.tools ?? [])];
+              const i = chips.findIndex((c) => c.name === tool.name && c.status === 'running');
+              if (tool.status === 'running' || i < 0) chips.push(tool);
+              else chips[i] = tool;
+              messages[messages.length - 1] = { ...last, tools: chips };
+            }
+            continue;
+          }
+          const delta = j.choices?.[0]?.delta?.content;
           if (delta) {
             acc += delta;
             const last = messages[messages.length - 1];
@@ -208,6 +230,16 @@ function copy(text: string) {
         <article class={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} data-role={m.role}>
           <div class={`max-w-[80%] rounded-lg px-4 py-2 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
             {#if m.role === 'assistant'}
+              {#if m.tools?.length}
+                <ul class="mb-1 flex flex-wrap gap-1" aria-label={t('ai.chat.tools_used')}>
+                  {#each m.tools as tl, i (i)}
+                    <li class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-muted-foreground" data-tool={tl.name} data-status={tl.status}>
+                      <Icon name="puzzle" size={12} /><code>{tl.name}</code>
+                      {#if tl.status === 'running'}<span>{t('ai.chat.tool_running')}</span>{:else if tl.status === 'error'}<span class="text-destructive">{t('ai.chat.tool_error')}</span>{/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
               {#if m.content}<div class="prose-chat">{@html m.html}</div>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
               {#if m.content}<button type="button" class="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => copy(m.content)}><Icon name="copy" size={12} />{t('ai.chat.copy')}</button>{/if}
             {:else}<p class="whitespace-pre-wrap">{m.content}</p>{/if}

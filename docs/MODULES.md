@@ -35,6 +35,7 @@ Satu perintah menghasilkan **modul utuh** di `modules/Billing/` dan mendaftarkan
 | `permissions.ts` · `menu.ts` | `billing.invoice.read/create/edit/manage`; entri menu `/m/billing/invoices` yang tampil hanya bila izin ada |
 | `config.ts` · `i18n/{id,en}.json` | section "Billing" di Pengaturan (form otomatis); kunci `billing.*` untuk kedua bahasa |
 | `api/schemas.ts` · `api/routes.ts` | skema TypeBox bersama + CRUD `/v1/m/billing/invoices` lewat facade tenant, teraudit, dengan pencarian & paginasi |
+| `api/tools.ts` | tool AI/MCP `billing.list_invoices` — ditawarkan ke asisten AI hanya bagi user yang punya `billing.invoice.read`, berjalan di tenant aktif |
 | `web/routes/invoices/**` | halaman daftar, buat, ubah/hapus — `FormBuilder` memakai skema API yang sama (L-17), jalan tanpa JavaScript |
 | `widgets.ts` · `web/widgets/` | widget dasbor terfilter izin |
 | `hooks.ts` · `jobs.ts` | contoh langganan `user.created` dan job `billing.heartbeat` setiap jam |
@@ -66,7 +67,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 5 | Izin | `permissions.ts` (`definePermissions`, `CORE_ACTIONS`) | `modules/Example/permissions.ts` | m6 proof: 403 di API & halaman |
 | 6 | Konfigurasi | `config.ts` (`defineConfig`) → section di `/settings`, `settings.get()` | `modules/AI/config.ts` | `scripts/m3-gate-proof.ts` |
 | 7 | i18n | `i18n/<locale>.json`, kunci `<ns>.*`, `t('<ns>.x')` di halaman | `modules/Example/i18n/` | m6 proof: halaman berganti bahasa lewat `/lang` |
-| 8 | Tool AI / MCP | — | — | **belum ada kontrak** (MCP di M7, FR-I). Jangan diasumsikan |
+| 8 | Tool AI / MCP | `api/tools.ts` (`defineTools`) → ditawarkan ke asisten AI (function calling) dan `GET/POST /v1/tools`; izin + tenant ditegakkan registry core (I-3, I-6) | `modules/Example/api/tools.ts`, `modules/Dummy/api/tools.ts` | `apps/api/test/integration/tools.test.ts` (I-6), tes modul AI (loop tool stream & non-stream), m6 proof: tool tidak ditawarkan bagi user tanpa izin |
 | 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
 | 10 | Komponen UI | `import { Button, DataTable, FormBuilder, Icon } from '@core/ui'` | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
@@ -367,6 +368,48 @@ export default defineJobs('Billing', [
 
 Yang dijamin penjadwal core (G-18): dengan berapa pun instance API (`--scale api=3`), sebuah job berjalan **tepat sekali per interval** — lock diambil lewat satu `UPDATE` bersyarat di tabel `scheduler_jobs`, jadi jalur bakunya tidak butuh Redis (Keputusan M). Setiap eksekusi tercatat di `scheduler_runs`. Job yang melebihi `lease`-nya boleh dimulai ulang di instance lain — buat run pendek atau pecah pekerjaannya. Modul **tidak pernah** membuat timer sendiri.
 
+### `api/tools.ts` — tool AI / MCP (titik perluasan 8)
+
+Fungsi yang boleh dipanggil asisten AI (dan, nanti, klien MCP) atas nama user. Modul hanya **mendeklarasikan**; yang menegakkan izin, tenant, dan skema adalah registry core — jadi tool tidak pernah menjadi pintu belakang (I-3, I-6).
+
+```ts
+// api/tools.ts
+import { isNull, schema } from '@core/db';
+import { defineTools } from '@core/module-kit';
+import { t } from 'elysia';
+
+export default defineTools('Billing', [
+  {
+    name: 'billing.list_invoices',                    // wajib "billing.*"; nama kawat ke model: billing_list_invoices
+    description: {                                    // untuk model — katakan KAPAN tool ini dipakai
+      id: 'Daftar tagihan tenant aktif, opsional filter nomor (q).',
+      en: 'List the active tenant’s invoices, optionally filtered by number (q).',
+    },
+    permission: 'billing.invoice.read',               // izin modul sendiri (harus ada di permissions.ts) atau izin core
+    readOnly: true,                                   // petunjuk MCP readOnlyHint
+    input: t.Object({ q: t.Optional(t.String({ maxLength: 120 })) }),   // TypeBox = JSON Schema: validasi + deskripsi argumen
+    run: async (input, { db, userId, can, locale, signal }) => {
+      const rows = await db.select(schema.billingInvoices, isNull(schema.billingInvoices.deleted_at));
+      return { total: rows.length, invoices: rows.slice(0, 20) };      // apa pun yang bisa di-JSON; string diteruskan apa adanya
+    },
+  },
+]);
+```
+
+Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (chat AI, `POST /v1/tools/call`, MCP nanti):
+
+| Jaminan | Cara |
+|---|---|
+| Hanya terlihat & terpanggil bila user punya `permission` | registry RBAC yang sama dengan route API; tanpa izin, tool **tidak ditawarkan** ke model dan panggilan langsung ditolak `forbidden` |
+| Hanya untuk tenant aktif | `ctx.db` adalah facade tenant (`forTenant(clientId)`) — tool tidak pernah menerima koneksi mentah; `X-Client-ID` mengganti tenant hanya bila user anggotanya |
+| Modul nonaktif per tenant → tool ikut hilang | `module_disabled`, sama seperti route-nya (G-8) |
+| Argumen sesuai skema | divalidasi TypeBox sebelum `run`; yang tidak valid dijawab ke model sebagai galat, bukan dieksekusi |
+| Teraudit | setiap panggilan menulis `audit_log` (`tool.call`, resource = nama tool), sukses maupun ditolak |
+
+Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `dab.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
+
+Aturan: `name` diawali namespace dan ≤ 64 karakter dalam bentuk kawat (`<ns>_<nama>`); `permission` milik modul sendiri harus dideklarasikan di `permissions.ts` (sync menolak yang tidak ada); `input` harus skema objek. Modul **tidak boleh** memanggil tool modul lain lewat internal — pakai `POST /v1/tools/call` atau tunggu MCP.
+
 ---
 
 ## 4. Apa yang diperiksa `bun modules:sync`
@@ -383,6 +426,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Bentrok antar-modul | `tabel "billing_invoices" didefinisikan oleh Billing dan Legacy` |
 | `api/routes.ts` bukan Elysia | `… api/routes.ts harus meng-export default instance Elysia (pakai defineApiRoutes)` |
 | Event tak dikenal / job tanpa prefiks / interval < 1 s | `… hooks.ts berlangganan event "invoice.paid" yang tidak dikenal core` · `… job "cleanup" harus diawali "billing." (G-9)` · `… job "billing.fast": interval 0s harus bilangan bulat ≥ 1 detik` |
+| Tool tanpa prefiks / izin tak dideklarasikan / skema bukan objek | `… nama tool "other.thing" harus diawali "billing." (G-9)` · `… tool "billing.ghost" menuntut izin "billing.nothing.read" yang tidak ada di permissions.ts` · `… tool "billing.bare": input harus JSON Schema bertipe object` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -409,11 +453,11 @@ Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` 
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua titik perluasan di §2a **tersedia**, kecuali:
+Semua 16 titik perluasan di §2a **tersedia**. Yang belum ada:
 
 | Hal | Status |
 |---|---|
-| 8 tool AI / MCP (`defineTools`) | **Belum ada kontrak.** Dijadwalkan bersama MCP server & client (FR-I) di M7. Modul yang butuh tool AI hari ini harus menunggu — jangan membuat jalur sendiri lewat internal modul AI |
+| MCP server & client (FR-I, I-1…I-5) | Menyusul (ROADMAP §8 butir 2). Kontrak tool-nya — titik perluasan 8, `api/tools.ts` + registry `/v1/tools` — **sudah ada** dan dipakai asisten AI; MCP nanti hanya membungkus registry yang sama, jadi tool yang Anda tulis hari ini otomatis ikut |
 | Modul sebagai paket npm (`source: "package"`) | M7. Hari ini: `local` atau `submodule` |
 | UI admin modul (G-14) — daftar modul, sumber & versi, aktif/nonaktif per tenant, galat muat | Sebagian: `/modules` menampilkan modul dan status per tenant; sumber/versi/galat muat menyusul M7 |
 | Uninstall bersih dengan migrasi turun (G-15) | M7. Mencabut modul hari ini meninggalkan tabelnya (G-8) |
@@ -484,7 +528,7 @@ Janji modularitas diukur, bukan dipercaya. Dua penjaga berjalan di setiap push:
 
 | Penjaga | Perintah | Yang dibuktikan |
 |---|---|---|
-| modgen | `bun run ci:modgen-guard` | `bun modgen CiProbe …` lalu `git status` hanya menyentuh `modules/CiProbe/`, `modules.json`, `bun.lock`, `packages/db/migrations/**`; migrasinya hanya `CREATE TABLE`; modul dihapus + sync → pohon identik HEAD dan tidak ada jejak `ciprobe` di output generate (gate M6 #4) |
+| modgen | `bun run ci:modgen-guard` | `bun modgen CiProbe …` lalu `git status` hanya menyentuh `modules/CiProbe/`, `modules.json`, `bun.lock`, `packages/db/migrations/**`; tool modul masuk registry generate; migrasinya hanya `CREATE TABLE`; modul dihapus + sync → pohon identik HEAD dan tidak ada jejak `ciprobe` di output generate (gate M6 #4) |
 | lintas repo | `bun run ci:cross-repo` | seperti di §7b |
 
 Ditambah `bun run ci:sync-pure` (sync modul yang sudah tercatat adalah no-op) dan `bun run proof:m5:gate4` (tanpa modul AI, aplikasi ter-build tanpa jejak AI).

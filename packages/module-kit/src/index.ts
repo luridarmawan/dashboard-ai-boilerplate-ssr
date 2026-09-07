@@ -62,3 +62,15 @@ export {
   namespaceOf,
   satisfiesCore,
 } from './manifest.ts';
+export {
+  defineTools,
+  type RegisteredTool,
+  TOOL_WIRE_MAX,
+  type ToolContext,
+  type ToolDef,
+  type ToolInputSchema,
+  toolInputJsonSchema,
+  toolNameFromWire,
+  toolWireName,
+  validateTool,
+} from './tools.ts';

@@ -9,6 +9,7 @@ import { moduleDomain } from './domains/modules.ts';
 import { outbox } from './domains/outbox.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
+import { toolsDomain } from './domains/tools.ts';
 import { users } from './domains/users.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { csrf } from './plugins/csrf.ts';
@@ -56,6 +57,10 @@ export const app = new Elysia()
           { name: 'module', description: 'Installed modules and per-tenant state' },
           { name: 'menu', description: 'Menu entries for API clients' },
           { name: 'mail', description: 'Email outbox: status, retry, worker' },
+          {
+            name: 'tools',
+            description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
+          },
         ],
       },
     }),
@@ -72,6 +77,7 @@ export const app = new Elysia()
       .use(moduleDomain)
       .use(menuDomain)
       .use(outbox)
+      .use(toolsDomain)
       .use(moduleGate)
       .use(modulesPlugin),
   );
