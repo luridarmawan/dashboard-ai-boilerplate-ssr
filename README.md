@@ -60,7 +60,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 - **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema baku dan allowlist diatur admin di **Pengaturan → Aplikasi**.
 - **Mengganti landing page** — **Pengaturan → Aplikasi → Route landing** (`app.landing_route`), berlaku seketika tanpa restart; route yang tidak ada ditolak saat disimpan. Modul mana pun boleh menyumbang halaman publik (`public.ts`).
 - **Mengganti provider AI** — **Pengaturan → AI**: base URL OpenAI-compatible, kunci API (disimpan terenkripsi, tidak pernah dikirim ke klien), model. Rincian di [`docs/AI.md`](./docs/AI.md). Provider tiruan untuk pengembangan: `bun run ai:mock`.
-- **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log.
+- **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log. Uji kredensial `.env` tanpa database: `bun run mail:test --to anda@contoh.id`.
 - **Konfigurasi runtime lain** (bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
 - **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah.
 
@@ -93,6 +93,7 @@ Pengujian, semuanya tanpa container:
 | `BOOTSTRAP_ADMIN_EMAIL=… BOOTSTRAP_ADMIN_PASSWORD='…' sh scripts/ci/m1-proof.sh` | database ter-seed | membangun web, menyalakan mock AI + API + web, lalu bukti gate M1–M6 lewat HTTP tanpa browser. `PROOF_ONLY=M4,M6` untuk sebagian |
 | `E2E=1 PROOF_ONLY=M5,E2E sh scripts/ci/m1-proof.sh` | + `cd apps/web && bunx playwright install chromium` | E2E browser: landing → login → CRUD → chat |
 | `bun run scheduler:proof` | database ter-migrasi | job berjalan tepat sekali per interval di 3 instance |
+| `bun run mail:test [--to alamat]` | `SMTP_*` + `MAIL_FROM_*` di `.env` | koneksi, TLS, autentikasi SMTP, lalu satu email uji ke alamat itu (`--verify-only` tanpa mengirim) |
 | `PROOF_MODE=native sh scripts/ci/backup-restore-proof.sh` | `mysqldump`/`mysql` (atau `pg_dump`/`psql`) di PATH | backup → hapus database → restore → aplikasi utuh |
 | `bun run ci:bundle-secrets` | tidak ada | tidak ada rahasia di bundle klien |
 | `bun run check` · `bun run theme:validate` · `bun run ci:modgen-guard` · `bun run ci:cross-repo` | tidak ada (cross-repo butuh jaringan untuk `bun install` di clone) | lint, typecheck dua dialect, kontrak tema, penjaga modularitas |

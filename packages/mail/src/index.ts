@@ -1,8 +1,22 @@
 import { and, asc, type Db, eq, inArray, isNull, lte, newId, or, schema } from '@core/db';
 import { logger } from '@core/logger';
-import nodemailer from 'nodemailer';
+import { createSmtpTransport, formatFrom } from './smtp-test.ts';
 import { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
 
+export {
+  buildTestMessage,
+  createSmtpTransport,
+  formatFrom,
+  type MailSender,
+  type SendTestOptions,
+  sendTestEmail,
+  smtpFromEnv,
+  smtpHints,
+  type TestMessage,
+  type TestSendResult,
+  type TransportOptions,
+  tlsMode,
+} from './smtp-test.ts';
 export { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
 
 /**
@@ -100,19 +114,8 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
     .limit(limit);
   if (!due.length) return { picked: 0, sent: 0, failed: 0, deferred: 0 };
 
-  const transport = opts.smtp
-    ? nodemailer.createTransport({
-        host: opts.smtp.host,
-        port: opts.smtp.port,
-        secure: opts.smtp.secure ?? opts.smtp.port === 465,
-        ...(opts.smtp.user
-          ? { auth: { user: opts.smtp.user, pass: opts.smtp.password ?? '' } }
-          : {}),
-      })
-    : null;
-  const from = opts.smtp
-    ? `"${opts.smtp.fromName.replace(/"/g, '')}" <${opts.smtp.fromAddress}>`
-    : `"${opts.brand.appName}" <no-reply@localhost>`;
+  const transport = opts.smtp ? createSmtpTransport(opts.smtp) : null;
+  const from = opts.smtp ? formatFrom(opts.smtp) : `"${opts.brand.appName}" <no-reply@localhost>`;
   const send =
     opts.send ??
     (async (msg) => {

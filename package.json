@@ -31,6 +31,7 @@
     "dev:db": "docker compose up -d --wait",
     "format": "biome format --write .",
     "layout:variants": "bun run scripts/layout-variants.ts",
+    "mail:test": "bun run packages/mail/scripts/smtp-test.ts",
     "lint": "biome check .",
     "modgen": "bun run scripts/modgen.ts",
     "modgen:ci": "bun run scripts/modgen.ts CiProbe --resource widget --fields \"name:string!,qty:number,active:boolean,notes:text,kind:select(a|b|c),due:date\" --public",
