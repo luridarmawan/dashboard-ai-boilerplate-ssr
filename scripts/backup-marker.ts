@@ -74,7 +74,9 @@ if (cmd === 'write') {
     new Request(`${ORIGIN}/v1/auth/me`, { headers: { cookie: `dab_csrf=${TOKEN}; ${session}` } }),
   );
   const tenants = await app.handle(
-    new Request(`${ORIGIN}/v1/clients`, { headers: { cookie: `dab_csrf=${TOKEN}; ${session}` } }),
+    new Request(`${ORIGIN}/v1/clients?q=${encodeURIComponent(code as string)}`, {
+      headers: { cookie: `dab_csrf=${TOKEN}; ${session}` },
+    }),
   );
   const list = (await tenants.json()) as { data?: { code: string }[] };
   const listed = list.data?.some((t) => t.code === code) ?? false;

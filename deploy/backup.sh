@@ -5,7 +5,7 @@
 #   docker compose --env-file .env.prod -f compose.prod.yml run --rm backup-once
 #   DATABASE_URL=mysql://app:pw@127.0.0.1:3306/app BACKUP_DIR=./backups sh deploy/backup.sh
 #
-# Output: $BACKUP_DIR/app-<dialect>-<UTC timestamp>.sql.gz and a `latest.sql.gz` symlink.
+# Output: $BACKUP_DIR/app-<dialect>-<UTC timestamp>.sql.gz and `latest.sql.gz` (hard link to the newest).
 set -eu
 . "$(dirname "$0")/db-env.sh"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"
@@ -23,7 +23,11 @@ case "$DB_DIALECT" in
     pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" --no-owner --no-privileges --clean --if-exists "$DB_NAME" | gzip -6 > "$tmp" ;;
 esac
 mv "$tmp" "$file"
-ln -sfn "$(basename "$file")" "$BACKUP_DIR/latest.sql.gz"
+# `latest.sql.gz` is a HARD link to the newest dump (same bytes, no extra space, shows the real size in
+# every tool — a symlink reads as 0 bytes in `du`, breaks over SFTP/SMB and after some rsyncs). Copy
+# when the filesystem cannot hard-link.
+rm -f "$BACKUP_DIR/latest.sql.gz"
+ln "$file" "$BACKUP_DIR/latest.sql.gz" 2>/dev/null || cp "$file" "$BACKUP_DIR/latest.sql.gz"
 # Retention: keep BACKUP_KEEP_DAYS days of dumps (never the symlink, never partial files of a running dump).
 find "$BACKUP_DIR" -name "app-*.sql.gz" -type f -mtime +"$BACKUP_KEEP_DAYS" -delete 2>/dev/null || true
 size="$(du -h "$file" | cut -f1)"

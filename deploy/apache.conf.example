@@ -1,0 +1,31 @@
+# Apache 2.4 in front of the stack (when Apache already owns :80/:443 on the host).
+# Requires: a2enmod ssl proxy proxy_http headers rewrite ; certbot --apache -d app.example.com
+# Pair with: CADDYFILE=./deploy/Caddyfile.behind-proxy  HTTP_PORT=127.0.0.1:8080  XFF_DEPTH=2  in .env.prod
+<VirtualHost *:80>
+    ServerName app.example.com
+    # certbot's ACME challenge stays on Apache; everything else goes to HTTPS
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/\.well-known/acme-challenge/
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName app.example.com
+    SSLEngine on
+    SSLCertificateFile    /etc/letsencrypt/live/app.example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/app.example.com/privkey.pem
+
+    ProxyPreserveHost On
+    ProxyRequests Off
+    # The app decides https/absolute links and the client IP from these (Caddy passes them through).
+    RequestHeader set X-Forwarded-Proto "https"
+    RequestHeader set X-Forwarded-Host "%{HTTP_HOST}s"
+    # SSE streaming (AI chat): flush every packet, no buffering, long read timeout.
+    ProxyPass        / http://127.0.0.1:8080/ flushpackets=on timeout=600
+    ProxyPassReverse / http://127.0.0.1:8080/
+    SetEnv proxy-nokeepalive 0
+
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    # Body size for uploads
+    LimitRequestBody 52428800
+</VirtualHost>

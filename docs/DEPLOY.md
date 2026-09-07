@@ -85,6 +85,36 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 | `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
 
+### 2b. Port 80/443 sudah dipakai Apache/Nginx di host yang sama
+
+Caddy butuh port 80 untuk tantangan Let's Encrypt, jadi bila Apache (atau Nginx) sudah memegang 80/443, **biarkan server itu yang mengakhiri TLS** untuk (sub)domain Anda dan meneruskan ke Caddy di port loopback. Semua di dalam stack tetap sama; hanya sertifikat dan HSTS yang pindah ke server depan.
+
+```bash
+# 1. .env.prod — tambahkan/ubah empat baris ini (contoh sudah ada di .env.prod.example)
+CADDYFILE=./deploy/Caddyfile.behind-proxy     # Caddy tanpa TLS, auto_https off, mempercayai X-Forwarded-* dari host
+HTTP_PORT=127.0.0.1:8080                      # hanya loopback; tidak ada port publik dari Docker
+HTTPS_PORT=127.0.0.1:8443                     # tidak dipakai di mode ini
+XFF_DEPTH=2                                   # IP klien = 2 hop di belakang (Apache → Caddy → web)
+#    DOMAIN tetap nama publik (app.example.com): dipakai untuk APP_ORIGIN/ORIGIN dan pemeriksaan CSRF
+
+# 2. Apache: aktifkan modul, pasang vhost dari contoh, minta sertifikat
+sudo a2enmod ssl proxy proxy_http headers rewrite
+sudo cp deploy/apache.conf.example /etc/apache2/sites-available/app.conf   # ganti app.example.com
+sudo a2ensite app && sudo apachectl configtest && sudo systemctl reload apache2
+sudo certbot --apache -d app.example.com
+
+# 3. Stack seperti §2 langkah 3–7 (perintahnya identik). Lalu verifikasi langkah 8 lewat DUA pintu:
+curl -sI http://127.0.0.1:8080/ -H 'Host: app.example.com' | head -1        # 200 dari Caddy langsung
+curl -sI https://app.example.com/ | head -1                                  # 200 lewat Apache + TLS
+curl -s  https://app.example.com/v1/ready                                    # database menjawab
+```
+
+Nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) dengan `proxy_pass http://127.0.0.1:8080` dan `proxy_buffering off` (streaming AI).
+
+Cara kerja hop ganda: Apache menulis `X-Forwarded-Proto: https` dan menambahkan IP klien ke `X-Forwarded-For`; Caddy mempercayainya (`trusted_proxies private_ranges`) dan meneruskan; web mengambil IP klien dari kedalaman `XFF_DEPTH=2`, API memakai entri pertama. Tanpa `XFF_DEPTH=2`, rate limit login dan audit log akan mencatat `127.0.0.1` untuk semua orang.
+
+Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy memakai CA internalnya; terima peringatan sertifikat di browser).
+
 ## 3. Operasi harian
 
 ```bash
@@ -121,7 +151,7 @@ $DC --profile redis up -d --wait --scale api=3
 
 | Apa | Bagaimana |
 |---|---|
-| Terjadwal | service `backup` (selalu hidup): `mysqldump --single-transaction` (atau `pg_dump`) → `./backups/app-<dialect>-<UTC>.sql.gz` + symlink `latest.sql.gz`, segera saat start lalu tiap `BACKUP_INTERVAL_SECONDS` (baku 24 jam) |
+| Terjadwal | service `backup` (selalu hidup): `mysqldump --single-transaction` (atau `pg_dump`) → `./backups/app-<dialect>-<UTC>.sql.gz`, segera saat start lalu tiap `BACKUP_INTERVAL_SECONDS` (baku 24 jam). `latest.sql.gz` adalah **hard link** ke dump terbaru: ukurannya nyata di semua alat, aman disalin lewat SFTP/rsync, tanpa ruang tambahan |
 | Retensi | dump lebih tua dari `BACKUP_KEEP_DAYS` (baku 14) dihapus setelah setiap dump |
 | Sekarang juga | `$DC run --rm backup-once` |
 | Restore | `$DC run --rm -e CONFIRM_RESTORE=yes restore latest` atau nama berkas di `./backups`. **Destruktif**: database dikosongkan lalu dump dimuat; tanpa `CONFIRM_RESTORE=yes` perintah menolak dan menjelaskan. Hentikan `api`/`web` dulu bila tidak ingin ada request gagal selama beberapa detik |

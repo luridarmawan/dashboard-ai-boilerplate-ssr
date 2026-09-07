@@ -47,7 +47,8 @@ services:
       DOMAIN: ${DOMAIN:-localhost}
       ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # CADDYFILE=./deploy/Caddyfile.behind-proxy when another server on the host terminates TLS (DEPLOY.md §2b)
+      - ${CADDYFILE:-./deploy/Caddyfile}:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
@@ -72,6 +73,8 @@ services:
       API_URL: http://api:3001
       # SvelteKit trusts the proxy for the client IP / protocol
       ADDRESS_HEADER: X-Forwarded-For
+      # How many proxies append to X-Forwarded-For before web: 1 (Caddy only) or 2 (Apache/Nginx → Caddy)
+      XFF_DEPTH: ${XFF_DEPTH:-1}
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
     depends_on:
