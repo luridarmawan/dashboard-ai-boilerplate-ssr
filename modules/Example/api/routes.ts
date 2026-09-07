@@ -1,4 +1,5 @@
 import { publicLink, sendTemplate } from '@app/api/mail';
+import { notify } from '@app/api/notifications';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
@@ -248,6 +249,16 @@ export default defineApiRoutes(
             },
           });
         }
+        // J-4: whoever may read inquiries in this tenant gets a bell notification (no email needed).
+        await notify({
+          clientId: tid,
+          permission: 'example.inquiry.read',
+          type: 'example.inquiry',
+          title: `Pesan baru dari ${body.name.trim()}`,
+          body: body.message.trim().slice(0, 200),
+          link: '/m/example/inquiries',
+          data: { inquiryId: id },
+        });
         await writeAudit(db, {
           clientId: tid,
           actorId: null,

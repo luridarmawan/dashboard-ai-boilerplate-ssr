@@ -368,6 +368,27 @@ export default defineJobs('Billing', [
 
 Yang dijamin penjadwal core (G-18): dengan berapa pun instance API (`--scale api=3`), sebuah job berjalan **tepat sekali per interval** — lock diambil lewat satu `UPDATE` bersyarat di tabel `scheduler_jobs`, jadi jalur bakunya tidak butuh Redis (Keputusan M). Setiap eksekusi tercatat di `scheduler_runs`. Job yang melebihi `lease`-nya boleh dimulai ulang di instance lain — buat run pendek atau pecah pekerjaannya. Modul **tidak pernah** membuat timer sendiri.
 
+### Notifikasi dari modul (J-4)
+
+Modul memberi tahu pengguna lewat bel di header dengan memanggil layanan core — bukan menulis tabelnya sendiri:
+
+```ts
+import { notify } from '@app/api/notifications';
+
+await notify({
+  clientId,                               // tenant tempat kejadian
+  permission: 'billing.invoice.read',     // fan-out: semua user tenant yang izinnya memenuhi ini …
+  userIds: [ownerId],                     // … dan/atau penerima eksplisit
+  excludeUserIds: [actorId],              // pelaku biasanya tidak perlu diberi tahu
+  type: 'billing.invoice_overdue',        // `<ns>.<kejadian>` — untuk ikon & filter
+  title: 'Tagihan #123 lewat tempo',
+  body: 'Jatuh tempo 3 hari lalu.',       // opsional
+  link: '/m/billing/invoices/123',        // halaman dasbor yang dibuka dari notifikasi
+});
+```
+
+`notify()` tidak pernah melempar ke request pemanggil (kegagalan dicatat di log), menerbitkan event `notification.created` yang bisa didengar `hooks.ts` modul lain (mis. meneruskan ke webhook), dan barisnya adalah data tenant biasa: hanya pemiliknya yang bisa membaca lewat `/v1/notifications`. Notifikasi yang sudah dibaca dipangkas job retensi sesuai **Pengaturan → Log & retensi**. Contoh hidup: `modules/Example/api/routes.ts` (pesan kontak baru → pemegang `example.inquiry.read`).
+
 ### `api/tools.ts` — tool AI / MCP (titik perluasan 8)
 
 Fungsi yang boleh dipanggil asisten AI (dan, nanti, klien MCP) atas nama user. Modul hanya **mendeklarasikan**; yang menegakkan izin, tenant, dan skema adalah registry core — jadi tool tidak pernah menjadi pintu belakang (I-3, I-6).

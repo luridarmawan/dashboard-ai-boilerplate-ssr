@@ -9,6 +9,7 @@ import {
 import { errorResponses, fail, Id, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
+import { notify } from '../notifications.ts';
 import { type AuthState, clientIp, sessionOnly } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { tenantContext } from '../plugins/tenancy.ts';
@@ -96,6 +97,18 @@ export const tokensDomain = new Elysia({ name: 'tokens', prefix: '/tokens', tags
         requestId,
         after: { name: body.name, scopes, expiresAt: expiresAt?.toISOString() ?? null },
       });
+      // Security courtesy (J-4): the owner learns about every token minted in their name.
+      if (clientId)
+        await notify({
+          clientId,
+          userIds: [a.user.id],
+          type: 'token.created',
+          title: `Token API "${body.name}" dibuat`,
+          body: expiresAt
+            ? `Berlaku sampai ${expiresAt.toISOString().slice(0, 10)}. Bukan Anda? Cabut di Profil → Token API.`
+            : 'Tanpa masa berlaku. Bukan Anda? Cabut di Profil → Token API.',
+          link: '/profile',
+        });
       set.status = 201;
       return ok({
         id: created.id,

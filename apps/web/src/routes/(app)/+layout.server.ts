@@ -2,7 +2,7 @@ import { resolveLayout } from '@core/ui-theme';
 import { redirect } from '@sveltejs/kit';
 import { layoutVariants } from '$lib/../generated/layout-variants';
 import { buildBreadcrumb, buildMenu } from '$lib/server/menu';
-import { csrfToken } from '$lib/server/session';
+import { apiFor, csrfToken } from '$lib/server/session';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -17,6 +17,11 @@ export const load: LayoutServerLoad = async (event) => {
     redirect(303, `/auth/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   const locale = event.locals.locale.locale;
   const menu = buildMenu(s, event.url.pathname, locale, event.locals.config.enabledModules);
+  // Bell (J-4): one cheap count per page; a failure must never break the shell.
+  const unread = await apiFor(event)
+    .v1.notifications.count.get()
+    .then((r) => (r.data?.success ? r.data.data.unread : 0))
+    .catch(() => 0);
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'dashboard', variant);
   if (layout.fellBack && variant !== 'default' && import.meta.env.DEV) {
@@ -37,5 +42,6 @@ export const load: LayoutServerLoad = async (event) => {
     layoutId: layout.layout.id,
     layoutVariant: variant,
     appName: (event.locals.config.values['app.name'] as string | undefined) ?? 'Dashboard',
+    unreadNotifications: unread,
   };
 };

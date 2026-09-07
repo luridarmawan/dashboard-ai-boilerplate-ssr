@@ -12,7 +12,8 @@ export interface RetentionResult {
   readonly audit: number;
   readonly schedulerRuns: number;
   readonly outbox: number;
-  readonly days: { audit: number; schedulerRuns: number; outbox: number };
+  readonly notifications: number;
+  readonly days: { audit: number; schedulerRuns: number; outbox: number; notifications: number };
 }
 
 function affected(r: unknown): number {
@@ -34,6 +35,11 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
       1,
     ),
     outbox: clamp(await settings.get<number | null>(null, 'logs.outbox_retention_days'), 30, 1),
+    notifications: clamp(
+      await settings.get<number | null>(null, 'logs.notification_retention_days'),
+      90,
+      7,
+    ),
   };
   const at = (d: number) => new Date(now.getTime() - d * 86_400_000);
 
@@ -60,7 +66,18 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
         ),
       ),
   );
-  if (audit || schedulerRuns || outbox)
-    logger.info('logs: retention pruned', { audit, schedulerRuns, outbox, days });
-  return { audit, schedulerRuns, outbox, days };
+  // Read notifications only (J-4): an unread one is still a message for its owner.
+  const notifications = affected(
+    await db
+      .delete(schema.notifications)
+      .where(
+        and(
+          isNotNull(schema.notifications.read_at),
+          lt(schema.notifications.created_at, at(days.notifications)),
+        ),
+      ),
+  );
+  if (audit || schedulerRuns || outbox || notifications)
+    logger.info('logs: retention pruned', { audit, schedulerRuns, outbox, notifications, days });
+  return { audit, schedulerRuns, outbox, notifications, days };
 }

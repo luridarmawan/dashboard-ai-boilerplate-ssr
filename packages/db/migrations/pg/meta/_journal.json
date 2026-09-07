@@ -71,6 +71,13 @@
       "when": 1788819199389,
       "tag": "0009_tiresome_lady_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788823939491,
+      "tag": "0010_red_squadron_supreme",
+      "breakpoints": true
     }
   ]
 }

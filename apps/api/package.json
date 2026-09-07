@@ -10,6 +10,7 @@
     "./services": "./src/services.ts",
     "./mail": "./src/mail.ts",
     "./tools": "./src/tools.ts",
+    "./notifications": "./src/notifications.ts",
     "./lib/*": "./src/lib/*.ts"
   },
   "scripts": {

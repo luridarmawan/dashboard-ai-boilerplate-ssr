@@ -21,6 +21,8 @@ export interface CoreEventPayloads {
   'config.saved': { section: string; key: string; clientId: string | null };
   /** A module was enabled or disabled for a tenant. */
   'module.toggled': { module: string; clientId: string; enabled: boolean };
+  /** In-app notifications were written for these users (J-4); modules may fan out (webhook, push). */
+  'notification.created': { clientId: string; type: string; userIds: readonly string[] };
   /** Diagnostic event used by tests and the M0 gate; never emitted in production flows. */
   'system.ping': { at: string; note?: string };
 }
@@ -34,6 +36,7 @@ export const CORE_EVENTS = [
   'tenant.switched',
   'config.saved',
   'module.toggled',
+  'notification.created',
   'system.ping',
 ] as const satisfies readonly CoreEventName[];
 

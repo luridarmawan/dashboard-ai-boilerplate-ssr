@@ -7,6 +7,7 @@ import { groups } from './domains/groups.ts';
 import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
+import { notificationsDomain } from './domains/notifications.ts';
 import { outbox } from './domains/outbox.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
@@ -59,6 +60,7 @@ export const app = new Elysia()
           { name: 'module', description: 'Installed modules and per-tenant state' },
           { name: 'menu', description: 'Menu entries for API clients' },
           { name: 'mail', description: 'Email outbox: status, retry, worker' },
+          { name: 'notifications', description: 'In-app notifications of the caller (J-4)' },
           {
             name: 'tools',
             description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
@@ -79,6 +81,7 @@ export const app = new Elysia()
       .use(moduleDomain)
       .use(menuDomain)
       .use(outbox)
+      .use(notificationsDomain)
       .use(tokensDomain)
       .use(toolsDomain)
       .use(mcpDomain)

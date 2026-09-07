@@ -4,6 +4,7 @@ import { inArray, schema, unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import { GLOBAL } from '@core/settings';
 import { Elysia, t } from 'elysia';
+import { notify } from '../notifications.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
@@ -200,12 +201,25 @@ export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags
         requestId,
         after: { enabled: body.enabled, scope: clientId ?? GLOBAL },
       });
-      if (clientId)
+      if (clientId) {
         emit(
           'module.toggled',
           { module: mod.name, clientId, enabled: body.enabled ?? true },
           { requestId },
         );
+        await notify({
+          clientId,
+          permission: 'module.manage',
+          excludeUserIds: [a.user.id],
+          type: 'module.toggled',
+          title:
+            body.enabled === null
+              ? `Modul ${mod.name} kembali mengikuti state global`
+              : `Modul ${mod.name} ${body.enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
+          body: `Oleh ${a.user.name}.`,
+          link: '/modules',
+        });
+      }
       const states = await moduleState.listFor(clientId);
       return ok(
         states.find((s) => s.module === mod.name) ?? {

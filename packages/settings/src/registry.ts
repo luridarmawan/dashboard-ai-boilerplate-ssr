@@ -176,6 +176,22 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         max: 3650,
         order: 2,
       },
+      {
+        key: 'logs.notification_retention_days',
+        type: 'number',
+        title: {
+          id: 'Retensi notifikasi terbaca (hari)',
+          en: 'Read notification retention (days)',
+        },
+        note: {
+          id: 'Notifikasi yang sudah dibaca dihapus setelah usia ini; yang belum dibaca tidak pernah dihapus (J-4).',
+          en: 'Read notifications are removed past this age; unread ones are never removed (J-4).',
+        },
+        default: 90,
+        min: 7,
+        max: 3650,
+        order: 3,
+      },
     ],
   },
   {
