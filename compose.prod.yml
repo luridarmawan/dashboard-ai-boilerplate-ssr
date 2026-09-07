@@ -138,6 +138,29 @@ services:
         condition: service_healthy
     <<: *logging
 
+  db-init:
+    # `run --rm db-init` — idempotent: makes sure DATABASE_NAME exists and user `app` owns it. The mysql
+    # image only does this when the volume is FIRST created, so run this after changing DATABASE_NAME
+    # (or MYSQL_PASSWORD) on an existing volume, then `migrate` + `seed` as usual.
+    image: mysql:8
+    profiles: ['ops']
+    entrypoint:
+      - sh
+      - -c
+      - >
+        MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -h mysql -uroot -e
+        "CREATE DATABASE IF NOT EXISTS \`$$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        ALTER USER 'app'@'%' IDENTIFIED BY '$$APP_PASSWORD';
+        GRANT ALL PRIVILEGES ON \`$$DB_NAME\`.* TO 'app'@'%'; FLUSH PRIVILEGES;"
+        && echo "db-init: database $$DB_NAME siap, user app punya hak penuh"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
+      APP_PASSWORD: ${MYSQL_PASSWORD:-app}
+      DB_NAME: ${DATABASE_NAME:-app}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
   backup:
     # Scheduled logical dumps (O-7, Q-8) into ./backups on the host — copy that folder off-site.
     # BACKUP_IMAGE must carry the client tools of your dialect: mysql:8 (default) or postgres:16.

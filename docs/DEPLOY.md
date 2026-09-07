@@ -47,7 +47,7 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
 #   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
 #   Kata sandi dan DATABASE_NAME HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
-#   = ALTER USER di MySQL atau `down -v` (hapus data) — lihat tabel gejala di bawah.
+#   = `dc run --rm db-init` (membuat database + hak user app, idempoten) atau `down -v` (hapus data).
 #    Cek cepat: nilai yang benar-benar diterima compose (DATABASE_NAME, kata sandi, origin, port) — lakukan
 #    SEBELUM langkah 4, karena setelah volume dibuat nama database dan kata sandi terkunci:
 dc config | grep -E 'MYSQL_DATABASE|DATABASE_URL|APP_ORIGIN|ORIGIN:|HTTP_PORT|published' | sort -u
@@ -94,7 +94,8 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 | `502` | `api`/`web` belum sehat | `docker compose … ps`, `docker compose … logs api --tail 50` |
 | `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
-| `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `dc config \| grep DATABASE_URL`; samakan: `dc exec mysql mysql -uroot -p'<root lama>' -e "ALTER USER 'app'@'%' IDENTIFIED BY '<baru>'"`, atau bila data belum penting `dc down -v && dc up -d --wait mysql` |
+| `migrate`/`seed`: `Access denied for user 'app'@'%' to database '<nama>'` (errno 1044) | `DATABASE_NAME` diubah setelah volume `mysql-data` dibuat — database baru belum ada / user `app` belum punya hak | `dc run --rm db-init` lalu `migrate` + `seed`; atau `dc down -v` bila data belum penting |
+| `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` (errno 1045) | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `dc config \| grep DATABASE_URL`; `dc run --rm db-init` menyamakan kata sandi user `app` dengan `.env.prod` (butuh root password yang berlaku di volume), atau bila data belum penting `dc down -v && dc up -d --wait mysql` |
 
 ### 2b. Port 80/443 sudah dipakai Apache/Nginx di host yang sama
 
