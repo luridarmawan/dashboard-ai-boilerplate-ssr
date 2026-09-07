@@ -6,11 +6,6 @@
  * Fonts are self-hosted through @fontsource (§7: no third-party request on the render path).
  */
 @import "tailwindcss";
-/* Module pages live outside apps/web (modules/<Name>/web/**, mirrored here by shims that only
-   re-export them). Tailwind v4 scans from the Vite root, so without this the utilities used ONLY
-   by a module would never be generated (extension points 3, 10, 13). */
-@source "../../../modules";
-
 /* Theme token files — one per built-in theme, light + dark in each (§4.8). */
 @import "@core/ui-theme/themes/base/tokens.css";
 @import "@core/ui-theme/themes/corporate/tokens.css";
@@ -32,6 +27,12 @@
 @import "@fontsource/atkinson-hyperlegible/400.css";
 @import "@fontsource/atkinson-hyperlegible/700.css";
 @import "@fontsource/jetbrains-mono/400.css";
+
+/* Module pages live outside apps/web (modules/<Name>/web/**, mirrored here by shims that only
+   re-export them). Tailwind v4 scans from the Vite root, so without this the utilities used ONLY
+   by a module would never be generated (extension points 3, 10, 13). Placed after every @import:
+   the CSS spec (and Biome) require @import to precede all other at-rules. */
+@source "../../../modules";
 
 @custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 

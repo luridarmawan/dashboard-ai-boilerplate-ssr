@@ -1,9 +1,11 @@
-import { readFileSync } from 'node:fs';
 import { env } from '@core/config';
 import { OkSchema, ok } from '@core/contracts';
 import { activeDialect, schema, unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import { Elysia, t } from 'elysia';
+// Static import: bundled into the compiled binary (Q-2) — a runtime file read would look for
+// /package.json next to the executable and crash.
+import rootPkg from '../../../../package.json' with { type: 'json' };
 import { instanceId } from '../instance.ts';
 
 /**
@@ -13,10 +15,6 @@ import { instanceId } from '../instance.ts';
  *   /ready    readiness — the database answers (Redis only when a redis driver is active)
  *   /version  build identity + installed modules, for support and for the module admin UI
  */
-
-const rootPkg = JSON.parse(
-  readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8'),
-) as { name: string; version: string };
 
 const build = {
   name: rootPkg.name,

@@ -184,14 +184,28 @@ Alur "backup → hapus database → restore → aplikasi utuh" dijalankan CI pad
 
 ## 5. Image
 
-Satu `Dockerfile`, dua target: install penuh → `bun run bootstrap` + build web → install produksi bersih → runtime `oven/bun:alpine`, user `bun`, `HEALTHCHECK`. Dialect dipilih saat build (`--build-arg DB_DIALECT=postgres`) karena skema ter-generate mengikat satu driver (§4.3).
+Satu `Dockerfile`, dua target. Tahap `build` (image `oven/bun:alpine`) melakukan install penuh → `bun run bootstrap` (registri modul, skema per dialect, **migrasi disematkan**) → build web → lalu mengompilasi api dan membundel web. Tidak ada `node_modules` yang keluar dari tahap itu. Dialect dipilih saat build (`--build-arg DB_DIALECT=postgres`) karena skema ter-generate dan migrasi yang disematkan mengikat satu driver (§4.3).
 
-| Image | Ukuran | Isi utama |
-|---|---|---|
-| `dab/api` | ±212 MB | bun 70 MB · `node_modules` produksi 67 MB (`typescript` 23 MB adalah dependensi runtime `elysia`) · alpine · kode < 1 MB |
-| `dab/web` | ±213 MB | serupa; `build/` adapter-node 1,8 MB |
+| Image | Ukuran | Isi | Runtime |
+|---|---|---|---|
+| `dab/api` | ±92 MB terpasang (±40 MB saat pull) | **satu binary** `/app/api` (`bun build --compile`, ±80 MB — runtime Bun + kode + dependensi) · alpine + `ca-certificates`, `libstdc++`, `libgcc` | tanpa `bun`, tanpa sumber, tanpa `node_modules`; user `app` (uid 1000) |
+| `dab/web` | ±94 MB terpasang (±45 MB saat pull) | `index.js` (adapter-node + seluruh dependensinya dibundel jadi satu berkas, ±2 MB) · `client/` aset statis · runtime `oven/bun:alpine` | `bun index.js`, user `bun` |
 
-PRD Q-2 menargetkan < 150 MB; lantai realistis dengan runtime Bun ±190 MB. Ini keputusan produk yang masih terbuka: merevisi Q-2, atau `bun build --compile` (binary ±90 MB tanpa `node_modules`).
+Keduanya memenuhi PRD Q-2 (< 150 MB); job CI `docker-build` gagal bila salah satu melewati batas itu.
+
+**Subperintah binary api.** Karena image tidak berisi `bun`, perintah operasional adalah subperintah dari binary yang sama ([`apps/api/src/cli.ts`](../apps/api/src/cli.ts)); `dc run --rm migrate` dan `dc run --rm seed` di §2 memanggilnya lewat `command:` di `compose.prod.yml`:
+
+| Perintah | Fungsi |
+|---|---|
+| `api` / `api serve` | server HTTP + scheduler (baku, `CMD` image) |
+| `api migrate` | terapkan migrasi yang disematkan saat build — langkah eksplisit, tidak pernah otomatis saat start (Q-4); menghormati `TABLE_PREFIX` (O-2) |
+| `api seed` | seed bootstrap idempoten: tenant baku, grup sistem, superadmin dari `BOOTSTRAP_ADMIN_*` (O-3) |
+| `api health` | GET `/v1/health` di port lokal, keluar 0/1 — inilah `HEALTHCHECK` image |
+| `api version` | cetak nama, versi, `APP_COMMIT`, `APP_BUILT_AT` — mis. `dc run --rm --no-deps api version` |
+
+Pengembangan tetap memakai sumber: `bun apps/api/src/index.ts [perintah]` menerima subperintah yang sama, dan `bun db:migrate` / `bun db:seed` memanggil fungsi yang sama (`runMigrations`, `runSeedAll`). Yang **tidak** ada di dalam image: `bun run mail:test`, `db:smoke`, `modules:sync` — jalankan dari checkout repo dengan `.env` yang menunjuk ke server yang sama.
+
+**Yang berubah dari image lama (±212 MB):** migrasi tidak lagi dibaca dari folder `packages/db/migrations` saat runtime tetapi dari `packages/db/src/generated/migrations.ts` yang ditulis `db:codegen`; `/v1/version` membaca `package.json` lewat import statis, bukan `readFileSync`. Volume `uploads` tetap dimiliki uid 1000, sama seperti user `bun` sebelumnya — tidak perlu `chown` saat upgrade.
 
 ## 6. Nginx
 
