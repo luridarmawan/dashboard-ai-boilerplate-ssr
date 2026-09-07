@@ -11,7 +11,7 @@ export const load: PageServerLoad = async (event) => {
   return {
     tokens: tokens.data?.success ? tokens.data.data : [],
     appOrigin: event.url.origin,
-    themes: themes()
+    themes: [...themes(), ...event.locals.config.customThemes.map((c) => c.manifest)]
       .filter(
         (t) =>
           !t.module ||

@@ -7,7 +7,7 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 | [`docs/PRD.md`](./docs/PRD.md) | Kebutuhan produk, keputusan arsitektur, 16 titik perluasan modul, kriteria terima §8 |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Urutan milestone M0–M7 dengan gate keluar |
 | [`docs/MODULES.md`](./docs/MODULES.md) | **Membangun modul** — `bun modgen`, kontrak tiap berkas, repositori terpisah, penjaga CI |
-| [`docs/THEMES.md`](./docs/THEMES.md) | Tema, layout, set ikon; cara menambah tema dari modul |
+| [`docs/THEMES.md`](./docs/THEMES.md) | Tema, layout, set ikon; tema dari modul; editor tema kustom di UI admin |
 | [`docs/AI.md`](./docs/AI.md) | Modul AI: provider OpenAI-compatible, streaming, tool modul, log & retensi |
 | [`docs/MCP.md`](./docs/MCP.md) | MCP server di `/v1/mcp`, token API bearer, dan MCP client (server MCP eksternal untuk asisten) |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | **Deploy ke VPS kosong sampai HTTPS**, backup/restore, operasi harian |
@@ -58,13 +58,13 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 ## Cara mengubah hal-hal yang paling sering ditanyakan
 
 - **Membuat modul** — `bun modgen`, lalu baca [`docs/MODULES.md`](./docs/MODULES.md). Di repositori sendiri: `bun create module`.
-- **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema baku dan allowlist diatur admin di **Pengaturan → Aplikasi**.
+- **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema **kustom tanpa deploy**: admin merakitnya di **Tema kustom** (`/themes`) dari token, set ikon, dan layout terdaftar; wajib lolos kontras AA. Tema baku dan allowlist diatur di **Pengaturan → Aplikasi**.
 - **Mengganti landing page** — **Pengaturan → Aplikasi → Route landing** (`app.landing_route`), berlaku seketika tanpa restart; route yang tidak ada ditolak saat disimpan. Modul mana pun boleh menyumbang halaman publik (`public.ts`).
 - **Mengganti provider AI** — **Pengaturan → AI**: base URL OpenAI-compatible, kunci API (disimpan terenkripsi, tidak pernah dikirim ke klien), model. Rincian di [`docs/AI.md`](./docs/AI.md). Provider tiruan untuk pengembangan: `bun run ai:mock`.
 - **Menyambungkan Claude Desktop / Claude Code (MCP)** — buat token di **Profil → Token API**, lalu `claude mcp add --transport http dashboard https://<domain>/v1/mcp --header "Authorization: Bearer <token>"`. Tool yang tampil adalah `api/tools.ts` modul, sebatas izin user: [`docs/MCP.md`](./docs/MCP.md).
 - **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log. Uji kredensial `.env` tanpa database: `bun run mail:test --to anda@contoh.id`.
 - **Konfigurasi runtime lain** (bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
-- **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah.
+- **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah. Upgrade **tanpa downtime**: `sh deploy/upgrade.sh`; cek kesiapan kapan saja: `dc run --rm preflight`; tanpa Docker: unit systemd di `deploy/systemd/`.
 
 ## Menjalankan dan menguji tanpa Docker
 

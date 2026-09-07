@@ -30,9 +30,18 @@ export interface Palette {
 
 const NAMES: (keyof Palette)[] = ['background', 'foreground', 'card', 'primary', 'muted', 'border'];
 
+/** The tokens.css source of a file theme (core or module), for seeding the editor (L-24). */
+export function tokenSourceOf(themeId: string): string | null {
+  return TOKEN_SOURCES[themeId] ?? null;
+}
+
 /** Light and dark palettes from a tokens.css (same parsing rules as validate.mjs). */
-export function paletteOf(themeId: string, mode: 'light' | 'dark'): Palette | null {
-  const css = TOKEN_SOURCES[themeId]?.replace(/\/\*[\s\S]*?\*\//g, '');
+export function paletteOf(
+  themeId: string,
+  mode: 'light' | 'dark',
+  cssOverride?: string,
+): Palette | null {
+  const css = (cssOverride ?? TOKEN_SOURCES[themeId])?.replace(/\/\*[\s\S]*?\*\//g, '');
   if (!css) return null;
   const light: Partial<Palette> = {};
   const dark: Partial<Palette> = {};
@@ -48,8 +57,12 @@ export function paletteOf(themeId: string, mode: 'light' | 'dark'): Palette | nu
 }
 
 /** A 160×100 skeleton of the dashboard in the theme's palette AND its default dashboard layout. */
-export function previewSvg(theme: ThemeManifest, mode: 'light' | 'dark' = 'light'): string {
-  const p = paletteOf(theme.id, mode);
+export function previewSvg(
+  theme: ThemeManifest,
+  mode: 'light' | 'dark' = 'light',
+  cssOverride?: string,
+): string {
+  const p = paletteOf(theme.id, mode, cssOverride);
   if (!p) return '';
   const layout = theme.layouts.dashboard?.default ?? 'sidebar-classic';
   const r = 3;

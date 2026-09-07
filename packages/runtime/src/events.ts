@@ -26,6 +26,16 @@ export interface Subscription {
   readonly event: CoreEventName;
 }
 
+/** A hook that threw, kept in memory (this instance only) so the module admin UI can show it (G-14). */
+export interface HookFailure {
+  readonly module: string;
+  readonly event: CoreEventName;
+  readonly error: string;
+  readonly at: Date;
+  readonly requestId: string | null;
+}
+const MAX_FAILURES = 100;
+
 export interface EventBusOptions {
   /** Structured logger sink; defaults to console (JSON lines). */
   readonly log?: (entry: Record<string, unknown>) => void;
@@ -43,6 +53,8 @@ export interface EventBus {
     meta?: { requestId?: string | null },
   ): Promise<EmitResult>;
   subscriptions(): readonly Subscription[];
+  /** Most recent hook failures on THIS instance, newest first (G-14). */
+  failures(module?: string): readonly HookFailure[];
 }
 
 interface Entry {
@@ -56,6 +68,7 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus {
     ((entry: Record<string, unknown>) =>
       console.log(JSON.stringify({ t: new Date().toISOString(), ...entry })));
   const handlers = new Map<CoreEventName, Entry[]>();
+  const recentFailures: HookFailure[] = [];
 
   const on: EventBus['on'] = (event, handler, module = 'core') => {
     const list = handlers.get(event) ?? [];
@@ -91,6 +104,14 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus {
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           failed.push({ module, error });
+          recentFailures.unshift({
+            module,
+            event,
+            error,
+            at: ctx.emittedAt,
+            requestId: ctx.requestId,
+          });
+          if (recentFailures.length > MAX_FAILURES) recentFailures.length = MAX_FAILURES;
           log({
             level: 'error',
             msg: 'hook failed',
@@ -108,6 +129,9 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus {
       for (const [event, list] of handlers)
         for (const e of list) out.push({ module: e.module, event });
       return out;
+    },
+    failures(module) {
+      return module ? recentFailures.filter((f) => f.module === module) : [...recentFailures];
     },
   };
 }

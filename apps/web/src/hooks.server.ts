@@ -22,7 +22,8 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.config = await loadPublicConfig(event, event.locals.session?.clientId ?? null);
   event.locals.theme = resolveRequestTheme(event, event.locals.config);
   event.locals.locale = resolveRequestLocale(event, event.locals.config);
-  const { theme, mode } = event.locals.theme;
+  const { theme, mode, css } = event.locals.theme;
+  const themeCss = css ? `<style data-custom-theme="${theme.id}">${css}</style>` : '';
 
   // Decision I / F-5 / F-6: `/` for an anonymous visitor serves the configured landing route —
   // rendered server-side and returned as `/` (no redirect, no flicker; search engines see the
@@ -49,7 +50,8 @@ export const handle: Handle = async ({ event, resolve }) => {
       html
         .replace('%lang%', event.locals.locale.locale)
         .replace('%theme%', theme.id)
-        .replace('%mode%', mode),
+        .replace('%mode%', mode)
+        .replace('%theme_css%', themeCss),
   });
   response.headers.set('x-request-id', event.locals.requestId);
   return response;

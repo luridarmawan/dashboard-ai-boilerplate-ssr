@@ -458,7 +458,6 @@ Semua 16 titik perluasan di §2a **tersedia**. Yang belum ada:
 | Hal | Status |
 |---|---|
 | Modul sebagai paket npm (`source: "package"`) | M7. Hari ini: `local` atau `submodule` |
-| UI admin modul (G-14) — daftar modul, sumber & versi, aktif/nonaktif per tenant, galat muat | Sebagian: `/modules` menampilkan modul dan status per tenant; sumber/versi/galat muat menyusul M7 |
 | Uninstall bersih dengan migrasi turun (G-15) | M7. Mencabut modul hari ini meninggalkan tabelnya (G-8) |
 | Playwright E2E untuk halaman modul (P-8) | M7. Bukti hari ini lewat HTTP tanpa browser (`scripts/m6-gate-proof.ts`) |
 

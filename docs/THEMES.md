@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Spesifikasi + implementasi token; siap dipakai saat `packages/ui-theme` dibangun |
+| **Status** | Empat tema bawaan + tema modul (berkas), dan **editor tema dari UI admin** (L-24) yang menyimpan tema kustom ke database tanpa deploy |
 | **Berkas** | `packages/ui-theme/themes/<id>/` · `packages/ui-theme/icons/registry.json` · `packages/ui-theme/layouts/registry.json` |
 | **Validator** | `node packages/ui-theme/validate.mjs` — menegakkan L-3, L-5, L-8, L-21 |
 | **Kontrak** | [`PRD.md` §4.8](./PRD.md) — anatomi tema; FR-L L-2…L-15 |
@@ -118,6 +118,16 @@ Validator akan memberi tahu persis apa yang kurang: token yang belum terdefinisi
 
 Modul menyumbang tema lewat titik perluasan 14 dengan bentuk folder yang sama persis (§4.5). Tidak ada perlakuan istimewa untuk tema core.
 
+### 5a. Tema kustom dari UI admin (L-24)
+
+Admin dengan izin `theme.manage` membuka **Tema kustom** (`/themes`), memilih tema awal (core atau kustom lain), lalu **merakit**: nilai token (terang dan gelap), set ikon dari yang terdaftar, layout per jenis shell dari yang terdaftar, nama dan slug. Simpan → tema `custom.<slug>` hidup **seketika di semua instance** (dibaca lewat cache berversi, seperti konfigurasi), muncul di pemilih tema, di daftar tema profil, dan sebagai opsi tema baku/allowlist di Pengaturan. Superadmin bisa membuat tema **global** (`?scope=global`) yang berlaku di semua tenant; tema tenant dengan slug sama menutupinya. Pengunjung **anonim** hanya melihat scope global (aturan yang sama dengan konfigurasi publik), jadi tema untuk landing page publik harus dibuat global.
+
+Yang tidak berubah: **kontraknya**. Sebelum tersimpan, tema kustom harus lolos pemeriksaan yang sama dengan tema berkas di CI — set ikon terdaftar (L-5), layout terdaftar dan sesuai jenis shell (L-8), seluruh token terisi, dan kontras WCAG AA di kedua mode (L-21, pasangan yang sama dengan `validate.mjs`, di `packages/ui-theme/src/custom.ts`). Pelanggaran dijawab 422 dengan daftar pasangan dan rasionya, dan tidak ada yang disimpan. Editor merakit tema, bukan membuat kode: tidak ada layout baru, komponen, atau CSS bebas — nilai token disanitasi dan hanya bisa berupa warna, ukuran, atau daftar font.
+
+Cara kerjanya: tabel `themes` (`scope`, `code`, `tokens` json, `icons`, `layouts` json); API `GET /v1/themes/custom` (anonim, manifest + CSS untuk tenant aktif) dan `GET/POST/PUT/DELETE /v1/themes/custom[/…]` (`theme.manage`); web memuat daftar itu per request bersama konfigurasi publik, menambahkannya ke rantai resolusi (`resolveTheme({ extra })`), dan menyuntikkan CSS tema kustom yang aktif ke `<head>` lewat placeholder `%theme_css%` — tema berkas tetap dari bundel. Pratinjau di editor dan pemilih dihitung dari token yang tersimpan. Bukti: `apps/api/test/integration/themes-custom.test.ts`, `packages/ui-theme/test/custom.test.ts`.
+
+**Belum ada di editor:** unggah logo/favicon per tema — menunggu endpoint unggah berkas (Q-16, ROADMAP §8 butir 5); saat ini tema kustom tidak membawa aset merek.
+
 **Yang tidak boleh dilakukan tema** (§4.8): mengganti implementasi komponen, menambah atau mengubah route, mengubah data atau perilaku, dan mem-bypass RBAC. Tema boleh menetapkan nilai baku varian komponen; tidak boleh menulis ulang komponennya.
 
 ---
@@ -126,7 +136,9 @@ Modul menyumbang tema lewat titik perluasan 14 dengan bentuk folder yang sama pe
 
 **Tersedia sejak M2:** komponen enam layout terdaftar (`apps/web/src/lib/layouts/*`), pemetaan tiga set ikon (`apps/web/src/lib/icons/*`), font self-hosted lewat `@fontsource`, resolusi tema/mode/layout saat SSR, pemilih tema tanpa JavaScript (`/theme`) dengan pratinjau SVG yang dihasilkan dari token + layout tema, dan tema/layout/set ikon dari modul (lihat `docs/MODULES.md`). `bun run theme:validate` memeriksa tema core **dan** modul, cakupan set ikon, serta kontrak region layout.
 
-**Belum:** aset merek per tema (`logo.svg`, `favicon.svg`, `preview.png` — pratinjau saat ini digenerate), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle), tema/bahasa baku per tenant dari konfigurasi (M3).
+**Tersedia sejak 2026-09-08:** editor tema dari UI admin (L-24, §5a) — tema kustom per tenant/global tersimpan di database, divalidasi kontras sebelum disimpan, berlaku tanpa deploy.
+
+**Belum:** aset merek per tema (`logo.svg`, `favicon.svg`, `preview.png` — pratinjau saat ini digenerate; unggah menunggu Q-16), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle).
 
 ## 7. Catatan lama
 

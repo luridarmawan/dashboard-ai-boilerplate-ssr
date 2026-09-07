@@ -16,4 +16,12 @@ export {
   type SaveResult,
   SettingsStore,
 } from './store.ts';
+export {
+  type CustomThemeInput,
+  type CustomThemeRow,
+  CustomThemeStore,
+  type CustomThemeView,
+  type ThemeSaveResult,
+  viewCustomTheme,
+} from './themes.ts';
 export { type ConfigValue, parseValue, validateValue } from './validate.ts';

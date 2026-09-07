@@ -7,7 +7,7 @@ import { Elysia, t } from 'elysia';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
-import { emit, settings } from '../services.ts';
+import { customThemes, emit, settings } from '../services.ts';
 
 /**
  * Runtime configuration (PRD FR-E, Decision I). Scope = the active tenant, or `global` when the
@@ -84,7 +84,14 @@ export const configuration = new Elysia({
       }
       // The theme list fills `app.allowed_themes` / `theme` options at read time (registry, not stored).
       type Opt = { value: string; label: { id: string; en: string } };
-      const themeOptions: Opt[] = themes().map((th) => ({ value: th.id, label: { ...th.name } }));
+      const custom = await customThemes.listFor(scope.clientId, { includeDisabled: true });
+      const themeOptions: Opt[] = [
+        ...themes().map((th) => ({ value: th.id, label: { ...th.name } })),
+        ...custom.map((c) => ({
+          value: c.code,
+          label: { ...(c.name as { id: string; en: string }) },
+        })),
+      ];
       const sections: (typeof Section)['static'][] = (await settings.adminView(scope.clientId)).map(
         (s) => ({
           section: s.section,

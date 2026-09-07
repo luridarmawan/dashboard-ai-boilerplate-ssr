@@ -16,6 +16,7 @@ import { rateLimits } from './rate_limits.def.ts';
 import { schedulerJobs } from './scheduler_jobs.def.ts';
 import { schedulerRuns } from './scheduler_runs.def.ts';
 import { sessions } from './sessions.def.ts';
+import { themes } from './themes.def.ts';
 import { users } from './users.def.ts';
 
 /**
@@ -41,5 +42,6 @@ export const tables: readonly TableDef[] = [
   configurations,
   cacheVersions,
   modules,
+  themes,
   outboxEmail,
 ];

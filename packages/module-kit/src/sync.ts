@@ -134,6 +134,24 @@ export interface ThemeContrib {
   readonly tokensPath: string;
 }
 
+/** What a module contributes, as counted by the sync (G-14 admin UI). */
+export interface ModuleContributions {
+  readonly tables: number;
+  readonly permissions: number;
+  readonly menu: number;
+  readonly config: number;
+  readonly api: boolean;
+  readonly pages: number;
+  readonly publicRoutes: number;
+  readonly widgets: number;
+  readonly hooks: readonly string[];
+  readonly jobs: readonly string[];
+  readonly tools: readonly string[];
+  readonly themes: number;
+  readonly layouts: number;
+  readonly iconSets: number;
+}
+
 export class SyncError extends Error {
   constructor(readonly problems: readonly string[]) {
     super(`modules:sync gagal:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
@@ -882,10 +900,31 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         emitModuleTables(tables),
       ),
     );
+    // G-14: what each module contributes, for the admin UI — data only, computed from what the
+    // sync already loaded, so the registry stays import-free.
+    const contributions = new Map<string, ModuleContributions>();
+    for (const m of ordered) {
+      contributions.set(m.name, {
+        tables: tables.filter((t) => t.name.startsWith(`${m.ns}_`)).length,
+        permissions: permissions.filter((p) => p.module === m.name).length,
+        menu: menu.filter((x) => x.module === m.name).length,
+        config: configSections.filter((c) => c.module === m.name).length,
+        api: apiModules.some((a) => a.name === m.name),
+        pages: webRoutes.filter((w) => w.module === m.name && w.kind === 'svelte').length,
+        publicRoutes: publicRoutes.filter((p) => p.module === m.name).length,
+        widgets: widgets.filter((w) => w.module === m.name).length,
+        hooks: hookModules.find((h) => h.name === m.name)?.items ?? [],
+        jobs: jobModules.find((j) => j.name === m.name)?.items ?? [],
+        tools: toolModules.find((t) => t.name === m.name)?.items ?? [],
+        themes: themesContrib.filter((t) => t.module === m.name).length,
+        layouts: layoutsContrib.filter((l) => l.module === m.name).length,
+        iconSets: iconSetsContrib.filter((i) => i.module === m.name).length,
+      });
+    }
     files.push(
       await writeFile(
         join(root, 'packages/module-kit/src/generated/registry.ts'),
-        emitRegistry(ordered, permissions, menu, configSections),
+        emitRegistry(ordered, permissions, menu, configSections, contributions),
       ),
     );
     files.push(
@@ -1113,13 +1152,32 @@ function emitRegistry(
   permissions: readonly (PermissionDef & { module: string })[],
   menu: readonly (MenuEntryDef & { module: string })[],
   config: readonly (ConfigSectionDef & { module: string })[] = [],
+  contributions: ReadonlyMap<string, ModuleContributions> = new Map(),
 ): string {
-  const mods = modules.map(({ name, ns, version, source, path }) => ({
+  const none: ModuleContributions = {
+    tables: 0,
+    permissions: 0,
+    menu: 0,
+    config: 0,
+    api: false,
+    pages: 0,
+    publicRoutes: 0,
+    widgets: 0,
+    hooks: [],
+    jobs: [],
+    tools: [],
+    themes: 0,
+    layouts: 0,
+    iconSets: 0,
+  };
+  const mods = modules.map(({ name, ns, version, source, path, manifest }) => ({
     name,
     ns,
     version,
     source,
     path,
+    description: manifest.description ?? null,
+    contributes: contributions.get(name) ?? none,
   }));
   return `${GEN_HEADER}import type { ConfigSectionDef, MenuEntryDef, PermissionDef } from '../contract.ts';
 

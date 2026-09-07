@@ -1,4 +1,5 @@
 import { modules } from '@core/module-kit/registry';
+import type { ThemeManifest } from '@core/ui-theme';
 import type { RequestEvent } from '@sveltejs/kit';
 import { api } from '$lib/api/client';
 import { sessionCookieHeader } from './session.ts';
@@ -13,6 +14,8 @@ import { sessionCookieHeader } from './session.ts';
 export interface PublicConfig {
   readonly values: Readonly<Record<string, unknown>>;
   readonly enabledModules: ReadonlySet<string>;
+  /** Admin-assembled themes usable by this tenant (L-24), with the CSS to inject for the active one. */
+  readonly customThemes: readonly { manifest: ThemeManifest; css: string }[];
   readonly ok: boolean;
 }
 
@@ -40,15 +43,36 @@ export async function loadPublicConfig(
     cookie: sessionCookieHeader(event.cookies),
   });
   try {
-    const [cfg, mods] = await Promise.all([
+    const [cfg, mods, custom] = await Promise.all([
       client.v1.configuration.public.get(),
       client.v1.module.enabled.get(),
+      client.v1.themes.custom.get(),
     ]);
     const values = cfg.data?.success ? { ...DEFAULTS, ...cfg.data.data } : DEFAULTS;
     const enabled = mods.data?.success ? new Set(mods.data.data.map((m) => m.ns)) : null;
-    return { values, enabledModules: enabled ?? ALL_MODULES(), ok: !!cfg.data?.success };
+    const customThemes = custom.data?.success
+      ? custom.data.data.map((c) => ({
+          manifest: {
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            tokens: '',
+            icons: c.icons,
+            layouts: c.layouts as ThemeManifest['layouts'],
+            module: 'core',
+            custom: true,
+          } satisfies ThemeManifest,
+          css: c.css,
+        }))
+      : [];
+    return {
+      values,
+      enabledModules: enabled ?? ALL_MODULES(),
+      customThemes,
+      ok: !!cfg.data?.success,
+    };
   } catch {
-    return { values: DEFAULTS, enabledModules: ALL_MODULES(), ok: false };
+    return { values: DEFAULTS, enabledModules: ALL_MODULES(), customThemes: [], ok: false };
   }
 }
 

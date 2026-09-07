@@ -72,6 +72,6 @@ Bukti: `modules/AI/test/integration/mcp-client.test.ts` — server MCP nyata (SD
 
 ## Yang sengaja tidak ada
 
-- Transport `stdio` dan `websocket` untuk klien (alasan di tabel di atas).
+- Transport `stdio` dan `websocket` untuk klien — **tidak direncanakan**. `websocket` bukan transport resmi spesifikasi MCP dan hampir tidak ada server yang menyajikannya. `stdio` berarti API menjalankan proses pilihan admin tenant di server (eksekusi kode jarak jauh yang disengaja) di dalam image yang tidak punya Node/Python. Pola yang dipakai: jalankan server stdio di proses terpisah di balik *bridge* seperti `mcp-proxy` atau `supergateway` yang mengekspos Streamable HTTP, lalu daftarkan URL-nya seperti server HTTP biasa. Buka kembali hanya bila ada pemakai nyata yang tidak bisa memakai bridge.
 - Sesi MCP *stateful* dan notifikasi `tools/list_changed` di server kami: mode stateless tidak butuh state antar-instance (`--scale api=3`) dan tool hanya berubah saat deploy atau saat admin menekan **Uji & muat tool**.
 - Cache koneksi ke server eksternal: satu handshake `initialize` per panggilan adalah harga yang dibayar untuk tidak punya state; kalau kelak terasa, tambahkan cache ber-TTL per instance, bukan Redis.

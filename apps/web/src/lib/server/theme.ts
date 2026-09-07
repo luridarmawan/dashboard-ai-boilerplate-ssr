@@ -16,13 +16,18 @@ export const MODE_COOKIE = 'dab_mode';
 export interface ResolvedTheme extends ThemeResolution {
   readonly mode: Mode;
   readonly allowed: readonly string[] | null;
+  /** Inline CSS for an admin-assembled theme (L-24); empty for file themes (their CSS is bundled). */
+  readonly css: string;
 }
 
 export function resolveRequestTheme(event: RequestEvent, config: PublicConfig): ResolvedTheme {
   const configured = cfgList(config, 'app.allowed_themes');
+  const extra = config.customThemes.map((c) => c.manifest);
+  const lookup = (id: string | null | undefined) =>
+    (id && extra.find((t) => t.id === id)) || themeById(id);
   // Module themes follow their module's state for this tenant (L-14): drop disabled ones.
   const usable = (id: string | null | undefined) => {
-    const th = themeById(id);
+    const th = lookup(id);
     if (!th) return null;
     if (th.module && th.module !== 'core' && !config.enabledModules.has(th.module.toLowerCase()))
       return null;
@@ -35,9 +40,11 @@ export function resolveRequestTheme(event: RequestEvent, config: PublicConfig): 
     tenantDefault: usable(cfgString(config, 'app.default_theme')), // tenant value or global fallback (E-2)
     globalDefault: null,
     allowed,
+    extra,
   });
   const rawMode = event.cookies.get(MODE_COOKIE);
-  return { ...resolution, mode: isMode(rawMode) ? rawMode : 'system', allowed };
+  const css = config.customThemes.find((c) => c.manifest.id === resolution.theme.id)?.css ?? '';
+  return { ...resolution, mode: isMode(rawMode) ? rawMode : 'system', allowed, css };
 }
 
 const secure = (event: RequestEvent) =>

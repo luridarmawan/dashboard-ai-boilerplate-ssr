@@ -3,6 +3,7 @@ import { unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import type { EventBus } from '@core/runtime';
 import {
+  CustomThemeStore,
   ModuleStateStore,
   NoCache,
   RedisCache,
@@ -47,6 +48,10 @@ function lazy<T extends object>(factory: () => T): T {
 export const settings: SettingsStore = lazy(
   () => new SettingsStore(unsafeAcrossTenants(), cacheFor('config')),
 );
+/** Admin-assembled themes (L-24), read per request like configuration. */
+export const customThemes: CustomThemeStore = lazy(
+  () => new CustomThemeStore(unsafeAcrossTenants(), cacheFor('themes')),
+);
 export const moduleState: ModuleStateStore = lazy(
   () =>
     new ModuleStateStore(
@@ -60,6 +65,10 @@ export const moduleState: ModuleStateStore = lazy(
 let bus: EventBus | null = null;
 export function setBus(b: EventBus): void {
   bus = b;
+}
+/** The process bus when serving (null under `app.handle()` in tests / OpenAPI generation). */
+export function getBus(): EventBus | null {
+  return bus;
 }
 export function emit<E extends Parameters<EventBus['emit']>[0]>(
   event: E,

@@ -63,6 +63,14 @@ export const CORE_MENU: readonly Entry[] = [
     order: 30,
   },
   {
+    id: 'core.themes',
+    label: { id: 'Tema kustom', en: 'Custom themes' },
+    href: '/themes',
+    icon: 'palette',
+    permission: 'theme.manage',
+    order: 40,
+  },
+  {
     id: 'core.profile',
     label: { id: 'Profil', en: 'Profile' },
     href: '/profile',

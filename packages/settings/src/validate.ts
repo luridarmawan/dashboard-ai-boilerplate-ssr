@@ -1,5 +1,5 @@
 import type { ConfigFieldDef } from '@core/module-kit';
-import { themeById } from '@core/ui-theme';
+import { CUSTOM_PREFIX, CUSTOM_SLUG_RE, themeById } from '@core/ui-theme';
 import { webRoutes } from './generated/routes.ts';
 
 /**
@@ -80,7 +80,11 @@ export function validateValue(
     case 'theme': {
       if (empty) return { ok: true, stored: null };
       const s = String(raw);
-      if (!themeById(s)) return { ok: false, message: `tema "${s}" tidak terdaftar` };
+      // Admin-made themes (L-24) live in the database, not the static registry: their id shape is
+      // accepted here; whether one exists for the scope is checked by the themes domain on save.
+      const custom =
+        s.startsWith(CUSTOM_PREFIX) && CUSTOM_SLUG_RE.test(s.slice(CUSTOM_PREFIX.length));
+      if (!themeById(s) && !custom) return { ok: false, message: `tema "${s}" tidak terdaftar` };
       return { ok: true, stored: s };
     }
     case 'locale': {

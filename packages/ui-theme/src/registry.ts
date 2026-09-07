@@ -37,6 +37,8 @@ export interface ThemeManifest {
   readonly preview?: string;
   /** Owning module for contributed themes; `core` for the built-ins. */
   readonly module?: string;
+  /** Assembled in the admin UI and stored in the database (L-24); its CSS is injected per request. */
+  readonly custom?: boolean;
 }
 
 export interface LayoutDef {
@@ -122,6 +124,8 @@ export interface ThemeResolutionInput {
   readonly globalDefault?: string | null;
   /** `app.allowed_themes` — a theme outside this list is treated as absent (L-11). */
   readonly allowed?: readonly string[] | null;
+  /** Runtime themes (L-24) that count as registered for this resolution. */
+  readonly extra?: readonly ThemeManifest[] | null;
 }
 
 export interface ThemeResolution {
@@ -137,10 +141,12 @@ export interface ThemeResolution {
  */
 export function resolveTheme(input: ThemeResolutionInput): ThemeResolution {
   const allowed = input.allowed?.length ? new Set(input.allowed) : null;
+  const lookup = (id: string): ThemeManifest | null =>
+    input.extra?.find((t) => t.id === id) ?? themeById(id);
   const ok = (id: string | null | undefined): ThemeManifest | null => {
     if (!id) return null;
     if (allowed && !allowed.has(id)) return null;
-    return themeById(id);
+    return lookup(id);
   };
   const steps: readonly [ThemeResolution['source'], string | null | undefined][] = [
     ['user', input.user],
@@ -153,7 +159,7 @@ export function resolveTheme(input: ThemeResolutionInput): ThemeResolution {
     if (theme) return { theme, source };
   }
   // The allowlist may itself exclude the built-in fallback: then its first entry is the floor.
-  const floor = (allowed && themeById([...allowed][0])) || themeById(FALLBACK_THEME);
+  const floor = (allowed && lookup([...allowed][0] ?? '')) || themeById(FALLBACK_THEME);
   if (!floor) throw new Error('ui-theme: tidak ada tema terdaftar sama sekali');
   return { theme: floor, source: 'fallback' };
 }

@@ -1,0 +1,45 @@
+import { error, redirect } from '@sveltejs/kit';
+import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import type { Actions, PageServerLoad } from './$types';
+
+/** Custom themes of the active tenant (or global with ?scope=global, superadmin) — PRD L-24. */
+export const _layoutVariant = 'wide';
+
+export const load: PageServerLoad = async (event) => {
+  const scope = event.url.searchParams.get('scope') === 'global' ? 'global' : 'tenant';
+  const res = await apiFor(event).v1.themes.custom.mine.get({
+    query: scope === 'global' ? { scope: 'global' } : {},
+  });
+  if (!res.data?.success)
+    error(
+      res.status,
+      res.status === 403 ? 'Anda tidak punya izin mengelola tema' : 'Tema tidak bisa dimuat',
+    );
+  return {
+    scope,
+    canGlobal: !!event.locals.session?.user.isSuperadmin,
+    themes: res.data.data.themes,
+    bases: res.data.data.bases,
+    defaultTheme: String(event.locals.config.values['app.default_theme'] ?? 'base'),
+    saved: event.url.searchParams.get('saved'),
+  };
+};
+
+export const actions: Actions = {
+  /** Make a custom theme the tenant (or global) default — same endpoint the settings page uses. */
+  setDefault: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return actionFailure({
+        status: 403,
+        code: 'csrf_failed',
+        message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+      });
+    const scope = str(form, 'scope') === 'global' ? ('global' as const) : ('tenant' as const);
+    const r = unwrap(
+      await apiFor(event).v1.themes.default.put({ theme: str(form, 'theme'), scope }),
+    );
+    if (!r.ok) return actionFailure(r.failure);
+    redirect(303, `/themes?saved=default${scope === 'global' ? '&scope=global' : ''}`);
+  },
+};

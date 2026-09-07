@@ -15,7 +15,8 @@ export const load: PageServerLoad = async (event) => {
   const t = event.locals.theme;
   // L-14: themes of a module disabled for this tenant are not offered.
   const enabled = event.locals.config.enabledModules;
-  const list = themes()
+  const custom = event.locals.config.customThemes;
+  const list = [...themes(), ...custom.map((c) => c.manifest)]
     .filter((th) => !th.module || th.module === 'core' || enabled.has(th.module.toLowerCase()))
     .filter((th) => !t.allowed || t.allowed.includes(th.id));
   const locale = event.locals.session?.user.locale === 'en' ? 'en' : 'id';
@@ -32,7 +33,12 @@ export const load: PageServerLoad = async (event) => {
       description: th.description[locale],
       icons: th.icons,
       layout: th.layouts.dashboard?.default ?? '—',
-      preview: previewSvg(th, t.mode === 'dark' ? 'dark' : 'light'),
+      preview: previewSvg(
+        th,
+        t.mode === 'dark' ? 'dark' : 'light',
+        custom.find((c) => c.manifest.id === th.id)?.css,
+      ),
+      custom: th.custom === true,
     })),
   };
 };
@@ -46,7 +52,9 @@ export const actions: Actions = {
 
     const allowed = event.locals.theme.allowed;
     const wanted = str(form, 'theme');
-    const theme = themeById(wanted) && (!allowed || allowed.includes(wanted)) ? wanted : null;
+    const known =
+      themeById(wanted) || event.locals.config.customThemes.some((c) => c.manifest.id === wanted);
+    const theme = known && (!allowed || allowed.includes(wanted)) ? wanted : null;
     const modeRaw = str(form, 'mode');
     const mode = isMode(modeRaw) ? modeRaw : null;
     rememberTheme(event, theme, mode);

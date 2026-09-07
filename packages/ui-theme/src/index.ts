@@ -1,4 +1,23 @@
 export {
+  ALL_TOKENS,
+  COLOR_TOKENS,
+  CONTRAST_PAIRS,
+  type ContrastProblem,
+  CUSTOM_PREFIX,
+  CUSTOM_SLUG_RE,
+  type CustomThemeDef,
+  checkContrast,
+  contrastRatio,
+  customManifest,
+  isHexColor,
+  parseTokensCss,
+  SHAPE_TOKENS,
+  sanitizeValue,
+  type ThemeTokens,
+  type TokenMap,
+  tokensToCss,
+} from './custom.ts';
+export {
   CORE_ICONS,
   CORE_VARIANTS,
   type CoreVariant,
