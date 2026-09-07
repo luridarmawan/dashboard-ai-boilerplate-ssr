@@ -63,6 +63,41 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 - **Konfigurasi runtime lain** (SMTP, bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
 - **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah.
 
+## Menjalankan dan menguji tanpa Docker
+
+Docker hanya dipakai untuk database di dev dan untuk paket produksi. Semua yang lain adalah `bun` biasa, jadi dengan MySQL 8 / MariaDB 11 / PostgreSQL 16 yang sudah terpasang di mesin (atau di server lain) Anda bisa lewati Docker sepenuhnya.
+
+```bash
+# 1. database: buat user + database sekali (contoh MySQL/MariaDB lokal)
+mysql -uroot -p -e "CREATE DATABASE app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER 'app'@'%' IDENTIFIED BY 'app'; GRANT ALL ON app.* TO 'app'@'%';"
+
+# 2. env: arahkan ke database itu (port bawaan 3306, bukan 33306 milik compose)
+cp .env.example .env
+#   DATABASE_URL=mysql://app:app@127.0.0.1:3306/app      (atau postgres://… dengan DB_DIALECT=postgres)
+
+# 3. siapkan & jalankan
+bun install
+bun run bootstrap                 # codegen skema untuk dialect di .env + rakit modul
+bun run db:migrate                # migrasi ter-versi
+bun run db:seed                   # tenant, grup, superadmin dari BOOTSTRAP_ADMIN_*
+bun dev                           # http://127.0.0.1:5173 (API :3001)
+```
+
+Pengujian, semuanya tanpa container:
+
+| Perintah | Butuh | Yang diuji |
+|---|---|---|
+| `bun run test:unit` | tidak ada (tanpa `.env` pun jalan) | util, RBAC, tenant guard, resolver tema/route, sync modul, config |
+| `bun run test:integration` | `DATABASE_URL` yang sudah dimigrasi | API nyata lewat `app.handle`: auth, tenancy, RBAC, CRUD, konfigurasi, outbox, AI (mock in-process), retensi |
+| `BOOTSTRAP_ADMIN_EMAIL=… BOOTSTRAP_ADMIN_PASSWORD='…' sh scripts/ci/m1-proof.sh` | database ter-seed | membangun web, menyalakan mock AI + API + web, lalu bukti gate M1–M6 lewat HTTP tanpa browser. `PROOF_ONLY=M4,M6` untuk sebagian |
+| `E2E=1 PROOF_ONLY=M5,E2E sh scripts/ci/m1-proof.sh` | + `cd apps/web && bunx playwright install chromium` | E2E browser: landing → login → CRUD → chat |
+| `bun run scheduler:proof` | database ter-migrasi | job berjalan tepat sekali per interval di 3 instance |
+| `PROOF_MODE=native sh scripts/ci/backup-restore-proof.sh` | `mysqldump`/`mysql` (atau `pg_dump`/`psql`) di PATH | backup → hapus database → restore → aplikasi utuh |
+| `bun run ci:bundle-secrets` | tidak ada | tidak ada rahasia di bundle klien |
+| `bun run check` · `bun run theme:validate` · `bun run ci:modgen-guard` · `bun run ci:cross-repo` | tidak ada (cross-repo butuh jaringan untuk `bun install` di clone) | lint, typecheck dua dialect, kontrak tema, penjaga modularitas |
+
+Ini persis yang dijalankan job CI (`.github/workflows/ci.yml`) — di runner GitHub database berjalan sebagai service, sisanya `bun` native. Menjalankan **produksi** tanpa Docker (proses `bun apps/api/src/index.ts` dan `bun apps/web/build/index.js` di bawah systemd, Apache/Nginx di depan) dimungkinkan dengan env yang sama seperti `compose.prod.yml`, tetapi unit systemd dan `preflight`-nya adalah pekerjaan P1 (Q-11, Q-13) yang belum disediakan.
+
 ## Prinsip yang dijaga CI
 
 Menambah atau mencabut modul tidak mengubah berkas core (`ci:modgen-guard`, `ci:cross-repo`); sync modul yang tercatat adalah no-op (`ci:sync-pure`); tanpa modul AI aplikasi tetap ter-build (`proof:m5:gate4`); tidak ada rahasia di bundle klien (`ci:bundle-secrets`); suite yang sama lulus di tiga dialect; backup → hapus database → restore diuji setiap push.
