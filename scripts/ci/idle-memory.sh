@@ -16,10 +16,11 @@ total=0
 docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' $ids | while read -r name used _ _; do
   num="$(echo "$used" | sed 's/[A-Za-z]*$//')"
   unit="$(echo "$used" | sed 's/^[0-9.]*//')"
+  # awk instead of bc: present on every base image and stock VPS
   case "$unit" in
-    GiB) mb="$(echo "$num * 1024" | bc)" ;;
+    GiB) mb="$(awk -v n="$num" 'BEGIN { printf "%.1f", n * 1024 }')" ;;
     MiB) mb="$num" ;;
-    KiB) mb="$(echo "$num / 1024" | bc -l)" ;;
+    KiB) mb="$(awk -v n="$num" 'BEGIN { printf "%.3f", n / 1024 }')" ;;
     B) mb=0 ;;
     *) mb="$num" ;;
   esac

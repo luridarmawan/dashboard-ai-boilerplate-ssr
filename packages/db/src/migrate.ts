@@ -49,6 +49,104 @@ export function materializeMigrations(prefix = ''): string {
   return out;
 }
 
+/** Rows in Drizzle's journal table = migrations applied so far; 0 when the table does not exist yet. */
+async function journalCountWith(
+  run: (sqlText: string) => Promise<unknown>,
+  family: Family,
+  migrationsTable: string,
+): Promise<number> {
+  try {
+    const rows = (await run(
+      family === 'pg'
+        ? `select count(*)::int as n from drizzle."${migrationsTable}"`
+        : `select count(*) as n from \`${migrationsTable}\``,
+    )) as unknown;
+    const first = Array.isArray(rows)
+      ? Array.isArray(rows[0])
+        ? (rows[0] as Record<string, unknown>[])[0]
+        : (rows[0] as Record<string, unknown>)
+      : (rows as { rows?: Record<string, unknown>[] }).rows?.[0];
+    return Number(first?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+export interface MigrationStatus {
+  readonly family: Family;
+  /** Migrations embedded in this build. */
+  readonly embedded: number;
+  /** Rows in the journal table (0 = never migrated). */
+  readonly applied: number;
+  readonly pending: number;
+}
+
+/** Race a driver call against a deadline: a wrong host must fail fast, not hang the preflight. */
+async function withDeadline<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what}: tidak menjawab dalam ${ms} ms`)), ms);
+  });
+  try {
+    return await Promise.race([p, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * `select 1` over a FRESH connection to `databaseUrl` — for `api preflight` (Q-13), which must probe
+ * the URL it was given rather than the process-wide pool. Throws with the driver's message.
+ */
+export async function probeDatabase(
+  databaseUrl: string,
+  dialect: string,
+  timeoutMs = 5000,
+): Promise<void> {
+  if (familyOf(dialect) === 'pg') {
+    const { createDb } = await import('./dialect/pg-client.ts');
+    const db = createDb(databaseUrl);
+    try {
+      await withDeadline(db.$client.unsafe('select 1'), timeoutMs, 'database');
+    } finally {
+      await db.$client.end({ timeout: 1 }).catch(() => undefined);
+    }
+  } else {
+    const { createDb } = await import('./dialect/mysql-client.ts');
+    const db = createDb(databaseUrl);
+    try {
+      await withDeadline(db.$client.query('select 1'), timeoutMs, 'database');
+    } finally {
+      await db.$client.end().catch(() => undefined);
+    }
+  }
+}
+
+/**
+ * Compare the embedded migrations with the journal — read-only, for `api preflight` (Q-13). Pass
+ * `override` to inspect a database other than the process env's (preflight probes what it is given).
+ */
+export async function migrationStatus(
+  override?: Pick<ReturnType<typeof env>, 'DB_DIALECT' | 'DATABASE_URL' | 'TABLE_PREFIX'>,
+): Promise<MigrationStatus> {
+  const e = override ?? env();
+  const family = familyOf(e.DB_DIALECT);
+  const migrationsTable = migrationsTableFor(e.TABLE_PREFIX);
+  let applied = 0;
+  if (family === 'pg') {
+    const { createDb } = await import('./dialect/pg-client.ts');
+    const db = createDb(e.DATABASE_URL);
+    applied = await journalCountWith((q) => db.$client.unsafe(q), family, migrationsTable);
+    await db.$client.end();
+  } else {
+    const { createDb } = await import('./dialect/mysql-client.ts');
+    const db = createDb(e.DATABASE_URL);
+    applied = await journalCountWith((q) => db.$client.query(q), family, migrationsTable);
+    await db.$client.end();
+  }
+  return { family, embedded: files.length, applied, pending: Math.max(0, files.length - applied) };
+}
+
 export async function runMigrations(): Promise<MigrateResult> {
   const e = env();
   const family = familyOf(e.DB_DIALECT);
@@ -64,24 +162,8 @@ export async function runMigrations(): Promise<MigrateResult> {
   const migrationsTable = migrationsTableFor(prefix);
   const migrationsFolder = materializeMigrations(prefix);
 
-  /** Rows in Drizzle's journal table = migrations applied so far; 0 when the table does not exist yet. */
-  async function journalCount(run: (sqlText: string) => Promise<unknown>): Promise<number> {
-    try {
-      const rows = (await run(
-        family === 'pg'
-          ? `select count(*)::int as n from drizzle."${migrationsTable}"`
-          : `select count(*) as n from \`${migrationsTable}\``,
-      )) as unknown;
-      const first = Array.isArray(rows)
-        ? Array.isArray(rows[0])
-          ? (rows[0] as Record<string, unknown>[])[0]
-          : (rows[0] as Record<string, unknown>)
-        : (rows as { rows?: Record<string, unknown>[] }).rows?.[0];
-      return Number(first?.n ?? 0);
-    } catch {
-      return 0;
-    }
-  }
+  const journalCount = (run: (sqlText: string) => Promise<unknown>) =>
+    journalCountWith(run, family, migrationsTable);
 
   let before = 0;
   let after = 0;

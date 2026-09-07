@@ -6,6 +6,7 @@
  *   (none) | serve   HTTP server + scheduler (default)
  *   migrate          apply committed migrations — explicit, never on start (Q-4)
  *   seed             idempotent bootstrap seed (O-3)
+ *   preflight        readiness checks before start: env, DB, migrations, Redis, volumes (Q-13)
  *   health           GET /v1/health on the local port; exit 0/1 — the image HEALTHCHECK
  *   version          print build identity (M-5) and exit
  *
@@ -13,7 +14,15 @@
  */
 import rootPkg from '../../../package.json' with { type: 'json' };
 
-export const COMMANDS = ['serve', 'migrate', 'seed', 'health', 'version', 'help'] as const;
+export const COMMANDS = [
+  'serve',
+  'migrate',
+  'seed',
+  'preflight',
+  'health',
+  'version',
+  'help',
+] as const;
 export type Command = (typeof COMMANDS)[number];
 
 export function parseCommand(argv: readonly string[]): Command {
@@ -27,10 +36,11 @@ export function parseCommand(argv: readonly string[]): Command {
 
 export function usage(): string {
   return [
-    'pemakaian: api [serve|migrate|seed|health|version|help]',
-    '  serve    jalankan server HTTP + scheduler (baku)',
-    '  migrate  terapkan migrasi skema yang tersemat — langkah eksplisit (Q-4)',
-    '  seed     seed bootstrap idempoten: tenant baku, grup sistem, superadmin (O-3)',
+    'pemakaian: api [serve|migrate|seed|preflight|health|version|help]',
+    '  serve      jalankan server HTTP + scheduler (baku)',
+    '  migrate    terapkan migrasi skema yang tersemat — langkah eksplisit (Q-4)',
+    '  seed       seed bootstrap idempoten: tenant baku, grup sistem, superadmin (O-3)',
+    '  preflight  periksa kesiapan sebelum start: env, database, migrasi, Redis, volume; keluar 0/1 (Q-13)',
     '  health   cek /v1/health di port lokal, keluar 0/1 — dipakai HEALTHCHECK image',
     '  version  cetak identitas build (nama, versi, commit, waktu build)',
   ].join('\n');
@@ -93,6 +103,12 @@ export async function main(argv: readonly string[]): Promise<number> {
       const { runSeedAll } = await import('@core/auth/seed-all');
       await runSeedAll();
       return 0;
+    }
+    case 'preflight': {
+      const { formatPreflight, runPreflight } = await import('./preflight.ts');
+      const r = await runPreflight();
+      console.log(formatPreflight(r));
+      return r.ok ? 0 : 1;
     }
     case 'serve': {
       const { serve } = await import('./serve.ts');

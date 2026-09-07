@@ -343,7 +343,13 @@ jobs:
           cp .env.prod.example .env.prod
           sed -i 's/^DOMAIN=.*/DOMAIN=localhost/; s/^HTTP_PORT=.*/HTTP_PORT=18080/; s/^HTTPS_PORT=.*/HTTPS_PORT=18443/' .env.prod
           sed -i 's/^BOOTSTRAP_ADMIN_EMAIL=.*/BOOTSTRAP_ADMIN_EMAIL=admin@example.test/; s/^BOOTSTRAP_ADMIN_PASSWORD=.*/BOOTSTRAP_ADMIN_PASSWORD="bootstrap admin password"/' .env.prod
+          # preflight (Q-13) refuses placeholder secrets in production — CI must look like a real install
+          sed -i 's/^MYSQL_ROOT_PASSWORD=.*/MYSQL_ROOT_PASSWORD=ci-root-9f3a7c/; s/^MYSQL_PASSWORD=.*/MYSQL_PASSWORD=ci-app-4b8e2d/' .env.prod
       - run: sh scripts/ci/m1-scale-proof.sh
+      - name: Q-13 · preflight hijau pada stack yang sudah dimigrasi & di-seed
+        run: docker compose --env-file .env.prod -f compose.prod.yml run --rm preflight
+      - name: Q-12 · rollout api + web tanpa request gagal
+        run: sh scripts/ci/rollout-proof.sh
       - name: §8 #25 · RAM idle seluruh stack (3 replika api) < 1,5 GB
         run: PROJECT=dab-prod SETTLE_SECONDS=20 sh scripts/ci/idle-memory.sh
       - if: always()

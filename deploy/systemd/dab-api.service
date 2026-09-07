@@ -1,0 +1,36 @@
+# systemd unit for the API without Docker (PRD Q-11). Install:
+#   sh scripts/build-release.sh && sudo cp -r dist /opt/dab
+#   sudo useradd -r -s /usr/sbin/nologin dab && sudo mkdir -p /var/lib/dab/uploads && sudo chown -R dab:dab /var/lib/dab /opt/dab
+#   sudo cp deploy/systemd/api.env.example /etc/dab/api.env   # then edit; chmod 600
+#   sudo cp deploy/systemd/dab-api.service /etc/systemd/system/ && sudo systemctl enable --now dab-api
+# Migrations stay an explicit step (Q-4): `sudo -u dab /opt/dab/api migrate` before the first start
+# and after every upgrade. ExecStartPre runs `preflight` (Q-13): a half-configured host never starts.
+[Unit]
+Description=Dashboard AI Boilerplate — API
+Documentation=https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr/blob/main/docs/DEPLOY.md
+After=network-online.target mysql.service mariadb.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dab
+Group=dab
+EnvironmentFile=/etc/dab/api.env
+WorkingDirectory=/opt/dab
+ExecStartPre=/opt/dab/api preflight
+ExecStart=/opt/dab/api serve
+Restart=always
+RestartSec=3
+# serve() finishes in-flight requests and running jobs on SIGTERM
+KillSignal=SIGTERM
+TimeoutStopSec=25
+LimitNOFILE=65536
+# Hardening: the binary needs only its uploads directory writable
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dab/uploads
+
+[Install]
+WantedBy=multi-user.target

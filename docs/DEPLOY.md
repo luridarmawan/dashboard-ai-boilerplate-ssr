@@ -142,12 +142,10 @@ Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy me
 ```bash
 alias dc='docker compose --env-file .env.prod -f compose.prod.yml'   # sekali per shell (bash & zsh)
 
-# Upgrade versi
-git pull --recurse-submodules
-export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
-dc run --rm backup-once                       # dump sebelum menyentuh apa pun
-dc build && dc run --rm migrate && dc run --rm seed
-dc up -d --wait --scale api=3                 # replika lama diganti satu per satu oleh compose
+# Upgrade versi — TANPA downtime (Q-12; rincian di §8a)
+sh deploy/upgrade.sh                          # pull → build → backup → migrate → seed → preflight → rollout api lalu web
+API_REPLICAS=5 sh deploy/upgrade.sh --no-pull # dari kode yang sudah di-checkout, 5 replika api
+dc run --rm preflight                         # kapan saja: cek kesiapan, keluar 0/1 (Q-13; §8b)
 
 # Skala / status / log
 dc up -d --scale api=5                        # SELALU sertakan --scale pada setiap `up`, kalau tidak api kembali ke 1
@@ -219,4 +217,60 @@ Stack baku (caddy + web + 3×api + mysql + backup) idle di sekitar 600–900 MB 
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
-CI menjalankan pengukuran yang sama pada stack `--scale api=3` (`scripts/ci/idle-memory.sh`). Batas per service (`deploy.resources`), systemd tanpa Docker, deploy tanpa downtime, dan `preflight` (Q-11…Q-14) adalah P1 — lihat ROADMAP §8.
+CI menjalankan pengukuran yang sama pada stack `--scale api=3` (`scripts/ci/idle-memory.sh`).
+
+**Batas per service (Q-14):** setiap service di `compose.prod.yml` punya `mem_limit` dan `cpus` yang bisa diubah lewat `.env.prod` (`API_MEM_LIMIT`, `API_CPUS`, `WEB_*`, `MYSQL_*`, `CADDY_*`, `BACKUP_*`, `VALKEY_*`). Bakunya untuk 2 vCPU / 4 GB dengan 3 replika api: api 384 MB × 3, web 384 MB, mysql 1 GB, caddy 128 MB, backup 256 MB — total pagu ± 2,9 GB, jadi satu container yang bocor tidak bisa menjatuhkan host. Container yang menyentuh pagunya di-OOM-kill dan dinyalakan ulang Docker (`restart: unless-stopped`); `dc ps` dan `docker inspect --format '{{.State.OOMKilled}}'` memperlihatkannya.
+
+---
+
+## 8. Operasi lanjutan: upgrade tanpa downtime, preflight, systemd
+
+### 8a. Upgrade tanpa downtime (Q-12)
+
+`sh deploy/upgrade.sh` menjalankan urutan yang aman, satu langkah gagal = berhenti di situ dan versi lama tetap melayani:
+
+1. `git pull` (lewati dengan `--no-pull`), lalu **build** image dengan `IMAGE_TAG=<commit>` — versi lama tidak disentuh.
+2. **Backup** (`backup-once`), lalu **migrate**. Karena kode lama masih berjalan di atas skema baru sampai rollout selesai, migrasi harus **aditif** (tambah tabel/kolom/indeks, isi default). Menghapus atau mengganti nama kolom dilakukan di rilis berikutnya setelah tidak ada kode yang memakainya (pola *expand → migrate code → contract*).
+3. **seed** (idempoten) dan **preflight** (§8b) — bila preflight merah, tidak ada yang di-rollout.
+4. **Rollout** `api` lalu `web` lewat `deploy/rollout.sh`: replika baru dinyalakan **berdampingan** dengan yang lama (`--no-recreate`), masing-masing harus `healthy` menurut `HEALTHCHECK` image, Caddy diberi waktu menemukan upstream baru (`dynamic a`, refresh 5 s), baru replika lama dimatikan satu per satu dengan SIGTERM dan `stop_grace_period` 20 s sehingga request yang sedang berjalan selesai. Caddy mencoba ulang request yang upstream-nya baru hilang ke replika lain (`lb_try_duration 8s`, `lb_retries 3`), jadi klien tidak melihat kegagalan. Kalau replika baru tidak pernah sehat, skrip menghapusnya dan berhenti — yang lama tetap melayani.
+5. `IMAGE_TAG` ditulis kembali ke `.env.prod`, supaya `dc up -d` biasa di kemudian hari tidak diam-diam membuat ulang versi lama.
+
+Bukti: `scripts/ci/rollout-proof.sh` (job CI `scale-proof`) menembakkan request ke `/v1/health` dan `/robots.txt` lewat Caddy setiap 200 ms selama rollout tiga replika api dan web; syarat lolos: **nol** request gagal dan semua replika memakai tag baru. Yang tidak ditangani di sini: upgrade image `mysql`/`caddy` (restart singkat, lakukan di jendela pemeliharaan) dan skema yang tidak aditif.
+
+### 8b. Preflight (Q-13)
+
+`dc run --rm preflight` (di dalam image: `api preflight`; dari sumber: `bun apps/api/src/index.ts preflight`) memeriksa, **hanya membaca**, dan keluar 0/1:
+
+| Pemeriksaan | Gagal bila | Petunjuk yang dicetak |
+|---|---|---|
+| `env` | variabel wajib kosong/salah bentuk (satu baris per masalah) | isi di `.env.prod` / `/etc/dab/api.env` |
+| `secrets` (production) | `DATABASE_URL` atau `BOOTSTRAP_ADMIN_PASSWORD` masih nilai contoh (`change-me`) | ganti, lalu `db-init` |
+| `origin`, `signup`, `smtp` (production) | peringatan: origin tanpa https, pendaftaran terbuka, SMTP kosong | — |
+| `dialect` | image dibuild untuk dialect lain dari `DB_DIALECT` | build ulang dengan `--build-arg DB_DIALECT` |
+| `database` | `select 1` gagal | DATABASE_URL, service sehat, firewall |
+| `migrations` | ada migrasi tersemat yang belum diterapkan, atau database kosong | `dc run --rm migrate` |
+| `seed` | peringatan: belum ada tenant | `dc run --rm seed` |
+| `redis` | `PING` gagal saat ada `*_DRIVER=redis` | REDIS_URL / `--profile redis` |
+| `uploads` | `UPLOADS_DIR` tidak bisa ditulis | `chown 1000:1000` volume |
+| `modules` | (dari sumber) `modules.json` ≠ registry | `bun modules:sync` |
+
+Unit systemd memanggilnya sebagai `ExecStartPre`, sehingga host yang setengah terkonfigurasi tidak pernah start.
+
+### 8c. Tanpa Docker: systemd (Q-11)
+
+```bash
+# di mesin build (atau server, bila ada bun):
+DB_DIALECT=mysql sh scripts/build-release.sh        # → dist/api (binary) + dist/web/ (bundel + aset)
+# di server:
+sudo useradd -r -s /usr/sbin/nologin dab
+sudo mkdir -p /opt/dab /etc/dab /var/lib/dab/uploads && sudo cp -r dist/* /opt/dab/ && sudo chown -R dab:dab /opt/dab /var/lib/dab
+sudo cp deploy/systemd/api.env.example /etc/dab/api.env && sudo cp deploy/systemd/web.env.example /etc/dab/web.env
+sudo chmod 600 /etc/dab/*.env && sudo nano /etc/dab/api.env       # DATABASE_URL, APP_ORIGIN, BOOTSTRAP_*
+sudo -u dab -- env $(grep -v '^#' /etc/dab/api.env | xargs) /opt/dab/api migrate   # eksplisit (Q-4)
+sudo -u dab -- env $(grep -v '^#' /etc/dab/api.env | xargs) /opt/dab/api seed
+sudo cp deploy/systemd/dab-api.service deploy/systemd/dab-web.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now dab-api dab-web
+systemctl status dab-api dab-web; journalctl -u dab-api -f
+```
+
+`dab-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `dab-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/dab.next`, `api migrate`, tukar simlink/folder, `systemctl restart dab-api dab-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker.

@@ -5,12 +5,16 @@
 #   docker compose -f compose.prod.yml up -d
 #   docker compose -f compose.prod.yml run --rm migrate      # explicit, never automatic (Q-4)
 #   docker compose -f compose.prod.yml run --rm seed         # idempotent bootstrap (O-3)
+#   docker compose -f compose.prod.yml run --rm preflight    # readiness checks, exit 0/1 (Q-13)
+#   sh deploy/upgrade.sh                                     # new version without downtime (Q-12)
 #   docker compose -f compose.prod.yml up -d --scale api=3   # stateless: scale freely (Decision F)
 #   docker compose -f compose.prod.yml run --rm backup-once  # dump now; `backup` does it daily (Q-8)
 #   docker compose -f compose.prod.yml run --rm -e CONFIRM_RESTORE=yes restore latest
 #
 # One origin: Caddy terminates TLS and routes / → web, /v1/* /docs /openapi.json → api (Decisions D, E).
 # Valkey is optional (Decision M): `--profile redis`. Everything restarts on crash and on reboot (Q-6).
+# Every service is capped (Q-14, *_MEM_LIMIT / *_CPUS in .env.prod) so one runaway container cannot
+# take the VPS down; the defaults fit a 2 vCPU / 4 GB host with 3 api replicas (§8 #25).
 
 name: dab-prod
 
@@ -50,6 +54,8 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    mem_limit: ${CADDY_MEM_LIMIT:-128m}
+    cpus: ${CADDY_CPUS:-0.5}
     ports:
       - '${HTTP_PORT:-80}:80'
       - '${HTTPS_PORT:-443}:443'
@@ -78,6 +84,10 @@ services:
         APP_BUILT_AT: '${APP_BUILT_AT:-}'
     image: ${IMAGE_PREFIX:-dab}/web:${IMAGE_TAG:-local}
     restart: unless-stopped
+    mem_limit: ${WEB_MEM_LIMIT:-384m}
+    cpus: ${WEB_CPUS:-1.0}
+    # Rollouts (deploy/rollout.sh) stop the old replica with SIGTERM; give in-flight requests time.
+    stop_grace_period: 20s
     environment:
       # Deliberately NO fixed ORIGIN: SvelteKit derives each request's origin from
       # X-Forwarded-Proto/Host (set by Caddy, or by the front proxy in DEPLOY.md §2b), so every domain
@@ -106,6 +116,10 @@ services:
         APP_BUILT_AT: '${APP_BUILT_AT:-}'
     image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
     restart: unless-stopped
+    mem_limit: ${API_MEM_LIMIT:-384m}
+    cpus: ${API_CPUS:-1.0}
+    # serve() finishes in-flight requests and running jobs on SIGTERM before the port closes.
+    stop_grace_period: 20s
     environment:
       <<: *app-env
       API_HOST: 0.0.0.0
@@ -126,6 +140,25 @@ services:
       SCHEDULER_ENABLED: 'false'
     # The api image is one binary; `migrate` is its subcommand (apps/api/src/cli.ts)
     command: ['migrate']
+    depends_on:
+      mysql:
+        condition: service_healthy
+    <<: *logging
+
+  preflight:
+    # `run --rm preflight` — read-only readiness checks with actionable messages (Q-13): env complete,
+    # no placeholder secrets, database reachable, migrations up to date, seed present, Redis when
+    # enabled, uploads volume writable. deploy/upgrade.sh runs it before every rollout.
+    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    profiles: ['ops']
+    environment:
+      <<: *app-env
+      SCHEDULER_ENABLED: 'false'
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    command: ['preflight']
+    volumes:
+      - uploads:/data/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -175,6 +208,8 @@ services:
     # BACKUP_IMAGE must carry the client tools of your dialect: mysql:8 (default) or postgres:16.
     image: ${BACKUP_IMAGE:-mysql:8}
     restart: unless-stopped
+    mem_limit: ${BACKUP_MEM_LIMIT:-256m}
+    cpus: ${BACKUP_CPUS:-0.5}
     entrypoint: ['sh', '/deploy/backup-loop.sh']
     environment:
       DB_DIALECT: ${DB_DIALECT:-mysql}
@@ -228,6 +263,8 @@ services:
   mysql:
     image: mysql:8
     restart: unless-stopped
+    mem_limit: ${MYSQL_MEM_LIMIT:-1024m}
+    cpus: ${MYSQL_CPUS:-1.5}
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -251,6 +288,8 @@ services:
     image: valkey/valkey:8-alpine
     profiles: ['redis']
     restart: unless-stopped
+    mem_limit: ${VALKEY_MEM_LIMIT:-256m}
+    cpus: ${VALKEY_CPUS:-0.5}
     command: ['valkey-server', '--save', '60', '1', '--appendonly', 'yes']
     volumes:
       - valkey-data:/data

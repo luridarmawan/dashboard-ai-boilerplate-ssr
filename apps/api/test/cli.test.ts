@@ -13,6 +13,11 @@ describe('api cli (Q-2)', () => {
     expect(parseCommand(['--version'])).toBe('version');
   });
 
+  test('preflight is a first-class subcommand (Q-13)', () => {
+    expect(parseCommand(['preflight'])).toBe('preflight');
+    expect(usage()).toContain('preflight');
+  });
+
   test('unknown command fails loudly with usage', () => {
     expect(() => parseCommand(['migrat'])).toThrow(/tidak dikenal: migrat/);
     expect(() => parseCommand(['migrat'])).toThrow(/pemakaian: api/);
