@@ -33,13 +33,14 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 ## Cara menjalankan bagian manual
 
 ```bash
+alias dc='dc'   # bash & zsh
 # 23: di VPS baru, ikuti docs/DEPLOY.md §2 sambil menyalakan stopwatch; berhenti bila ada langkah yang tidak tertulis
 # 24: di VPS
-docker compose --env-file .env.prod -f compose.prod.yml run --rm backup-once
-docker compose --env-file .env.prod -f compose.prod.yml stop api web
-docker compose --env-file .env.prod -f compose.prod.yml exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE app; CREATE DATABASE app'
-docker compose --env-file .env.prod -f compose.prod.yml run --rm -e CONFIRM_RESTORE=yes restore latest
-docker compose --env-file .env.prod -f compose.prod.yml up -d --scale api=3 && curl -s https://DOMAIN/v1/ready
+dc run --rm backup-once
+dc stop api web
+dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE app; CREATE DATABASE app'
+dc run --rm -e CONFIRM_RESTORE=yes restore latest
+dc up -d --scale api=3 && curl -s https://DOMAIN/v1/ready
 # 25: setelah 10 menit idle
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```

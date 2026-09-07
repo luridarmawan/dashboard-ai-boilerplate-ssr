@@ -38,6 +38,8 @@ git clone --recurse-submodules https://github.com/luridarmawan/dashboard-ai-boil
 # 2. Buat .env.prod dari contoh dan isi EMPAT nilai (≈ 1 mnt)
 cp .env.prod.example .env.prod
 nano .env.prod
+#    Alias untuk semua perintah berikutnya — berlaku di bash maupun zsh (tambahkan ke ~/.zshrc / ~/.bashrc):
+alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   DOMAIN=app.example.com            ← domain Anda (record A sudah mengarah ke sini)
 #   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
@@ -48,23 +50,23 @@ nano .env.prod
 
 # 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)
 export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
-docker compose --env-file .env.prod -f compose.prod.yml build
+dc build
 #   → terlihat: "dab/api" dan "dab/web" di `docker image ls`
 
 # 4. Nyalakan database dan tunggu sehat (≈ 30 dtk)
-docker compose --env-file .env.prod -f compose.prod.yml up -d --wait mysql
+dc up -d --wait mysql
 #   → terlihat: "Container dab-prod-mysql-1 Healthy"
 
 # 5. Migrasi skema — langkah eksplisit, bukan otomatis (≈ 10 dtk)
-docker compose --env-file .env.prod -f compose.prod.yml run --rm migrate
+dc run --rm migrate
 #   → baris terakhir menyebut jumlah migrasi yang diterapkan; tidak ada "error"
 
 # 6. Seed: tenant default, grup sistem, superadmin pertama (≈ 5 dtk, idempoten)
-docker compose --env-file .env.prod -f compose.prod.yml run --rm seed
+dc run --rm seed
 #   → "db:seed: selesai — tenant …"
 
 # 7. Nyalakan seluruh stack: 3 replika api, web, caddy, backup harian (≈ 30 dtk)
-docker compose --env-file .env.prod -f compose.prod.yml up -d --wait --scale api=3
+dc up -d --wait --scale api=3
 #   → semua service "Healthy"/"Started"; Caddy mengambil sertifikat dalam ± 10–30 dtk
 
 # 8. Verifikasi HTTPS (ulangi bila sertifikat belum keluar)
@@ -86,7 +88,7 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 | `502` | `api`/`web` belum sehat | `docker compose … ps`, `docker compose … logs api --tail 50` |
 | `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
-| `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `$DC config \| grep DATABASE_URL`; samakan: `$DC exec mysql mysql -uroot -p'<root lama>' -e "ALTER USER 'app'@'%' IDENTIFIED BY '<baru>'"`, atau bila data belum penting `$DC down -v && $DC up -d --wait mysql` |
+| `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `dc config \| grep DATABASE_URL`; samakan: `dc exec mysql mysql -uroot -p'<root lama>' -e "ALTER USER 'app'@'%' IDENTIFIED BY '<baru>'"`, atau bila data belum penting `dc down -v && dc up -d --wait mysql` |
 
 ### 2b. Port 80/443 sudah dipakai Apache/Nginx di host yang sama
 
@@ -125,27 +127,27 @@ Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy me
 ## 3. Operasi harian
 
 ```bash
-DC="docker compose --env-file .env.prod -f compose.prod.yml"   # bash. Di zsh pakai: alias DC='docker compose …' lalu `DC ps`, atau `${=DC} ps`
+alias dc='dc'   # sekali per shell (bash & zsh)
 
 # Upgrade versi
 git pull --recurse-submodules
 export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
-$DC run --rm backup-once                       # dump sebelum menyentuh apa pun
-$DC build && $DC run --rm migrate && $DC run --rm seed
-$DC up -d --wait --scale api=3                 # replika lama diganti satu per satu oleh compose
+dc run --rm backup-once                       # dump sebelum menyentuh apa pun
+dc build && dc run --rm migrate && dc run --rm seed
+dc up -d --wait --scale api=3                 # replika lama diganti satu per satu oleh compose
 
 # Skala / status / log
-$DC up -d --scale api=5                        # SELALU sertakan --scale pada setiap `up`, kalau tidak api kembali ke 1
-$DC ps && $DC logs -f --tail 100 api           # log JSON, request id ikut mengalir (M-1)
+dc up -d --scale api=5                        # SELALU sertakan --scale pada setiap `up`, kalau tidak api kembali ke 1
+dc ps && dc logs -f --tail 100 api           # log JSON, request id ikut mengalir (M-1)
 docker stats --no-stream                        # RAM per container (§8 #25: total idle < 1,5 GB)
 
 # Backup & restore (Q-8, O-7) — lihat §4
-$DC run --rm backup-once
-$DC run --rm -e CONFIRM_RESTORE=yes restore latest
+dc run --rm backup-once
+dc run --rm -e CONFIRM_RESTORE=yes restore latest
 
 # Redis/Valkey opsional (Keputusan M) — percepatan cache konfigurasi, bukan kebutuhan
 #   di .env.prod: CACHE_DRIVER=redis, REDIS_URL=redis://valkey:6379
-$DC --profile redis up -d --wait --scale api=3
+dc --profile redis up -d --wait --scale api=3
 ```
 
 **Rotasi log (Q-7):** semua service memakai driver `json-file` dengan `max-size 10m`, `max-file 5` — maksimum ±50 MB per container. Log audit dan log aplikasi di database dipangkas job `core.logs.retention` sesuai **Pengaturan → Log & retensi** (M-3).
@@ -160,8 +162,8 @@ $DC --profile redis up -d --wait --scale api=3
 |---|---|
 | Terjadwal | service `backup` (selalu hidup): `mysqldump --single-transaction` (atau `pg_dump`) → `./backups/app-<dialect>-<UTC>.sql.gz`, segera saat start lalu tiap `BACKUP_INTERVAL_SECONDS` (baku 24 jam). `latest.sql.gz` adalah **hard link** ke dump terbaru: ukurannya nyata di semua alat, aman disalin lewat SFTP/rsync, tanpa ruang tambahan |
 | Retensi | dump lebih tua dari `BACKUP_KEEP_DAYS` (baku 14) dihapus setelah setiap dump |
-| Sekarang juga | `$DC run --rm backup-once` |
-| Restore | `$DC run --rm -e CONFIRM_RESTORE=yes restore latest` atau nama berkas di `./backups`. **Destruktif**: database dikosongkan lalu dump dimuat; tanpa `CONFIRM_RESTORE=yes` perintah menolak dan menjelaskan. Hentikan `api`/`web` dulu bila tidak ingin ada request gagal selama beberapa detik |
+| Sekarang juga | `dc run --rm backup-once` |
+| Restore | `dc run --rm -e CONFIRM_RESTORE=yes restore latest` atau nama berkas di `./backups`. **Destruktif**: database dikosongkan lalu dump dimuat; tanpa `CONFIRM_RESTORE=yes` perintah menolak dan menjelaskan. Hentikan `api`/`web` dulu bila tidak ingin ada request gagal selama beberapa detik |
 | Off-site | salin `./backups` keluar VPS (rclone/rsync/objek storage) — ini di luar cakupan stack |
 | PostgreSQL | `DB_DIALECT=postgres`, `BACKUP_IMAGE=postgres:16`, `DATABASE_URL` eksternal; skrip yang sama memakai `pg_dump`/`psql` |
 
