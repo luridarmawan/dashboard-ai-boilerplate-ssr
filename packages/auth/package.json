@@ -8,7 +8,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "seed": "bun run scripts/seed.ts",
+    "seed": "bun --env-file=../../.env run scripts/seed.ts",
     "typecheck": "bun run --cwd ../.. bootstrap >/dev/null && tsc -p tsconfig.json"
   },
   "dependencies": {
