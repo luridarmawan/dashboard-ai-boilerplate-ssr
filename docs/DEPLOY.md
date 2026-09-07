@@ -48,6 +48,11 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
 #   Kata sandi dan DATABASE_NAME HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
 #   = ALTER USER di MySQL atau `down -v` (hapus data) — lihat tabel gejala di bawah.
+#    Cek cepat: nilai yang benar-benar diterima compose (DATABASE_NAME, kata sandi, origin, port) — lakukan
+#    SEBELUM langkah 4, karena setelah volume dibuat nama database dan kata sandi terkunci:
+dc config | grep -E 'MYSQL_DATABASE|DATABASE_URL|APP_ORIGIN|ORIGIN:|HTTP_PORT|published' | sort -u
+#    → MYSQL_DATABASE dan akhiran DATABASE_URL harus sama dengan DATABASE_NAME Anda; APP_ORIGIN memuat
+#      semua domain; tidak ada baris yang masih berisi nilai contoh (change-me-…, example.com).
 
 # 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)
 export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
