@@ -127,7 +127,7 @@ Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy me
 ## 3. Operasi harian
 
 ```bash
-alias dc='dc'   # sekali per shell (bash & zsh)
+alias dc='docker compose --env-file .env.prod -f compose.prod.yml'   # sekali per shell (bash & zsh)
 
 # Upgrade versi
 git pull --recurse-submodules
