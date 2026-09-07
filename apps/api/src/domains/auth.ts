@@ -442,7 +442,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         '/logout',
         async ({ auth, cookie, request, server, requestId }) => {
           const a = auth as NonNullable<typeof auth>;
-          await revokeSession(unsafeAcrossTenants(), a.session.id);
+          if (a.session) await revokeSession(unsafeAcrossTenants(), a.session.id);
           cookie[SESSION_COOKIE]?.set({ value: '', ...cookieAttributes(request), maxAge: 0 });
           await writeAudit(unsafeAcrossTenants(), {
             clientId: a.clientId,
@@ -469,13 +469,18 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             user: publicUser(a.user),
             clientId: a.clientId,
             tenants,
-            session: {
-              id: a.session.id,
-              expiresAt: a.session.expires_at.toISOString(),
-              lastSeenAt: a.session.last_seen_at.toISOString(),
-              ip: a.session.ip,
-              userAgent: a.session.user_agent,
-            },
+            session: a.session
+              ? {
+                  id: a.session.id,
+                  expiresAt: a.session.expires_at.toISOString(),
+                  lastSeenAt: a.session.last_seen_at.toISOString(),
+                  ip: a.session.ip,
+                  userAgent: a.session.user_agent,
+                }
+              : null,
+            token: a.token
+              ? { id: a.token.id, name: a.token.name, scopes: a.scopes ? [...a.scopes] : null }
+              : null,
           });
         },
         {
@@ -492,13 +497,22 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
                     isDefault: t.Boolean(),
                   }),
                 ),
-                session: t.Object({
-                  id: t.String(),
-                  expiresAt: t.String(),
-                  lastSeenAt: t.String(),
-                  ip: t.Nullable(t.String()),
-                  userAgent: t.Nullable(t.String()),
-                }),
+                token: t.Nullable(
+                  t.Object({
+                    id: t.String(),
+                    name: t.String(),
+                    scopes: t.Nullable(t.Array(t.String())),
+                  }),
+                ),
+                session: t.Nullable(
+                  t.Object({
+                    id: t.String(),
+                    expiresAt: t.String(),
+                    lastSeenAt: t.String(),
+                    ip: t.Nullable(t.String()),
+                    userAgent: t.Nullable(t.String()),
+                  }),
+                ),
               }),
             ),
             ...errorResponses,
@@ -541,6 +555,17 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
           if (!(await canActInTenant(db, a.user, body.clientId))) {
             set.status = 403;
             return fail('tenant_forbidden', 'Anda bukan anggota tenant tersebut', requestId);
+          }
+          if (!a.session) {
+            set.status = 403;
+            return fail(
+              'forbidden',
+              'API token tidak bisa berganti tenant — pakai X-Client-ID',
+              requestId,
+              {
+                reason: 'session_only',
+              },
+            );
           }
           await setActiveTenant(db, a.session.id, body.clientId);
           await writeAudit(db, {

@@ -1,6 +1,8 @@
 <script lang="ts">
+import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
-import { Card } from '$lib/components/ui';
+import Icon from '$lib/components/Icon.svelte';
+import { Badge, Button, Card, Table } from '$lib/components/ui';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
 
@@ -51,6 +53,35 @@ const passwordFields: FieldDef[] = [
     autocomplete: 'new-password',
   },
 ];
+const tokenFields: FieldDef[] = [
+  {
+    name: 'name',
+    type: 'string',
+    label: 'Nama token',
+    required: true,
+    maxlength: 100,
+    placeholder: 'mis. Claude Desktop di laptop',
+  },
+  {
+    name: 'expiresInDays',
+    type: 'select',
+    label: 'Masa berlaku',
+    options: [
+      { value: '30', label: '30 hari' },
+      { value: '90', label: '90 hari' },
+      { value: '365', label: '1 tahun' },
+      { value: '', label: 'Tanpa batas' },
+    ],
+  },
+  {
+    name: 'scopes',
+    type: 'text',
+    label: 'Batasi izin (opsional)',
+    rows: 2,
+    hint: 'Satu izin per baris atau dipisah spasi, mis. example.product.read. Kosong = seluruh izin Anda. Token tidak pernah melebihi izin Anda sendiri.',
+  },
+];
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -75,6 +106,39 @@ const apiError = $derived(form?.error && Object.keys(fieldErrors).length === 0 ?
     <p class="mt-3 text-sm text-muted-foreground"><a href="/theme?back=/profile">Tema &amp; tampilan</a> · <a href="/lang?back=/profile">Bahasa</a></p>
   </Card>
   <Card title="Ganti kata sandi" description="Sesi di perangkat lain akan diakhiri.">
-    <FormBuilder fields={passwordFields} errors={fieldErrors} csrf={data.csrf} action="?/password" submitLabel="Ganti kata sandi" notice={form?.saved === 'password' ? 'Kata sandi diganti. Sesi di perangkat lain telah diakhiri.' : null} error={null} />
+    <FormBuilder fields={passwordFields} errors={form?.saved === undefined && form?.code ? {} : fieldErrors} csrf={data.csrf} action="?/password" submitLabel="Ganti kata sandi" notice={form?.saved === 'password' ? 'Kata sandi diganti. Sesi di perangkat lain telah diakhiri.' : null} error={null} />
+  </Card>
+  <Card title="Token API" description="Untuk klien di luar browser — MCP (Claude Desktop, Claude Code), aplikasi mobile, skrip. Token bertindak sebagai Anda di tenant aktif; kirim sebagai header Authorization: Bearer.">
+    {#if form?.saved === 'token' && form.token}
+      <div class="notice mb-4" role="status" data-testid="new-token">
+        <p class="font-medium">Token “{form.tokenName}” dibuat. Salin sekarang — tidak akan ditampilkan lagi.</p>
+        <code class="mt-2 block select-all break-all rounded-md border bg-background px-3 py-2 text-sm">{form.token}</code>
+        <p class="mt-2 text-sm text-muted-foreground">Contoh: <code>claude mcp add --transport http dashboard {data.appOrigin ?? ''}/v1/mcp --header "Authorization: Bearer …"</code></p>
+      </div>
+    {/if}
+    {#if form?.saved === 'revoke'}<p class="notice mb-4">Token dicabut.</p>{/if}
+    {#if data.tokens.length}
+      <Table caption="Token aktif milik Anda">
+        <thead><tr><th>Nama</th><th>Izin</th><th>Berlaku sampai</th><th>Terakhir dipakai</th><th></th></tr></thead>
+        <tbody>
+          {#each data.tokens as tk (tk.id)}
+            <tr data-testid="token-row">
+              <td class="font-medium">{tk.name}</td>
+              <td>{#if tk.scopes?.length}{#each tk.scopes as s (s)}<Badge variant="outline">{s}</Badge> {/each}{:else}<span class="text-muted-foreground">semua izin Anda</span>{/if}</td>
+              <td>{tk.expiresAt ? fmt(tk.expiresAt) : 'tanpa batas'}</td>
+              <td>{fmt(tk.lastUsedAt)}</td>
+              <td class="text-right">
+                <form method="POST" action="?/revokeToken"><Csrf token={data.csrf} /><input type="hidden" name="id" value={tk.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />Cabut</Button></form>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </Table>
+    {:else}
+      <p class="mb-3 text-sm text-muted-foreground">Belum ada token.</p>
+    {/if}
+    <div class="mt-4">
+      <FormBuilder fields={tokenFields} values={{ expiresInDays: '90' }} errors={form?.code === 'validation_failed' && form?.saved === undefined ? fieldErrors : {}} csrf={data.csrf} action="?/createToken" submitLabel="Buat token" columns={2} notice={null} error={form?.saved === undefined && form?.values && 'name' in (form.values as object) ? apiError : null} />
+    </div>
   </Card>
 </div>

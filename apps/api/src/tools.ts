@@ -25,6 +25,11 @@ import { moduleState } from './services.ts';
  *   scoped    ⇔ `run` gets `forTenant(clientId)` — never a raw connection
  *
  * Every call is audited (`tool.call`), success or failure, with the tool name as resource.
+ *
+ * Besides the static tools from `api/tools.ts`, a module may register a **tool source** (I-4):
+ * tools resolved per caller at request time — the AI module's external MCP servers. They flow
+ * through the same three guarantees; the only difference is that their input schema comes from
+ * a remote server and is validated there, not here (`external: true`).
  */
 
 export interface ToolCaller {
@@ -65,18 +70,53 @@ export type ToolCallResult =
       readonly ms: number;
     };
 
+/** A registered tool; `external` marks tools whose schema lives on a remote server (I-4). */
+export type RegistryTool = RegisteredTool & { readonly external?: boolean };
+
+/** Per-caller tool provider (I-4). Registered once per process by the module that owns it. */
+export interface ToolSource {
+  readonly id: string;
+  /** Tools this caller may use right now (already filtered by the source's own rules). */
+  list(caller: ToolCaller): Promise<readonly RegistryTool[]>;
+  /** Resolve one tool by `<ns>.<name>` or wire name for this caller; undefined when not theirs. */
+  find(nameOrWire: string, caller: ToolCaller): Promise<RegistryTool | undefined>;
+}
+
 const all: readonly RegisteredTool[] = moduleTools.flatMap((m) =>
   m.tools.map((tool: ToolDef) => ({ ...tool, module: m.module, ns: m.ns })),
 );
 const byName = new Map(all.map((tool) => [tool.name, tool]));
+const sources = new Map<string, ToolSource>();
 
-/** Every declared tool, regardless of caller — for admin views and tests. */
+/** Every statically declared tool, regardless of caller — for admin views and tests. */
 export function allTools(): readonly RegisteredTool[] {
   return all;
 }
 
-function resolve(nameOrWire: string): RegisteredTool | undefined {
+/** Register (or replace) a dynamic tool source. Idempotent by id, so module re-imports are safe. */
+export function registerToolSource(source: ToolSource): void {
+  sources.set(source.id, source);
+}
+
+function resolveStatic(nameOrWire: string): RegisteredTool | undefined {
   return byName.get(nameOrWire) ?? byName.get(toolNameFromWire(nameOrWire) ?? '');
+}
+
+async function resolve(nameOrWire: string, caller: ToolCaller): Promise<RegistryTool | undefined> {
+  const hit = resolveStatic(nameOrWire);
+  if (hit) return hit;
+  for (const source of sources.values()) {
+    try {
+      const found = await source.find(nameOrWire, caller);
+      if (found) return found;
+    } catch (err) {
+      logger.warn('tool: source lookup failed', {
+        source: source.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return undefined;
 }
 
 export function describeTool(tool: RegisteredTool): ToolDescriptor {
@@ -92,16 +132,28 @@ export function describeTool(tool: RegisteredTool): ToolDescriptor {
 }
 
 /** Tools the caller may see in the active tenant: module enabled and permission held (I-3). */
-export async function listTools(caller: ToolCaller): Promise<readonly RegisteredTool[]> {
-  if (!all.length) return [];
+export async function listTools(caller: ToolCaller): Promise<readonly RegistryTool[]> {
+  if (!all.length && !sources.size) return [];
   const enabled = await moduleState.enabledFor(caller.clientId);
-  return all.filter(
-    (tool) => enabled.has(tool.module) && (!tool.permission || caller.can(tool.permission)),
-  );
+  const visible = (tool: RegistryTool) =>
+    enabled.has(tool.module) && (!tool.permission || caller.can(tool.permission));
+  const out: RegistryTool[] = all.filter(visible);
+  for (const source of sources.values()) {
+    try {
+      out.push(...(await source.list(caller)).filter(visible));
+    } catch (err) {
+      // A remote source that is down must not take the module tools with it.
+      logger.warn('tool: source listing failed', {
+        source: source.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return out;
 }
 
 /** OpenAI `tools` array for a chat completion request, descriptions in the caller's locale. */
-export function toOpenAiTools(tools: readonly RegisteredTool[], locale = 'id') {
+export function toOpenAiTools(tools: readonly RegistryTool[], locale = 'id') {
   return tools.map((tool) => ({
     type: 'function' as const,
     function: {
@@ -140,7 +192,7 @@ export async function callTool(
 ): Promise<ToolCallResult> {
   const started = performance.now();
   const ms = () => Math.round(performance.now() - started);
-  const tool = resolve(nameOrWire);
+  const tool = await resolve(nameOrWire, caller);
   const name = tool?.name ?? nameOrWire;
   const refuse = (code: Exclude<ToolCallResult, { ok: true }>['code'], message: string) => {
     void audit(caller, name, { ok: false, code });
@@ -153,7 +205,8 @@ export async function callTool(
   if (tool.permission && !caller.can(tool.permission))
     return refuse('forbidden', `Anda tidak punya izin ${tool.permission}`);
   const input = rawInput === undefined || rawInput === null ? {} : rawInput;
-  const invalid = validationMessage(tool.input, input);
+  // External tools carry a remote JSON Schema (not TypeBox); the remote server validates those.
+  const invalid = tool.external ? null : validationMessage(tool.input, input);
   if (invalid) return refuse('invalid_input', `Argumen tool tidak valid — ${invalid}`);
 
   try {

@@ -20,6 +20,16 @@ export const ChatCompletionBody = t.Object({
    */
   tools: t.Optional(t.Boolean()),
 });
+/** External MCP server registration (I-4, I-5). `headers` values are secrets: never echoed back. */
+export const McpBody = t.Object({
+  name: t.String({ minLength: 1, maxLength: 191 }),
+  code: t.String({ minLength: 2, maxLength: 40, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }),
+  transport: t.Union([t.Literal('http'), t.Literal('sse')]),
+  url: t.String({ minLength: 8, maxLength: 512, pattern: '^https?://' }),
+  headers: t.Optional(t.Record(t.String({ maxLength: 100 }), t.String({ maxLength: 4000 }))),
+  enabled: t.Optional(t.Boolean()),
+});
+export const McpUpdateBody = t.Partial(McpBody);
 export const ConversationPatch = t.Object({
   title: t.Optional(t.String({ minLength: 1, maxLength: 191 })),
   archived: t.Optional(t.Boolean()),

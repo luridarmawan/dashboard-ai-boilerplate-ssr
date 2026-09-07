@@ -1,3 +1,13 @@
+export {
+  type ApiTokenRow,
+  type CreatedApiToken,
+  createApiToken,
+  defaultTenantOf,
+  findApiToken,
+  listApiTokens,
+  type NewApiToken,
+  revokeApiToken,
+} from './api-tokens.ts';
 export { type AuditEntry, writeAudit } from './audit.ts';
 export {
   canActInTenant,

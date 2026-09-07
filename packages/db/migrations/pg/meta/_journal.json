@@ -57,6 +57,13 @@
       "when": 1788733157869,
       "tag": "0007_overjoyed_daredevil",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788816763018,
+      "tag": "0008_empty_molly_hayes",
+      "breakpoints": true
     }
   ]
 }

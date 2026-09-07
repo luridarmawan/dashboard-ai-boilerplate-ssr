@@ -25,7 +25,9 @@ import { and, count, desc, eq, isNull, newId, schema, unsafeAcrossTenants } from
 import { logger } from '@core/logger';
 import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
-import { ChatCompletionBody, ConversationPatch } from './schemas.ts';
+import { discoverRemoteTools, wireSuffix } from './mcp-client.ts';
+import { maskedHeaders, mcpToolSource, mergeHeaders, toolNameFor } from './mcp-tools.ts';
+import { ChatCompletionBody, ConversationPatch, McpBody, McpUpdateBody } from './schemas.ts';
 
 /** Provider-side message: OpenAI shape, including the tool round-trip (I-3). */
 interface ProviderMessage {
@@ -166,6 +168,57 @@ function logCall(c: CallLog): void {
 }
 
 const estimateTokens = (s: string) => Math.ceil(s.length / 4);
+
+// ---- external MCP servers (I-4, I-5) ----
+void mcpToolSource; // importing mcp-tools.ts registers the tool source with the core registry
+type McpRow = typeof schema.aiMcps.$inferSelect;
+type McpToolRow = typeof schema.aiMcpTools.$inferSelect;
+const McpView = t.Object({
+  id: t.String(),
+  code: t.String(),
+  name: t.String(),
+  transport: t.String(),
+  url: t.String(),
+  /** Header names with masked values — secrets never leave the server. */
+  headers: t.Record(t.String(), t.String()),
+  enabled: t.Boolean(),
+  lastStatus: t.Nullable(t.String()),
+  lastError: t.Nullable(t.String()),
+  lastSyncedAt: t.Nullable(t.String()),
+  toolsCount: t.Integer(),
+  createdAt: t.String(),
+});
+const McpToolView = t.Object({
+  id: t.String(),
+  name: t.String(),
+  wire: t.String(),
+  /** What the assistant / MCP clients see: `ext_<code>__<wire>`. */
+  wireName: t.String(),
+  description: t.Nullable(t.String()),
+  enabled: t.Boolean(),
+});
+const mcpView = (m: McpRow) => ({
+  id: m.id,
+  code: m.code,
+  name: m.name,
+  transport: m.transport,
+  url: m.url,
+  headers: maskedHeaders(m),
+  enabled: m.enabled,
+  lastStatus: m.last_status,
+  lastError: m.last_error,
+  lastSyncedAt: m.last_synced_at?.toISOString() ?? null,
+  toolsCount: m.tools_count,
+  createdAt: m.created_at.toISOString(),
+});
+const mcpToolView = (code: string) => (r: McpToolRow) => ({
+  id: r.id,
+  name: r.name,
+  wire: r.wire,
+  wireName: toolNameFor(code, r.wire).replace('.', '_'),
+  description: r.description,
+  enabled: r.enabled,
+});
 
 export default defineApiRoutes(
   'AI',
@@ -866,6 +919,300 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: { summary: 'AI call log of the active tenant (tokens, latency, status, cost)' },
+      },
+    )
+
+    // ---- external MCP servers (I-4, I-5): registrations are tenant data; secrets never echo ----
+    .get(
+      '/mcps',
+      async ({ tenantState }) => {
+        if (!tenantState?.tenant) return ok([]);
+        const rows = await tenantState.tenant.select(
+          schema.aiMcps,
+          isNull(schema.aiMcps.deleted_at),
+        );
+        return ok(rows.sort((a, b) => a.name.localeCompare(b.name)).map(mcpView));
+      },
+      {
+        beforeHandle: permission('ai.mcp.read'),
+        response: { 200: OkSchema(t.Array(McpView)), ...errorResponses },
+        detail: { summary: 'External MCP servers registered for the active tenant (I-4)' },
+      },
+    )
+    .get(
+      '/mcps/:id',
+      async ({ params, set, requestId, tenantState }) => {
+        const tenant = tenantState?.tenant;
+        const row = tenant
+          ? await tenant.selectOne(
+              schema.aiMcps,
+              and(eq(schema.aiMcps.id, params.id), isNull(schema.aiMcps.deleted_at)),
+            )
+          : null;
+        if (!row || !tenant) {
+          set.status = 404;
+          return fail('not_found', 'Server MCP tidak ditemukan', requestId);
+        }
+        const tools = await tenant.select(schema.aiMcpTools, eq(schema.aiMcpTools.mcp_id, row.id));
+        return ok({
+          ...mcpView(row),
+          tools: tools.sort((a, b) => a.name.localeCompare(b.name)).map(mcpToolView(row.code)),
+        });
+      },
+      {
+        beforeHandle: permission('ai.mcp.read'),
+        params: t.Object({ id: Id }),
+        response: {
+          200: OkSchema(t.Intersect([McpView, t.Object({ tools: t.Array(McpToolView) })])),
+          ...errorResponses,
+        },
+        detail: { summary: 'One MCP server with the tools discovered on it' },
+      },
+    )
+    .post(
+      '/mcps',
+      async ({ auth, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        if (!tenant || !tenantState.clientId) {
+          set.status = 409;
+          return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        const dup = await tenant.selectOne(
+          schema.aiMcps,
+          and(eq(schema.aiMcps.code, body.code), isNull(schema.aiMcps.deleted_at)),
+        );
+        if (dup) {
+          set.status = 409;
+          return fail('conflict', `Kode "${body.code}" sudah dipakai`, requestId, {
+            code: body.code,
+          });
+        }
+        const id = newId();
+        await tenant.insert(schema.aiMcps, {
+          id,
+          code: body.code,
+          name: body.name.trim(),
+          transport: body.transport,
+          url: body.url.trim(),
+          headers: mergeHeaders(null, body.headers),
+          enabled: body.enabled ?? true,
+          last_status: null,
+          last_error: null,
+          last_synced_at: null,
+          tools_count: 0,
+        });
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.mcp.create',
+          resource: 'ai.mcp',
+          resourceId: id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { code: body.code, url: body.url, transport: body.transport },
+        });
+        const row = (await tenant.selectOne(schema.aiMcps, eq(schema.aiMcps.id, id))) as McpRow;
+        set.status = 201;
+        return ok(mcpView(row));
+      },
+      {
+        beforeHandle: permission('ai.mcp.manage'),
+        body: McpBody,
+        response: { 201: OkSchema(McpView), ...errorResponses },
+        detail: {
+          summary: 'Register an external MCP server (http or sse); headers are stored as secrets',
+        },
+      },
+    )
+    .put(
+      '/mcps/:id',
+      async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = tenant
+          ? await tenant.selectOne(
+              schema.aiMcps,
+              and(eq(schema.aiMcps.id, params.id), isNull(schema.aiMcps.deleted_at)),
+            )
+          : null;
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Server MCP tidak ditemukan', requestId);
+        }
+        if (body.code && body.code !== row.code) {
+          const dup = await tenant.selectOne(
+            schema.aiMcps,
+            and(eq(schema.aiMcps.code, body.code), isNull(schema.aiMcps.deleted_at)),
+          );
+          if (dup) {
+            set.status = 409;
+            return fail('conflict', `Kode "${body.code}" sudah dipakai`, requestId, {
+              code: body.code,
+            });
+          }
+        }
+        const patch: Partial<typeof schema.aiMcps.$inferInsert> = {};
+        if (body.name !== undefined) patch.name = body.name.trim();
+        if (body.code !== undefined) patch.code = body.code;
+        if (body.transport !== undefined) patch.transport = body.transport;
+        if (body.url !== undefined) patch.url = body.url.trim();
+        if (body.headers !== undefined) patch.headers = mergeHeaders(row.headers, body.headers);
+        if (body.enabled !== undefined) patch.enabled = body.enabled;
+        if (Object.keys(patch).length)
+          await tenant.update(schema.aiMcps, patch, eq(schema.aiMcps.id, row.id));
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.mcp.edit',
+          resource: 'ai.mcp',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { ...patch, headers: patch.headers ? Object.keys(patch.headers) : undefined },
+        });
+        const after = (await tenant.selectOne(
+          schema.aiMcps,
+          eq(schema.aiMcps.id, row.id),
+        )) as McpRow;
+        return ok(mcpView(after));
+      },
+      {
+        beforeHandle: permission('ai.mcp.manage'),
+        params: t.Object({ id: Id }),
+        body: McpUpdateBody,
+        response: { 200: OkSchema(McpView), ...errorResponses },
+        detail: { summary: 'Update an MCP server; a header value of *** keeps the stored secret' },
+      },
+    )
+    .delete(
+      '/mcps/:id',
+      async ({ auth, params, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const n = tenant
+          ? await tenant.update(
+              schema.aiMcps,
+              { deleted_at: new Date(), enabled: false },
+              and(eq(schema.aiMcps.id, params.id), isNull(schema.aiMcps.deleted_at)),
+            )
+          : 0;
+        if (!n || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Server MCP tidak ditemukan', requestId);
+        }
+        await tenant.delete(schema.aiMcpTools, eq(schema.aiMcpTools.mcp_id, params.id));
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.mcp.delete',
+          resource: 'ai.mcp',
+          resourceId: params.id,
+          ip: clientIp(request, server),
+          requestId,
+        });
+        return ok({ deleted: true as const });
+      },
+      {
+        beforeHandle: permission('ai.mcp.manage'),
+        params: t.Object({ id: Id }),
+        response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
+        detail: { summary: 'Remove an MCP server and forget its tools' },
+      },
+    )
+    .post(
+      '/mcps/:id/test',
+      async ({ auth, params, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = tenant
+          ? await tenant.selectOne(
+              schema.aiMcps,
+              and(eq(schema.aiMcps.id, params.id), isNull(schema.aiMcps.deleted_at)),
+            )
+          : null;
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Server MCP tidak ditemukan', requestId);
+        }
+        const started = performance.now();
+        let discovered: Awaited<ReturnType<typeof discoverRemoteTools>> = [];
+        let error: string | null = null;
+        try {
+          discovered = await discoverRemoteTools(row);
+        } catch (err) {
+          error = (err instanceof Error ? err.message : String(err)).slice(0, 1000);
+        }
+        const ms = Math.round(performance.now() - started);
+        if (error === null) {
+          // Replace the discovered set: tools that vanished upstream vanish here too.
+          const existing = await tenant.select(
+            schema.aiMcpTools,
+            eq(schema.aiMcpTools.mcp_id, row.id),
+          );
+          const wasDisabled = new Set(existing.filter((x) => !x.enabled).map((x) => x.wire));
+          await tenant.delete(schema.aiMcpTools, eq(schema.aiMcpTools.mcp_id, row.id));
+          const seen = new Set<string>();
+          for (const rt of discovered) {
+            let wire = wireSuffix(rt.name);
+            for (let i = 2; seen.has(wire); i++) wire = `${wireSuffix(rt.name).slice(0, 36)}_${i}`;
+            seen.add(wire);
+            await tenant.insert(schema.aiMcpTools, {
+              id: newId(),
+              mcp_id: row.id,
+              name: rt.name.slice(0, 191),
+              wire,
+              description: rt.description,
+              input_schema: rt.inputSchema,
+              enabled: !wasDisabled.has(wire),
+            });
+          }
+        }
+        await tenant.update(
+          schema.aiMcps,
+          {
+            last_status: error === null ? 'ok' : 'error',
+            last_error: error,
+            last_synced_at: new Date(),
+            ...(error === null ? { tools_count: discovered.length } : {}),
+          },
+          eq(schema.aiMcps.id, row.id),
+        );
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.mcp.test',
+          resource: 'ai.mcp',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { ok: error === null, tools: discovered.length, ms },
+        });
+        const tools = await tenant.select(schema.aiMcpTools, eq(schema.aiMcpTools.mcp_id, row.id));
+        return ok({
+          ok: error === null,
+          error,
+          ms,
+          tools: tools.sort((x, y) => x.name.localeCompare(y.name)).map(mcpToolView(row.code)),
+        });
+      },
+      {
+        beforeHandle: permission('ai.mcp.manage'),
+        params: t.Object({ id: Id }),
+        response: {
+          200: OkSchema(
+            t.Object({
+              ok: t.Boolean(),
+              error: t.Nullable(t.String()),
+              ms: t.Integer(),
+              tools: t.Array(McpToolView),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary: 'Connect to the MCP server, (re)load its tool list, record status (I-5)',
+        },
       },
     ),
 );

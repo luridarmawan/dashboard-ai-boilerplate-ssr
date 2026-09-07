@@ -1,13 +1,23 @@
-import { findSession, looksLikeToken, type SessionRow, type UserRow } from '@core/auth';
+import {
+  type ApiTokenRow,
+  defaultTenantOf,
+  findApiToken,
+  findSession,
+  looksLikeToken,
+  type SessionRow,
+  type UserRow,
+} from '@core/auth';
 import { fail } from '@core/contracts';
 import { newId, unsafeAcrossTenants } from '@core/db';
 import { Elysia } from 'elysia';
 
 /**
- * Session resolution (PRD A-3, B-2). Runs on every request: reads the `dab_session` cookie,
- * looks the session up in the database (no per-process cache — Decision M / D1), and exposes
- * `auth` to handlers. Routes that need a user opt in with `requireAuth`; everything else in the
- * API is protected by default because the domain groups mount it (Principle 4).
+ * Session resolution (PRD A-3, A-4, B-2). Runs on every request: an `Authorization: Bearer`
+ * header names an API token (A-4, non-browser clients such as MCP); otherwise the `dab_session`
+ * cookie names a session. Both are looked up in the database (no per-process cache — Decision M
+ * / D1), and exposed as `auth` to handlers. Routes that need a user opt in with `requireAuth`;
+ * everything else in the API is protected by default because the domain groups mount it
+ * (Principle 4). Bearer requests carry no cookie, so the CSRF plugin exempts them structurally.
  *
  * The lookup uses the raw connection on purpose: sessions and users are global tables, and
  * the active tenant is only KNOWN after the session is read.
@@ -16,25 +26,82 @@ import { Elysia } from 'elysia';
 export const SESSION_COOKIE = 'dab_session';
 
 export interface AuthState {
-  readonly session: SessionRow;
+  /** The cookie session; null when the request authenticated with an API token (A-4). */
+  readonly session: SessionRow | null;
+  /** The API token; null when the request authenticated with a cookie session. */
+  readonly token: ApiTokenRow | null;
   readonly user: UserRow;
-  /** Active tenant of this session; null until the user has one (B-2). */
+  /** Active tenant of this session / token; null until the user has one (B-2). */
   readonly clientId: string | null;
+  /** Permission strings a token is limited to (A-4); null = the user's full permissions. */
+  readonly scopes: readonly string[] | null;
 }
 
 export const authContext = new Elysia({ name: 'auth-context' }).derive(
   { as: 'global' },
-  async ({ cookie }): Promise<{ auth: AuthState | null }> => {
+  async ({ cookie, request }): Promise<{ auth: AuthState | null }> => {
+    const db = unsafeAcrossTenants(); // global tables (sessions, tokens, users): no tenant to scope by yet
+    const header = request.headers.get('authorization');
+    if (header && /^bearer\s+/i.test(header)) {
+      const secret = header.replace(/^bearer\s+/i, '').trim();
+      if (!looksLikeToken(secret)) return { auth: null };
+      const found = await findApiToken(db, secret);
+      if (!found) return { auth: null };
+      const scopes = Array.isArray(found.token.scopes)
+        ? (found.token.scopes as unknown[]).filter((s): s is string => typeof s === 'string')
+        : null;
+      return {
+        auth: {
+          session: null,
+          token: found.token,
+          user: found.user,
+          clientId: found.token.client_id ?? (await defaultTenantOf(db, found.user.id)),
+          scopes,
+        },
+      };
+    }
     const token = cookie[SESSION_COOKIE]?.value;
     if (typeof token !== 'string' || !looksLikeToken(token)) return { auth: null };
-    // Global tables (sessions, users): no tenant to scope by yet.
-    const found = await findSession(unsafeAcrossTenants(), token);
+    const found = await findSession(db, token);
     if (!found) return { auth: null };
     return {
-      auth: { session: found.session, user: found.user, clientId: found.session.client_id },
+      auth: {
+        session: found.session,
+        token: null,
+        user: found.user,
+        clientId: found.session.client_id,
+        scopes: null,
+      },
     };
   },
 );
+
+/**
+ * Route guard for actions that only make sense for a cookie session — logout, switching the
+ * session's tenant, minting tokens. An API token gets 403 with a reason, not a crash.
+ */
+export function sessionOnly({
+  auth,
+  set,
+  request,
+}: {
+  auth: AuthState | null;
+  set: { status?: number | string; headers: Record<string, string | number | undefined> };
+  request: Request;
+}) {
+  const rid = String(set.headers['x-request-id'] ?? request.headers.get('x-request-id') ?? newId());
+  if (!auth) {
+    set.status = 401;
+    return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', rid);
+  }
+  if (!auth.session) {
+    set.status = 403;
+    return fail('forbidden', 'Aksi ini hanya untuk sesi browser, bukan API token', rid, {
+      reason: 'session_only',
+    });
+  }
+  return undefined;
+}
 
 /** Mount inside a group to make every route in it require a live session. */
 export const requireAuth = new Elysia({ name: 'require-auth' })

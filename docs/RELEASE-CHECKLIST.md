@@ -45,4 +45,4 @@ dc up -d --scale api=3 && curl -s https://DOMAIN/v1/ready
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
-Yang belum ditepati MVP dan sengaja ditunda (P1/P2, PRD §8 bagian akhir & ROADMAP §8): MCP server/client (FR-I; kontrak tool titik perluasan 8 sudah tersedia lewat `api/tools.ts` dan `/v1/tools`), adapter Redis untuk sesi/rate limit, systemd tanpa Docker, deploy tanpa downtime, `preflight`, batas sumber daya per service, UI admin modul lengkap, uninstall modul dengan migrasi turun.
+Yang belum ditepati MVP dan sengaja ditunda (P1/P2, PRD §8 bagian akhir & ROADMAP §8): transport `stdio`/`websocket` untuk MCP client (FR-I selebihnya selesai — `docs/MCP.md`), adapter Redis untuk sesi/rate limit, systemd tanpa Docker, deploy tanpa downtime, `preflight`, batas sumber daya per service, UI admin modul lengkap, uninstall modul dengan migrasi turun.

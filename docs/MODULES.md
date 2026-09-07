@@ -406,7 +406,7 @@ Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (cha
 | Argumen sesuai skema | divalidasi TypeBox sebelum `run`; yang tidak valid dijawab ke model sebagai galat, bukan dieksekusi |
 | Teraudit | setiap panggilan menulis `audit_log` (`tool.call`, resource = nama tool), sukses maupun ditolak |
 
-Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `dab.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
+Tool yang sama tersaji ke klien MCP eksternal lewat `/v1/mcp` ([`MCP.md`](./MCP.md)). Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `dab.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
 
 Aturan: `name` diawali namespace dan ≤ 64 karakter dalam bentuk kawat (`<ns>_<nama>`); `permission` milik modul sendiri harus dideklarasikan di `permissions.ts` (sync menolak yang tidak ada); `input` harus skema objek. Modul **tidak boleh** memanggil tool modul lain lewat internal — pakai `POST /v1/tools/call` atau tunggu MCP.
 
@@ -457,7 +457,6 @@ Semua 16 titik perluasan di §2a **tersedia**. Yang belum ada:
 
 | Hal | Status |
 |---|---|
-| MCP server & client (FR-I, I-1…I-5) | Menyusul (ROADMAP §8 butir 2). Kontrak tool-nya — titik perluasan 8, `api/tools.ts` + registry `/v1/tools` — **sudah ada** dan dipakai asisten AI; MCP nanti hanya membungkus registry yang sama, jadi tool yang Anda tulis hari ini otomatis ikut |
 | Modul sebagai paket npm (`source: "package"`) | M7. Hari ini: `local` atau `submodule` |
 | UI admin modul (G-14) — daftar modul, sumber & versi, aktif/nonaktif per tenant, galat muat | Sebagian: `/modules` menampilkan modul dan status per tenant; sumber/versi/galat muat menyusul M7 |
 | Uninstall bersih dengan migrasi turun (G-15) | M7. Mencabut modul hari ini meninggalkan tabelnya (G-8) |

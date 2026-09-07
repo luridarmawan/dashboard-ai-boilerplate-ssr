@@ -4,11 +4,13 @@ import { auth } from './domains/auth.ts';
 import { clients } from './domains/clients.ts';
 import { configuration } from './domains/configuration.ts';
 import { groups } from './domains/groups.ts';
+import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
 import { outbox } from './domains/outbox.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
+import { tokensDomain } from './domains/tokens.ts';
 import { toolsDomain } from './domains/tools.ts';
 import { users } from './domains/users.ts';
 import { modulesPlugin } from './generated/modules.ts';
@@ -77,7 +79,9 @@ export const app = new Elysia()
       .use(moduleDomain)
       .use(menuDomain)
       .use(outbox)
+      .use(tokensDomain)
       .use(toolsDomain)
+      .use(mcpDomain)
       .use(moduleGate)
       .use(modulesPlugin),
   );

@@ -88,12 +88,19 @@ export const tenantContext = new Elysia({ name: 'tenant-context' })
       }
       clientId = requested;
     }
-    const perms = await effectivePermissions(db, auth.user, clientId);
+    const granted = await effectivePermissions(db, auth.user, clientId);
+    // A-4: an API token can only NARROW what its user holds — its scopes are the ceiling.
+    const scopes = auth.scopes;
+    const perms = scopes
+      ? scopes.filter((s) => auth.user.is_superadmin || hasPermission(granted, s))
+      : granted;
     const state: TenantState = {
       clientId,
       tenant: clientId ? forTenant(clientId) : null,
       perms,
-      can: (p) => auth.user.is_superadmin || hasPermission(perms, p),
+      can: (p) =>
+        (auth.user.is_superadmin || hasPermission(granted, p)) &&
+        (!scopes || hasPermission(scopes, p)),
     };
     return { tenantState: state, tenantRejection: null as ReturnType<typeof fail> | null };
   })

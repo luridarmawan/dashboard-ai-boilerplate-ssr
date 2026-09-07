@@ -57,6 +57,13 @@
       "when": 1788733157383,
       "tag": "0007_colorful_azazel",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788816762529,
+      "tag": "0008_amusing_terror",
+      "breakpoints": true
     }
   ]
 }

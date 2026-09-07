@@ -225,30 +225,52 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
     expect(ok.ok).toBe(true);
     if (ok.ok) expect((ok.result as { pong: string }).pong).toBe('in-process');
 
-    // Audit: both the refusal and the success left a row in the tenant's audit log (M-2).
-    const rows = await db
-      .select({
-        action: schema.auditLog.action,
-        resource: schema.auditLog.resource,
-        after: schema.auditLog.after,
-      })
-      .from(schema.auditLog)
-      .where(and(eq(schema.auditLog.client_id, tenantId), eq(schema.auditLog.actor_id, memberId)))
-      .orderBy(desc(schema.auditLog.created_at))
-      .limit(20);
-    const toolRows = rows.filter((r) => r.action === 'tool.call');
-    expect(toolRows.some((r) => r.resource === 'dummy.ping')).toBe(true);
-    expect(toolRows.some((r) => r.resource === 'dummy.count_notes')).toBe(true);
-    const adminRows = await db
-      .select({ resource: schema.auditLog.resource })
-      .from(schema.auditLog)
-      .where(
-        and(
-          eq(schema.auditLog.client_id, acmeId),
-          eq(schema.auditLog.actor_id, adminId),
-          eq(schema.auditLog.action, 'tool.call'),
-        ),
-      );
-    expect(adminRows.some((r) => r.resource === 'example.list_products')).toBe(true);
+    // Audit: both the refusal and the success left a row in the tenant's audit log (M-2). Rows are
+    // written off the hot path, so poll briefly.
+    const eventually = async (fn: () => Promise<boolean>) => {
+      const until = Date.now() + 3000;
+      while (Date.now() < until) {
+        if (await fn()) return true;
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return fn();
+    };
+    const toolRows = () =>
+      db
+        .select({ resource: schema.auditLog.resource, action: schema.auditLog.action })
+        .from(schema.auditLog)
+        .where(
+          and(
+            eq(schema.auditLog.client_id, tenantId),
+            eq(schema.auditLog.actor_id, memberId),
+            eq(schema.auditLog.action, 'tool.call'),
+          ),
+        )
+        .orderBy(desc(schema.auditLog.created_at))
+        .limit(20);
+    expect(
+      await eventually(async () => (await toolRows()).some((r) => r.resource === 'dummy.ping')),
+    ).toBe(true);
+    expect(
+      await eventually(async () =>
+        (await toolRows()).some((r) => r.resource === 'dummy.count_notes'),
+      ),
+    ).toBe(true);
+    expect(
+      await eventually(async () =>
+        (
+          await db
+            .select({ resource: schema.auditLog.resource })
+            .from(schema.auditLog)
+            .where(
+              and(
+                eq(schema.auditLog.client_id, acmeId),
+                eq(schema.auditLog.actor_id, adminId),
+                eq(schema.auditLog.action, 'tool.call'),
+              ),
+            )
+        ).some((r) => r.resource === 'example.list_products'),
+      ),
+    ).toBe(true);
   });
 });

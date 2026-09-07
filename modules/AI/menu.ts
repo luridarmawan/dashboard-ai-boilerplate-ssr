@@ -10,6 +10,14 @@ export default defineMenu('AI', [
     order: 5,
   },
   {
+    id: 'ai.mcps',
+    label: { id: 'Server MCP', en: 'MCP servers' },
+    href: '/m/ai/mcps',
+    icon: 'plug',
+    permission: 'ai.mcp.read',
+    order: 120,
+  },
+  {
     id: 'ai.logs',
     label: { id: 'Log AI', en: 'AI log' },
     href: '/m/ai/logs',

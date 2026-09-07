@@ -1,13 +1,16 @@
 import { formToObject, PasswordChangeBody, ProfileBody, validateForm } from '@core/contracts';
 import { themes } from '@core/ui-theme';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
-/** Own profile (D-4): basics + preferences, and a separate password form. */
+/** Own profile (D-4): basics + preferences, a separate password form, and API tokens (A-4). */
 export const load: PageServerLoad = async (event) => {
   const locale = event.locals.locale.locale;
   const allowed = event.locals.theme.allowed;
+  const tokens = await apiFor(event).v1.tokens.get();
   return {
+    tokens: tokens.data?.success ? tokens.data.data : [],
+    appOrigin: event.url.origin,
     themes: themes()
       .filter(
         (t) =>
@@ -69,5 +72,49 @@ export const actions: Actions = {
     const r = unwrap(await apiFor(event).v1.users.profile.password.put(v.value));
     if (!r.ok) return actionFailure(r.failure);
     return { saved: 'password' as const };
+  },
+  // ---- API tokens (A-4): minted for MCP clients and other non-browser callers ----
+  createToken: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const name = str(form, 'name').trim();
+    const days = Number(optStr(form, 'expiresInDays') ?? '0');
+    const scopes = str(form, 'scopes')
+      .split(/[\s,]+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!name)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: 'Periksa isian yang ditandai',
+          details: { name: 'Nama token wajib diisi' },
+        },
+        { name, scopes: scopes.join(' ') },
+      );
+    const r = unwrap<{
+      success: true;
+      data: { id: string; token: string; expiresAt: string | null };
+    }>(
+      await apiFor(event).v1.tokens.post({
+        name,
+        ...(days > 0 ? { expiresInDays: days } : {}),
+        ...(scopes.length ? { scopes } : {}),
+      }),
+    );
+    if (!r.ok) return actionFailure(r.failure, { name, scopes: scopes.join(' ') });
+    return { saved: 'token' as const, token: r.data.data.token, tokenName: name };
+  },
+  revokeToken: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap(
+      await apiFor(event)
+        .v1.tokens({ id: str(form, 'id') })
+        .delete(),
+    );
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'revoke' as const };
   },
 };

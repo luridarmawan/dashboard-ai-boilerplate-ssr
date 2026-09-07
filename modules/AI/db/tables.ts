@@ -1,7 +1,10 @@
 import { col, defineTable } from '@core/db';
 import { defineTables } from '@core/module-kit';
 
-/** AI tables (extension point 1): conversations + messages (H-6) and the call log (H-9, M-3). */
+/**
+ * AI tables (extension point 1): conversations + messages (H-6), the call log (H-9, M-3), and the
+ * external MCP servers a tenant connects to with the tools discovered on them (I-4).
+ */
 export default defineTables('AI', [
   defineTable({
     name: 'ai_conversations',
@@ -50,5 +53,42 @@ export default defineTables('AI', [
       streamed: col.boolean().default(false),
     },
     indexes: [{ columns: ['client_id', 'created_at'] }, { columns: ['client_id', 'user_id'] }],
+  }),
+  defineTable({
+    name: 'ai_mcps',
+    tenant: true,
+    columns: {
+      /** Slug used in wire names: `ext_<code>__<tool>`. Unique per tenant. */
+      code: col.identifier(40),
+      name: col.varchar(191),
+      /** http (Streamable HTTP) | sse */
+      transport: col.identifier(16).default('http'),
+      url: col.varchar(512),
+      /** Extra request headers (e.g. Authorization). Values are secrets: masked in every view. */
+      headers: col.json().nullable(),
+      enabled: col.boolean().default(true),
+      /** ok | error | null (never tested) */
+      last_status: col.identifier(16).nullable(),
+      last_error: col.text().nullable(),
+      last_synced_at: col.datetime().nullable(),
+      tools_count: col.int().default(0),
+    },
+    indexes: [{ columns: ['client_id', 'code'], unique: true }],
+  }),
+  defineTable({
+    name: 'ai_mcp_tools',
+    tenant: true,
+    softDelete: false,
+    columns: {
+      mcp_id: col.uuid().references('ai_mcps', 'cascade'),
+      /** The tool's name on the remote server, verbatim. */
+      name: col.varchar(191),
+      /** OpenAI/MCP-legal suffix derived from `name`; the wire name is `ext_<code>__<wire>`. */
+      wire: col.identifier(64),
+      description: col.text().nullable(),
+      input_schema: col.json().nullable(),
+      enabled: col.boolean().default(true),
+    },
+    indexes: [{ columns: ['client_id', 'mcp_id', 'wire'], unique: true }],
   }),
 ]);

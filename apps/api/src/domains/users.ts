@@ -239,7 +239,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         .set({ password_hash: await hashPassword(body.newPassword) })
         .where(eq(schema.users.id, a.user.id));
       // Other devices are signed out; this session stays (the user is clearly present here).
-      const revoked = await revokeAllSessions(db, a.user.id, a.session.id);
+      const revoked = await revokeAllSessions(db, a.user.id, a.session?.id);
       await writeAudit(db, {
         clientId: tenantState?.clientId ?? null,
         actorId: a.user.id,
