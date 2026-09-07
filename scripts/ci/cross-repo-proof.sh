@@ -56,7 +56,7 @@ git checkout -- modules.json biome.json bun.lock packages/db/migrations 2>/dev/n
 if git cat-file -e HEAD:.gitmodules 2>/dev/null; then git checkout HEAD -- .gitmodules; else git rm -q -f --cached .gitmodules 2>/dev/null || true; rm -f .gitmodules; fi
 git clean -fdq packages/db/migrations
 bun install --no-summary >/dev/null
-bun run modules:sync >/dev/null
+bun run bootstrap >/dev/null
 LEFT="$(git status --porcelain --untracked-files=all)"
 [ -z "$LEFT" ] || { echo "cross-repo: GAGAL — sisa setelah uninstall:"; echo "$LEFT"; exit 1; }
 echo "GATE M6 #2: LOLOS — modul dari repositori terpisah dibangun & dites sendiri, dipasang lewat git URL, dicabut bersih"

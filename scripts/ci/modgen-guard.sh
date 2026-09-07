@@ -46,7 +46,7 @@ rm -rf "$DIR"
 git checkout -- modules.json bun.lock packages/db/migrations
 git clean -fdq packages/db/migrations
 bun install --no-summary >/dev/null
-bun run modules:sync >/dev/null
+bun run bootstrap >/dev/null
 bun run db:generate >/dev/null 2>&1
 LEFT="$(git status --porcelain --untracked-files=all)"
 if [ -n "$LEFT" ]; then echo "modgen-guard: GAGAL — sisa setelah modul dihapus:"; echo "$LEFT"; exit 1; fi

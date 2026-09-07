@@ -324,7 +324,7 @@ jobs:
           sed -i 's/^BOOTSTRAP_ADMIN_EMAIL=.*/BOOTSTRAP_ADMIN_EMAIL=admin@example.test/; s/^BOOTSTRAP_ADMIN_PASSWORD=.*/BOOTSTRAP_ADMIN_PASSWORD="bootstrap admin password"/' .env.prod
       - run: sh scripts/ci/m1-scale-proof.sh
       - name: §8 #25 · RAM idle seluruh stack (3 replika api) < 1,5 GB
-        run: PROJECT=dab-prod SETTLE_SECONDS=20 bun run ci:idle-memory
+        run: PROJECT=dab-prod SETTLE_SECONDS=20 sh scripts/ci/idle-memory.sh
       - if: always()
         run: test -f .env.prod && docker compose --env-file .env.prod -f compose.prod.yml down -v || true
 

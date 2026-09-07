@@ -145,7 +145,9 @@ if (import.meta.main) {
   const added = register(spec, dir);
   console.log(added ? '→ terdaftar di modules.json' : '→ sudah ada di modules.json');
   run(['bun', 'install', '--no-summary'], 'bun install (tautkan workspace)');
-  run(['bun', 'run', 'modules:sync'], 'modules:sync');
+  // bootstrap = db codegen → modules:sync → codegen → layout variants: works on a fresh clone too,
+  // where modules:sync alone would fail because module files import @core/db's generated schema.
+  run(['bun', 'run', 'bootstrap'], 'bootstrap (codegen + modules:sync)');
   run(['bunx', 'biome', 'check', '--write', relative(root, dir)], 'biome check --write');
   run(['bun', 'run', 'db:generate'], 'db:generate (migrasi untuk tabel baru)');
   console.log(`
