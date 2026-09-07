@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
+import { readFileSync } from 'node:fs';
 /**
  * L-5 guard: every icon set must map EVERY core semantic name (icons/registry.json). A hole
  * would only surface on a rarely opened page, so it fails the build instead. Reads the mapping
  * files as text — no Svelte runtime needed in CI.
  */
 import { fileURLToPath } from 'node:url';
-import { readFileSync } from 'node:fs';
 import { CORE_ICONS, ICON_SETS } from '@core/ui-theme';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));

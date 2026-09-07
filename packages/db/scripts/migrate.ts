@@ -46,9 +46,9 @@ function prefixedFolder(source: string): string {
   const tables = collectTableNames(contents);
   const out = mkdtempSync(join(tmpdir(), `dab-migrations-${prefix}`));
   mkdirSync(join(out, 'meta'), { recursive: true });
-  files.forEach((f, i) =>
-    writeFileSync(join(out, f), prefixSql(contents[i] ?? '', prefix, tables)),
-  );
+  files.forEach((f, i) => {
+    writeFileSync(join(out, f), prefixSql(contents[i] ?? '', prefix, tables));
+  });
   writeFileSync(
     join(out, 'meta', '_journal.json'),
     readFileSync(join(source, 'meta', '_journal.json')),

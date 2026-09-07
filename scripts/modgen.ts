@@ -26,8 +26,8 @@
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
+import { fileURLToPath } from 'node:url';
 import { type ModuleSpec, makeSpec } from './modgen/spec.ts';
 import { renderModule } from './modgen/templates.ts';
 

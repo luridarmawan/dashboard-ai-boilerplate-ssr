@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
+import { existsSync, readFileSync } from 'node:fs';
 /**
  * L-8 guard: every registered layout component renders EVERY region its kind requires.
  * Reads the .svelte source for `{@render <region>(` — a layout that forgets a region is
  * rejected here with the layout and region named, not discovered on a page in production.
  */
 import { fileURLToPath } from 'node:url';
-import { existsSync, readFileSync } from 'node:fs';
 import { layouts, REGIONS } from '@core/ui-theme';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));

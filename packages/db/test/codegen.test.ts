@@ -73,8 +73,8 @@ describe('emitMysql — aturan §4.3 untuk MySQL/MariaDB', () => {
   });
 
   test('metadata tenant untuk penjaga B-3', () => {
-    expect(out).toContain(
-      "export const tenantTables: ReadonlySet<string> = new Set(['probe'].map((n) => `${TABLE_PREFIX}${n}`))",
+    expect(out).toMatch(
+      /export const tenantTables: ReadonlySet<string> = new Set\(\['probe'\]\.map\(\(n\) => `\$\{TABLE_PREFIX\}\$\{n\}`\)\)/,
     );
   });
 });
