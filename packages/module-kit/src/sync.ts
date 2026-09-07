@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type {
@@ -740,7 +740,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           publicOwner.set(r.path, manifest.name);
           publicRoutes.push({ ...r, module: manifest.name, ns });
           for (const file of walk(pdir)) {
-            const base = file.split('/').pop() ?? '';
+            const base = basename(file);
             if (!WEB_ROUTE_FILES.has(base)) continue;
             const relIn = relative(pdir, file).split('\\').join('/');
             webRoutes.push({
@@ -759,7 +759,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     const webDir = join(dir, 'web', 'routes');
     if (existsSync(webDir)) {
       for (const file of walk(webDir)) {
-        const base = file.split('/').pop() ?? '';
+        const base = basename(file);
         if (!WEB_ROUTE_FILES.has(base)) continue;
         const relInRoutes = relative(webDir, file).split('\\').join('/');
         webRoutes.push({
