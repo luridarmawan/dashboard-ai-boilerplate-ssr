@@ -43,6 +43,10 @@ if [ -d "modules/${MODGEN_GUARD_NAME:-CiProbe}" ] && wants M6; then
 elif wants M6; then
   echo "== proof M6 dilewati (tidak ada modules/${MODGEN_GUARD_NAME:-CiProbe} — jalankan: bun run modgen:ci)"
 fi
+if wants SHOT; then
+  echo "== screenshots + overflow report (design review) → $LOG/shots"
+  (cd apps/web && WEB_URL=http://127.0.0.1:5173 OUT="$LOG/shots" bun run e2e/shots.ts /example /product/gayo-arabika /auth/login)
+fi
 if [ "${E2E:-}" = "1" ] && wants E2E; then
   echo "== E2E Playwright (P-8): landing → login → CRUD → chat, JavaScript aktif"
   (cd apps/web && bun x playwright test)

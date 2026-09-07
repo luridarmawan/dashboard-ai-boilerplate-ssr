@@ -46,14 +46,33 @@ const ld = $derived(
   {@html `<script type="application/ld+json">${ld}</script>`}
 </svelte:head>
 
-<article class="mx-auto grid max-w-5xl gap-10 px-4 py-12 md:grid-cols-2">
-  <div class="aspect-square w-full rounded-2xl border bg-primary/10" aria-hidden="true"></div>
-  <div>
-    <a href="/example#products" class="inline-flex items-center gap-1 text-sm"><Icon name="arrow-left" size={14} />{t('example.product.back')}</a>
-    <h1 class="mt-3 text-3xl font-semibold">{p.name}</h1>
-    {#if p.summary}<p class="mt-2 text-lg text-muted-foreground">{p.summary}</p>{/if}
-    <p class="mt-4 text-2xl font-semibold" data-testid="price">{money(p.price, p.currency)}</p>
-    {#if p.description}<div class="mt-6 whitespace-pre-line text-foreground/90">{p.description}</div>{/if}
-    <div class="mt-8"><Button href="/example#contact" size="lg">{t('example.product.order')}<Icon name="arrow-right" size={18} /></Button></div>
+<article class="mx-auto grid max-w-6xl gap-12 px-4 py-12 md:grid-cols-2 md:items-start">
+  <div class="relative aspect-[4/5] w-full overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/30 via-primary/10 to-accent shadow-sm">
+    {#if p.imageUrl}
+      <img src={p.imageUrl} alt={p.name} class="h-full w-full object-cover" />
+    {:else}
+      <span class="absolute -bottom-10 -right-4 select-none text-[16rem] font-semibold leading-none text-primary/15" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase()}</span>
+    {/if}
+    {#if p.featured}<span class="absolute left-4 top-4 rounded-full bg-background/90 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">{t('example.products.badge')}</span>{/if}
+  </div>
+  <div class="md:sticky md:top-24">
+    <nav class="text-sm text-muted-foreground" aria-label="Breadcrumb"><a href="/example" class="hover:text-foreground">{data.brand}</a> <span aria-hidden="true">/</span> <a href="/example#products" class="hover:text-foreground">{t('example.products.title')}</a></nav>
+    <h1 class="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">{p.name}</h1>
+    {#if p.summary}<p class="mt-3 text-lg text-muted-foreground">{p.summary}</p>{/if}
+    <div class="mt-6 flex flex-wrap items-baseline gap-x-2">
+      <p class="text-3xl font-semibold tracking-tight" data-testid="price">{money(p.price, p.currency)}</p>
+      <span class="text-sm text-muted-foreground">{t('example.products.per')}</span>
+    </div>
+    <ul class="mt-6 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+      <li class="flex items-center gap-2"><Icon name="clock" size={16} class="text-primary" />{t('example.trust.t3')}</li>
+      <li class="flex items-center gap-2"><Icon name="sparkles" size={16} class="text-primary" />{t('example.trust.t1')}</li>
+      <li class="flex items-center gap-2"><Icon name="shield" size={16} class="text-primary" />{t('example.trust.t2')}</li>
+      <li class="flex items-center gap-2"><Icon name="check" size={16} class="text-primary" />{t('example.trust.t4')}</li>
+    </ul>
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+      <Button href="/example#contact" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.product.order')}<Icon name="arrow-right" size={18} /></Button>
+      <Button href="/example#products" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto"><Icon name="arrow-left" size={16} />{t('example.product.back')}</Button>
+    </div>
+    {#if p.description}<div class="prose-sm mt-10 max-w-none whitespace-pre-line border-t pt-8 text-foreground/90">{p.description}</div>{/if}
   </div>
 </article>

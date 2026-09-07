@@ -6,6 +6,10 @@
  * Fonts are self-hosted through @fontsource (§7: no third-party request on the render path).
  */
 @import "tailwindcss";
+/* Module pages live outside apps/web (modules/<Name>/web/**, mirrored here by shims that only
+   re-export them). Tailwind v4 scans from the Vite root, so without this the utilities used ONLY
+   by a module would never be generated (extension points 3, 10, 13). */
+@source "../../../modules";
 
 /* Theme token files — one per built-in theme, light + dark in each (§4.8). */
 @import "@core/ui-theme/themes/base/tokens.css";
@@ -162,9 +166,6 @@
   }
   fieldset {
     @apply rounded-lg border px-4 py-3;
-  }
-  .grid {
-    @apply grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-3 gap-y-1;
   }
   .check {
     @apply flex items-center gap-2 text-sm;
