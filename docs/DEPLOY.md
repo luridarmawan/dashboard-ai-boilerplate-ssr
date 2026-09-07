@@ -42,7 +42,9 @@ nano .env.prod
 #   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
 #   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
-#   (jangan pakai @ : / ? # di kata sandi database — DATABASE_URL diparse oleh skrip backup)
+#   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
+#   Kata sandi MySQL HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
+#   = ALTER USER di MySQL atau `down -v` (hapus data) — lihat tabel gejala di bawah.
 
 # 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)
 export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
@@ -84,6 +86,7 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 | `502` | `api`/`web` belum sehat | `docker compose … ps`, `docker compose … logs api --tail 50` |
 | `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
+| `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `$DC config \| grep DATABASE_URL`; samakan: `$DC exec mysql mysql -uroot -p'<root lama>' -e "ALTER USER 'app'@'%' IDENTIFIED BY '<baru>'"`, atau bila data belum penting `$DC down -v && $DC up -d --wait mysql` |
 
 ### 2b. Port 80/443 sudah dipakai Apache/Nginx di host yang sama
 
