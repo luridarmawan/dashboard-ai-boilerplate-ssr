@@ -12,7 +12,11 @@ bun -e '
 echo "== bootstrap without AI"
 bun run bootstrap | tail -3
 echo "== no AI trace in generated registries"
-! grep -rqiE "\"ai\"|'ai'|module:ai|/m/ai|ai_conversations" packages/module-kit/src/generated packages/db/src/generated apps/api/src/generated apps/web/src/generated packages/i18n/src/generated || { echo "AI trace found in generated files"; exit 1; }
+# generated/migrations.ts is excluded: it is the committed migration HISTORY (packages/db/migrations)
+# embedded verbatim for the compiled binary (Q-2), and that history already contains the AI tables
+# from when the module was generated. The gate is about registries and the active schema, which
+# must not mention AI when the module is absent.
+! grep -rqiE --exclude=migrations.ts "\"ai\"|'ai'|module:ai|/m/ai|ai_conversations" packages/module-kit/src/generated packages/db/src/generated apps/api/src/generated apps/web/src/generated packages/i18n/src/generated || { echo "AI trace found in generated files"; exit 1; }
 test ! -d "apps/web/src/routes/(app)/m/ai" || { echo "AI routes still shimmed"; exit 1; }
 echo "== typecheck + build without AI"
 bun run typecheck >/dev/null
