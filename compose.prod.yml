@@ -32,8 +32,9 @@ x-app-env: &app-env
   RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
   REDIS_URL: ${REDIS_URL:-}
   LANDING_ROUTE: ${LANDING_ROUTE:-/example}
-  # The public origin the CSRF check compares Origin against (A-10, Decision E)
-  APP_ORIGIN: https://${DOMAIN:-localhost}
+  # The public origin the CSRF check compares Origin against (A-10, Decision E). Override only for a
+  # temporary http-only test behind a front proxy (DEPLOY.md §2b); production is https.
+  APP_ORIGIN: ${APP_ORIGIN:-https://${DOMAIN:-localhost}}
   UPLOADS_DIR: /data/uploads
 
 services:
@@ -69,7 +70,7 @@ services:
     image: ${IMAGE_PREFIX:-dab}/web:${IMAGE_TAG:-local}
     restart: unless-stopped
     environment:
-      ORIGIN: https://${DOMAIN:-localhost}
+      ORIGIN: ${APP_ORIGIN:-https://${DOMAIN:-localhost}}
       API_URL: http://api:3001
       # SvelteKit trusts the proxy for the client IP / protocol
       ADDRESS_HEADER: X-Forwarded-For

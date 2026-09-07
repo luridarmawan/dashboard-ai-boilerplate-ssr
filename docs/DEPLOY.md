@@ -103,11 +103,15 @@ sudo cp deploy/apache.conf.example /etc/apache2/sites-available/app.conf   # gan
 sudo a2ensite app && sudo apachectl configtest && sudo systemctl reload apache2
 sudo certbot --apache -d app.example.com
 
-# 3. Stack seperti §2 langkah 3–7 (perintahnya identik). Lalu verifikasi langkah 8 lewat DUA pintu:
+# 3. Stack seperti §2 langkah 3–7 (perintahnya identik). Verifikasi (pengganti langkah 8) TANPA TLS dulu:
 curl -sI http://127.0.0.1:8080/ -H 'Host: app.example.com' | head -1        # 200 dari Caddy langsung
+curl -s  http://127.0.0.1:8080/v1/ready -H 'Host: app.example.com'           # database menjawab
+curl -s  http://127.0.0.1:8080/v1/version -H 'Host: app.example.com'         # commit & modul terpasang
+# 4. Setelah vhost + sertifikat di server depan siap:
 curl -sI https://app.example.com/ | head -1                                  # 200 lewat Apache + TLS
-curl -s  https://app.example.com/v1/ready                                    # database menjawab
 ```
+
+Selama sertifikat belum ada dan Anda ingin mencoba **login lewat vhost HTTP** di server depan, set sementara `APP_ORIGIN=http://app.example.com` di `.env.prod` lalu `up -d` lagi — pemeriksaan CSRF membandingkan header `Origin` browser dengan nilai ini, jadi dengan `https://` baku semua form POST akan ditolak sampai HTTPS hidup. Hapus baris itu begitu certbot selesai; GET (halaman, `/v1/ready`) tidak terpengaruh. Kriteria §8 #23 untuk pola ini adalah "sampai server depan menyajikan HTTPS", sertifikatnya milik certbot di Apache/Nginx, bukan Caddy.
 
 Nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) dengan `proxy_pass http://127.0.0.1:8080` dan `proxy_buffering off` (streaming AI).
 
