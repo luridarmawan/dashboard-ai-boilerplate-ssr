@@ -38,7 +38,7 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'   # bash & zs
 # 24: di VPS
 dc run --rm backup-once
 dc stop api web
-dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE app; CREATE DATABASE app'
+dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE <DATABASE_NAME>; CREATE DATABASE <DATABASE_NAME>'   # nama dari .env.prod (baku app)
 dc run --rm -e CONFIRM_RESTORE=yes restore latest
 dc up -d --scale api=3 && curl -s https://DOMAIN/v1/ready
 # 25: setelah 10 menit idle

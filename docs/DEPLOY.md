@@ -43,9 +43,10 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   DOMAIN=app.example.com            ← domain Anda (record A sudah mengarah ke sini)
 #   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
+#   DATABASE_NAME=app                 ← opsional; nama database di service mysql, mis. app_boilerplate
 #   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
 #   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
-#   Kata sandi MySQL HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
+#   Kata sandi dan DATABASE_NAME HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
 #   = ALTER USER di MySQL atau `down -v` (hapus data) — lihat tabel gejala di bawah.
 
 # 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)

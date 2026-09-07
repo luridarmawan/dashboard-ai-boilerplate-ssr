@@ -25,7 +25,7 @@ x-logging: &logging
 x-app-env: &app-env
   NODE_ENV: production
   DB_DIALECT: ${DB_DIALECT:-mysql}
-  DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+  DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/${DATABASE_NAME:-app}}
   TABLE_PREFIX: ${TABLE_PREFIX:-}
   SESSION_DRIVER: ${SESSION_DRIVER:-database}
   CACHE_DRIVER: ${CACHE_DRIVER:-database}
@@ -146,7 +146,7 @@ services:
     entrypoint: ['sh', '/deploy/backup-loop.sh']
     environment:
       DB_DIALECT: ${DB_DIALECT:-mysql}
-      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/${DATABASE_NAME:-app}}
       BACKUP_DIR: /backups
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
       BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
@@ -165,7 +165,7 @@ services:
     entrypoint: ['sh', '/deploy/backup.sh']
     environment:
       DB_DIALECT: ${DB_DIALECT:-mysql}
-      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/${DATABASE_NAME:-app}}
       BACKUP_DIR: /backups
       BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
     volumes:
@@ -184,7 +184,7 @@ services:
     command: ['latest']
     environment:
       DB_DIALECT: ${DB_DIALECT:-mysql}
-      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/app}
+      DATABASE_URL: ${DATABASE_URL:-mysql://app:${MYSQL_PASSWORD:-app}@mysql:3306/${DATABASE_NAME:-app}}
       BACKUP_DIR: /backups
     volumes:
       - ./deploy:/deploy:ro
@@ -202,7 +202,8 @@ services:
       - --default-time-zone=+00:00
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-me-root}
-      MYSQL_DATABASE: app
+      # Database name (DATABASE_NAME in .env.prod); applied when the volume is first created, like the passwords.
+      MYSQL_DATABASE: ${DATABASE_NAME:-app}
       MYSQL_USER: app
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app}
     volumes:
