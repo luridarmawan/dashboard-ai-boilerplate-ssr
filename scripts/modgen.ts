@@ -26,11 +26,12 @@
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 import { type ModuleSpec, makeSpec } from './modgen/spec.ts';
 import { renderModule } from './modgen/templates.ts';
 
-const root = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 const args = process.argv.slice(2);
 const flag = (k: string) => args.includes(`--${k}`);
 const opt = (k: string): string | undefined => {

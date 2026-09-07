@@ -6,9 +6,10 @@
  * editing modules.json and running this — no core file changes (G-6).
  */
 import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SyncError, syncModules } from '@core/module-kit/sync';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 try {
   const result = await syncModules({ root });

@@ -8,6 +8,7 @@
  * Expects the databases from `docker compose --profile matrix up -d --wait`.
  * Host ports follow the same env overrides as compose.yml.
  */
+import { fileURLToPath } from 'node:url';
 
 interface Target {
   dialect: 'mysql' | 'mariadb' | 'postgres';
@@ -51,7 +52,7 @@ const results: Result[] = [];
 async function run(target: Target, step: string, args: string[]): Promise<boolean> {
   const started = performance.now();
   const proc = Bun.spawn(['bun', 'run', ...args], {
-    cwd: new URL('../packages/db', import.meta.url).pathname,
+    cwd: fileURLToPath(new URL('../packages/db', import.meta.url)),
     env: { ...process.env, DB_DIALECT: target.dialect, DATABASE_URL: target.url, NODE_ENV: 'test' },
     stdout: 'pipe',
     stderr: 'pipe',

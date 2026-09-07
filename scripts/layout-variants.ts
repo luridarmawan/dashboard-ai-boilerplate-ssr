@@ -10,8 +10,9 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const routes = join(root, 'apps/web/src/routes');
 const out = join(root, 'apps/web/src/generated/layout-variants.ts');
 const routesOut = join(root, 'packages/settings/src/generated/routes.ts');

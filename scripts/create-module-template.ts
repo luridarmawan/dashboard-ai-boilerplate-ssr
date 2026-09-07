@@ -21,10 +21,11 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { makeSpec } from './modgen/spec.ts';
 import { renderModule } from './modgen/templates.ts';
 
-const root = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 const out = join(root, '.bun-create', 'module');
 const check = process.argv.includes('--check');
 const starterDir = join(root, 'scripts', 'modgen', 'starter');

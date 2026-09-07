@@ -4,10 +4,11 @@
  * would only surface on a rarely opened page, so it fails the build instead. Reads the mapping
  * files as text — no Svelte runtime needed in CI.
  */
+import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { CORE_ICONS, ICON_SETS } from '@core/ui-theme';
 
-const root = new URL('../..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../..', import.meta.url));
 let failures = 0;
 // Module sets (`<ns>.<id>`) are verified by modules:sync against their own glyph map.
 for (const set of Object.keys(ICON_SETS).filter((id) => !id.includes('.'))) {

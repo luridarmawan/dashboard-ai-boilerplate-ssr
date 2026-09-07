@@ -8,9 +8,10 @@
  */
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Glob } from 'bun';
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 const rootPkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   workspaces?: string[];
 };

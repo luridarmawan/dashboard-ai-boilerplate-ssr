@@ -7,9 +7,10 @@
  */
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { moduleIconSets, moduleLayouts } from '@core/ui-theme/generated';
 
-const root = new URL('../..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../..', import.meta.url));
 const themeDirs: string[] = [];
 const modulesDir = join(root, 'modules');
 if (existsSync(modulesDir)) {

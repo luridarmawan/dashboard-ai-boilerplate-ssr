@@ -6,7 +6,9 @@
  * Output is prefixed per process; Ctrl-C stops both. If either exits on its own, the other
  * is stopped too — a half-running dev stack hides errors.
  */
-const root = new URL('..', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 const procs = [
   { name: 'api', color: '\x1b[36m', cwd: `${root}apps/api`, cmd: ['bun', 'run', 'dev'] },

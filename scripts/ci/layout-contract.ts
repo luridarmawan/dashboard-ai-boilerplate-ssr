@@ -4,10 +4,11 @@
  * Reads the .svelte source for `{@render <region>(` — a layout that forgets a region is
  * rejected here with the layout and region named, not discovered on a page in production.
  */
+import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { layouts, REGIONS } from '@core/ui-theme';
 
-const root = new URL('../..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../..', import.meta.url));
 let failures = 0;
 // Module layouts (`<ns>.<id>`) are verified by modules:sync against their own component.
 for (const l of layouts().filter((x) => !x.id.includes('.'))) {

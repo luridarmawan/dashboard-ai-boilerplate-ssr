@@ -10,6 +10,7 @@
  *   - the total must be about duration / every (not N × that)
  * Exits 1 on any violation. Expects migrations applied (`bun db:migrate`).
  */
+import { fileURLToPath } from 'node:url';
 
 const N = Number(process.env.PROBE_INSTANCES ?? 3);
 const every = Number(process.env.PROBE_EVERY ?? 3);
@@ -17,7 +18,7 @@ const duration = Number(process.env.PROBE_DURATION ?? 12);
 const tickMs = Number(process.env.PROBE_TICK_MS ?? 250);
 const job = `core.probe_${Date.now()}`;
 
-const root = new URL('..', import.meta.url).pathname;
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 // The generated schema must match DB_DIALECT (a previous matrix run may have left another
 // dialect active); getDb() would refuse otherwise. Regenerate for this run's dialect.

@@ -12,9 +12,10 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { MODULE_NAME_RE, modulesFileSchema } from '@core/module-kit';
 
-const root = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 
 function usage(msg?: string): never {
   if (msg) console.error(`modules:add: ${msg}\n`);
