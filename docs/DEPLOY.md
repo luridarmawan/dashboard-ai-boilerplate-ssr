@@ -98,7 +98,7 @@ CADDYFILE=./deploy/Caddyfile.behind-proxy     # Caddy tanpa TLS, auto_https off,
 HTTP_PORT=127.0.0.1:8080                      # hanya loopback; tidak ada port publik dari Docker
 HTTPS_PORT=127.0.0.1:8443                     # tidak dipakai di mode ini
 XFF_DEPTH=2                                   # IP klien = 2 hop di belakang (Apache → Caddy → web)
-#    DOMAIN tetap nama publik (app.example.com): dipakai untuk APP_ORIGIN/ORIGIN dan pemeriksaan CSRF
+#    DOMAIN = nama publik utama; APP_ORIGIN (daftar) menentukan origin yang lolos pemeriksaan CSRF
 
 # 2. Apache: aktifkan modul, pasang vhost dari contoh, minta sertifikat
 sudo a2enmod ssl proxy proxy_http headers rewrite
@@ -114,7 +114,7 @@ curl -s  http://127.0.0.1:8080/v1/version -H 'Host: app.example.com'         # c
 curl -sI https://app.example.com/ | head -1                                  # 200 lewat Apache + TLS
 ```
 
-Selama sertifikat belum ada dan Anda ingin mencoba **login lewat vhost HTTP** di server depan, set sementara `APP_ORIGIN=http://app.example.com` di `.env.prod` lalu `up -d` lagi — pemeriksaan CSRF membandingkan header `Origin` browser dengan nilai ini, jadi dengan `https://` baku semua form POST akan ditolak sampai HTTPS hidup. Hapus baris itu begitu certbot selesai; GET (halaman, `/v1/ready`) tidak terpengaruh. Kriteria §8 #23 untuk pola ini adalah "sampai server depan menyajikan HTTPS", sertifikatnya milik certbot di Apache/Nginx, bukan Caddy.
+`APP_ORIGIN` adalah **daftar** origin publik yang boleh mengirim form/login (pemeriksaan CSRF), dipisah koma; host tanpa skema berarti http dan https. Satu instalasi yang dilayani beberapa (sub)domain cukup mendaftarkan semuanya, mis. `APP_ORIGIN=https://apps.carik.id,https://xxx.domain.com,localhost,http://localhost:8080`. Selama sertifikat belum ada, sertakan varian `http://` domainnya agar login lewat vhost HTTP tidak ditolak; hapus lagi begitu certbot selesai. Web tidak memakai `ORIGIN` tetap: origin tiap request diturunkan dari `X-Forwarded-Proto/Host`, sehingga semua domain di daftar itu bekerja tanpa konfigurasi tambahan. GET (halaman, `/v1/ready`) tidak pernah terpengaruh. Kriteria §8 #23 untuk pola ini adalah "sampai server depan menyajikan HTTPS", sertifikatnya milik certbot di Apache/Nginx, bukan Caddy.
 
 Nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) dengan `proxy_pass http://127.0.0.1:8080` dan `proxy_buffering off` (streaming AI).
 

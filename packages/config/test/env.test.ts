@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { EnvError, loadEnv } from '../src/index.ts';
+import { EnvError, loadEnv, parseOrigins } from '../src/index.ts';
 
 const valid = {
   DATABASE_URL: 'mysql://app:app@127.0.0.1:33306/app',
@@ -71,5 +71,28 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     expect(loadEnv({ DB_DIALECT: 'mariadb', DATABASE_URL: 'mysql://a:b@h/db' }).DB_DIALECT).toBe(
       'mariadb',
     );
+  });
+
+  test('APP_ORIGIN: daftar dipisah koma; host tanpa skema = http dan https; utama = https pertama', () => {
+    expect(
+      parseOrigins(
+        'localhost,http://localhost:8080,https://apps.carik.id, https://xxx.domain.com/path',
+      ),
+    ).toEqual([
+      'http://localhost',
+      'https://localhost',
+      'http://localhost:8080',
+      'https://apps.carik.id',
+      'https://xxx.domain.com',
+    ]);
+    const env = loadEnv({ ...valid, APP_ORIGIN: 'localhost,https://apps.carik.id' });
+    expect(env.APP_ORIGINS).toEqual([
+      'http://localhost',
+      'https://localhost',
+      'https://apps.carik.id',
+    ]);
+    expect(env.APP_ORIGIN_PRIMARY).toBe('https://localhost');
+    expect(loadEnv(valid).APP_ORIGINS).toEqual([]);
+    expect(() => loadEnv({ ...valid, APP_ORIGIN: 'not a url' })).toThrow(EnvError);
   });
 });

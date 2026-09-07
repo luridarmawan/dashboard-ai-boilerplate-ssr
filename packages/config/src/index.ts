@@ -73,8 +73,19 @@ const envSchema = z
       .min(1)
       .max(24 * 365)
       .default(720),
-    /** Public origin, e.g. https://app.example.com — used for the CSRF Origin check and absolute links. */
-    APP_ORIGIN: z.url().optional(),
+    /**
+     * Public origin(s), comma-separated: `https://app.example.com,https://apps.other.id,localhost`.
+     * Every entry is accepted by the CSRF Origin check (Decision E); an entry without a scheme
+     * (`localhost`, `localhost:8080`) means both http and https. The first https entry (else the
+     * first entry) is the primary origin used for absolute links in emails.
+     */
+    APP_ORIGIN: z
+      .string()
+      .optional()
+      .refine((raw) => raw === undefined || parseOrigins(raw).length > 0, {
+        message:
+          'daftar origin dipisah koma, mis. https://app.example.com,localhost — setiap entri harus host atau URL yang valid',
+      }),
     /** Login attempts per window, per IP and per email (A-2): `<limit>/<seconds>`. */
     LOGIN_RATE_LIMIT: z
       .string()
@@ -121,7 +132,40 @@ const envSchema = z
         message: `skema URL "${scheme}" tidak cocok dengan DB_DIALECT=${env.DB_DIALECT} (diharapkan ${allowed.join(' atau ')})`,
       });
     }
+  })
+  .transform((env) => {
+    const APP_ORIGINS = parseOrigins(env.APP_ORIGIN);
+    return {
+      ...env,
+      /** Normalised allow-list derived from APP_ORIGIN (lowercase origins, no paths). */
+      APP_ORIGINS,
+      /** Origin for absolute links (emails, sitemap fallbacks): first https entry, else the first. */
+      APP_ORIGIN_PRIMARY: APP_ORIGINS.find((o) => o.startsWith('https://')) ?? APP_ORIGINS[0],
+    };
   });
+
+/**
+ * `APP_ORIGIN` → normalised origin list. Entries with a scheme keep it; bare hosts expand to
+ * http:// and https://. Invalid entries are dropped (the schema refine rejects an all-invalid value).
+ */
+export function parseOrigins(raw: string | undefined): string[] {
+  const out = new Set<string>();
+  for (const entry of (raw ?? '').split(',')) {
+    const e = entry.trim();
+    if (!e) continue;
+    const candidates = /^[a-z][a-z0-9+.-]*:\/\//i.test(e) ? [e] : [`http://${e}`, `https://${e}`];
+    for (const c of candidates) {
+      try {
+        const u = new URL(c);
+        if (u.origin !== 'null' && (u.protocol === 'http:' || u.protocol === 'https:'))
+          out.add(u.origin.toLowerCase());
+      } catch {
+        /* skip invalid entry */
+      }
+    }
+  }
+  return [...out];
+}
 
 export type Env = z.infer<typeof envSchema>;
 

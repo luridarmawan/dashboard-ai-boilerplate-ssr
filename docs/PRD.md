@@ -253,7 +253,7 @@ Target deployment adalah **satu VPS biasa** (2 vCPU / 4 GB cukup untuk memulai).
 Caddy mengurus TLS otomatis tanpa cron certbot — mengurangi satu sumber kegagalan operasional pada deployment kecil. Contoh konfigurasi Nginx tetap disediakan bagi yang sudah punya standar sendiri.
 
 **Keputusan E — satu domain, satu origin.**
-Web dan API disajikan dari origin yang sama lewat path (`/` dan `/v1`). Ini menghilangkan seluruh kelas masalah CORS dan cookie lintas-domain. API tetap bisa dipublikasikan di subdomain terpisah bagi yang membutuhkannya — CORS jadi konfigurasi, bukan keharusan.
+Web dan API disajikan dari origin yang sama lewat path (`/` dan `/v1`). Ini menghilangkan seluruh kelas masalah CORS dan cookie lintas-domain. API tetap bisa dipublikasikan di subdomain terpisah bagi yang membutuhkannya — CORS jadi konfigurasi, bukan keharusan. Satu instalasi boleh dijangkau lewat **beberapa domain/subdomain** sekaligus (mis. domain lama dan baru, atau uji lokal); tiap domain tetap satu origin untuk web + API, dan daftarnya dideklarasikan di `APP_ORIGIN` (dipisah koma) sebagai daftar putih pemeriksaan `Origin` (A-10). Origin per request diturunkan dari header proxy (`X-Forwarded-Proto/Host`), bukan dari satu nilai tetap.
 
 **Keputusan F — proses stateless, state di volume/Valkey/DB.**
 Container web dan api tidak menyimpan apa pun di disk lokal. Berkas unggahan masuk ke volume yang dipetakan (dengan adapter S3-compatible sebagai opsi). Ini yang membuat `--scale api=3` langsung berfungsi, di satu host maupun beberapa host.

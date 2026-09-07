@@ -8,7 +8,7 @@ const base = {
   method: 'POST',
   origin: 'https://app.example.com',
   referer: null,
-  expectedOrigin: 'https://app.example.com',
+  allowedOrigins: ['https://app.example.com', 'https://apps.other.id'],
   hasBearer: false,
   cookieToken: TOKEN,
   headerToken: TOKEN,
@@ -17,6 +17,10 @@ const base = {
 describe('checkCsrf — pure decision (A-10)', () => {
   test('same origin + matching double-submit token passes', () => {
     expect(checkCsrf(base)).toEqual({ ok: true });
+  });
+  test('any origin in the allow-list passes (one installation, several domains)', () => {
+    expect(checkCsrf({ ...base, origin: 'https://apps.other.id' })).toEqual({ ok: true });
+    expect(checkCsrf({ ...base, origin: 'HTTPS://Apps.Other.ID' })).toEqual({ ok: true });
   });
   test('cross-origin is rejected even with a valid token', () => {
     expect(checkCsrf({ ...base, origin: 'https://evil.example' })).toEqual({

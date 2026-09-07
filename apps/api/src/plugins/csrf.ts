@@ -34,7 +34,8 @@ export interface CsrfInput {
   readonly origin: string | null;
   readonly referer: string | null;
   /** Origin this deployment is served from (scheme://host[:port]). */
-  readonly expectedOrigin: string;
+  /** Origins this deployment is served from (Decision E); the request's Origin must be one of them. */
+  readonly allowedOrigins: readonly string[];
   readonly hasBearer: boolean;
   readonly cookieToken: string | null;
   readonly headerToken: string | null;
@@ -61,10 +62,10 @@ export function checkCsrf(i: CsrfInput): CsrfVerdict {
   if (SAFE_METHODS.has(i.method.toUpperCase())) return { ok: true };
   if (i.hasBearer) return { ok: true };
 
-  const expected = i.expectedOrigin.toLowerCase();
+  const allowed = i.allowedOrigins.map((o) => o.toLowerCase());
   const seen = originOf(i.origin) ?? originOf(i.referer);
   if (!seen) return { ok: false, reason: 'origin_missing' };
-  if (seen !== expected) return { ok: false, reason: 'origin_mismatch' };
+  if (!allowed.includes(seen)) return { ok: false, reason: 'origin_mismatch' };
 
   if (!looksLikeToken(i.cookieToken) || !i.headerToken)
     return { ok: false, reason: 'token_missing' };
@@ -73,14 +74,23 @@ export function checkCsrf(i: CsrfInput): CsrfVerdict {
   return { ok: true };
 }
 
-/** The origin a request is served from — behind Caddy that is the forwarded scheme + host (Decision E). */
-export function requestOrigin(request: Request): string {
-  const configured = env().APP_ORIGIN;
-  if (configured) return new URL(configured).origin;
+/**
+ * Origins a state-changing request may come from: the configured APP_ORIGIN list when set (one
+ * installation may serve several domains), else the origin this request was served from — behind
+ * Caddy that is the forwarded scheme + host (Decision E).
+ */
+export function allowedOrigins(request: Request): readonly string[] {
+  const configured = env().APP_ORIGINS;
+  if (configured.length) return configured;
   const url = new URL(request.url);
   const proto = request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '');
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? url.host;
-  return `${proto}://${host}`.toLowerCase();
+  return [`${proto}://${host}`.toLowerCase()];
+}
+
+/** First allowed origin — kept for callers that need a single value. */
+export function requestOrigin(request: Request): string {
+  return allowedOrigins(request)[0] ?? '';
 }
 
 export function isSecureRequest(request: Request): boolean {
@@ -112,7 +122,7 @@ export const csrf = new Elysia({ name: 'csrf' }).onRequest(({ request, set }) =>
     method: request.method,
     origin: request.headers.get('origin'),
     referer: request.headers.get('referer'),
-    expectedOrigin: requestOrigin(request),
+    allowedOrigins: allowedOrigins(request),
     hasBearer: (request.headers.get('authorization') ?? '').toLowerCase().startsWith('bearer '),
     cookieToken: cookieValue(request, CSRF_COOKIE),
     headerToken: request.headers.get(CSRF_HEADER),

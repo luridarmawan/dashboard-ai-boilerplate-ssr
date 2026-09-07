@@ -24,7 +24,7 @@ export async function brandFor(clientId: string | null): Promise<Brand> {
     appName: (await settings.get<string | null>(clientId, 'app.name')) ?? 'Dashboard',
     logoUrl: (await settings.get<string | null>(clientId, 'app.logo_url')) ?? null,
     primary: (await settings.get<string | null>(clientId, 'app.brand_color')) ?? '#2563eb',
-    origin: e.APP_ORIGIN ?? 'http://127.0.0.1:5173',
+    origin: e.APP_ORIGIN_PRIMARY ?? 'http://127.0.0.1:5173',
   };
 }
 
@@ -56,5 +56,5 @@ export async function runOutboxOnce() {
 
 /** Absolute link for an email, from the public origin. */
 export function publicLink(path: string): string {
-  return `${env().APP_ORIGIN ?? 'http://127.0.0.1:5173'}${path}`;
+  return `${env().APP_ORIGIN_PRIMARY ?? 'http://127.0.0.1:5173'}${path}`;
 }
