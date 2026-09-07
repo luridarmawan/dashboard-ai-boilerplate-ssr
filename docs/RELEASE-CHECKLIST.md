@@ -33,7 +33,7 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 ## Cara menjalankan bagian manual
 
 ```bash
-alias dc='dc'   # bash & zsh
+alias dc='docker compose --env-file .env.prod -f compose.prod.yml'   # bash & zsh
 # 23: di VPS baru, ikuti docs/DEPLOY.md §2 sambil menyalakan stopwatch; berhenti bila ada langkah yang tidak tertulis
 # 24: di VPS
 dc run --rm backup-once
