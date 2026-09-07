@@ -73,7 +73,9 @@ describe('emitMysql — aturan §4.3 untuk MySQL/MariaDB', () => {
   });
 
   test('metadata tenant untuk penjaga B-3', () => {
-    expect(out).toContain("export const tenantTables: ReadonlySet<string> = new Set(['probe'])");
+    expect(out).toContain(
+      "export const tenantTables: ReadonlySet<string> = new Set(['probe'].map((n) => `${TABLE_PREFIX}${n}`))",
+    );
   });
 });
 
@@ -125,7 +127,7 @@ describe('codegen — sifat umum', () => {
     expect(out).toContain("'clients', // global");
     expect(out).toContain("'audit_log', // tenant-scoped");
     expect(out).toMatch(
-      /tenantTables: ReadonlySet<string> = new Set\(\[.*'audit_log'.*'groups'.*\]\)/,
+      /tenantTables: ReadonlySet<string> = new Set\(\[.*'audit_log'.*'groups'.*\]\.map/,
     );
     expect(out).not.toMatch(/new Set\(\[[^\]]*'users'/); // users is global
     const start = out.indexOf("'audit_log'");

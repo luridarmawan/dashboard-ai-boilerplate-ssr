@@ -10,9 +10,12 @@
  * Reads DB_DIALECT and DATABASE_URL through the validated env loader; the schema family
  * chosen at codegen time must match the env, otherwise we would migrate with the wrong SQL.
  */
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { env } from '@core/config';
 import { activeDialect } from '../src/generated/active.ts';
+import { collectTableNames, migrationsTableFor, prefixSql } from '../src/migrate-prefix.ts';
 
 const e = env();
 const family = (d: string): 'mysql' | 'pg' => (d === 'postgres' ? 'pg' : 'mysql');
@@ -24,16 +27,43 @@ if (family(e.DB_DIALECT) !== family(activeDialect)) {
   process.exit(1);
 }
 
-const migrationsFolder = join(import.meta.dir, '..', 'migrations', family(e.DB_DIALECT));
+const committedFolder = join(import.meta.dir, '..', 'migrations', family(e.DB_DIALECT));
 const started = performance.now();
+const prefix = e.TABLE_PREFIX;
+const migrationsTable = migrationsTableFor(prefix);
+
+/**
+ * TABLE_PREFIX (O-2): the committed SQL is for an empty prefix. Rewrite every file into a temp
+ * folder with prefixed table/constraint/index names and migrate from there. Hashes in the journal
+ * table are per rewritten content, i.e. per prefix — consistent across runs of the same prefix.
+ */
+function prefixedFolder(source: string): string {
+  if (!prefix) return source;
+  const files = readdirSync(source)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+  const contents = files.map((f) => readFileSync(join(source, f), 'utf8'));
+  const tables = collectTableNames(contents);
+  const out = mkdtempSync(join(tmpdir(), `dab-migrations-${prefix}`));
+  mkdirSync(join(out, 'meta'), { recursive: true });
+  files.forEach((f, i) =>
+    writeFileSync(join(out, f), prefixSql(contents[i] ?? '', prefix, tables)),
+  );
+  writeFileSync(
+    join(out, 'meta', '_journal.json'),
+    readFileSync(join(source, 'meta', '_journal.json')),
+  );
+  return out;
+}
+const migrationsFolder = prefixedFolder(committedFolder);
 
 /** Rows in Drizzle's journal table = migrations applied so far; 0 when the table does not exist yet. */
 async function journalCount(run: (sqlText: string) => Promise<unknown>): Promise<number> {
   try {
     const rows = (await run(
       family(e.DB_DIALECT) === 'pg'
-        ? 'select count(*)::int as n from drizzle.__drizzle_migrations'
-        : 'select count(*) as n from __drizzle_migrations',
+        ? `select count(*)::int as n from drizzle."${migrationsTable}"`
+        : `select count(*) as n from \`${migrationsTable}\``,
     )) as unknown;
     const first = Array.isArray(rows)
       ? Array.isArray(rows[0])
@@ -54,7 +84,7 @@ if (family(e.DB_DIALECT) === 'pg') {
   const db = createDb(e.DATABASE_URL);
   const raw = (q: string) => db.$client.unsafe(q);
   before = await journalCount(raw);
-  await migrate(db, { migrationsFolder });
+  await migrate(db, { migrationsFolder, migrationsTable });
   after = await journalCount(raw);
   await db.$client.end();
 } else {
@@ -63,12 +93,12 @@ if (family(e.DB_DIALECT) === 'pg') {
   const db = createDb(e.DATABASE_URL);
   const raw = (q: string) => db.$client.query(q);
   before = await journalCount(raw);
-  await migrate(db, { migrationsFolder });
+  await migrate(db, { migrationsFolder, migrationsTable });
   after = await journalCount(raw);
   await db.$client.end();
 }
 
 const applied = Math.max(0, after - before);
 console.log(
-  `db:migrate: ${e.DB_DIALECT} mutakhir — ${applied} migrasi diterapkan sekarang, ${after} total (${migrationsFolder.split('/').slice(-2).join('/')}, ${Math.round(performance.now() - started)} ms)`,
+  `db:migrate: ${e.DB_DIALECT} mutakhir — ${applied} migrasi diterapkan sekarang, ${after} total (${committedFolder.split('/').slice(-2).join('/')}${prefix ? `, TABLE_PREFIX=${prefix}` : ''}, ${Math.round(performance.now() - started)} ms)`,
 );

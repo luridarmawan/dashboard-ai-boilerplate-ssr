@@ -219,8 +219,8 @@ function emitFooter(tables: readonly TableDef[]): string {
   return `/** All tables — passed to \`drizzle(client, { schema })\` so relations and types are complete. */
 export const schema = { ${names.join(', ')} } as const;
 
-/** Names of tenant-scoped tables. Used by the data-layer tenant guard (B-3) to inject the client_id filter. */
-export const tenantTables: ReadonlySet<string> = new Set([${tenant.join(', ')}]);
+/** Names of tenant-scoped tables (with TABLE_PREFIX, matching getTableName). Used by the data-layer tenant guard (B-3). */
+export const tenantTables: ReadonlySet<string> = new Set([${tenant.join(', ')}].map((n) => \`\${TABLE_PREFIX}\${n}\`));
 `;
 }
 

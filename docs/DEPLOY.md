@@ -44,6 +44,8 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
 #   DATABASE_NAME=app                 ← opsional; nama database di service mysql, mis. app_boilerplate
+#   TABLE_PREFIX=dab_                 ← opsional; prefiks semua tabel bila satu database dipakai beberapa aplikasi (O-2).
+#                                       Tetapkan SEBELUM migrate pertama; mengubahnya = database baru + migrate ulang.
 #   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
 #   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
 #   Kata sandi dan DATABASE_NAME HANYA diterapkan saat volume mysql-data dibuat pertama kali. Mengubahnya belakangan
