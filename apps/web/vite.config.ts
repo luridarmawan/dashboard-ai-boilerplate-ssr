@@ -1,15 +1,22 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig({
-  plugins: [tailwindcss(), sveltekit()],
-  server: {
-    port: 5173,
-    strictPort: true,
-    host: '127.0.0.1',
-    // Module pages are shimmed from modules/<Name>/web/routes — outside the web root.
-    fs: { allow: ['../..'] },
-  },
-  preview: { port: 4173, strictPort: true },
+export default defineConfig(({ mode }) => {
+  // Dev-server address comes from the repo-root .env (WEB_HOST / WEB_PORT) so it can be changed
+  // without editing this file. Bun only auto-loads .env from the cwd, so when Vite is started from
+  // apps/web the root file is read here explicitly; shell variables still win over the file.
+  const root = loadEnv(mode, '../..', '');
+  const env = { ...root, ...process.env };
+  return {
+    plugins: [tailwindcss(), sveltekit()],
+    server: {
+      port: Number(env.WEB_PORT ?? 5173),
+      strictPort: true,
+      host: env.WEB_HOST ?? '127.0.0.1',
+      // Module pages are shimmed from modules/<Name>/web/routes — outside the web root.
+      fs: { allow: ['../..'] },
+    },
+    preview: { port: 4173, strictPort: true },
+  };
 });
