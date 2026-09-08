@@ -15,6 +15,7 @@ import { themesDomain } from './domains/themes.ts';
 import { tokensDomain } from './domains/tokens.ts';
 import { toolsDomain } from './domains/tools.ts';
 import { users } from './domains/users.ts';
+import { webhooksDomain } from './domains/webhooks.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
@@ -72,6 +73,10 @@ export const app = new Elysia()
             name: 'tools',
             description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
           },
+          {
+            name: 'webhooks',
+            description: 'Outgoing webhooks: signed core events per tenant (J-5)',
+          },
         ],
       },
     }),
@@ -91,6 +96,7 @@ export const app = new Elysia()
       .use(notificationsDomain)
       .use(filesDomain)
       .use(tokensDomain)
+      .use(webhooksDomain)
       .use(toolsDomain)
       .use(mcpDomain)
       .use(moduleGate)

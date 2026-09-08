@@ -53,6 +53,16 @@ export const UserUpdateBody = t.Object({
   groupIds: t.Optional(t.Array(Id, { maxItems: 50 })),
 });
 
+// ---- outgoing webhooks (J-5) ----
+export const WebhookBody = t.Object({
+  name: Name,
+  url: t.String({ minLength: 12, maxLength: 512, pattern: '^https?://' }),
+  /** Core event names, or `*` for all of them. */
+  events: t.Array(t.String({ minLength: 1, maxLength: 64 }), { minItems: 1, maxItems: 50 }),
+  enabled: t.Optional(t.Boolean()),
+});
+export const WebhookUpdateBody = t.Partial(WebhookBody);
+
 // ---- groups (D-2) ----
 export const GroupCode = t.String({ minLength: 2, maxLength: 64, pattern: '^[a-z][a-z0-9_-]*$' });
 export const GroupCreateBody = t.Object({

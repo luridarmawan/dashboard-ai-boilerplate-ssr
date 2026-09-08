@@ -30,6 +30,12 @@ export const CORE_PERMISSIONS: readonly PermissionDef[] = [
     name: { id: 'Outbox email', en: 'Email outbox' },
   },
   {
+    resource: 'webhook',
+    /** read = see registrations and deliveries; manage = create/edit/test/retry/delete (J-5). */
+    actions: ['read', 'manage'],
+    name: { id: 'Webhook keluar', en: 'Outgoing webhooks' },
+  },
+  {
     resource: 'file',
     /** create = upload own files; read = fetch others' private files; manage = list/delete any (Q-16). */
     actions: ['read', 'create', 'manage'],

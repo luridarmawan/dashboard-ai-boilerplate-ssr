@@ -101,7 +101,13 @@ describe.skipIf(!enabled)('log retention (M-3)', () => {
     ] as never);
 
     const r = await runLogRetentionOnce(now);
-    expect(r.days).toEqual({ audit: 365, schedulerRuns: 14, outbox: 30, notifications: 90 }); // registry defaults
+    expect(r.days).toEqual({
+      audit: 365,
+      schedulerRuns: 14,
+      outbox: 30,
+      notifications: 90,
+      webhooks: 30,
+    }); // registry defaults
     expect(r.audit).toBeGreaterThanOrEqual(1);
     expect(r.schedulerRuns).toBeGreaterThanOrEqual(1);
     expect(r.outbox).toBeGreaterThanOrEqual(1);

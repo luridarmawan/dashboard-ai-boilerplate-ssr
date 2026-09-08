@@ -177,6 +177,18 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 2,
       },
       {
+        key: 'logs.webhook_retention_days',
+        type: 'number',
+        title: {
+          id: 'Retensi riwayat webhook (hari)',
+          en: 'Webhook delivery history retention (days)',
+        },
+        default: 30,
+        min: 1,
+        max: 3650,
+        order: 4,
+      },
+      {
         key: 'logs.notification_retention_days',
         type: 'number',
         title: {

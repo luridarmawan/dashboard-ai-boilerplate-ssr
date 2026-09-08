@@ -8,6 +8,7 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Urutan milestone M0–M7 dengan gate keluar |
 | [`docs/MODULES.md`](./docs/MODULES.md) | **Membangun modul** — `bun modgen`, kontrak tiap berkas, repositori terpisah, penjaga CI |
 | [`docs/THEMES.md`](./docs/THEMES.md) | Tema, layout, set ikon; tema dari modul; editor tema kustom di UI admin |
+| [`docs/WEBHOOKS.md`](./docs/WEBHOOKS.md) | Webhook keluar: event inti tenant sebagai POST bertanda tangan, percobaan ulang, riwayat |
 | [`docs/AI.md`](./docs/AI.md) | Modul AI: provider OpenAI-compatible (satu atau banyak profil dengan daftar harga), streaming, tool modul, log, analitik biaya & retensi |
 | [`docs/MCP.md`](./docs/MCP.md) | MCP server di `/v1/mcp`, token API bearer, dan MCP client (server MCP eksternal untuk asisten) |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | **Deploy ke VPS kosong sampai HTTPS**, backup/restore, operasi harian |

@@ -296,7 +296,7 @@ P2 (2FA, SSO tambahan, impersonasi, job queue, marketplace modul) sebaiknya menu
 **P2 yang dikerjakan atas keputusan pemilik (2026-09-08)**, urutan berdasar nilai per usaha:
 
 1. **Pipeline CD contoh** (Q-15) — **selesai**: `.github/workflows/deploy.yml` (build + push ke GHCR → SSH → `deploy/upgrade.sh --pull <tag>`), mode `--pull` di upgrade.sh ([`DEPLOY.md` §8d](./DEPLOY.md))
-2. Webhook keluar (J-5)
+2. **Webhook keluar** (J-5) — **selesai**: tabel `webhooks` + `webhook_deliveries`, event inti tenant → POST bertanda tangan HMAC-SHA256 dengan retry 1m/5m/30m/2h/12h, halaman `/webhooks` (secret sekali tampil, ping uji, riwayat, coba lagi), retensi riwayat, metrik ([`WEBHOOKS.md`](./WEBHOOKS.md))
 3. Kuota AI per tenant/user (H-14)
 4. 2FA TOTP + recovery codes (A-11)
 5. Impersonasi user oleh superadmin (D-6)

@@ -13,7 +13,14 @@ export interface RetentionResult {
   readonly schedulerRuns: number;
   readonly outbox: number;
   readonly notifications: number;
-  readonly days: { audit: number; schedulerRuns: number; outbox: number; notifications: number };
+  readonly webhooks: number;
+  readonly days: {
+    audit: number;
+    schedulerRuns: number;
+    outbox: number;
+    notifications: number;
+    webhooks: number;
+  };
 }
 
 function affected(r: unknown): number {
@@ -40,6 +47,7 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
       90,
       7,
     ),
+    webhooks: clamp(await settings.get<number | null>(null, 'logs.webhook_retention_days'), 30, 1),
   };
   const at = (d: number) => new Date(now.getTime() - d * 86_400_000);
 
@@ -77,7 +85,25 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
         ),
       ),
   );
-  if (audit || schedulerRuns || outbox || notifications)
-    logger.info('logs: retention pruned', { audit, schedulerRuns, outbox, notifications, days });
-  return { audit, schedulerRuns, outbox, notifications, days };
+  // Delivered/failed webhook attempts are history; pending ones are still owed.
+  const webhooks = affected(
+    await db
+      .delete(schema.webhookDeliveries)
+      .where(
+        and(
+          inArray(schema.webhookDeliveries.status, ['delivered', 'failed']),
+          lt(schema.webhookDeliveries.created_at, at(days.webhooks)),
+        ),
+      ),
+  );
+  if (audit || schedulerRuns || outbox || notifications || webhooks)
+    logger.info('logs: retention pruned', {
+      audit,
+      schedulerRuns,
+      outbox,
+      notifications,
+      webhooks,
+      days,
+    });
+  return { audit, schedulerRuns, outbox, notifications, webhooks, days };
 }

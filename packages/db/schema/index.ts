@@ -20,6 +20,7 @@ import { schedulerRuns } from './scheduler_runs.def.ts';
 import { sessions } from './sessions.def.ts';
 import { themes } from './themes.def.ts';
 import { users } from './users.def.ts';
+import { webhookDeliveries, webhooks } from './webhooks.def.ts';
 
 /**
  * Core table list. Modules do NOT add to this — module tables enter through
@@ -47,5 +48,7 @@ export const tables: readonly TableDef[] = [
   themes,
   notifications,
   files,
+  webhooks,
+  webhookDeliveries,
   outboxEmail,
 ];

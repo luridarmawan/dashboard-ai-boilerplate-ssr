@@ -1,12 +1,14 @@
 import { cleanupExpiredSessions } from '@core/auth';
 import { env } from '@core/config';
 import { getDb, unsafeAcrossTenants } from '@core/db';
+import { CORE_EVENTS } from '@core/module-kit';
 import { createEventBus, createScheduler, type EventBus, type Scheduler } from '@core/runtime';
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
 import { runOutboxOnce } from './mail.ts';
 import { hookRunsTotal, jobDuration, jobRunsTotal } from './metrics.ts';
 import { runLogRetentionOnce } from './retention.ts';
+import { deliverWebhooksOnce, enqueueEvent, nudgeDelivery } from './webhooks.ts';
 
 /**
  * Process-level runtime services, assembled once per API process:
@@ -32,6 +34,16 @@ export function createRuntime(): Runtime {
       hookRunsTotal.inc({ event: h.event, module: h.module, status: h.ok ? 'ok' : 'failed' }),
   });
   for (const hooks of moduleHooks) bus.register(hooks);
+  // Outgoing webhooks (J-5): every tenant event is queued for the tenant's webhooks, then nudged.
+  for (const event of CORE_EVENTS)
+    bus.on(
+      event,
+      async (payload, ctx) => {
+        const n = await enqueueEvent(event, payload, { requestId: ctx.requestId });
+        if (n) nudgeDelivery();
+      },
+      'core',
+    );
 
   const scheduler = createScheduler({
     db: getDb(),
@@ -55,6 +67,24 @@ export function createRuntime(): Runtime {
             t: new Date().toISOString(),
             level: 'info',
             msg: 'outbox delivered',
+            ...r,
+          }),
+        );
+    },
+  });
+  scheduler.register({
+    name: 'core.webhooks.deliver',
+    every: '1m',
+    lease: 300,
+    description: { id: 'Kirim ulang webhook yang tertunda', en: 'Deliver pending webhooks' },
+    run: async () => {
+      const r = await deliverWebhooksOnce();
+      if (r.picked)
+        console.log(
+          JSON.stringify({
+            t: new Date().toISOString(),
+            level: 'info',
+            msg: 'webhooks delivered',
             ...r,
           }),
         );

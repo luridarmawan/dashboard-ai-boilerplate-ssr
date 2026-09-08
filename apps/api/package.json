@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Elysia API \u2014 the product's source of truth; SvelteKit is its first consumer (Decision A)",
+  "description": "Elysia API — the product's source of truth; SvelteKit is its first consumer (Decision A)",
   "exports": {
     "./app": "./src/app.ts",
     "./plugins/*": "./src/plugins/*.ts",
@@ -13,7 +13,8 @@
     "./notifications": "./src/notifications.ts",
     "./lib/*": "./src/lib/*.ts",
     "./files": "./src/files.ts",
-    "./metrics": "./src/metrics.ts"
+    "./metrics": "./src/metrics.ts",
+    "./webhooks": "./src/webhooks.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",

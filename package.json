@@ -57,7 +57,7 @@
     "starter:build": "bun run scripts/create-module-template.ts",
     "test": "bun run bootstrap && bun test",
     "test:integration": "INTEGRATION=1 bun test integration",
-    "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun --env-file=/dev/null run bootstrap && bun --env-file=/dev/null run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun --env-file=/dev/null run db:seed && bun --env-file=/dev/null test integration\"",
+    "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e TABLE_PREFIX= -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun --env-file=/dev/null run bootstrap && bun --env-file=/dev/null run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun --env-file=/dev/null run db:seed && bun --env-file=/dev/null test integration\"",
     "test:unit": "bun --env-file=/dev/null test",
     "theme:validate": "bun run scripts/ci/theme-validate.ts",
     "typecheck": "bun run scripts/typecheck-all.ts",

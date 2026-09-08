@@ -71,6 +71,14 @@ export const CORE_MENU: readonly Entry[] = [
     order: 40,
   },
   {
+    id: 'core.webhooks',
+    label: { id: 'Webhook keluar', en: 'Outgoing webhooks' },
+    href: '/webhooks',
+    icon: 'link',
+    permission: 'webhook.read',
+    order: 45,
+  },
+  {
     id: 'core.profile',
     label: { id: 'Profil', en: 'Profile' },
     href: '/profile',

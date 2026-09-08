@@ -163,4 +163,6 @@ export {
   UserCreateBody,
   UserUpdateBody,
   validateForm,
+  WebhookBody,
+  WebhookUpdateBody,
 } from './forms.ts';
