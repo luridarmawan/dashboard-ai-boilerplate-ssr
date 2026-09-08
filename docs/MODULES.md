@@ -395,6 +395,28 @@ await notify({
 
 `notify()` tidak pernah melempar ke request pemanggil (kegagalan dicatat di log), menerbitkan event `notification.created` yang bisa didengar `hooks.ts` modul lain (mis. meneruskan ke webhook), dan barisnya adalah data tenant biasa: hanya pemiliknya yang bisa membaca lewat `/v1/notifications`. Notifikasi yang sudah dibaca dipangkas job retensi sesuai **Pengaturan → Log & retensi**. Contoh hidup: `modules/Example/api/routes.ts` (pesan kontak baru → pemegang `example.inquiry.read`).
 
+### Antrean pekerjaan dari modul (P2: retry, prioritas, dead-letter)
+
+Pekerjaan yang terjadi **karena sesuatu** (impor, laporan, kiriman massal, panggilan pihak ketiga yang lambat) tidak dijalankan di dalam request dan bukan pula job berkala (G-18). Daftarkan handler-nya saat modul dimuat, lalu enqueue dari route:
+
+```ts
+import { enqueue, registerTask } from '@app/api/queue';
+
+// sekali, saat plugin API modul dibuat (setiap instance mendaftarkan set yang sama)
+registerTask('billing.invoice.render', async (payload, ctx) => {
+  const { invoiceId } = payload as { invoiceId: string };
+  // ctx.attempt, ctx.maxAttempts, ctx.clientId, ctx.requestId, ctx.signal (batas waktu)
+  return { pdf: await renderInvoice(invoiceId, ctx.signal) };
+}, { maxAttempts: 5, timeoutMs: 60_000, description: { id: 'Render PDF tagihan', en: 'Render invoice PDF' } });
+
+// di route: tulis satu baris, request langsung selesai
+await enqueue('billing.invoice.render', { invoiceId }, {
+  clientId, priority: 10, delayMs: 0, dedupeKey: `invoice:${invoiceId}`, requestId,
+});
+```
+
+Worker `core.queue.work` (tiap 10 detik, plus *nudge* segera setelah enqueue) mengklaim baris yang jatuh tempo dengan satu UPDATE bersyarat — di `--scale api=3` setiap baris tetap dijalankan **sekali** — urut prioritas tertinggi lalu `run_at`. Handler yang melempar atau melewati `timeoutMs` dicoba lagi dengan backoff 10 dtk → 1 → 5 → 30 mnt → 2 jam; setelah `maxAttempts` barisnya menjadi **dead-letter** yang tampil di **Antrean pekerjaan** (`/queue`, izin `queue.read`; `queue.manage` untuk *Ulangi*/hapus, teraudit). `dedupeKey` menolak enqueue kedua selagi yang pertama pending/running. Lease yang kedaluwarsa (worker mati) dipulihkan pada pass berikutnya. Baris selesai/dead dipangkas retensi `logs.queue_retention_days`. Metrik: `queue_jobs_total{name,status}`, `queue_job_duration_seconds`. Bukti: `apps/api/test/integration/queue.test.ts`.
+
 ### Berkas unggahan dari modul (Q-16)
 
 Modul yang menerima berkas (lampiran, gambar produk, impor CSV) tidak menulis ke disk atau S3 sendiri — semuanya lewat layanan core, yang memvalidasi ukuran dan tipe menurut **Pengaturan → Berkas** (`files.max_size_mb`, `files.allowed_types`), mengendus isi (`.png` yang bukan PNG ditolak), menulis ke adapter yang dikonfigurasi (`STORAGE_DRIVER=local` → volume `UPLOADS_DIR`, atau `s3`), dan mencatat barisnya di tabel `files` sebagai data tenant:

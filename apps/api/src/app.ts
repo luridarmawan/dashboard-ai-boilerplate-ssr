@@ -10,6 +10,7 @@ import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
 import { notificationsDomain } from './domains/notifications.ts';
 import { outbox } from './domains/outbox.ts';
+import { queueDomain } from './domains/queue.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
 import { tokensDomain } from './domains/tokens.ts';
@@ -97,6 +98,7 @@ export const app = new Elysia()
       .use(filesDomain)
       .use(tokensDomain)
       .use(webhooksDomain)
+      .use(queueDomain)
       .use(toolsDomain)
       .use(mcpDomain)
       .use(moduleGate)

@@ -14,12 +14,14 @@ export interface RetentionResult {
   readonly outbox: number;
   readonly notifications: number;
   readonly webhooks: number;
+  readonly queue: number;
   readonly days: {
     audit: number;
     schedulerRuns: number;
     outbox: number;
     notifications: number;
     webhooks: number;
+    queue: number;
   };
 }
 
@@ -48,6 +50,7 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
       7,
     ),
     webhooks: clamp(await settings.get<number | null>(null, 'logs.webhook_retention_days'), 30, 1),
+    queue: clamp(await settings.get<number | null>(null, 'logs.queue_retention_days'), 14, 1),
   };
   const at = (d: number) => new Date(now.getTime() - d * 86_400_000);
 
@@ -96,7 +99,18 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
         ),
       ),
   );
-  if (audit || schedulerRuns || outbox || notifications || webhooks)
+  // Finished and dead-lettered queue jobs are history; pending/running ones are still owed.
+  const queue = affected(
+    await db
+      .delete(schema.queueJobs)
+      .where(
+        and(
+          inArray(schema.queueJobs.status, ['done', 'dead']),
+          lt(schema.queueJobs.created_at, at(days.queue)),
+        ),
+      ),
+  );
+  if (audit || schedulerRuns || outbox || notifications || webhooks || queue)
     logger.info('logs: retention pruned', {
       audit,
       schedulerRuns,
@@ -105,5 +119,5 @@ export async function runLogRetentionOnce(now = new Date()): Promise<RetentionRe
       webhooks,
       days,
     });
-  return { audit, schedulerRuns, outbox, notifications, webhooks, days };
+  return { audit, schedulerRuns, outbox, notifications, webhooks, queue, days };
 }

@@ -127,6 +127,13 @@
       "when": 1788866474865,
       "tag": "0017_first_mauler",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1788867746070,
+      "tag": "0018_blushing_stature",
+      "breakpoints": true
     }
   ]
 }

@@ -177,6 +177,22 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 2,
       },
       {
+        key: 'logs.queue_retention_days',
+        type: 'number',
+        title: {
+          id: 'Retensi pekerjaan antrean selesai/dead (hari)',
+          en: 'Finished/dead queue job retention (days)',
+        },
+        note: {
+          id: 'Baris pending dan running tidak pernah dihapus.',
+          en: 'Pending and running rows are never removed.',
+        },
+        default: 14,
+        min: 1,
+        max: 3650,
+        order: 3,
+      },
+      {
         key: 'logs.webhook_retention_days',
         type: 'number',
         title: {

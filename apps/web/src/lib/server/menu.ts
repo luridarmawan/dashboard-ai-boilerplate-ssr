@@ -79,6 +79,14 @@ export const CORE_MENU: readonly Entry[] = [
     order: 45,
   },
   {
+    id: 'core.queue',
+    label: { id: 'Antrean pekerjaan', en: 'Job queue' },
+    href: '/queue',
+    icon: 'clock',
+    permission: 'queue.read',
+    order: 46,
+  },
+  {
     id: 'core.profile',
     label: { id: 'Profil', en: 'Profile' },
     href: '/profile',

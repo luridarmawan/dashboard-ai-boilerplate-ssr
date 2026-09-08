@@ -127,6 +127,13 @@
       "when": 1788866475404,
       "tag": "0017_abnormal_kinsey_walden",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788867746633,
+      "tag": "0018_common_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

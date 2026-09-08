@@ -36,6 +36,12 @@ export const CORE_PERMISSIONS: readonly PermissionDef[] = [
     name: { id: 'Webhook keluar', en: 'Outgoing webhooks' },
   },
   {
+    resource: 'queue',
+    /** read = see the job queue and its dead letters; manage = retry / delete (P2 queue). */
+    actions: ['read', 'manage'],
+    name: { id: 'Antrean pekerjaan', en: 'Job queue' },
+  },
+  {
     resource: 'file',
     /** create = upload own files; read = fetch others' private files; manage = list/delete any (Q-16). */
     actions: ['read', 'create', 'manage'],

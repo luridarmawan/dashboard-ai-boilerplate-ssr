@@ -7,6 +7,7 @@ import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
 import { runOutboxOnce } from './mail.ts';
 import { hookRunsTotal, jobDuration, jobRunsTotal } from './metrics.ts';
+import { setQueueInstanceId, workQueueOnce } from './queue.ts';
 import { runLogRetentionOnce } from './retention.ts';
 import { deliverWebhooksOnce, enqueueEvent, nudgeDelivery } from './webhooks.ts';
 
@@ -45,6 +46,7 @@ export function createRuntime(): Runtime {
       'core',
     );
 
+  setQueueInstanceId(instanceId);
   const scheduler = createScheduler({
     db: getDb(),
     instanceId,
@@ -87,6 +89,19 @@ export function createRuntime(): Runtime {
             msg: 'webhooks delivered',
             ...r,
           }),
+        );
+    },
+  });
+  scheduler.register({
+    name: 'core.queue.work',
+    every: '10s',
+    lease: 120,
+    description: { id: 'Jalankan pekerjaan antrean yang jatuh tempo', en: 'Run due queue jobs' },
+    run: async () => {
+      const r = await workQueueOnce();
+      if (r.picked || r.requeued)
+        console.log(
+          JSON.stringify({ t: new Date().toISOString(), level: 'info', msg: 'queue worked', ...r }),
         );
     },
   });

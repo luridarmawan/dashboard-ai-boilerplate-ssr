@@ -14,6 +14,7 @@ import { modules } from './modules.def.ts';
 import { notifications } from './notifications.def.ts';
 import { outboxEmail } from './outbox_email.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
+import { queueJobs } from './queue_jobs.def.ts';
 import { rateLimits } from './rate_limits.def.ts';
 import { schedulerJobs } from './scheduler_jobs.def.ts';
 import { schedulerRuns } from './scheduler_runs.def.ts';
@@ -54,4 +55,5 @@ export const tables: readonly TableDef[] = [
   userMfa,
   mfaChallenges,
   outboxEmail,
+  queueJobs,
 ];

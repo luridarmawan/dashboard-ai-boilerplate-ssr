@@ -107,6 +107,7 @@ describe.skipIf(!enabled)('log retention (M-3)', () => {
       outbox: 30,
       notifications: 90,
       webhooks: 30,
+      queue: 14,
     }); // registry defaults
     expect(r.audit).toBeGreaterThanOrEqual(1);
     expect(r.schedulerRuns).toBeGreaterThanOrEqual(1);
