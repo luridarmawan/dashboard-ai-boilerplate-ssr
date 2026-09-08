@@ -133,4 +133,29 @@ export default defineTables('AI', [
     },
     indexes: [{ columns: ['client_id', 'mcp_id', 'wire'], unique: true }],
   }),
+  defineTable({
+    name: 'ai_credits',
+    tenant: true,
+    softDelete: false,
+    columns: {
+      /** Prepaid balance in micro-units of the currency; NULL = no balance limit (B-6, H-14). */
+      balance_micro: col.bigint().nullable(),
+      /** Lifetime spend charged against this tenant, micro-units. */
+      spent_micro: col.bigint().default(0),
+    },
+    indexes: [{ columns: ['client_id'], unique: true }],
+  }),
+  defineTable({
+    name: 'ai_credit_ledger',
+    tenant: true,
+    softDelete: false,
+    columns: {
+      /** Positive = top-up, negative = adjustment; charges from calls are not ledgered (see ai_calls.cost_micro). */
+      amount_micro: col.bigint(),
+      balance_after_micro: col.bigint().nullable(),
+      note: col.varchar(255).nullable(),
+      actor_id: col.uuid().nullable(),
+    },
+    indexes: [{ columns: ['client_id', 'created_at'] }],
+  }),
 ]);

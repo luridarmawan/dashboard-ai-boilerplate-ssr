@@ -50,6 +50,7 @@ import {
   resolveProvider,
   toPriceMicro,
 } from './providers.ts';
+import { adjustCredit, chargeCredit, checkQuota, creditLedger, creditOf } from './quota.ts';
 import {
   ChatCompletionBody,
   ConversationCreate,
@@ -170,6 +171,12 @@ function logCall(c: CallLog): void {
   if (c.tokensIn) aiTokensTotal.inc({ ...labels, direction: 'in' }, c.tokensIn);
   if (c.tokensOut) aiTokensTotal.inc({ ...labels, direction: 'out' }, c.tokensOut);
   if (cost) aiCostMicroTotal.inc(labels, cost);
+  if (cost && c.status === 'ok')
+    chargeCredit(c.clientId, cost).catch((err) =>
+      logger.warn('ai: credit charge failed', {
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
   queueMicrotask(() => {
     unsafeAcrossTenants()
       .insert(schema.aiCalls)
@@ -367,6 +374,29 @@ interface UserStat extends Stat {
 /** Analytics aggregate in memory over at most this many rows of the window (dialect-neutral). */
 const ANALYTICS_ROW_CAP = 100_000;
 
+// ---- quota & balance (B-6, H-14) ----
+const QuotaSideView = t.Object({ used: t.Integer(), limit: t.Integer() });
+const QuotaView = t.Object({
+  ok: t.Boolean(),
+  reason: t.Nullable(t.String()),
+  tenant: QuotaSideView,
+  user: QuotaSideView,
+  credit: t.Object({ balanceMicro: t.Nullable(t.Number()), spentMicro: t.Number() }),
+  monthStart: t.String(),
+});
+function quotaView(q: Awaited<ReturnType<typeof checkQuota>> | null) {
+  return (
+    q ?? {
+      ok: true,
+      reason: null,
+      tenant: { used: 0, limit: 0 },
+      user: { used: 0, limit: 0 },
+      credit: { balanceMicro: null, spentMicro: 0 },
+      monthStart: new Date(0).toISOString(),
+    }
+  );
+}
+
 export default defineApiRoutes(
   'AI',
   new Elysia({ name: 'module:ai', tags: ['module:ai'] })
@@ -390,6 +420,21 @@ export default defineApiRoutes(
             'Asisten AI dimatikan lewat konfigurasi (ai.enable)',
             requestId,
             { reason: 'ai_disabled' },
+          );
+        }
+        // Quota & balance (H-14): refused before the provider is called; usage lands after.
+        const quota = await checkQuota(clientId, a.user.id);
+        if (!quota.ok) {
+          set.status = 429;
+          return fail(
+            'rate_limited',
+            quota.reason === 'credit_exhausted'
+              ? 'Saldo AI tenant habis — hubungi administrator untuk menambah saldo'
+              : quota.reason === 'tenant_quota'
+                ? `Kuota token tenant bulan ini habis (${quota.tenant.used.toLocaleString('id-ID')} / ${quota.tenant.limit.toLocaleString('id-ID')})`
+                : `Kuota token Anda bulan ini habis (${quota.user.used.toLocaleString('id-ID')} / ${quota.user.limit.toLocaleString('id-ID')})`,
+            requestId,
+            { reason: quota.reason, tenant: quota.tenant, user: quota.user },
           );
         }
         const tenant = tenantState?.tenant;
@@ -1455,6 +1500,7 @@ export default defineApiRoutes(
           byModel: [] as ModelStat[],
           byUser: [] as UserStat[],
           truncated: false,
+          quota: quotaView(null),
         };
         if (!tenantState?.clientId) return ok(empty);
         const db = unsafeAcrossTenants(); // aggregate over the tenant's rows; condition explicit
@@ -1545,6 +1591,7 @@ export default defineApiRoutes(
         }
         const byCost = (a: Stat, b: Stat) =>
           b.costMicro - a.costMicro || b.tokensIn + b.tokensOut - (a.tokensIn + a.tokensOut);
+        const quota = await checkQuota(tenantState.clientId, null);
         return ok({
           days,
           from: from.toISOString(),
@@ -1553,6 +1600,7 @@ export default defineApiRoutes(
           byModel: [...byModel.values()].sort(byCost),
           byUser: [...byUser.values()].sort(byCost).slice(0, 50),
           truncated,
+          quota: quotaView(quota),
         });
       },
       {
@@ -1603,6 +1651,7 @@ export default defineApiRoutes(
                 }),
               ),
               truncated: t.Boolean(),
+              quota: QuotaView,
             }),
           ),
           ...errorResponses,
@@ -1611,6 +1660,105 @@ export default defineApiRoutes(
           summary:
             'AI usage analytics of the active tenant: totals, per day, per provider/model, per user (H-15). ?days=7|30|90',
         },
+      },
+    )
+
+    // ---- quota & balance (B-6, H-14) ----
+    .get(
+      '/quota',
+      async ({ auth, tenantState }) => {
+        const a = auth as AuthState;
+        if (!tenantState?.clientId) return ok(quotaView(null));
+        return ok(quotaView(await checkQuota(tenantState.clientId, a.user.id)));
+      },
+      {
+        beforeHandle: permission('ai.chat.read'),
+        response: { 200: OkSchema(QuotaView), ...errorResponses },
+        detail: {
+          summary: 'My AI quota this month: tenant + user token usage vs limits, tenant balance',
+        },
+      },
+    )
+    .post(
+      '/credit',
+      async ({ auth, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        if (!tenantState?.clientId) {
+          set.status = 409;
+          return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        const before = await creditOf(tenantState.clientId);
+        const after = await adjustCredit(
+          tenantState.clientId,
+          body.unlimited
+            ? { unlimited: true }
+            : { amountMicro: Math.round((body.amount ?? 0) * 1_000_000) },
+          body.note ?? null,
+          a.user.id,
+        );
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.credit.adjust',
+          resource: 'ai.credit',
+          resourceId: tenantState.clientId,
+          ip: clientIp(request, server),
+          requestId,
+          before,
+          after: { ...after, note: body.note ?? null },
+        });
+        return ok(after);
+      },
+      {
+        beforeHandle: permission('ai.credit.manage'),
+        body: t.Object({
+          /** Currency units; positive tops up, negative adjusts down. */
+          amount: t.Optional(t.Number({ minimum: -1_000_000_000, maximum: 1_000_000_000 })),
+          /** Remove the balance limit (back to "unlimited"). */
+          unlimited: t.Optional(t.Boolean()),
+          note: t.Optional(t.String({ maxLength: 255 })),
+        }),
+        response: {
+          200: OkSchema(t.Object({ balanceMicro: t.Nullable(t.Number()), spentMicro: t.Number() })),
+          ...errorResponses,
+        },
+        detail: { summary: 'Top up or adjust the tenant’s AI balance (B-6); ledgered and audited' },
+      },
+    )
+    .get(
+      '/credit/ledger',
+      async ({ tenantState }) => {
+        if (!tenantState?.clientId) return ok([]);
+        return ok(
+          (await creditLedger(tenantState.clientId)).map((r) => ({
+            id: r.id,
+            amountMicro: Number(r.amount_micro),
+            balanceAfterMicro:
+              r.balance_after_micro === null ? null : Number(r.balance_after_micro),
+            note: r.note,
+            actorId: r.actor_id,
+            createdAt: r.created_at.toISOString(),
+          })),
+        );
+      },
+      {
+        beforeHandle: permission('ai.credit.manage'),
+        response: {
+          200: OkSchema(
+            t.Array(
+              t.Object({
+                id: t.String(),
+                amountMicro: t.Number(),
+                balanceAfterMicro: t.Nullable(t.Number()),
+                note: t.Nullable(t.String()),
+                actorId: t.Nullable(t.String()),
+                createdAt: t.String(),
+              }),
+            ),
+          ),
+          ...errorResponses,
+        },
+        detail: { summary: 'Last 50 balance changes (top-ups, adjustments)' },
       },
     )
 

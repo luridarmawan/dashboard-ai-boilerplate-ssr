@@ -107,6 +107,27 @@ export default defineConfig('AI', [
         default: true,
         order: 9,
       },
+      {
+        key: 'ai.quota_tokens_month',
+        type: 'number',
+        title: { id: 'Kuota token tenant / bulan', en: 'Tenant token quota / month' },
+        note: {
+          id: 'Total token (masuk + keluar) semua pengguna tenant per bulan kalender UTC; 0 = tanpa batas (H-14).',
+          en: 'Total tokens (in + out) of all tenant users per UTC calendar month; 0 = unlimited (H-14).',
+        },
+        default: 0,
+        min: 0,
+        order: 10,
+      },
+      {
+        key: 'ai.quota_tokens_user_month',
+        type: 'number',
+        title: { id: 'Kuota token per pengguna / bulan', en: 'Per-user token quota / month' },
+        note: { id: '0 = tanpa batas.', en: '0 = unlimited.' },
+        default: 0,
+        min: 0,
+        order: 11,
+      },
     ],
   },
 ]);

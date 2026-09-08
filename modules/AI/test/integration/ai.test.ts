@@ -192,6 +192,31 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
         { method: 'PUT', body: JSON.stringify({ scope: 'global', values }) },
         [admin],
       );
+    // Quota/balance (H-14) live on the shared default tenant: make sure nothing from another test
+    // file (or an aborted run) limits this one.
+    await call(
+      '/v1/configuration',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          scope: 'tenant',
+          values: { 'ai.quota_tokens_month': '0', 'ai.quota_tokens_user_month': '0' },
+        }),
+      },
+      [admin],
+    );
+    await call(
+      '/v1/m/ai/credit',
+      { method: 'POST', body: JSON.stringify({ unlimited: true, note: 'reset uji' }) },
+      [admin],
+    );
+    // Provider profiles (H-10) take precedence over the ai.* settings this file relies on: remove
+    // any left on the shared tenant by other files or aborted runs.
+    const profiles = (await json(await call('/v1/m/ai/providers', {}, [admin]))).data as unknown as
+      | { id: string }[]
+      | undefined;
+    for (const p of profiles ?? [])
+      await call(`/v1/m/ai/providers/${p.id}`, { method: 'DELETE' }, [admin]);
     expect(
       (
         await put({

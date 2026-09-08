@@ -89,5 +89,22 @@
   "ai.analytics.provider": "Penyedia",
   "ai.analytics.user": "Pengguna",
   "ai.analytics.legacy": "Pengaturan → AI",
-  "ai.analytics.truncated": "Rentang ini punya lebih dari 100.000 panggilan; angka dihitung dari 100.000 yang terbaru."
+  "ai.analytics.truncated": "Rentang ini punya lebih dari 100.000 panggilan; angka dihitung dari 100.000 yang terbaru.",
+  "ai.quota.title": "Kuota & saldo",
+  "ai.quota.intro": "Batas token per bulan (Pengaturan → AI) dan saldo prabayar tenant; permintaan ditolak saat habis.",
+  "ai.quota.tenant": "Token tenant bulan ini",
+  "ai.quota.user": "Token Anda bulan ini",
+  "ai.quota.tokens_month": "token / bulan kalender UTC",
+  "ai.quota.unlimited": "tanpa batas",
+  "ai.quota.balance": "Saldo",
+  "ai.quota.spent": "Terpakai seluruhnya",
+  "ai.quota.status": "Status",
+  "ai.quota.settings_hint": "Kuota token diatur di Pengaturan → AI; saldo lewat form di bawah.",
+  "ai.quota.amount": "Jumlah (mata uang)",
+  "ai.quota.note": "Catatan",
+  "ai.quota.make_unlimited": "hapus batas saldo",
+  "ai.quota.apply": "Terapkan",
+  "ai.quota.credited": "Saldo diperbarui.",
+  "ai.quota.ledger": "Riwayat saldo",
+  "ai.quota.exhausted": "Kuota atau saldo AI habis; permintaan ditolak sampai bulan berikutnya atau saldo ditambah."
 }

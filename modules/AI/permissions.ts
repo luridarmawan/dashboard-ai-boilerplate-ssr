@@ -14,6 +14,12 @@ export default definePermissions('AI', [
     name: { id: 'Penyedia AI', en: 'AI providers' },
   },
   {
+    resource: 'ai.credit',
+    /** Top up / adjust the tenant's AI balance and read its ledger (B-6, H-14). */
+    actions: ['manage'],
+    name: { id: 'Saldo AI', en: 'AI credit' },
+  },
+  {
     resource: 'ai.mcp',
     /** read/manage the registrations; `use` = the caller's assistant may call tools of enabled servers (I-4). */
     actions: ['read', 'manage', 'use'],

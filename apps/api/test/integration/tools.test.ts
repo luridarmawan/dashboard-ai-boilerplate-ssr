@@ -148,11 +148,13 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
       { id: newId(), client_id: tenantId, slug: `p-${run}`, name: mine },
       { id: newId(), client_id: acmeId, slug: `a-${run}`, name: theirs },
     ]);
+    // The shared dev tenant accumulates products from earlier runs: filter by this run's name prefix
+    // so the 50-row cap never hides ours (the tenancy assertion is unaffected — Acme has no such rows).
     const listNames = async (headers: Record<string, string>, cookies: string[]) => {
       const r = await json(
         await post(
           '/v1/tools/call',
-          { name: 'example.list_products', input: { limit: 50 } },
+          { name: 'example.list_products', input: { q: `-${run}`, limit: 50 } },
           cookies,
           headers,
         ),

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
-import { and, type Db, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { and, type Db, desc, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import {
   attemptDelivery,
@@ -197,15 +197,18 @@ describe.skipIf(!enabled)(
       await enqueueEvent('config.saved', { section: 'app', key: 'app.name', clientId: tenantId });
       const first = await deliverWebhooksOnce();
       expect(first.retried).toBeGreaterThanOrEqual(1);
+      // The seeded default tenant is shared with earlier runs: take THIS run's row (newest, ours).
       const [row] = await db
         .select()
         .from(schema.webhookDeliveries)
         .where(
           and(
             eq(schema.webhookDeliveries.client_id, tenantId),
+            eq(schema.webhookDeliveries.webhook_id, hookId),
             eq(schema.webhookDeliveries.event, 'config.saved'),
           ),
         )
+        .orderBy(desc(schema.webhookDeliveries.created_at))
         .limit(1);
       expect(row?.status).toBe('pending');
       expect(row?.attempts).toBe(1);

@@ -59,9 +59,13 @@ const errorText = $derived(
     ? t('ai.chat.no_key')
     : data.error === 'ai_disabled'
       ? t('ai.chat.disabled')
-      : data.error
-        ? t('ai.chat.error')
-        : null,
+      : data.error === 'tenant_quota' ||
+          data.error === 'user_quota' ||
+          data.error === 'credit_exhausted'
+        ? t('ai.quota.exhausted')
+        : data.error
+          ? t('ai.chat.error')
+          : null,
 );
 
 function scrollDown() {
@@ -112,7 +116,9 @@ async function streamSend(e: SubmitEvent) {
           ? t('ai.chat.no_key')
           : reason === 'ai_disabled'
             ? t('ai.chat.disabled')
-            : t('ai.chat.error');
+            : reason === 'tenant_quota' || reason === 'user_quota' || reason === 'credit_exhausted'
+              ? t('ai.quota.exhausted')
+              : t('ai.chat.error');
       messages = messages.slice(0, -1);
       return;
     }
@@ -246,6 +252,14 @@ function copy(text: string) {
       {/if}
     </header>
     {#if !data.aiEnabled}<p class="error m-4">{t('ai.chat.disabled')}</p>{/if}
+    {#if data.quota && (data.quota.tenant.limit || data.quota.user.limit || data.quota.credit.balanceMicro !== null)}
+      <p class={`mx-4 mt-2 text-xs ${data.quota.ok ? 'text-muted-foreground' : 'text-destructive'}`} data-testid="quota-line">
+        {#if data.quota.user.limit}{t('ai.quota.user')}: {data.quota.user.used.toLocaleString('id-ID')} / {data.quota.user.limit.toLocaleString('id-ID')} token · {/if}
+        {#if data.quota.tenant.limit}{t('ai.quota.tenant')}: {data.quota.tenant.used.toLocaleString('id-ID')} / {data.quota.tenant.limit.toLocaleString('id-ID')} token · {/if}
+        {#if data.quota.credit.balanceMicro !== null}{t('ai.quota.balance')}: {(data.quota.credit.balanceMicro / 1_000_000).toFixed(4)}{/if}
+        {#if !data.quota.ok} — {t('ai.quota.exhausted')}{/if}
+      </p>
+    {/if}
     {#if errorText || streamError || form?.error}<p class="error m-4" role="alert">{streamError ?? errorText ?? form?.error}</p>{/if}
     <div bind:this={listEl} class="flex-1 space-y-4 overflow-y-auto p-4" data-testid="messages">
       {#each messages as m (m.id)}

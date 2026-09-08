@@ -39,6 +39,18 @@ Aturannya:
 
 Tabel: `ai_providers`, `ai_models` (per tenant), kolom `ai_conversations.provider_id`, `ai_calls.provider` (migrasi 0012). Bukti: `modules/AI/test/integration/providers.test.ts` (dua provider tiruan; routing per percakapan, biaya dari daftar harga, key tak pernah bocor, uji `/models`, profil nonaktif, hapus).
 
+## Kuota & saldo (B-6, H-14)
+
+Dua batas yang saling bebas, keduanya opsional dan diperiksa **sebelum** penyedia dipanggil:
+
+| Batas | Tempat mengatur | Cara hitung | Habis → |
+|---|---|---|---|
+| Token per bulan, tenant | **Pengaturan → AI → Kuota token tenant / bulan** (`ai.quota_tokens_month`, 0 = tanpa batas) | jumlah `tokens_total` panggilan sukses di `ai_calls` sejak awal bulan kalender UTC | `429 rate_limited`, `reason: tenant_quota` |
+| Token per bulan, per pengguna | `ai.quota_tokens_user_month` | sama, difilter pengguna | `reason: user_quota` |
+| Saldo prabayar tenant | **Analitik AI → Kuota & saldo** (izin `ai.credit.manage`): top-up, koreksi negatif, atau hapus batas | `ai_credits.balance_micro` dikurangi `cost_micro` tiap panggilan sukses (harga dari daftar model, H-10); tanpa baris/NULL = tanpa batas | `reason: credit_exhausted` saat ≤ 0 |
+
+Pemakaian ditulis setelah respons selesai, jadi satu panggilan bisa melampaui batas sebesar dirinya sendiri — itu harga agar jalur panas tidak menunggu. Halaman chat menampilkan sisa kuota/saldo di bawah header saat ada batas, dan pesan penolakan yang jelas saat habis. Setiap top-up/koreksi masuk `ai_credit_ledger` dan audit `ai.credit.adjust`; `GET /v1/m/ai/quota` (izin `ai.chat.read`) memberi status untuk pemanggil, `GET /v1/m/ai/analytics` membawa blok `quota` untuk tenant. Bukti: `modules/AI/test/integration/quota.test.ts`.
+
 ## Analitik penggunaan (H-15)
 
 **Analitik AI** (`/m/ai/analytics`, izin `ai.log.read`) merangkum log panggilan: total panggilan (ok/gagal/dibatalkan), token masuk/keluar, biaya estimasi; grafik token per hari (CSS, tanpa pustaka, jalan tanpa JavaScript); tabel per penyedia & model dan per pengguna, diurutkan biaya. Rentang 7/30/90 hari (`GET /v1/m/ai/analytics?days=`; hari kalender UTC, batang terakhir = hari ini). Agregasi dilakukan di API dari baris `ai_calls` tenant aktif — netral dialect — dengan batas 100.000 baris terbaru per rentang (`truncated: true` bila terpotong). Retensi log (M-3) membatasi seberapa jauh analitik bisa melihat ke belakang.

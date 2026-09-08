@@ -23,8 +23,12 @@ export const load: ServerLoad = async (event) => {
         : 'Percakapan tidak bisa dimuat',
     );
   // H-10: the provider/model picker; empty when the tenant has no profiles (legacy ai.* settings).
-  const opts = await api.v1.m.ai.providers.options.get();
+  const [opts, quotaRes] = await Promise.all([
+    api.v1.m.ai.providers.options.get(),
+    api.v1.m.ai.quota.get(),
+  ]);
   const providers = opts.data?.success ? opts.data.data : [];
+  const quota = quotaRes.data?.success ? quotaRes.data.data : null;
   let conversation: {
     id: string;
     title: string;
@@ -56,6 +60,7 @@ export const load: ServerLoad = async (event) => {
     conversations: list.data.data,
     conversation,
     providers,
+    quota,
     aiEnabled: cfg['ai.enable'] !== false,
     error: event.url.searchParams.get('error'),
   };

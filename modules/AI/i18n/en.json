@@ -89,5 +89,22 @@
   "ai.analytics.provider": "Provider",
   "ai.analytics.user": "User",
   "ai.analytics.legacy": "Settings → AI",
-  "ai.analytics.truncated": "This window has more than 100,000 calls; figures use the newest 100,000."
+  "ai.analytics.truncated": "This window has more than 100,000 calls; figures use the newest 100,000.",
+  "ai.quota.title": "Quota & balance",
+  "ai.quota.intro": "Monthly token limits (Settings → AI) and the tenant's prepaid balance; requests are refused when exhausted.",
+  "ai.quota.tenant": "Tenant tokens this month",
+  "ai.quota.user": "Your tokens this month",
+  "ai.quota.tokens_month": "tokens / UTC calendar month",
+  "ai.quota.unlimited": "unlimited",
+  "ai.quota.balance": "Balance",
+  "ai.quota.spent": "Spent overall",
+  "ai.quota.status": "Status",
+  "ai.quota.settings_hint": "Token quotas live in Settings → AI; the balance is managed below.",
+  "ai.quota.amount": "Amount (currency)",
+  "ai.quota.note": "Note",
+  "ai.quota.make_unlimited": "remove balance limit",
+  "ai.quota.apply": "Apply",
+  "ai.quota.credited": "Balance updated.",
+  "ai.quota.ledger": "Balance history",
+  "ai.quota.exhausted": "AI quota or balance exhausted; requests are refused until next month or a top-up."
 }

@@ -1,14 +1,18 @@
 <script lang="ts">
-import { Badge, Card, Table } from '$lib/components/ui';
+import Csrf from '$lib/components/Csrf.svelte';
+import { Badge, Button, Card, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
+import { hasPermission } from '$lib/permissions';
 
 /**
  * Usage analytics (H-15). Server-rendered, no chart library: the per-day series is a CSS bar
  * chart whose bars scale to the busiest day, so the page works without JavaScript like the rest.
  */
-let { data } = $props();
+let { data, form } = $props();
 const t = useT();
 const s = $derived(data.stats);
+const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
+const q = $derived(data.stats.quota);
 const money = (micro: number) =>
   micro ? (micro / 1_000_000).toFixed(micro < 10_000 ? 4 : 2) : '—';
 const num = (n: number) => n.toLocaleString('id-ID');
@@ -42,6 +46,33 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
     <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.tokens_out')}</p><p class="text-2xl font-semibold">{num(s.totals.tokensOut)}</p></Card>
     <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.cost')}</p><p class="text-2xl font-semibold">{money(s.totals.costMicro)}</p><p class="text-xs text-muted-foreground">{t('ai.analytics.cost_hint')}</p></Card>
   </div>
+
+  <Card title={t('ai.quota.title')} description={t('ai.quota.intro')}>
+    <div class="grid gap-3 sm:grid-cols-3 text-sm" data-testid="ai-quota">
+      <div><p class="text-xs text-muted-foreground">{t('ai.quota.tenant')}</p><p class="text-xl font-semibold">{q.tenant.limit ? `${num(q.tenant.used)} / ${num(q.tenant.limit)}` : num(q.tenant.used)}</p><p class="text-xs text-muted-foreground">{q.tenant.limit ? t('ai.quota.tokens_month') : t('ai.quota.unlimited')}</p></div>
+      <div><p class="text-xs text-muted-foreground">{t('ai.quota.balance')}</p><p class="text-xl font-semibold">{q.credit.balanceMicro === null ? t('ai.quota.unlimited') : money(q.credit.balanceMicro)}</p><p class="text-xs text-muted-foreground">{t('ai.quota.spent')}: {money(q.credit.spentMicro)}</p></div>
+      <div><p class="text-xs text-muted-foreground">{t('ai.quota.status')}</p><p class="text-xl font-semibold">{#if q.ok}<Badge variant="success">ok</Badge>{:else}<Badge variant="destructive">{q.reason}</Badge>{/if}</p><p class="text-xs text-muted-foreground">{t('ai.quota.settings_hint')}</p></div>
+    </div>
+    {#if can('ai.credit.manage')}
+      <form method="POST" action="?/credit" class="mt-4 flex flex-wrap items-end gap-2" data-testid="credit-form">
+        <Csrf token={data.csrf} />
+        <label class="grid gap-1 text-xs"><span>{t('ai.quota.amount')}</span><input name="amount" type="number" step="0.000001" class="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm" placeholder="10" /></label>
+        <label class="grid gap-1 text-xs"><span>{t('ai.quota.note')}</span><input name="note" maxlength="255" class="h-8 w-56 rounded-md border border-input bg-background px-2 text-sm" /></label>
+        <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="unlimited" class="accent-primary" /> {t('ai.quota.make_unlimited')}</label>
+        <Button type="submit" size="sm">{t('ai.quota.apply')}</Button>
+      </form>
+      {#if form?.credited}<p class="notice mt-2">{t('ai.quota.credited')}</p>{/if}
+      {#if form?.error}<p class="error mt-2" role="alert">{form.error}</p>{/if}
+      {#if data.ledger?.length}
+        <details class="mt-3 text-sm"><summary class="cursor-pointer text-muted-foreground">{t('ai.quota.ledger')} ({data.ledger.length})</summary>
+          <Table caption={t('ai.quota.ledger')}>
+            <thead><tr><th>Waktu</th><th class="text-right">{t('ai.quota.amount')}</th><th class="text-right">{t('ai.quota.balance')}</th><th>{t('ai.quota.note')}</th></tr></thead>
+            <tbody>{#each data.ledger as l (l.id)}<tr><td class="whitespace-nowrap text-muted-foreground">{new Date(l.createdAt).toLocaleString('id-ID')}</td><td class="text-right">{money(l.amountMicro)}</td><td class="text-right">{l.balanceAfterMicro === null ? t('ai.quota.unlimited') : money(l.balanceAfterMicro)}</td><td class="text-muted-foreground">{l.note ?? '—'}</td></tr>{/each}</tbody>
+          </Table>
+        </details>
+      {/if}
+    {/if}
+  </Card>
 
   <Card title={t('ai.analytics.per_day')}>
     <div class="flex h-40 items-end gap-px overflow-x-auto" role="img" aria-label={t('ai.analytics.per_day')} data-testid="ai-analytics-chart">

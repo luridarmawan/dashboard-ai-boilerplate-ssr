@@ -99,6 +99,13 @@
       "when": 1788860493486,
       "tag": "0013_far_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1788861466546,
+      "tag": "0014_freezing_hydra",
+      "breakpoints": true
     }
   ]
 }
