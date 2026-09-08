@@ -252,7 +252,7 @@ describe.skipIf(!enabled)('AI threading (H-12) + attachments (H-11)', () => {
         created_at: new Date(base + i * 1000),
       });
     const msgs = await messagesOf(legacy);
-    expect(msgs.map((m) => m.parentId)).toEqual([null, ids[0], ids[1], ids[2]]);
+    expect(msgs.map((m) => m.parentId)).toEqual([null, ...ids.slice(0, 3)]);
     const [row] = await db
       .select()
       .from(schema.aiMessages)
