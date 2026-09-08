@@ -253,7 +253,9 @@ Yang tersedia (nama Prometheus baku, tanpa label user/tenant — kardinalitasnya
 
 Contoh PromQL: `histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))`, `sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))`.
 
-Modul mendaftarkan metriknya sendiri lewat registry yang sama: `import { metrics } from '@app/api/metrics'` lalu `metrics.counter('<ns>_x_total', '…', ['kind'])` — lihat [`MODULES.md` §3](./MODULES.md). Grafana tidak disertakan; arahkan instance Grafana Anda ke Prometheus ini.
+Modul mendaftarkan metriknya sendiri lewat registry yang sama: `import { metrics } from '@app/api/metrics'` lalu `metrics.counter('<ns>_x_total', '…', ['kind'])` — lihat [`MODULES.md` §3](./MODULES.md).
+
+**Grafana & alert.** Profil `monitoring` juga menjalankan Grafana (`127.0.0.1:3300`, login `admin` / `GRAFANA_ADMIN_PASSWORD`) dengan datasource Prometheus dan dashboard **Dashboard AI Boilerplate — API** sudah ter-provision dari `deploy/grafana/` (laju request per route, error rate, p50/p95/p99, in-flight, pool DB, RSS per replika, job & hook, token dan biaya AI). Aturan alert ada di `deploy/prometheus-rules.yml` dan tampil di tab *Alerts* Prometheus serta di Grafana: replika tidak ter-scrape 2 menit, 5xx > 5%, p95 > 1 s, antrean pool DB, job atau hook gagal, RSS > 320 MB. Untuk notifikasi (email/Slack/Telegram) sambungkan Alertmanager atau *contact point* Grafana — keduanya sengaja tidak dipaketkan karena bergantung pada penyedia notifikasi Anda.
 
 ---
 

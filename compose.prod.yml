@@ -326,9 +326,35 @@ services:
       - '--web.listen-address=0.0.0.0:9090'
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus-rules.yml:/etc/prometheus/rules.yml:ro
       - prometheus-data:/prometheus
     ports:
       - '127.0.0.1:9090:9090'
+    <<: *logging
+
+  # Grafana with the Prometheus datasource and the api dashboard provisioned (deploy/grafana/);
+  # UI on 127.0.0.1:3300 only (tunnel: ssh -L 3300:127.0.0.1:3300 <vps>), login admin / GRAFANA_ADMIN_PASSWORD.
+  grafana:
+    image: grafana/grafana-oss:12.1.1
+    profiles: ['monitoring']
+    restart: unless-stopped
+    mem_limit: ${GRAFANA_MEM_LIMIT:-256m}
+    cpus: ${GRAFANA_CPUS:-0.5}
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-please-now}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3300
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:3300:3000'
+    depends_on:
+      - prometheus
     <<: *logging
 
 volumes:
@@ -338,3 +364,4 @@ volumes:
   valkey-data:
   uploads:
   prometheus-data:
+  grafana-data:
