@@ -239,6 +239,8 @@ if (existsSync(biomePath)) {
     biome.files.includes = biome.files.includes.filter((p) => p !== pattern);
   if ((biome.files?.includes?.length ?? 0) !== before) {
     writeFileSync(biomePath, `${JSON.stringify(biome, null, 2)}\n`);
+    // Back to the repo's own formatting, so a round trip add → remove leaves the file byte-identical.
+    sh(['bunx', 'biome', 'format', '--write', 'biome.json'], { ok: true });
     console.log(`→ biome.json: ${pattern} dicabut`);
   }
 }

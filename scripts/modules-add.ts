@@ -104,6 +104,7 @@ if (existsSync(biomePath)) {
   if (!biome.files.includes.includes(pattern)) {
     biome.files.includes.push(pattern);
     writeFileSync(biomePath, `${JSON.stringify(biome, null, 2)}\n`);
+    sh(['bunx', 'biome', 'format', '--write', 'biome.json']);
     console.log(`modules:add: biome.json: ${pattern} (modul eksternal di-lint di reponya sendiri)`);
   }
 }
