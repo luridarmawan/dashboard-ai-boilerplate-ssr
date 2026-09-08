@@ -98,7 +98,8 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 |---|---|---|
 | `curl: (60) SSL certificate problem` / sertifikat internal | DNS belum mengarah ke VPS atau port 80 tertutup (tantangan ACME gagal) | `docker compose … logs caddy \| tail`, `dig +short DOMAIN` |
 | `502` | `api`/`web` belum sehat | `docker compose … ps`, `docker compose … logs api --tail 50` |
-| `/v1/ready` merah | database tidak terjangkau / migrasi belum jalan | ulangi langkah 4–5 |
+| `/v1/ready` merah (`ready:false`, 503) dengan `Failed query: select id from clients` | tabel belum ada: `dc up -d` tidak menjalankan migrasi — langkah 4–5 terlewat | `dc run --rm preflight` lalu `dc run --rm migrate && dc run --rm seed` |
+| `/v1/ready` merah dengan galat koneksi (`ECONNREFUSED`, `Access denied`) | database tidak terjangkau atau kredensial berubah | periksa `dc ps mysql`, `DATABASE_URL`; baris di bawah |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
 | `migrate`/`seed`: `Access denied for user 'app'@'%' to database '<nama>'` (errno 1044) | `DATABASE_NAME` diubah setelah volume `mysql-data` dibuat — database baru belum ada / user `app` belum punya hak | `dc run --rm db-init` lalu `migrate` + `seed`; atau `dc down -v` bila data belum penting |
 | `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` (errno 1045) | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `dc config \| grep DATABASE_URL`; `dc run --rm db-init` menyamakan kata sandi user `app` dengan `.env.prod` (butuh root password yang berlaku di volume), atau bila data belum penting `dc down -v && dc up -d --wait mysql` |

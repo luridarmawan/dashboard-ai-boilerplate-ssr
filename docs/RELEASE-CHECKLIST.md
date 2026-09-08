@@ -34,19 +34,19 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 
 ```bash
 alias dc='docker compose --env-file .env.prod -f compose.prod.yml'   # bash & zsh
-# 23: di VPS baru, ikuti docs/DEPLOY.md §2 sambil menyalakan stopwatch; berhenti bila ada langkah yang tidak tertulis
-# 24: di VPS
+# 23: di VPS baru, ikuti docs/DEPLOY.md §2 sambil menyalakan stopwatch; berhenti bila ada langkah yang tidak tertulis.
+#     Jangan lewati langkah 4–5 (`dc run --rm migrate`, `dc run --rm seed`) SEBELUM `dc up -d --wait --scale api=3`:
+#     tanpa itu /v1/ready menjawab 503 "Failed query: select id from clients" (tabel belum ada). Ragu? `dc run --rm preflight`
+#     menyebut persis apa yang kurang. Pengukuran 2026-09-08: build image 6 menit, VPS kosong → stack hidup 13 menit.
+# 24: di VPS (database hasil restore sudah membawa migrasi + seed dari dump; preflight yang memastikannya)
 dc run --rm backup-once
 dc stop api web
 dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE <DATABASE_NAME>; CREATE DATABASE <DATABASE_NAME>'   # nama dari .env.prod (baku app)
 dc run --rm -e CONFIRM_RESTORE=yes restore latest
-# build image
+dc run --rm preflight        # harus LOLOS: migrations mutakhir, seed ada — bila tidak, dump-nya cacat
 dc up -d --scale api=3
-dc run --rm preflight
-dc run --rm migrate
-dc run --rm seed
 curl -s https://DOMAIN/v1/ready
-# 25: setelah 10 menit idle
+# 25: setelah 10 menit idle (ukur dalam kondisi sudah migrate + seed, bukan stack kosong)
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
