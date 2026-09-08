@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | MCP **server** (I-1, I-2, I-3, I-6) dan MCP **client** (I-4, I-5) tersedia — FR-I lengkap kecuali transport `stdio`/`websocket` (lihat bagian akhir) |
+| **Status** | MCP **server** (I-1, I-2, I-3, I-6) dan MCP **client** (I-4, I-5) tersedia — FR-I lengkap. Transport: **HTTP / Streamable HTTP saja** (keputusan 2026-09-08; klien juga menerima SSE lama), lihat bagian akhir |
 | **Endpoint** | `POST /v1/mcp` — MCP *Streamable HTTP* memakai SDK resmi `@modelcontextprotocol/sdk` (I-1), stateless, respons JSON |
 | **Autentikasi** | `Authorization: Bearer <token API>` (PRD A-4) — dibuat di **Profil → Token API**; sesi cookie juga diterima (dengan CSRF) |
 | **Isi** | `tools/list` & `tools/call` dari registry tool core (titik perluasan 8, [`MODULES.md` §3](./MODULES.md)), `resources/read dab://me`, `prompts/get dashboard_context` |

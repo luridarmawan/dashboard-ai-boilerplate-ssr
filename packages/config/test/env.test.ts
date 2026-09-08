@@ -53,16 +53,13 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     expect(loadEnv({ ...valid, CACHE_DRIVER: 'memory' }).CACHE_DRIVER).toBe('memory');
   });
 
-  test('driver redis menuntut REDIS_URL; hanya cache yang punya adapter redis (§8 butir 7)', () => {
-    expect(() => loadEnv({ ...valid, CACHE_DRIVER: 'redis' })).toThrow(/REDIS_URL/);
-    expect(
-      loadEnv({ ...valid, CACHE_DRIVER: 'redis', REDIS_URL: 'redis://127.0.0.1:6379' })
-        .CACHE_DRIVER,
-    ).toBe('redis');
-    for (const key of ['SESSION_DRIVER', 'RATELIMIT_DRIVER'] as const)
-      expect(() =>
-        loadEnv({ ...valid, [key]: 'redis', REDIS_URL: 'redis://127.0.0.1:6379' }),
-      ).toThrow(/belum tersedia/);
+  test('driver redis (sesi, cache, rate limit) menuntut REDIS_URL', () => {
+    for (const key of ['SESSION_DRIVER', 'CACHE_DRIVER', 'RATELIMIT_DRIVER'] as const) {
+      expect(() => loadEnv({ ...valid, [key]: 'redis' })).toThrow(/REDIS_URL/);
+      expect(loadEnv({ ...valid, [key]: 'redis', REDIS_URL: 'redis://127.0.0.1:6379' })[key]).toBe(
+        'redis',
+      );
+    }
   });
 
   test('skema URL harus cocok dengan dialect', () => {

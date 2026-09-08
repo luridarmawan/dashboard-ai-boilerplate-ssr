@@ -50,4 +50,4 @@ curl -s https://DOMAIN/v1/ready
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
-Yang belum ditepati MVP dan sengaja ditunda (P1/P2, PRD §8 bagian akhir & ROADMAP §8): transport `stdio`/`websocket` untuk MCP client (FR-I selebihnya selesai — `docs/MCP.md`), adapter Redis untuk sesi/rate limit, uninstall modul dengan migrasi turun.
+Yang belum ditepati MVP dan sengaja ditunda (P1/P2, PRD §8 bagian akhir & ROADMAP §8): uninstall modul dengan migrasi turun. **Keputusan tetap** (bukan penundaan): transport MCP hanya HTTP / Streamable HTTP — `stdio`/`websocket` tidak akan dibangun (`docs/MCP.md`).

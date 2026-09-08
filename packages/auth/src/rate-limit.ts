@@ -1,11 +1,17 @@
 import { and, type Db, eq, newId, schema, sql } from '@core/db';
+import { rateLimitRedis, warnRedis } from './redis.ts';
 
 /**
- * Fixed-window rate limiting on the database, `RATELIMIT_DRIVER=database` (PRD A-2, N-7,
- * Decision M). One row per key; the increment is a conditional UPDATE so concurrent instances
- * never lose counts. Good enough for login throttling and API fairness on a single VPS; the
- * Redis adapter (INCR + EXPIRE) is the accelerator when this table becomes hot.
+ * Fixed-window rate limiting (PRD A-2, N-7, Decision M).
+ *
+ *   database (default)  one row per key; the increment is a conditional UPDATE so concurrent
+ *                       instances never lose counts
+ *   redis               `INCR` on `dab:rl:<key>:<window>` + `PEXPIREAT` at the window end — the
+ *                       same semantics, one round trip, no table growth; falls back to the
+ *                       database when Redis errors (never fails open)
  */
+
+const RL_PREFIX = 'dab:rl:';
 
 export interface RateLimitRule {
   readonly limit: number;
@@ -49,6 +55,25 @@ export async function consume(
   const windowMs = rule.windowSeconds * 1000;
   const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
   const resetAt = new Date(windowStart.getTime() + windowMs);
+
+  const redis = rateLimitRedis();
+  if (redis) {
+    try {
+      const rk = `${RL_PREFIX}${key}:${windowStart.getTime()}`;
+      const count = Number(await redis.send('INCR', [rk]));
+      // First hit of the window sets the expiry (a little past the window end, for clock skew).
+      if (count === 1) await redis.send('PEXPIREAT', [rk, String(resetAt.getTime() + 1000)]);
+      if (Number.isFinite(count))
+        return {
+          allowed: count <= rule.limit,
+          limit: rule.limit,
+          remaining: Math.max(0, rule.limit - count),
+          resetAt,
+        };
+    } catch (err) {
+      warnRedis('rate-limit', err);
+    }
+  }
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const [row] = await db

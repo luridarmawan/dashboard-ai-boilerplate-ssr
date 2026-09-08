@@ -1,4 +1,4 @@
-import { writeAudit } from '@core/auth';
+import { invalidateUserSessions, writeAudit } from '@core/auth';
 import { errorResponses, fail, Id, OkSchema, ok } from '@core/contracts';
 import { eq, schema, unsafeAcrossTenants } from '@core/db';
 import { type CustomThemeInput, GLOBAL, viewCustomTheme, webRoutes } from '@core/settings';
@@ -140,6 +140,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         .update(schema.users)
         .set({ theme: body.theme })
         .where(eq(schema.users.id, a.user.id));
+      await invalidateUserSessions(a.user.id);
       return ok({ theme: body.theme });
     },
     {

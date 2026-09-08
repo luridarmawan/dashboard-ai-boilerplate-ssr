@@ -1,6 +1,8 @@
 import {
+  detachTenantFromSessions,
   hashPassword,
   hashToken,
+  invalidateUserSessions,
   isMemberOf,
   passwordProblems,
   randomToken,
@@ -198,6 +200,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       if (body.avatarUrl !== undefined) patch.avatar_url = body.avatarUrl;
       if (Object.keys(patch).length) {
         await db.update(schema.users).set(patch).where(eq(schema.users.id, a.user.id));
+        await invalidateUserSessions(a.user.id);
       }
       const [after] = await db.select().from(schema.users).where(eq(schema.users.id, a.user.id));
       await writeAudit(db, {
@@ -252,6 +255,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const previous = fileIdFromUrl(a.user.avatar_url);
       const url = `/v1/files/${r.row.id}/content`;
       await db.update(schema.users).set({ avatar_url: url }).where(eq(schema.users.id, a.user.id));
+      await invalidateUserSessions(a.user.id);
       // The old uploaded avatar goes with it; an external URL is simply replaced.
       if (previous) {
         const old = await findAvatarFile(previous);
@@ -296,6 +300,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const db = unsafeAcrossTenants();
       const previous = fileIdFromUrl(a.user.avatar_url);
       await db.update(schema.users).set({ avatar_url: null }).where(eq(schema.users.id, a.user.id));
+      await invalidateUserSessions(a.user.id);
       if (previous) {
         const old = await findAvatarFile(previous);
         if (old && old.user_id === a.user.id) await removeFile(old);
@@ -342,6 +347,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         .update(schema.users)
         .set({ password_hash: await hashPassword(body.newPassword) })
         .where(eq(schema.users.id, a.user.id));
+      await invalidateUserSessions(a.user.id);
       // Other devices are signed out; this session stays (the user is clearly present here).
       const revoked = await revokeAllSessions(db, a.user.id, a.session?.id);
       await writeAudit(db, {
@@ -565,6 +571,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       if (body.isSuperadmin !== undefined) patch.is_superadmin = body.isSuperadmin;
       if (Object.keys(patch).length) {
         await db.update(schema.users).set(patch).where(eq(schema.users.id, before.id));
+        await invalidateUserSessions(before.id);
       }
       if (body.statusId === STATUS.INACTIVE) await revokeAllSessions(db, before.id);
       const beforeGroups = await groupsOf(ts.tenant, before.id);
@@ -619,12 +626,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         eq(schema.clientUserMaps.user_id, row.id),
       );
       // Sessions pinned to this tenant lose it; the account survives while other tenants remain.
-      await db
-        .update(schema.sessions)
-        .set({ client_id: null })
-        .where(
-          and(eq(schema.sessions.user_id, row.id), eq(schema.sessions.client_id, ts.clientId)),
-        );
+      await detachTenantFromSessions(db, ts.clientId, row.id);
       const [remaining] = await db
         .select({ n: count() })
         .from(schema.clientUserMaps)
@@ -637,6 +639,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
           .update(schema.users)
           .set({ deleted_at: new Date() })
           .where(eq(schema.users.id, row.id));
+        await invalidateUserSessions(row.id);
         await revokeAllSessions(db, row.id);
         emit('user.deleted', { userId: row.id, clientId: ts.clientId }, { requestId });
       }

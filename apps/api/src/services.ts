@@ -1,3 +1,4 @@
+import { configureRateLimitRedis, configureSessionRedis, type RedisCommands } from '@core/auth';
 import { env } from '@core/config';
 import { unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
@@ -17,14 +18,29 @@ import {
  * Decision M): `database` (versioned, default), `redis` (Bun's built-in client), or `memory`
  * (no cache — development only; refused in production by @core/config).
  */
+/** One Redis connection per process, shared by every adapter that asks for it (lazy). */
+let redis: (RedisLike & RedisCommands) | null | undefined;
+function redisClient(): (RedisLike & RedisCommands) | null {
+  if (redis !== undefined) return redis;
+  const e = env();
+  // Bun ships a Redis client; typed loosely here so the API package needs no extra dependency.
+  redis = e.REDIS_URL
+    ? new (
+        Bun as unknown as { RedisClient: new (url: string) => RedisLike & RedisCommands }
+      ).RedisClient(e.REDIS_URL)
+    : null;
+  return redis;
+}
+// Sessions and rate limits (Decision M, ROADMAP §8 item 7): Redis accelerators, chosen by env,
+// resolved lazily on first use so importing the app never needs an environment.
+configureSessionRedis(() => (env().SESSION_DRIVER === 'redis' ? redisClient() : null));
+configureRateLimitRedis(() => (env().RATELIMIT_DRIVER === 'redis' ? redisClient() : null));
+
 function cacheFor<T>(name: string) {
   const e = env();
   if (e.CACHE_DRIVER === 'redis' && e.REDIS_URL) {
-    // Bun ships a Redis client; typed loosely here so the API package needs no extra dependency.
-    const client = new (
-      Bun as unknown as { RedisClient: new (url: string) => RedisLike }
-    ).RedisClient(e.REDIS_URL);
-    return new RedisCache<T>(client, `dab:${name}`, 300);
+    const client = redisClient();
+    if (client) return new RedisCache<T>(client, `dab:${name}`, 300);
   }
   if (e.CACHE_DRIVER === 'memory') return new NoCache<T>();
   return undefined; // SettingsStore / ModuleStateStore default to the database version cache

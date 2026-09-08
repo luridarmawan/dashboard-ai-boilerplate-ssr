@@ -233,7 +233,7 @@ jobs:
         run: bun run ci:cross-repo
 
   integration-redis:
-    name: gate M7 #4 · suite yang sama DENGAN Redis (CACHE_DRIVER=redis, Valkey) + TABLE_PREFIX (O-2)
+    name: gate M7 #4 · suite yang sama DENGAN Redis (SESSION/CACHE/RATELIMIT_DRIVER=redis, Valkey) + TABLE_PREFIX (O-2)
     runs-on: ubuntu-latest
     needs: check
     services:
@@ -261,7 +261,9 @@ jobs:
     env:
       DB_DIALECT: mysql
       DATABASE_URL: mysql://app:app@127.0.0.1:3306/app
+      SESSION_DRIVER: redis
       CACHE_DRIVER: redis
+      RATELIMIT_DRIVER: redis
       REDIS_URL: redis://127.0.0.1:6379
       # O-2: several apps may share one database — every table, index, FK and the journal get the prefix
       TABLE_PREFIX: dab_

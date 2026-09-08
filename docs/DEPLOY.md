@@ -157,9 +157,13 @@ docker stats --no-stream                        # RAM per container (§8 #25: to
 dc run --rm backup-once
 dc run --rm -e CONFIRM_RESTORE=yes restore latest
 
-# Redis/Valkey opsional (Keputusan M) — percepatan cache konfigurasi, bukan kebutuhan
-#   di .env.prod: CACHE_DRIVER=redis, REDIS_URL=redis://valkey:6379
-#   (SESSION_DRIVER/RATELIMIT_DRIVER=redis ditolak saat start: adapternya belum ada, ROADMAP §8 butir 7)
+# Redis/Valkey opsional (Keputusan M) — percepatan, bukan kebutuhan; database tetap sumber kebenaran
+#   di .env.prod: REDIS_URL=redis://valkey:6379 lalu pilih per jenis state:
+#     CACHE_DRIVER=redis      cache konfigurasi/tema/modul (versi di Redis, bukan tabel cache_versions)
+#     SESSION_DRIVER=redis    sesi yang sudah di-resolve di-cache 60 s di depan tabel sessions (login,
+#                             logout, ganti tenant tetap ke database dan mengusir salinannya)
+#     RATELIMIT_DRIVER=redis  jendela rate limit dihitung INCR+PEXPIREAT, tabel rate_limits tidak tumbuh
+#   Redis mati = perilaku database biasa (fail-open ke database, satu peringatan per menit di log).
 dc --profile redis up -d --wait --scale api=3
 ```
 

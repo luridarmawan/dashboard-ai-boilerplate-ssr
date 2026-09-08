@@ -1,4 +1,10 @@
-import { canActInTenant, seedTenantGroups, tenantsOf, writeAudit } from '@core/auth';
+import {
+  canActInTenant,
+  detachTenantFromSessions,
+  seedTenantGroups,
+  tenantsOf,
+  writeAudit,
+} from '@core/auth';
 import {
   ClientCreateBody,
   ClientUpdateBody,
@@ -314,10 +320,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         .set({ deleted_at: new Date() })
         .where(eq(schema.clients.id, c.id));
       // Sessions parked on this tenant fall back to "no active tenant" on their next request.
-      await db
-        .update(schema.sessions)
-        .set({ client_id: null })
-        .where(eq(schema.sessions.client_id, c.id));
+      await detachTenantFromSessions(db, c.id);
       await writeAudit(db, {
         clientId: c.id,
         actorId: a.user.id,

@@ -34,6 +34,13 @@ export {
   rateLimitHeaders,
 } from './rate-limit.ts';
 export {
+  configureRateLimitRedis,
+  configureSessionRedis,
+  type RedisCommands,
+  type RedisProvider,
+  resetRedisAdapters,
+} from './redis.ts';
+export {
   allPermissionStrings,
   CORE_PERMISSIONS,
   isRegistered,
@@ -51,7 +58,9 @@ export {
   type CreatedSession,
   cleanupExpiredSessions,
   createSession,
+  detachTenantFromSessions,
   findSession,
+  invalidateUserSessions,
   type NewSession,
   revokeAllSessions,
   revokeSession,

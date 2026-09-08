@@ -5,6 +5,7 @@ import {
   effectivePermissions,
   hashPassword,
   hashToken,
+  invalidateUserSessions,
   parseRateLimitRule,
   passwordProblems,
   permissionRegistry,
@@ -306,6 +307,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         .update(schema.users)
         .set({ email_verified_at: now })
         .where(eq(schema.users.id, row.user_id));
+      await invalidateUserSessions(row.user_id);
       return ok({ verified: true as const });
     },
     {
