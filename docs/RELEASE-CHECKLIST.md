@@ -26,9 +26,9 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 | 20 | Allowlist tema; tema dicabut → user pindah ke baku tanpa galat | `scripts/m3-gate-proof.ts` | — |
 | 21 | Set ikon bertukar; CI gagal bila ada nama ikon tak tertutup | `icon-coverage.ts`, proof M2 | — |
 | 22 | Menonaktifkan modul pemilik tema/layout tidak merusak halaman | proof M3 (L-14) | — |
-| 23 | VPS bersih → HTTPS < 15 menit mengikuti [`DEPLOY.md`](./DEPLOY.md) tanpa langkah tak tertulis | `docker-build`, `scale-proof` (stack yang sama, tanpa domain publik) | ☐ **wajib**: VPS Ubuntu LTS + Docker, catat waktu |
+| 23 | VPS bersih → HTTPS < 15 menit mengikuti [`DEPLOY.md`](./DEPLOY.md) tanpa langkah tak tertulis | `docker-build`, `scale-proof` (stack yang sama, tanpa domain publik) | ☑ 2026-09-08: VPS Ubuntu LTS + Docker, 13 menit (setup 10.44 → build image 6 menit → stack hidup 10.57), `migrate` + `seed` + `/v1/ready` hijau; rollout `deploy/upgrade.sh` tanpa request gagal |
 | 24 | Backup → hapus database → restore → aplikasi utuh | job `backup-restore` (`scripts/ci/backup-restore-proof.sh`) | ☐ ulangi sekali di VPS dengan `run --rm restore` |
-| 25 | Stabil di 2 vCPU / 4 GB, RAM idle < 1,5 GB | `scripts/ci/idle-memory.sh` di job `scale-proof` (3 replika api) | ☐ **wajib**: `docker stats --no-stream` di VPS setelah 10 menit idle |
+| 25 | Stabil di 2 vCPU / 4 GB, RAM idle < 1,5 GB | `scripts/ci/idle-memory.sh` di job `scale-proof` (3 replika api) | ☑ 2026-09-08 (sudah migrate + seed, 10 menit idle): caddy 10 MB, web 68 MB, api 87/40/38 MB, backup 4 MB, mysql 467 MB — total container ≈ 713 MB, pagu 2,9 GB tidak tersentuh |
 
 ## Cara menjalankan bagian manual
 
