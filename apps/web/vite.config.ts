@@ -16,6 +16,18 @@ export default defineConfig(({ mode }) => {
       host: env.WEB_HOST ?? '127.0.0.1',
       // Module pages are shimmed from modules/<Name>/web/routes — outside the web root.
       fs: { allow: ['../..'] },
+      // Same-origin API surface in development, exactly what Caddy does in production (Decision E):
+      // browser-facing URLs such as /v1/files/<id>/content (avatars, theme logos), /docs and
+      // /openapi.json resolve on the web origin instead of 404-ing on the dev server.
+      proxy: Object.fromEntries(
+        ['/v1', '/docs', '/openapi.json'].map((path) => [
+          path,
+          {
+            target: env.API_URL ?? `http://127.0.0.1:${env.API_PORT ?? 3001}`,
+            changeOrigin: false,
+          },
+        ]),
+      ),
     },
     preview: { port: 4173, strictPort: true },
   };
