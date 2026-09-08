@@ -24,7 +24,7 @@ describe('buildMenu (F-3 groups)', () => {
     const kinds = menu.map((i) => i.kind);
     expect(kinds.indexOf('group')).toBeGreaterThan(0);
     expect(kinds.slice(kinds.indexOf('group')).every((k) => k === 'group')).toBe(true);
-    expect(labels(menu).slice(0, 3)).toEqual(['Dashboard', 'AI assistant', 'Profile']);
+    expect(labels(menu).slice(0, 2)).toEqual(['Dashboard', 'AI assistant']);
     expect(menu.at(-1)?.id).toBe('group.monitoring');
   });
 
@@ -52,7 +52,7 @@ describe('buildMenu (F-3 groups)', () => {
     expect(labels(group(menu, 'ai')?.children ?? [])).toEqual(['AI providers', 'AI analytics']);
     // nothing module-owned leaks to the top level
     const top = menu.filter((i) => i.kind === 'link').map((i) => i.id);
-    expect(top).toEqual(['core.dashboard', 'ai.chat', 'core.profile']);
+    expect(top).toEqual(['core.dashboard', 'ai.chat']);
   });
 
   test('the group holding the current page is active; others are not', () => {
@@ -65,7 +65,7 @@ describe('buildMenu (F-3 groups)', () => {
 
   test('a group whose entries are all hidden is not built', () => {
     const bare = buildMenu(nobody, '/dashboard', 'en');
-    expect(labels(bare)).toEqual(['Dashboard', 'Profile']);
+    expect(labels(bare)).toEqual(['Dashboard']);
   });
 
   test('a disabled module contributes neither entries nor a group (G-8)', () => {

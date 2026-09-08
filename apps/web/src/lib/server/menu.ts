@@ -8,7 +8,8 @@ import type { Session } from './session.ts';
  * never sent to the client (the API refuses it anyway, C-6). Resolved during SSR so the sidebar
  * is right in the first HTML (F-2). Layouts receive the result and only arrange it.
  *
- * Shape (F-3): a short top level (Dashboard, the AI assistant, Profile) followed by collapsible
+ * Shape (F-3): a short top level (Dashboard, the AI assistant — the profile lives in the header)
+ * followed by collapsible
  * GROUPS — the shared core groups Settings / Integration / Monitoring, and one group per module
  * for entries that name no group (title from module.json `menu.label`, else the module name).
  * A group whose entries are all hidden is not built; a group with an active entry is rendered open.
@@ -65,14 +66,6 @@ export const CORE_MENU: readonly Entry[] = [
     href: '/dashboard',
     icon: 'dashboard',
     order: 0,
-    group: null,
-  },
-  {
-    id: 'core.profile',
-    label: { id: 'Profil', en: 'Profile' },
-    href: '/profile',
-    icon: 'user',
-    order: 90,
     group: null,
   },
   {
