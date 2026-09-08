@@ -25,6 +25,11 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
   await page.fill('input[name="password"]', PASSWORD);
   await page.locator('main form button[type="submit"]').click();
   await expect(page).toHaveURL(/\/dashboard/);
+  // F-3: module entries live in collapsible groups; the Example group is closed on /dashboard
+  // (no active page inside), so open it before expecting its link to be visible.
+  const exampleGroup = page.getByTestId('nav-group.example').first();
+  await expect(exampleGroup).toBeAttached();
+  await exampleGroup.locator('summary').click();
   await expect(page.locator('a[href="/m/example/products"]').first()).toBeVisible();
 
   // H-13: the floating chat is on every dashboard page; it streams with the page as context
