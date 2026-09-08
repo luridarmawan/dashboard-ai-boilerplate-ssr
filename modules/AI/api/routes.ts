@@ -1,4 +1,5 @@
 import { publicLink } from '@app/api/mail';
+import { metrics } from '@app/api/metrics';
 import { type AuthState, clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, type TenantState, tenantContext } from '@app/api/plugins/tenancy';
@@ -143,9 +144,32 @@ interface CallLog {
   priceInMicro: number;
   priceOutMicro: number;
 }
+// Operational counters (M-6) beside the per-call log rows (H-9): provider/model/status only —
+// never a user or tenant label.
+const aiCallsTotal = metrics.counter(
+  'ai_calls_total',
+  'AI provider calls, by provider, model and status.',
+  ['provider', 'model', 'status'],
+);
+const aiTokensTotal = metrics.counter('ai_tokens_total', 'Tokens exchanged with AI providers.', [
+  'provider',
+  'model',
+  'direction',
+]);
+const aiCostMicroTotal = metrics.counter(
+  'ai_cost_micro_total',
+  'Estimated AI spend in micro-units of the configured currency.',
+  ['provider', 'model'],
+);
+
 /** H-9: fire-and-forget — the response is already on its way; a failed log line is logged, never thrown. */
 function logCall(c: CallLog): void {
   const cost = costMicro(c.tokensIn, c.tokensOut, c.priceInMicro, c.priceOutMicro);
+  const labels = { provider: c.provider ?? 'settings', model: c.model ?? '' };
+  aiCallsTotal.inc({ ...labels, status: c.status });
+  if (c.tokensIn) aiTokensTotal.inc({ ...labels, direction: 'in' }, c.tokensIn);
+  if (c.tokensOut) aiTokensTotal.inc({ ...labels, direction: 'out' }, c.tokensOut);
+  if (cost) aiCostMicroTotal.inc(labels, cost);
   queueMicrotask(() => {
     unsafeAcrossTenants()
       .insert(schema.aiCalls)

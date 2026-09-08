@@ -1,5 +1,6 @@
 import { env } from '@core/config';
 import { app } from './app.ts';
+import { bindServer } from './metrics.ts';
 import { createRuntime } from './runtime.ts';
 import { setBus } from './services.ts';
 
@@ -9,6 +10,7 @@ export async function serve(): Promise<void> {
   const e = env();
 
   app.listen({ port: e.API_PORT, hostname: e.API_HOST });
+  bindServer(() => app.server); // http_requests_in_flight (M-6)
 
   // Event bus + scheduler live for the life of the process; stop cleanly so a running job can
   // finish (or abort) before the port closes.

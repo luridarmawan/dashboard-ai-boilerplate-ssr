@@ -16,6 +16,7 @@ import { tokensDomain } from './domains/tokens.ts';
 import { toolsDomain } from './domains/tools.ts';
 import { users } from './domains/users.ts';
 import { modulesPlugin } from './generated/modules.ts';
+import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
 import { demoMode } from './plugins/demo.ts';
 import { moduleGate } from './plugins/module-gate.ts';
@@ -33,6 +34,7 @@ import { requestContext } from './plugins/request-context.ts';
  */
 export const app = new Elysia()
   .use(requestContext)
+  .use(metricsDomain)
   .use(csrf)
   .use(demoMode)
   .use(

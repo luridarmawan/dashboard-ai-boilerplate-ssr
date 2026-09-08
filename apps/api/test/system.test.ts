@@ -69,3 +69,62 @@ describe('/v1/version (M-5)', () => {
     expect(body.data.modules.map((m) => m.name)).toContain('Dummy');
   });
 });
+
+describe('/metrics (M-6)', () => {
+  test('exposes Prometheus text: request counters and latency buckets for the routes just hit, app_info, process gauges', async () => {
+    await call('/v1/health');
+    await call('/v1/nope-404');
+    // Metrics are recorded in onAfterResponse, which runs after the response has been handed back.
+    await Bun.sleep(30);
+    const res = await call('/metrics');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/plain; version=0.0.4');
+    const body = await res.text();
+    expect(body).toContain('# TYPE http_requests_total counter');
+    expect(body).toMatch(
+      /http_requests_total\{method="GET",route="\/v1\/health",status="200"\} \d+/,
+    );
+    expect(body).toMatch(/http_request_errors_total\{class="4xx"\} \d+/);
+    expect(body).toMatch(
+      /http_request_duration_seconds_bucket\{method="GET",route="\/v1\/health",le="\+Inf"\} \d+/,
+    );
+    expect(body).toMatch(
+      /app_info\{version="[^"]+",commit="[^"]+",dialect="[^"]+",instance="[^"]+"\} 1/,
+    );
+    expect(body).toMatch(/process_resident_memory_bytes \d+/);
+    expect(body).toContain('# TYPE scheduler_job_runs_total counter');
+    // Not listening in tests: Bun's pendingRequests is unavailable, so the gauge reads 0.
+    expect(body).toContain('http_requests_in_flight 0\n');
+    // No raw ids in route labels: an unmatched path with a uuid collapses to :id.
+    await call('/v1/files/0192a3b4-1234-7abc-8def-0123456789ab/nowhere');
+    await Bun.sleep(30);
+    expect(await (await call('/metrics')).text()).not.toContain(
+      '0192a3b4-1234-7abc-8def-0123456789ab',
+    );
+    // The endpoint itself is not documented in OpenAPI.
+    const spec = (await (await call('/openapi.json')).json()) as { paths: Record<string, unknown> };
+    expect(spec.paths['/metrics']).toBeUndefined();
+  });
+
+  test('METRICS_TOKEN gates the scrape with a bearer token; METRICS_ENABLED=false hides it', async () => {
+    process.env.METRICS_TOKEN = 'a-scrape-token-for-tests';
+    try {
+      expect((await call('/metrics')).status).toBe(401);
+      expect((await call('/metrics', { headers: { authorization: 'Bearer wrong' } })).status).toBe(
+        401,
+      );
+      const ok = await call('/metrics', {
+        headers: { authorization: 'Bearer a-scrape-token-for-tests' },
+      });
+      expect(ok.status).toBe(200);
+    } finally {
+      delete process.env.METRICS_TOKEN;
+    }
+    process.env.METRICS_ENABLED = 'false';
+    try {
+      expect((await call('/metrics')).status).toBe(404);
+    } finally {
+      delete process.env.METRICS_ENABLED;
+    }
+  });
+});

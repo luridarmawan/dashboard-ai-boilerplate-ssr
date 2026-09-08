@@ -37,6 +37,13 @@ const envSchema = z
     CACHE_DRIVER: driver,
     RATELIMIT_DRIVER: driver,
     REDIS_URL: z.url().optional(),
+    /** Prometheus exposition at GET /metrics (M-6). Not proxied by Caddy: scrape inside the network. */
+    METRICS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    /** When set, /metrics requires `Authorization: Bearer <token>`. */
+    METRICS_TOKEN: z.string().min(16).optional(),
 
     /** Bind address. 127.0.0.1 on a developer machine; 0.0.0.0 inside a container. */
     API_HOST: z.string().min(1).default('127.0.0.1'),

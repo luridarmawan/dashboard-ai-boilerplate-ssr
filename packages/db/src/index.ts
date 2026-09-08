@@ -86,6 +86,39 @@ export function getDb(): Db {
   return instance;
 }
 
+/** Connection-pool numbers for metrics (M-6); null before the first connection or when the driver hides them. */
+export function poolStats(): {
+  max: number;
+  open: number | null;
+  idle: number | null;
+  queued: number | null;
+} | null {
+  if (!instance) return null;
+  const client = (instance as unknown as { $client?: unknown }).$client as
+    | {
+        pool?: {
+          config?: { connectionLimit?: number };
+          _allConnections?: { length: number };
+          _freeConnections?: { length: number };
+          _connectionQueue?: { length: number };
+        };
+        options?: { max?: number };
+      }
+    | undefined;
+  if (!client) return null;
+  if (client.pool) {
+    // mysql2: the promise wrapper exposes the callback pool, whose internals hold the counts.
+    return {
+      max: client.pool.config?.connectionLimit ?? 10,
+      open: client.pool._allConnections?.length ?? null,
+      idle: client.pool._freeConnections?.length ?? null,
+      queued: client.pool._connectionQueue?.length ?? null,
+    };
+  }
+  // postgres.js publishes only its configured maximum.
+  return { max: client.options?.max ?? 10, open: null, idle: null, queued: null };
+}
+
 /**
  * The connection scoped to ONE tenant (B-3): every query on a tenant table carries
  * `client_id = clientId`. This is what domain code and modules use.

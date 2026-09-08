@@ -39,6 +39,8 @@ const MAX_FAILURES = 100;
 export interface EventBusOptions {
   /** Structured logger sink; defaults to console (JSON lines). */
   readonly log?: (entry: Record<string, unknown>) => void;
+  /** Observer for every handler invocation — metrics (M-6). Must not throw. */
+  readonly onHook?: (run: { event: string; module: string; ok: boolean; ms: number }) => void;
 }
 
 export interface EventBus {
@@ -69,6 +71,14 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus {
       console.log(JSON.stringify({ t: new Date().toISOString(), ...entry })));
   const handlers = new Map<CoreEventName, Entry[]>();
   const recentFailures: HookFailure[] = [];
+  let currentEvent = '';
+  const observe = (module: string, ok: boolean, t0: number) => {
+    try {
+      opts.onHook?.({ event: currentEvent, module, ok, ms: performance.now() - t0 });
+    } catch {
+      /* an observer must never break an emit */
+    }
+  };
 
   const on: EventBus['on'] = (event, handler, module = 'core') => {
     const list = handlers.get(event) ?? [];
@@ -94,14 +104,18 @@ export function createEventBus(opts: EventBusOptions = {}): EventBus {
     },
     async emit(event, payload, meta = {}) {
       const list = handlers.get(event) ?? [];
+      currentEvent = event;
       const ctx: HookContext = { event, requestId: meta.requestId ?? null, emittedAt: new Date() };
       const failed: { module: string; error: string }[] = [];
       let delivered = 0;
       for (const { module, handler } of list) {
+        const t0 = performance.now();
         try {
           await handler(payload, ctx);
           delivered++;
+          observe(module, true, t0);
         } catch (err) {
+          observe(module, false, t0);
           const error = err instanceof Error ? err.message : String(err);
           failed.push({ module, error });
           recentFailures.unshift({

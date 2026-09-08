@@ -225,6 +225,36 @@ CI menjalankan pengukuran yang sama pada stack `--scale api=3` (`scripts/ci/idle
 
 ---
 
+## 7a. Metrik Prometheus (M-6)
+
+Setiap proses api mengekspos `GET /metrics` (format teks Prometheus) di port api-nya — **bukan** di bawah `/v1`, jadi Caddy tidak pernah meneruskannya ke internet; yang bisa mengambilnya hanya sesuatu di dalam jaringan Docker (atau `127.0.0.1:3001` di mode systemd). Jalankan Prometheus di sampingnya:
+
+```bash
+dc --profile monitoring up -d          # prom/prometheus, konfigurasi deploy/prometheus.yml, retensi 15 hari
+ssh -L 9090:127.0.0.1:9090 <vps>       # UI di http://localhost:9090 dari laptop Anda
+```
+
+`deploy/prometheus.yml` memakai DNS Docker (`dns_sd_configs` ke `api`) sehingga **setiap replika** `--scale api=N` ter-scrape dan dibedakan lewat label `instance`. Bila port api bisa dijangkau lebih luas dari jaringan stack, isi `METRICS_TOKEN` di `.env.prod` dan nilai yang sama di `prometheus.yml` (`authorization: Bearer`); `METRICS_ENABLED=false` mematikan endpoint-nya.
+
+Yang tersedia (nama Prometheus baku, tanpa label user/tenant — kardinalitasnya terjaga; route adalah pola yang cocok seperti `/v1/users/:id`, bukan path mentah):
+
+| Metrik | Arti |
+|---|---|
+| `http_requests_total{method,route,status}` | laju request; error rate = `status=~"5.."` ÷ total |
+| `http_request_duration_seconds_bucket{method,route,le}` | latensi — p50/p95/p99 lewat `histogram_quantile` |
+| `http_requests_in_flight`, `http_request_errors_total{class}` | beban saat ini; 4xx vs 5xx |
+| `db_pool_connections{state}`, `db_pool_max_connections` | koneksi pool DB (open/idle/queued di MySQL; PostgreSQL hanya maksimum) |
+| `scheduler_job_runs_total{job,status}`, `scheduler_job_duration_seconds` | job berkala (G-18) per instance |
+| `event_hook_runs_total{event,module,status}` | hook modul yang jalan/gagal (G-17) |
+| `ai_calls_total{provider,model,status}`, `ai_tokens_total{…,direction}`, `ai_cost_micro_total` | dari modul AI — contoh metrik yang didaftarkan modul |
+| `app_info{version,commit,dialect,instance}`, `process_*` | identitas build, memori, CPU, uptime |
+
+Contoh PromQL: `histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))`, `sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))`.
+
+Modul mendaftarkan metriknya sendiri lewat registry yang sama: `import { metrics } from '@app/api/metrics'` lalu `metrics.counter('<ns>_x_total', '…', ['kind'])` — lihat [`MODULES.md` §3](./MODULES.md). Grafana tidak disertakan; arahkan instance Grafana Anda ke Prometheus ini.
+
+---
+
 ## 8. Operasi lanjutan: upgrade tanpa downtime, preflight, systemd
 
 ### 8a. Upgrade tanpa downtime (Q-12)

@@ -66,6 +66,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 - **Notifikasi dalam aplikasi** — bel di header dan halaman `/notifications`; modul mengirim lewat `notify()` dari `@app/api/notifications` (penerima eksplisit atau semua pemegang sebuah izin): [`docs/MODULES.md`](./docs/MODULES.md) §3.
 - **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log. Uji kredensial `.env` tanpa database: `bun run mail:test --to anda@contoh.id`.
 - **Konfigurasi runtime lain** (bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
+- **Pemantauan** — `GET /metrics` (Prometheus) di tiap proses api: laju request, latensi, error, pool DB, job, hook, metrik modul; `dc --profile monitoring up -d` menjalankan Prometheus di samping stack ([`docs/DEPLOY.md`](./docs/DEPLOY.md) §7a).
 - **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah. Upgrade **tanpa downtime**: `sh deploy/upgrade.sh`; cek kesiapan kapan saja: `dc run --rm preflight`; tanpa Docker: unit systemd di `deploy/systemd/`.
 
 ## Menjalankan dan menguji tanpa Docker

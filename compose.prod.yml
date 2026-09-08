@@ -58,6 +58,9 @@ x-app-env: &app-env
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-}
   S3_PUBLIC_URL: ${S3_PUBLIC_URL:-}
   S3_VIRTUAL_HOSTED_STYLE: ${S3_VIRTUAL_HOSTED_STYLE:-false}
+  # Prometheus (M-6): GET /metrics on the api port — not proxied by Caddy; optional bearer token
+  METRICS_ENABLED: ${METRICS_ENABLED:-true}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
 
 services:
   caddy:
@@ -309,9 +312,29 @@ services:
       retries: 30
     <<: *logging
 
+  # Metrics (M-6): `--profile monitoring` runs Prometheus inside the network, scraping every api
+  # replica; UI on 127.0.0.1:9090 only (tunnel with ssh -L 9090:127.0.0.1:9090 <vps>).
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: ['monitoring']
+    restart: unless-stopped
+    mem_limit: ${PROMETHEUS_MEM_LIMIT:-256m}
+    cpus: ${PROMETHEUS_CPUS:-0.5}
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
+      - '--web.listen-address=0.0.0.0:9090'
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '127.0.0.1:9090:9090'
+    <<: *logging
+
 volumes:
   caddy-data:
   caddy-config:
   mysql-data:
   valkey-data:
   uploads:
+  prometheus-data:

@@ -5,6 +5,7 @@ import { createEventBus, createScheduler, type EventBus, type Scheduler } from '
 import { moduleHooks, moduleJobs } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
 import { runOutboxOnce } from './mail.ts';
+import { hookRunsTotal, jobDuration, jobRunsTotal } from './metrics.ts';
 import { runLogRetentionOnce } from './retention.ts';
 
 /**
@@ -26,10 +27,20 @@ export interface Runtime {
 export function createRuntime(): Runtime {
   const e = env();
 
-  const bus = createEventBus();
+  const bus = createEventBus({
+    onHook: (h) =>
+      hookRunsTotal.inc({ event: h.event, module: h.module, status: h.ok ? 'ok' : 'failed' }),
+  });
   for (const hooks of moduleHooks) bus.register(hooks);
 
-  const scheduler = createScheduler({ db: getDb(), instanceId });
+  const scheduler = createScheduler({
+    db: getDb(),
+    instanceId,
+    onRun: (r) => {
+      jobRunsTotal.inc({ job: r.job, status: r.status });
+      jobDuration.observeMs({ job: r.job }, r.durationMs);
+    },
+  });
   // Core jobs: outbox delivery (M4), session cleanup, log retention (M7).
   scheduler.register({
     name: 'core.outbox.deliver',

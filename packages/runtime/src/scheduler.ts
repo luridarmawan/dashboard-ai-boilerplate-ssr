@@ -31,6 +31,13 @@ export interface SchedulerOptions {
   readonly log?: (entry: Record<string, unknown>) => void;
   /** Clock override for tests. */
   readonly now?: () => Date;
+  /** Observer for every run on this instance — metrics (M-6). Must not throw. */
+  readonly onRun?: (run: {
+    job: string;
+    module: string;
+    status: 'ok' | 'failed';
+    durationMs: number;
+  }) => void;
 }
 
 export interface Scheduler {
@@ -165,6 +172,16 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
       });
     }
     const finishedAt = now();
+    try {
+      opts.onRun?.({
+        job: r.job.name,
+        module: r.module,
+        status,
+        durationMs: finishedAt.getTime() - startedAt.getTime(),
+      });
+    } catch {
+      /* an observer must never break a run */
+    }
     await db
       .update(schema.schedulerRuns)
       .set({

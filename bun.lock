@@ -28,6 +28,7 @@
         "@core/db": "workspace:*",
         "@core/logger": "workspace:*",
         "@core/mail": "workspace:*",
+        "@core/metrics": "workspace:*",
         "@core/module-kit": "workspace:*",
         "@core/runtime": "workspace:*",
         "@core/settings": "workspace:*",
@@ -187,6 +188,10 @@
         "@types/nodemailer": "^8.0.1",
       },
     },
+    "packages/metrics": {
+      "name": "@core/metrics",
+      "version": "0.0.0",
+    },
     "packages/module-kit": {
       "name": "@core/module-kit",
       "version": "0.0.0",
@@ -265,6 +270,8 @@
     "@core/logger": ["@core/logger@workspace:packages/logger"],
 
     "@core/mail": ["@core/mail@workspace:packages/mail"],
+
+    "@core/metrics": ["@core/metrics@workspace:packages/metrics"],
 
     "@core/module-kit": ["@core/module-kit@workspace:packages/module-kit"],
 

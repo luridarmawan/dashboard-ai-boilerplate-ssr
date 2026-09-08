@@ -2,6 +2,7 @@ import { fail } from '@core/contracts';
 import { newId } from '@core/db';
 import { logger } from '@core/logger';
 import { Elysia } from 'elysia';
+import { observeRequest } from '../metrics.ts';
 
 /**
  * Cross-cutting request plumbing (PRD M-1, N-4):
@@ -10,28 +11,42 @@ import { Elysia } from 'elysia';
  *     already minted one, so one id follows a page load web → API → log; minted otherwise
  *   - one structured JSON log line per response, with that id
  *   - every error mapped to the failure envelope, with that id, and no stack in production
+ *   - request count, latency and error class recorded for /metrics (M-6)
  *
  * Marked `as: 'global'` so it applies to routes registered by modules too.
  */
 
 const isProd = process.env.NODE_ENV === 'production';
 
+/** Start times keyed by request: `onRequest` sees every request, matched or not (404s too). */
+const started = new WeakMap<Request, number>();
+
 export const requestContext = new Elysia({ name: 'request-context' })
+  // onRequest runs before routing for every request; it takes no scope option (always process-wide).
+  .onRequest(({ request }) => {
+    started.set(request, performance.now());
+  })
   .derive({ as: 'global' }, ({ request, set }) => {
     const requestId = request.headers.get('x-request-id') ?? newId();
     set.headers['x-request-id'] = requestId;
-    return { requestId, startedAt: performance.now() };
+    return { requestId, startedAt: started.get(request) ?? performance.now() };
   })
   .onAfterResponse({ as: 'global' }, (ctx) => {
     // Structured log (M-1). Nothing sensitive is logged — no headers, no body (M-7).
     // `path` comes from Elysia's context; logging must never throw, whatever the fast path did.
     try {
-      const { path, request, set, requestId, startedAt } = ctx;
+      const { path, request, set, requestId } = ctx;
+      const status = Number(set.status ?? 200) || 200;
+      const t0 = started.get(request) ?? ctx.startedAt ?? performance.now();
+      const ms = Math.round((performance.now() - t0) * 10) / 10;
+      // An unmatched path is not a route: label it as such so scans cannot inflate cardinality.
+      const route = status === 404 ? '(unmatched)' : (ctx as { route?: string }).route;
+      observeRequest(request?.method ?? '?', route, path, status, ms);
       logger.info('request', {
         method: request?.method ?? '?',
         path,
-        status: set.status ?? 200,
-        ms: Math.round((performance.now() - startedAt) * 10) / 10,
+        status,
+        ms,
         requestId,
       });
     } catch {

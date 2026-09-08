@@ -409,6 +409,22 @@ const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL 
 
 Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
 
+### Metrik dari modul (M-6)
+
+Angka operasional (bukan data produk) masuk ke registry Prometheus yang sama dengan core dan muncul di `GET /metrics`:
+
+```ts
+import { metrics } from '@app/api/metrics';
+
+const imported = metrics.counter('billing_invoices_imported_total', 'Invoices imported.', ['source']);
+const importSeconds = metrics.histogram('billing_import_duration_seconds', 'Import duration.', ['source']);
+
+imported.inc({ source: 'csv' }, rows.length);
+importSeconds.observeMs({ source: 'csv' }, performance.now() - t0);
+```
+
+Aturannya: nama Prometheus (`<ns>_…_total`, akhiran satuan), nilai label **terbatas** — jenis, status, sumber; **tidak pernah** id user, id tenant, atau teks bebas. Nama yang sama didaftarkan dua kali mengembalikan instrumen yang sama. Panduan pemakaian dan daftar metrik core: [`DEPLOY.md` §7a](./DEPLOY.md).
+
 ### `api/tools.ts` — tool AI / MCP (titik perluasan 8)
 
 Fungsi yang boleh dipanggil asisten AI (dan, nanti, klien MCP) atas nama user. Modul hanya **mendeklarasikan**; yang menegakkan izin, tenant, dan skema adalah registry core — jadi tool tidak pernah menjadi pintu belakang (I-3, I-6).

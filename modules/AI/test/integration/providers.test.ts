@@ -58,7 +58,7 @@ function mockProvider(
   models: string[],
   usage: { prompt: number; completion: number },
 ) {
-  const seen: { model?: string }[] = [];
+  const seen: { model: string | undefined }[] = [];
   const server = Bun.serve({
     port: 0,
     async fetch(req) {

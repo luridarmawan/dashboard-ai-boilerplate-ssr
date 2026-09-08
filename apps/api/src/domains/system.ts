@@ -7,6 +7,7 @@ import { Elysia, t } from 'elysia';
 // /package.json next to the executable and crash.
 import rootPkg from '../../../../package.json' with { type: 'json' };
 import { instanceId } from '../instance.ts';
+import { registerAppMetrics } from '../metrics.ts';
 
 /**
  * System endpoints (PRD M-4, M-5).
@@ -22,6 +23,8 @@ const build = {
   commit: process.env.APP_COMMIT ?? 'dev',
   builtAt: process.env.APP_BUILT_AT ?? null,
 };
+
+registerAppMetrics({ version: build.version, commit: build.commit, dialect: activeDialect });
 
 const ModuleInfo = t.Object({
   name: t.String(),
