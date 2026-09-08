@@ -23,6 +23,8 @@ export const themes = defineTable({
     icons: col.identifier(64),
     /** `{ dashboard: { default: layoutId, … }, public: {…}, auth: {…} }` — registered layouts only. */
     layouts: col.json(),
+    /** `{ logo?: fileId, favicon?: fileId }` — public files from the `files` table (Q-16). */
+    assets: col.json().nullable(),
     enabled: col.boolean().default(true),
     updated_by: col.uuid().nullable(),
   },

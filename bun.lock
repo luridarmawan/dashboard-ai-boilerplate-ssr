@@ -31,6 +31,7 @@
         "@core/module-kit": "workspace:*",
         "@core/runtime": "workspace:*",
         "@core/settings": "workspace:*",
+        "@core/storage": "workspace:*",
         "@core/ui-theme": "workspace:*",
         "@elysiajs/openapi": "^1.4.0",
         "@modelcontextprotocol/sdk": "^1.30.0",
@@ -214,6 +215,13 @@
         "@core/ui-theme": "workspace:*",
       },
     },
+    "packages/storage": {
+      "name": "@core/storage",
+      "version": "0.0.0",
+      "dependencies": {
+        "@core/config": "workspace:*",
+      },
+    },
     "packages/ui-theme": {
       "name": "@core/ui-theme",
       "version": "0.0.0",
@@ -263,6 +271,8 @@
     "@core/runtime": ["@core/runtime@workspace:packages/runtime"],
 
     "@core/settings": ["@core/settings@workspace:packages/settings"],
+
+    "@core/storage": ["@core/storage@workspace:packages/storage"],
 
     "@core/ui-theme": ["@core/ui-theme@workspace:packages/ui-theme"],
 

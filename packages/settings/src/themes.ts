@@ -41,6 +41,8 @@ export interface CustomThemeInput {
   readonly layouts: Partial<Record<ShellKind, Record<string, string>>>;
   readonly tokens: ThemeTokens;
   readonly enabled?: boolean;
+  /** Public file ids (Q-16): `{ logo?, favicon? }`; resolved to URLs in the manifest. */
+  readonly assets?: { logo?: string | null; favicon?: string | null } | null;
 }
 
 export interface CustomThemeView {
@@ -54,6 +56,7 @@ export interface CustomThemeView {
   readonly layouts: Partial<Record<ShellKind, Record<string, string>>>;
   readonly tokens: ThemeTokens;
   readonly enabled: boolean;
+  readonly assets: { logo: string | null; favicon: string | null };
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -112,11 +115,26 @@ export class CustomThemeStore {
     return (await this.rows()).find((r) => r.id === id) ?? null;
   }
 
-  /** Registry-shaped manifests + injectable CSS for a tenant (what the web app needs per request). */
+  /**
+   * Registry-shaped manifests + injectable CSS for a tenant (what the web app needs per request).
+   * `assets` become absolute API paths (`/v1/files/<id>/content`) the shell can put in an <img>.
+   */
   async manifestsFor(clientId: string | null): Promise<{ manifest: ThemeManifest; css: string }[]> {
     return (await this.listFor(clientId)).map((r) => {
       const def = toDef(r);
-      return { manifest: customManifest(def), css: tokensToCss(def.code, def.tokens) };
+      const a = assetsOf(r);
+      const manifest: ThemeManifest = {
+        ...customManifest(def),
+        ...(a.logo || a.favicon
+          ? {
+              assets: {
+                ...(a.logo ? { logo: `/v1/files/${a.logo}/content` } : {}),
+                ...(a.favicon ? { favicon: `/v1/files/${a.favicon}/content` } : {}),
+              },
+            }
+          : {}),
+      };
+      return { manifest, css: tokensToCss(def.code, def.tokens) };
     });
   }
 
@@ -201,6 +219,7 @@ export class CustomThemeStore {
       tokens: v.tokens,
       icons: input.icons,
       layouts: input.layouts,
+      assets: cleanAssets(input.assets),
       enabled: input.enabled ?? true,
       updated_by: actorId,
     });
@@ -242,6 +261,8 @@ export class CustomThemeStore {
         tokens: v.tokens,
         icons: input.icons,
         layouts: input.layouts,
+        // `assets` omitted = keep; `{}` or nulls = clear.
+        ...(input.assets === undefined ? {} : { assets: cleanAssets(input.assets) }),
         enabled: input.enabled ?? row.enabled,
         updated_by: actorId,
       })
@@ -278,6 +299,22 @@ function toDef(r: CustomThemeRow): CustomThemeDef {
   };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function cleanAssets(a: CustomThemeInput['assets']): { logo?: string; favicon?: string } | null {
+  if (!a) return null;
+  const out: { logo?: string; favicon?: string } = {};
+  if (a.logo && UUID_RE.test(a.logo)) out.logo = a.logo;
+  if (a.favicon && UUID_RE.test(a.favicon)) out.favicon = a.favicon;
+  return Object.keys(out).length ? out : null;
+}
+function assetsOf(r: CustomThemeRow): { logo: string | null; favicon: string | null } {
+  const a = (r.assets ?? {}) as { logo?: unknown; favicon?: unknown };
+  return {
+    logo: typeof a.logo === 'string' ? a.logo : null,
+    favicon: typeof a.favicon === 'string' ? a.favicon : null,
+  };
+}
+
 export function viewCustomTheme(r: CustomThemeRow): CustomThemeView {
   const def = toDef(r);
   return {
@@ -291,6 +328,7 @@ export function viewCustomTheme(r: CustomThemeRow): CustomThemeView {
     layouts: def.layouts,
     tokens: def.tokens,
     enabled: r.enabled,
+    assets: assetsOf(r),
     createdAt: r.created_at.toISOString(),
     updatedAt: r.updated_at.toISOString(),
   };

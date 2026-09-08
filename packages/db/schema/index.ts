@@ -6,6 +6,7 @@ import { clientUserMaps } from './client_user_maps.def.ts';
 import { clients } from './clients.def.ts';
 import { configurations } from './configurations.def.ts';
 import { emailVerificationTokens } from './email_verification_tokens.def.ts';
+import { files } from './files.def.ts';
 import { groupPermissions } from './group_permissions.def.ts';
 import { groupUserMaps } from './group_user_maps.def.ts';
 import { groups } from './groups.def.ts';
@@ -45,5 +46,6 @@ export const tables: readonly TableDef[] = [
   modules,
   themes,
   notifications,
+  files,
   outboxEmail,
 ];

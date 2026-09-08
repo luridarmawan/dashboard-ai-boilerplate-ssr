@@ -165,7 +165,9 @@ dc --profile redis up -d --wait --scale api=3
 
 **Restart otomatis (Q-6):** `restart: unless-stopped` di semua service; Docker menyalakannya kembali saat proses mati dan saat host reboot (pastikan `systemctl is-enabled docker` = `enabled`).
 
-**Berkas unggahan (Q-9):** volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`). Sertakan dalam backup host bila modul Anda menyimpan berkas: `docker run --rm -v dab-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
+**Berkas unggahan (Q-9, Q-16):** bawaan `STORAGE_DRIVER=local` — volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`); dengan `--scale api=N` semua replika berbagi volume yang sama di satu host. Sertakan dalam backup host bila ada berkas: `docker run --rm -v dab-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
+
+Untuk lebih dari satu host, atau agar bucket yang menanggung penyimpanan: `STORAGE_DRIVER=s3` + `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` di `.env.prod` (blok contoh ada di `.env.prod.example`; bekerja dengan AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces — path-style bawaan, `S3_VIRTUAL_HOSTED_STYLE=true` bila provider menolaknya). Metadata tetap di tabel `files`, jadi backup database + bucket adalah backup lengkap. `S3_PUBLIC_URL` opsional: berkas **publik** (logo tema) ditautkan langsung ke bucket/CDN alih-alih lewat API; berkas privat selalu lewat API dengan pemeriksaan izin. Berpindah driver tidak memindahkan objek lama — tiap baris `files` mengingat `storage`-nya, jadi lakukan `aws s3 sync` dari volume ke bucket dulu bila ingin berpindah dengan data. Preflight memeriksa driver yang aktif: volume bisa ditulis, atau bucket terjangkau dengan kredensial itu.
 
 ## 4. Backup & restore
 
@@ -251,7 +253,7 @@ Bukti: `scripts/ci/rollout-proof.sh` (job CI `scale-proof`) menembakkan request 
 | `migrations` | ada migrasi tersemat yang belum diterapkan, atau database kosong | `dc run --rm migrate` |
 | `seed` | peringatan: belum ada tenant | `dc run --rm seed` |
 | `redis` | `PING` gagal saat ada `*_DRIVER=redis` | REDIS_URL / `--profile redis` |
-| `uploads` | `UPLOADS_DIR` tidak bisa ditulis | `chown 1000:1000` volume |
+| `uploads` | `UPLOADS_DIR` tidak bisa ditulis, atau (`STORAGE_DRIVER=s3`) bucket tidak terjangkau | `chown 1000:1000` volume; periksa `S3_*` |
 | `modules` | (dari sumber) `modules.json` ≠ registry | `bun modules:sync` |
 
 Unit systemd memanggilnya sebagai `ExecStartPre`, sehingga host yang setengah terkonfigurasi tidak pernah start.

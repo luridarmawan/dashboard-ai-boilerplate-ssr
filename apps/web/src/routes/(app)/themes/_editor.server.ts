@@ -38,6 +38,8 @@ export function seedFromBase(
       layouts: own.layouts as EditorValues['layouts'],
       tokens: own.tokens,
       enabled: true,
+      logoId: '',
+      logoUrl: null,
     };
   }
   const manifest = themeById(baseId);
@@ -59,6 +61,8 @@ export function seedFromBase(
     layouts: manifest.layouts as EditorValues['layouts'],
     tokens: { light, dark },
     enabled: true,
+    logoId: '',
+    logoUrl: null,
   };
 }
 

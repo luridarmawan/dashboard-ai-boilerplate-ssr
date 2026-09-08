@@ -59,6 +59,14 @@ export async function loadPublicConfig(
             tokens: '',
             icons: c.icons,
             layouts: c.layouts as ThemeManifest['layouts'],
+            ...(c.assets.logo || c.assets.favicon
+              ? {
+                  assets: {
+                    ...(c.assets.logo ? { logo: c.assets.logo } : {}),
+                    ...(c.assets.favicon ? { favicon: c.assets.favicon } : {}),
+                  },
+                }
+              : {}),
             module: 'core',
             custom: true,
           } satisfies ThemeManifest,

@@ -12,6 +12,7 @@ import { type Env, EnvError, loadEnv } from '@core/config';
 import { activeDialect, schema, unsafeAcrossTenants } from '@core/db';
 import { familyOf, migrationStatus, probeDatabase } from '@core/db/migrate';
 import { modules } from '@core/module-kit/registry';
+import { S3Storage } from '@core/storage';
 
 /**
  * `api preflight` (PRD Q-13): is this environment ready to run the app? Every check answers with
@@ -238,21 +239,44 @@ export async function runPreflight(
     else push({ name: 'redis', status: 'ok', detail: e.REDIS_URL ?? '', ms: ping.ms });
   } else push({ name: 'redis', status: 'skip', detail: 'tidak dipakai (semua *_DRIVER=database)' });
 
-  // 8. uploads volume — exists, owned/writable by this user.
-  try {
-    if (!existsSync(e.UPLOADS_DIR)) mkdirSync(e.UPLOADS_DIR, { recursive: true });
-    accessSync(e.UPLOADS_DIR, constants.W_OK);
-    const probe = join(e.UPLOADS_DIR, `.preflight-${process.pid}`);
-    writeFileSync(probe, 'ok');
-    unlinkSync(probe);
-    push({ name: 'uploads', status: 'ok', detail: `${e.UPLOADS_DIR} bisa ditulis` });
-  } catch (err) {
-    push({
-      name: 'uploads',
-      status: 'fail',
-      detail: `${e.UPLOADS_DIR}: ${err instanceof Error ? err.message : String(err)}`,
-      hint: 'volume harus dimiliki uid 1000 (user app): `docker run --rm -v dab-prod_uploads:/u alpine chown -R 1000:1000 /u`; systemd: chown dab:dab',
+  // 8. uploads — the local volume writable, or the S3 bucket reachable with these credentials (Q-16).
+  if (e.STORAGE_DRIVER === 's3') {
+    const s3 = await timed(async () => {
+      const store = new S3Storage({
+        endpoint: e.S3_ENDPOINT ?? '',
+        bucket: e.S3_BUCKET ?? '',
+        region: e.S3_REGION,
+        accessKeyId: e.S3_ACCESS_KEY_ID ?? '',
+        secretAccessKey: e.S3_SECRET_ACCESS_KEY ?? '',
+      });
+      // A key never written: false on a healthy bucket, throws on a bad host, bucket or credentials.
+      await store.exists('.preflight-probe');
     });
+    if (s3.error)
+      push({
+        name: 'uploads',
+        status: 'fail',
+        detail: `S3 ${e.S3_ENDPOINT}/${e.S3_BUCKET}: ${s3.error.slice(0, 200)}`,
+        ms: s3.ms,
+        hint: 'periksa S3_ENDPOINT, S3_BUCKET, kredensial dan kebijakan bucket; atau kembalikan STORAGE_DRIVER=local',
+      });
+    else push({ name: 'uploads', status: 'ok', detail: `S3 ${e.S3_BUCKET} terjangkau`, ms: s3.ms });
+  } else {
+    try {
+      if (!existsSync(e.UPLOADS_DIR)) mkdirSync(e.UPLOADS_DIR, { recursive: true });
+      accessSync(e.UPLOADS_DIR, constants.W_OK);
+      const probe = join(e.UPLOADS_DIR, `.preflight-${process.pid}`);
+      writeFileSync(probe, 'ok');
+      unlinkSync(probe);
+      push({ name: 'uploads', status: 'ok', detail: `${e.UPLOADS_DIR} bisa ditulis` });
+    } catch (err) {
+      push({
+        name: 'uploads',
+        status: 'fail',
+        detail: `${e.UPLOADS_DIR}: ${err instanceof Error ? err.message : String(err)}`,
+        hint: 'volume harus dimiliki uid 1000 (user app): `docker run --rm -v dab-prod_uploads:/u alpine chown -R 1000:1000 /u`; systemd: chown dab:dab',
+      });
+    }
   }
 
   // 9. modules in sync — only checkable where modules.json is present (source checkouts).

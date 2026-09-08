@@ -126,7 +126,7 @@ Yang tidak berubah: **kontraknya**. Sebelum tersimpan, tema kustom harus lolos p
 
 Cara kerjanya: tabel `themes` (`scope`, `code`, `tokens` json, `icons`, `layouts` json); API `GET /v1/themes/custom` (anonim, manifest + CSS untuk tenant aktif) dan `GET/POST/PUT/DELETE /v1/themes/custom[/…]` (`theme.manage`); web memuat daftar itu per request bersama konfigurasi publik, menambahkannya ke rantai resolusi (`resolveTheme({ extra })`), dan menyuntikkan CSS tema kustom yang aktif ke `<head>` lewat placeholder `%theme_css%` — tema berkas tetap dari bundel. Pratinjau di editor dan pemilih dihitung dari token yang tersimpan. Bukti: `apps/api/test/integration/themes-custom.test.ts`, `packages/ui-theme/test/custom.test.ts`.
 
-**Belum ada di editor:** unggah logo/favicon per tema — menunggu endpoint unggah berkas (Q-16, ROADMAP §8 butir 5); saat ini tema kustom tidak membawa aset merek.
+**Logo tema (Q-16):** editor menerima berkas logo (PNG/JPEG/WebP/SVG/GIF). Berkas itu diunggah lewat `POST /v1/files` sebagai berkas **publik** berjenis `theme-logo`, id-nya disimpan di kolom `themes.assets`, dan manifest tema kustom membawanya sebagai URL (`/v1/files/<id>/content`) yang dirender semua shell di tempat ikon merek (header dasbor, publik, auth). Centang **hapus logo** untuk kembali ke ikon. Favicon mengikuti jalur yang sama lewat API (`assets.favicon`) dan dipasang sebagai `<link rel="icon">`; UI-nya belum ada di editor. SVG disajikan dengan CSP `sandbox` sehingga skrip di dalamnya tidak pernah jalan.
 
 **Yang tidak boleh dilakukan tema** (§4.8): mengganti implementasi komponen, menambah atau mengubah route, mengubah data atau perilaku, dan mem-bypass RBAC. Tema boleh menetapkan nilai baku varian komponen; tidak boleh menulis ulang komponennya.
 
@@ -138,7 +138,7 @@ Cara kerjanya: tabel `themes` (`scope`, `code`, `tokens` json, `icons`, `layouts
 
 **Tersedia sejak 2026-09-08:** editor tema dari UI admin (L-24, §5a) — tema kustom per tenant/global tersimpan di database, divalidasi kontras sebelum disimpan, berlaku tanpa deploy.
 
-**Belum:** aset merek per tema (`logo.svg`, `favicon.svg`, `preview.png` — pratinjau saat ini digenerate; unggah menunggu Q-16), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle).
+**Belum:** aset merek untuk tema **berkas** (`logo.svg`, `favicon.svg`, `preview.png` di folder tema — pratinjau saat ini digenerate; tema kustom sudah bisa membawa logo lewat unggahan, §5a), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle).
 
 ## 7. Catatan lama
 

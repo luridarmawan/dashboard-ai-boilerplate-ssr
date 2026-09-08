@@ -25,6 +25,9 @@ export interface EditorValues {
   layouts: Partial<Record<ShellKind, Record<string, string>>>;
   tokens: ThemeTokens;
   enabled: boolean;
+  /** Public file id of the logo (Q-16); '' = none. Set by the action after uploading `logo`. */
+  logoId: string;
+  logoUrl: string | null;
 }
 
 export interface ThemeApiBody {
@@ -36,6 +39,7 @@ export interface ThemeApiBody {
   layouts: Record<string, Record<string, string>>;
   tokens: { light: Record<string, string>; dark: Record<string, string> };
   enabled: boolean;
+  assets?: { logo: string | null } | null;
 }
 
 const str = (form: FormData, key: string) => {
@@ -73,6 +77,9 @@ export function readEditorForm(form: FormData): EditorValues {
     layouts,
     tokens: { light, dark },
     enabled: form.get('enabled') !== null,
+    // The current logo survives a resubmit unless "remove" is ticked; a new upload replaces it (action).
+    logoId: form.get('removeLogo') !== null ? '' : str(form, 'logoId'),
+    logoUrl: null,
   };
 }
 
@@ -87,6 +94,7 @@ export function toApiBody(v: EditorValues): ThemeApiBody {
     layouts: v.layouts as Record<string, Record<string, string>>,
     tokens: { light: { ...v.tokens.light }, dark: { ...v.tokens.dark } },
     enabled: v.enabled,
+    assets: { logo: v.logoId || null },
   };
 }
 
@@ -100,6 +108,7 @@ export function valuesOf(t: {
   layouts: Record<string, Record<string, string>>;
   tokens: ThemeTokens;
   enabled: boolean;
+  assets?: { logo: string | null; favicon: string | null };
 }): EditorValues {
   return {
     slug: t.code.replace(/^custom\./, ''),
@@ -112,5 +121,7 @@ export function valuesOf(t: {
     layouts: t.layouts as EditorValues['layouts'],
     tokens: t.tokens,
     enabled: t.enabled,
+    logoId: t.assets?.logo ?? '',
+    logoUrl: t.assets?.logo ? `/v1/files/${t.assets.logo}/content` : null,
   };
 }

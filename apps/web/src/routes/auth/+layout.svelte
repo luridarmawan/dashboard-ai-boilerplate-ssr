@@ -10,7 +10,7 @@ const t = useT();
 
 {#snippet brand()}
   <a href="/" class="flex items-center gap-2 text-lg font-semibold text-foreground no-underline hover:no-underline">
-    <Icon name="sparkles" class="text-primary" /><span>{t('app.name')}</span>
+    {#if data.theme.logoUrl}<img src={data.theme.logoUrl} alt="" class="h-8 w-auto max-w-40 object-contain" />{:else}<Icon name="sparkles" class="text-primary" />{/if}<span>{t('app.name')}</span>
   </a>
 {/snippet}
 {#snippet content()}{@render children()}{/snippet}

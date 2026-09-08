@@ -389,6 +389,26 @@ await notify({
 
 `notify()` tidak pernah melempar ke request pemanggil (kegagalan dicatat di log), menerbitkan event `notification.created` yang bisa didengar `hooks.ts` modul lain (mis. meneruskan ke webhook), dan barisnya adalah data tenant biasa: hanya pemiliknya yang bisa membaca lewat `/v1/notifications`. Notifikasi yang sudah dibaca dipangkas job retensi sesuai **Pengaturan → Log & retensi**. Contoh hidup: `modules/Example/api/routes.ts` (pesan kontak baru → pemegang `example.inquiry.read`).
 
+### Berkas unggahan dari modul (Q-16)
+
+Modul yang menerima berkas (lampiran, gambar produk, impor CSV) tidak menulis ke disk atau S3 sendiri — semuanya lewat layanan core, yang memvalidasi ukuran dan tipe menurut **Pengaturan → Berkas** (`files.max_size_mb`, `files.allowed_types`), mengendus isi (`.png` yang bukan PNG ditolak), menulis ke adapter yang dikonfigurasi (`STORAGE_DRIVER=local` → volume `UPLOADS_DIR`, atau `s3`), dan mencatat barisnya di tabel `files` sebagai data tenant:
+
+```ts
+import { storeUpload, fileUrl, findFile, readFile, removeFile } from '@app/api/files';
+
+const r = await storeUpload({
+  clientId, userId,
+  file: body.attachment,                  // File/Blob dari multipart (`t.File()`)
+  kind: 'billing.attachment',             // `<ns>.<tujuan>` — untuk filter & aturan per jenis
+  visibility: 'private',                  // `public` = bisa diambil siapa pun yang tahu tenantnya
+  allowedTypes: ['application/pdf'],      // opsional: mempersempit allowlist tenant untuk panggilan ini
+});
+if (!r.ok) return fail('validation_failed', r.message, requestId, { reason: r.code }); // too_large | type_not_allowed | content_mismatch | empty
+const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL CDN bila S3_PUBLIC_URL diisi
+```
+
+Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
+
 ### `api/tools.ts` — tool AI / MCP (titik perluasan 8)
 
 Fungsi yang boleh dipanggil asisten AI (dan, nanti, klien MCP) atas nama user. Modul hanya **mendeklarasikan**; yang menegakkan izin, tenant, dan skema adalah registry core — jadi tool tidak pernah menjadi pintu belakang (I-3, I-6).

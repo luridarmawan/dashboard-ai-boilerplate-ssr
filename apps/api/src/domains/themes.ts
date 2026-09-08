@@ -37,6 +37,10 @@ const CustomThemeBody = t.Object({
   layouts: t.Record(t.String(), t.Record(t.String(), t.String({ maxLength: 64 }))),
   tokens: Tokens,
   enabled: t.Optional(t.Boolean()),
+  /** Public file ids from POST /v1/files (kind theme-logo). Omit to keep, null values to clear. */
+  assets: t.Optional(
+    t.Nullable(t.Object({ logo: t.Optional(t.Nullable(Id)), favicon: t.Optional(t.Nullable(Id)) })),
+  ),
   /** `global` needs superadmin; default = the active tenant. */
   scope: t.Optional(t.Union([t.Literal('tenant'), t.Literal('global')])),
 });
@@ -51,6 +55,7 @@ const CustomThemeView = t.Object({
   layouts: t.Record(t.String(), t.Record(t.String(), t.String())),
   tokens: Tokens,
   enabled: t.Boolean(),
+  assets: t.Object({ logo: t.Nullable(t.String()), favicon: t.Nullable(t.String()) }),
   createdAt: t.String(),
   updatedAt: t.String(),
 });
@@ -209,6 +214,10 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
           description: c.manifest.description,
           icons: c.manifest.icons,
           layouts: c.manifest.layouts as Record<string, Record<string, string>>,
+          assets: {
+            logo: c.manifest.assets?.logo ?? null,
+            favicon: c.manifest.assets?.favicon ?? null,
+          },
           css: c.css,
         })),
       ),
@@ -222,6 +231,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
               description: Localized,
               icons: t.String(),
               layouts: t.Record(t.String(), t.Record(t.String(), t.String())),
+              assets: t.Object({ logo: t.Nullable(t.String()), favicon: t.Nullable(t.String()) }),
               css: t.String(),
             }),
           ),

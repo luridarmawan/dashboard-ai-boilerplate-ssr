@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import { previewsFor } from '../_editor.server.ts';
 import { readEditorForm, toApiBody, valuesOf } from '../_editor.ts';
+import { attachLogo } from '../_logo.server.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Edit / delete a custom theme (L-24). Saving re-validates the full contract on the API. */
@@ -39,6 +40,17 @@ export const actions: Actions = {
     const id = String(event.params.id ?? '');
     const values = readEditorForm(form);
     if (!checkCsrf(event, form)) return csrfFail({ values });
+    const logoError = await attachLogo(event, form, values);
+    if (logoError)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: logoError,
+          details: { logo: logoError },
+        },
+        { values, previews: previewsFor(values) },
+      );
     const r = unwrap(await apiFor(event).v1.themes.custom({ id }).put(toApiBody(values)));
     if (!r.ok) return actionFailure(r.failure, { values, previews: previewsFor(values) });
     return { saved: true, values, previews: previewsFor(values) };

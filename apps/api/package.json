@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Elysia API — the product's source of truth; SvelteKit is its first consumer (Decision A)",
+  "description": "Elysia API \u2014 the product's source of truth; SvelteKit is its first consumer (Decision A)",
   "exports": {
     "./app": "./src/app.ts",
     "./plugins/*": "./src/plugins/*.ts",
@@ -11,7 +11,8 @@
     "./mail": "./src/mail.ts",
     "./tools": "./src/tools.ts",
     "./notifications": "./src/notifications.ts",
-    "./lib/*": "./src/lib/*.ts"
+    "./lib/*": "./src/lib/*.ts",
+    "./files": "./src/files.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",
@@ -28,6 +29,7 @@
     "@core/module-kit": "workspace:*",
     "@core/runtime": "workspace:*",
     "@core/settings": "workspace:*",
+    "@core/storage": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@elysiajs/openapi": "^1.4.0",
     "@modelcontextprotocol/sdk": "^1.30.0",

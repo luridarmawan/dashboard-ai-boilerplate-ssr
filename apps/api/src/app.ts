@@ -3,6 +3,7 @@ import { Elysia } from 'elysia';
 import { auth } from './domains/auth.ts';
 import { clients } from './domains/clients.ts';
 import { configuration } from './domains/configuration.ts';
+import { filesDomain } from './domains/files.ts';
 import { groups } from './domains/groups.ts';
 import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
@@ -62,6 +63,10 @@ export const app = new Elysia()
           { name: 'mail', description: 'Email outbox: status, retry, worker' },
           { name: 'notifications', description: 'In-app notifications of the caller (J-4)' },
           {
+            name: 'files',
+            description: 'Uploads: local volume or S3, validated, under RBAC and tenancy (Q-16)',
+          },
+          {
             name: 'tools',
             description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
           },
@@ -82,6 +87,7 @@ export const app = new Elysia()
       .use(menuDomain)
       .use(outbox)
       .use(notificationsDomain)
+      .use(filesDomain)
       .use(tokensDomain)
       .use(toolsDomain)
       .use(mcpDomain)

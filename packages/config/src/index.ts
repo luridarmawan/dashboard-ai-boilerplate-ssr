@@ -53,8 +53,21 @@ const envSchema = z
     /** Stable identity of this process in lease rows and logs; defaults to hostname:pid. */
     INSTANCE_ID: z.string().min(1).optional(),
 
-    /** Upload storage root — a mapped volume in production (Q-9). Local adapter; S3 is optional later (Q-16). */
+    /** Upload storage root — a mapped volume in production (Q-9); used by STORAGE_DRIVER=local. */
     UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
+    /** Where uploaded bytes live (Q-16): the local volume, or any S3-compatible bucket (S3_*). */
+    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+    S3_ENDPOINT: z.url().optional(),
+    S3_BUCKET: z.string().min(1).optional(),
+    S3_REGION: z.string().min(1).default('auto'),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    /** Public base URL of the bucket/CDN; when set, public files are linked directly instead of through the API. */
+    S3_PUBLIC_URL: z.url().optional(),
+    S3_VIRTUAL_HOSTED_STYLE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
 
     /** E-7: every write is refused with a clear message. Lives in .env because it must hold even when the database is read-only. */
     DEMO_MODE: z
@@ -120,6 +133,21 @@ const envSchema = z
   .superRefine((env, ctx) => {
     const drivers = ['SESSION_DRIVER', 'CACHE_DRIVER', 'RATELIMIT_DRIVER'] as const;
 
+    if (env.STORAGE_DRIVER === 's3') {
+      for (const key of [
+        'S3_ENDPOINT',
+        'S3_BUCKET',
+        'S3_ACCESS_KEY_ID',
+        'S3_SECRET_ACCESS_KEY',
+      ] as const) {
+        if (!env[key])
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'wajib diisi bila STORAGE_DRIVER=s3',
+          });
+      }
+    }
     for (const key of drivers) {
       // Anti-pattern D1 must not be bypassed through configuration (Decision M, rule 2).
       if (env.NODE_ENV === 'production' && env[key] === 'memory') {

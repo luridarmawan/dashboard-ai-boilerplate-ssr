@@ -23,3 +23,6 @@ packages/settings/src/generated/
 backups/
 test-results/
 playwright-report/
+
+# Unggahan lokal saat pengembangan (UPLOADS_DIR bawaan, Q-9/Q-16)
+/data/

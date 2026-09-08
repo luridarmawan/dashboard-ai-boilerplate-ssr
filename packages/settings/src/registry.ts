@@ -195,6 +195,47 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     ],
   },
   {
+    section: 'files',
+    title: { id: 'Berkas unggahan', en: 'Uploaded files' },
+    note: {
+      id: 'Batas unggahan (Q-16). Penyimpanan (volume lokal atau S3) dipilih lewat STORAGE_DRIVER di .env — bukan di sini.',
+      en: 'Upload limits (Q-16). The store (local volume or S3) is chosen by STORAGE_DRIVER in .env — not here.',
+    },
+    order: 17,
+    fields: [
+      {
+        key: 'files.max_size_mb',
+        type: 'number',
+        title: { id: 'Ukuran maksimum per berkas (MB)', en: 'Maximum size per file (MB)' },
+        default: 10,
+        min: 1,
+        max: 500,
+        order: 0,
+      },
+      {
+        key: 'files.allowed_types',
+        type: 'list',
+        title: { id: 'Tipe yang diizinkan', en: 'Allowed types' },
+        note: {
+          id: 'MIME type, boleh pola seperti image/*; satu per baris atau dipisah koma. Isi berkas diperiksa (magic number), bukan hanya klaimnya.',
+          en: 'MIME types, patterns like image/* allowed; one per line or comma-separated. File contents are sniffed, not just the claim.',
+        },
+        default: [
+          'image/png',
+          'image/jpeg',
+          'image/gif',
+          'image/webp',
+          'image/svg+xml',
+          'application/pdf',
+          'text/plain',
+          'text/csv',
+        ],
+        options: [],
+        order: 1,
+      },
+    ],
+  },
+  {
     section: 'mail',
     title: { id: 'Email', en: 'Email' },
     note: {

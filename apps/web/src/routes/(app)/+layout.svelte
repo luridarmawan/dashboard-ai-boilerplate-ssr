@@ -18,7 +18,7 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 
 {#snippet brand()}
   <a href="/dashboard" class="flex items-center gap-2 font-semibold text-foreground no-underline hover:no-underline">
-    <Icon name="sparkles" class="text-primary" />
+    {#if data.theme.logoUrl}<img src={data.theme.logoUrl} alt="" class="h-7 w-auto max-w-32 object-contain" />{:else}<Icon name="sparkles" class="text-primary" />{/if}
     <span>{t('app.name')}</span>
   </a>
 {/snippet}

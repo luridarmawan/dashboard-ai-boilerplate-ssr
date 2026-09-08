@@ -29,6 +29,12 @@ export const CORE_PERMISSIONS: readonly PermissionDef[] = [
     actions: ['read', 'manage'],
     name: { id: 'Outbox email', en: 'Email outbox' },
   },
+  {
+    resource: 'file',
+    /** create = upload own files; read = fetch others' private files; manage = list/delete any (Q-16). */
+    actions: ['read', 'create', 'manage'],
+    name: { id: 'Berkas unggahan', en: 'Uploaded files' },
+  },
 ];
 
 export interface RegistryEntry extends PermissionDef {

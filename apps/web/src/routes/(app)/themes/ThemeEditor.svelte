@@ -126,7 +126,7 @@ const kindLabel: Record<string, string> = {
 };
 </script>
 
-<form method="POST" {action} class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+<form method="POST" {action} enctype="multipart/form-data" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
   <Csrf token={csrf} />
   <div class="grid gap-4">
     {#if notice}<p class="notice">{notice}</p>{/if}
@@ -154,6 +154,23 @@ const kindLabel: Record<string, string> = {
           {#if errors.icons}<span class="text-xs text-destructive">{errors.icons}</span>{/if}
         </label>
         <label class="flex items-center gap-2 self-end rounded-md border px-3 py-2 text-sm"><input type="checkbox" name="enabled" checked={values.enabled} class="accent-primary" disabled={readonly} /> Aktif — bisa dipilih pengguna dan dijadikan baku</label>
+        <div class="grid gap-2 rounded-md border p-3 text-sm sm:col-span-2" data-testid="theme-logo">
+          <div class="flex flex-wrap items-center gap-3">
+            {#if values.logoUrl}
+              <img src={values.logoUrl} alt="Logo tema" class="h-10 w-auto max-w-40 rounded bg-background object-contain p-1" />
+            {:else}
+              <span class="flex h-10 w-10 items-center justify-center rounded bg-muted text-muted-foreground"><Icon name="image" size={18} /></span>
+            {/if}
+            <label class="grid flex-1 gap-1">
+              <span class="font-medium">Logo (opsional)</span>
+              <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" class="text-sm" disabled={readonly} />
+              <span class="text-xs text-muted-foreground">PNG/JPEG/WebP/SVG/GIF ≤ batas unggah tenant; disimpan sebagai berkas publik dan menggantikan ikon merek di header semua shell.</span>
+            </label>
+            <input type="hidden" name="logoId" value={values.logoId} />
+            {#if values.logoId}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="removeLogo" class="accent-primary" disabled={readonly} /> hapus logo</label>{/if}
+          </div>
+          {#if errors.logo}<span class="text-xs text-destructive">{errors.logo}</span>{/if}
+        </div>
       </div>
     </Card>
 

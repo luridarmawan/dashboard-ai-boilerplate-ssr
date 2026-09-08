@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import { previewsFor, seedFromBase } from '../_editor.server.ts';
 import { readEditorForm, toApiBody } from '../_editor.ts';
+import { attachLogo } from '../_logo.server.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** New custom theme: seeded from a registered theme (`?base=`), assembled, validated by the API (L-24). */
@@ -56,6 +57,17 @@ export const actions: Actions = {
           message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
         },
         { values },
+      );
+    const logoError = await attachLogo(event, form, values);
+    if (logoError)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: logoError,
+          details: { logo: logoError },
+        },
+        { values, previews: previewsFor(values) },
       );
     const r = unwrap<{ success: true; data: { id: string } }>(
       await apiFor(event).v1.themes.custom.post({ ...toApiBody(values), scope }),

@@ -35,6 +35,7 @@ provideI18n({
 
 <svelte:head>
   <meta name="color-scheme" content={data.theme.mode === 'dark' ? 'dark' : data.theme.mode === 'light' ? 'light' : 'light dark'} />
+  {#if data.theme.faviconUrl}<link rel="icon" href={data.theme.faviconUrl} />{/if}
 </svelte:head>
 
 {@render children()}
