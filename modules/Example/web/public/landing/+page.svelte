@@ -85,20 +85,20 @@ const hero = $derived(data.products.slice(0, 3));
 
 <!-- hero -->
 <section class="relative overflow-hidden">
-  <div class="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" aria-hidden="true"></div>
-  <div class="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-warning/15 blur-3xl" aria-hidden="true"></div>
+  <div class="pointer-events-none absolute -end-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" aria-hidden="true"></div>
+  <div class="pointer-events-none absolute -bottom-24 -start-24 h-80 w-80 rounded-full bg-warning/15 blur-3xl" aria-hidden="true"></div>
   <div class="relative mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-14 md:grid-cols-[1.1fr_1fr] md:items-center md:pt-24">
     <div>
       <p class="mb-5 inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground backdrop-blur"><span class="h-1.5 w-1.5 rounded-full bg-primary"></span>{t('example.hero.eyebrow')}</p>
       <h1 class="text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">{t('example.hero.title')}</h1>
       <p class="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{data.tagline ?? t('example.hero.subtitle')}</p>
       <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Button href="#products" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.hero.cta')}<Icon name="arrow-right" size={18} /></Button>
+        <Button href="#products" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.hero.cta')}<Icon name="arrow-right" class="rtl:rotate-180" size={18} /></Button>
         <Button href="#contact" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto">{t('example.hero.cta2')}</Button>
       </div>
       <dl class="mt-10 grid max-w-lg grid-cols-3 divide-x divide-border">
         {#each stats as s (s)}
-          <div class="px-4 first:pl-0">
+          <div class="px-4 first:ps-0">
             <dt class="text-2xl font-semibold tracking-tight text-foreground">{t(`example.hero.${s}.value`)}</dt>
             <dd class="mt-1 text-xs text-muted-foreground">{t(`example.hero.${s}.label`)}</dd>
           </div>
@@ -181,9 +181,9 @@ const hero = $derived(data.products.slice(0, 3));
                 {#if p.imageUrl}
                   <img src={p.imageUrl} alt={p.name} loading="lazy" class="h-full w-full object-cover" />
                 {:else}
-                  <span class="absolute -bottom-6 -right-2 select-none text-[11rem] font-semibold leading-none text-primary/15" aria-hidden="true">{initial(p.name)}</span>
+                  <span class="absolute -bottom-6 -end-2 select-none text-[11rem] font-semibold leading-none text-primary/15" aria-hidden="true">{initial(p.name)}</span>
                 {/if}
-                {#if p.featured}<span class="absolute left-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">{t('example.products.badge')}</span>{/if}
+                {#if p.featured}<span class="absolute start-3 top-3 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">{t('example.products.badge')}</span>{/if}
               </div>
               <div class="flex flex-1 flex-col p-5">
                 <h3 class="font-semibold text-foreground">{p.name}</h3>
@@ -210,7 +210,7 @@ const hero = $derived(data.products.slice(0, 3));
       <div class="absolute inset-x-10 bottom-10 top-16 rounded-2xl border border-primary/20 bg-background/60 backdrop-blur"></div>
       <div class="absolute bottom-10 left-1/2 h-44 w-32 -translate-x-1/2 rounded-b-[2rem] rounded-t-xl bg-primary shadow-lg"></div>
       <div class="absolute bottom-[13.5rem] left-1/2 h-6 w-40 -translate-x-1/2 rounded-full bg-primary/40"></div>
-      <div class="absolute right-8 top-8 h-14 w-14 rounded-full bg-warning/70"></div>
+      <div class="absolute end-8 top-8 h-14 w-14 rounded-full bg-warning/70"></div>
     </div>
     <div>
       <p class="text-xs font-medium uppercase tracking-[0.18em] text-primary">{t('example.story.eyebrow')}</p>
@@ -224,7 +224,7 @@ const hero = $derived(data.products.slice(0, 3));
           </li>
         {/each}
       </ul>
-      <Button href="#contact" variant="link" class="mt-6 px-0">{t('example.story.cta')}<Icon name="arrow-right" size={16} /></Button>
+      <Button href="#contact" variant="link" class="mt-6 px-0">{t('example.story.cta')}<Icon name="arrow-right" class="rtl:rotate-180" size={16} /></Button>
     </div>
   </div>
 </section>
@@ -262,7 +262,7 @@ const hero = $derived(data.products.slice(0, 3));
       <div class="mt-10 grid gap-5 md:grid-cols-3 md:items-stretch">
         {#each plans as plan (plan.k)}
           <div class={`relative flex flex-col rounded-2xl border p-6 shadow-sm ${plan.hi ? 'border-primary bg-card ring-2 ring-primary/30 md:-my-3 md:py-9' : 'bg-card'}`}>
-            {#if plan.hi}<span class="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">{t('example.pricing.popular')}</span>{/if}
+            {#if plan.hi}<span class="absolute -top-3 start-6 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">{t('example.pricing.popular')}</span>{/if}
             <h3 class="text-lg font-semibold">{t(`example.pricing.${plan.k}`)}</h3>
             <p class="mt-3 flex flex-wrap items-baseline gap-x-1 text-3xl font-semibold tracking-tight sm:text-4xl">{plan.price === null ? t('example.pricing.contact') : money(plan.price, 'IDR')}{#if plan.price !== null}<span class="text-base font-normal text-muted-foreground">{t('example.pricing.per_month')}</span>{/if}</p>
             <p class="mt-2 text-sm text-muted-foreground">{t(`example.pricing.${plan.k}.text`)}</p>

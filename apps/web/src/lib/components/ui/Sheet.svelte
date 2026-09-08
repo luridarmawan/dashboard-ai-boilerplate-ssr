@@ -30,7 +30,7 @@ let {
     <Dialog.Content
       class={cn(
         'fixed inset-y-0 z-50 flex w-[min(20rem,calc(100%-2rem))] flex-col gap-4 border-border bg-background p-6 shadow-lg',
-        side === 'left' ? 'left-0 border-r' : 'right-0 border-l',
+        side === 'left' ? 'start-0 border-e' : 'end-0 border-s',
         className,
       )}
     >

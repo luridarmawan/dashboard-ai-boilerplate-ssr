@@ -31,7 +31,7 @@ const modes = [
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {#each data.themes as th (th.id)}
           <label class="group relative grid cursor-pointer gap-3 rounded-lg border bg-card p-3 text-card-foreground has-checked:border-primary has-checked:ring-2 has-checked:ring-ring/40">
-            <input type="radio" name="theme" value={th.id} checked={th.id === data.current} class="absolute top-3 right-3 h-4 w-4 accent-primary" />
+            <input type="radio" name="theme" value={th.id} checked={th.id === data.current} class="absolute top-3 end-3 h-4 w-4 accent-primary" />
             <div class="overflow-hidden rounded-md border" aria-hidden="true">{@html th.preview}</div>
             <div>
               <p class="font-medium">{th.name}</p>

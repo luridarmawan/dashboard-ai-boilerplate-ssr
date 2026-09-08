@@ -44,10 +44,10 @@ const shellContext = $derived({
         >
           <Icon name={item.icon} size={18} />
           <span>{item.label}</span>
-          {#if item.badge !== undefined}<span class="ml-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{item.badge}</span>{/if}
+          {#if item.badge !== undefined}<span class="ms-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{item.badge}</span>{/if}
         </a>
         {#if item.children.length && orientation === 'vertical'}
-          <ul class="ml-6 grid gap-0.5 border-l pl-2">
+          <ul class="ms-6 grid gap-0.5 border-s ps-2">
             {#each item.children as c (c.id)}
               <li><a href={c.href} aria-current={c.active ? 'page' : undefined} class="block rounded-md px-2 py-1 text-sm text-foreground no-underline hover:bg-accent hover:no-underline aria-[current=page]:font-medium">{c.label}</a></li>
             {/each}
@@ -88,7 +88,7 @@ const shellContext = $derived({
   <!-- Bell (J-4): a plain link, badge rendered server-side; the page marks items read via forms. -->
   <a href="/notifications" class="relative flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={data.unreadNotifications ? `${t('shell.notifications')} (${data.unreadNotifications})` : t('shell.notifications')} data-testid="bell">
     <Icon name="bell" size={18} />
-    {#if data.unreadNotifications}<span class="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
+    {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
   </a>
   <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('shell.theme_link')}><Icon name="palette" size={18} /></a>
   <a href={`/lang?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('nav.language')}><Icon name="language" size={18} /></a>
@@ -105,7 +105,7 @@ const shellContext = $derived({
   <nav aria-label="Breadcrumb">
     <ol class="flex flex-wrap items-center gap-1">
       {#each data.breadcrumb as c, i (c.href ?? c.label)}
-        {#if i > 0}<li aria-hidden="true"><Icon name="chevron-right" size={14} /></li>{/if}
+        {#if i > 0}<li aria-hidden="true"><Icon name="chevron-right" size={14} class="rtl:rotate-180" /></li>{/if}
         <li>
           {#if c.href}<a href={c.href} class="text-muted-foreground hover:text-foreground">{c.label}</a>{:else}<span aria-current="page" class="text-foreground">{c.label}</span>{/if}
         </li>

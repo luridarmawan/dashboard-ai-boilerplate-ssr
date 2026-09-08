@@ -12,12 +12,12 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
       <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
         <Icon name="menu" />
       </summary>
-      <nav class="absolute left-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
+      <nav class="absolute start-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
         {@render nav({ orientation: 'vertical' })}
       </nav>
     </details>
     {@render brand()}
-    <div class="ml-auto flex items-center gap-2">{@render header()}</div>
+    <div class="ms-auto flex items-center gap-2">{@render header()}</div>
   </header>
   <div class="mx-auto w-full max-w-2xl px-4">
     <div class="pt-3 text-sm text-muted-foreground">{@render breadcrumb()}</div>

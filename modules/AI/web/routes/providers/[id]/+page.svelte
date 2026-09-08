@@ -44,10 +44,10 @@ const money = (n: number) => (n ? n.toFixed(n < 0.01 ? 4 : 2) : '—');
   </Card>
   <Card title={t('ai.providers.price_list')}>
     <Table caption={t('ai.providers.price_list')}>
-      <thead><tr><th>Model</th><th>Label</th><th class="text-right">{t('ai.providers.price_in')}</th><th class="text-right">{t('ai.providers.price_out')}</th></tr></thead>
+      <thead><tr><th>Model</th><th>Label</th><th class="text-end">{t('ai.providers.price_in')}</th><th class="text-end">{t('ai.providers.price_out')}</th></tr></thead>
       <tbody>
         {#each p.models as m (m.id)}
-          <tr><td><code>{m.model}</code>{#if m.model === p.defaultModel} <Badge variant="outline">{t('ai.providers.default')}</Badge>{/if}</td><td class="text-muted-foreground">{m.label ?? '—'}</td><td class="text-right">{money(m.priceIn)}</td><td class="text-right">{money(m.priceOut)}</td></tr>
+          <tr><td><code>{m.model}</code>{#if m.model === p.defaultModel} <Badge variant="outline">{t('ai.providers.default')}</Badge>{/if}</td><td class="text-muted-foreground">{m.label ?? '—'}</td><td class="text-end">{money(m.priceIn)}</td><td class="text-end">{money(m.priceOut)}</td></tr>
         {/each}
       </tbody>
     </Table>

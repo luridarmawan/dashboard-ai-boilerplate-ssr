@@ -51,9 +51,9 @@ const ld = $derived(
     {#if p.imageUrl}
       <img src={p.imageUrl} alt={p.name} class="h-full w-full object-cover" />
     {:else}
-      <span class="absolute -bottom-10 -right-4 select-none text-[16rem] font-semibold leading-none text-primary/15" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase()}</span>
+      <span class="absolute -bottom-10 -end-4 select-none text-[16rem] font-semibold leading-none text-primary/15" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase()}</span>
     {/if}
-    {#if p.featured}<span class="absolute left-4 top-4 rounded-full bg-background/90 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">{t('example.products.badge')}</span>{/if}
+    {#if p.featured}<span class="absolute start-4 top-4 rounded-full bg-background/90 px-3 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">{t('example.products.badge')}</span>{/if}
   </div>
   <div class="md:sticky md:top-24">
     <nav class="text-sm text-muted-foreground" aria-label="Breadcrumb"><a href="/example" class="hover:text-foreground">{data.brand}</a> <span aria-hidden="true">/</span> <a href="/example#products" class="hover:text-foreground">{t('example.products.title')}</a></nav>
@@ -70,7 +70,7 @@ const ld = $derived(
       <li class="flex items-center gap-2"><Icon name="check" size={16} class="text-primary" />{t('example.trust.t4')}</li>
     </ul>
     <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-      <Button href="/example#contact" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.product.order')}<Icon name="arrow-right" size={18} /></Button>
+      <Button href="/example#contact" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.product.order')}<Icon name="arrow-right" class="rtl:rotate-180" size={18} /></Button>
       <Button href="/example#products" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto"><Icon name="arrow-left" size={16} />{t('example.product.back')}</Button>
     </div>
     {#if p.description}<div class="prose-sm mt-10 max-w-none whitespace-pre-line border-t pt-8 text-foreground/90">{p.description}</div>{/if}

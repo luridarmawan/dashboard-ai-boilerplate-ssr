@@ -71,7 +71,7 @@ const unhealthy = $derived(data.modules.filter((m) => m.health.status === 'faile
               <code class="text-xs">{m.ns}</code>
               <Badge variant="outline">v{m.version}</Badge>
               <Badge variant={m.effective ? 'success' : 'destructive'}>{m.effective ? 'aktif' : 'nonaktif'}</Badge>
-              {#if m.health.status === 'failed'}<Badge variant="destructive"><Icon name="warning" size={12} class="mr-1" />bermasalah</Badge>{:else if m.health.status === 'ok'}<Badge variant="secondary"><Icon name="check" size={12} class="mr-1" />sehat</Badge>{/if}
+              {#if m.health.status === 'failed'}<Badge variant="destructive"><Icon name="warning" size={12} class="me-1" />bermasalah</Badge>{:else if m.health.status === 'ok'}<Badge variant="secondary"><Icon name="check" size={12} class="me-1" />sehat</Badge>{/if}
             </div>
             {#if m.description}<p class="mt-1 text-sm text-muted-foreground">{m.description[locale]}</p>{/if}
             <p class="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span>{sourceLabel(m.source)}</span><span aria-hidden="true">·</span><code>{m.path}</code></p>

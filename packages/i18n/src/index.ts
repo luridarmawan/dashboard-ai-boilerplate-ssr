@@ -14,6 +14,30 @@ export function isLocale(v: unknown): v is Locale {
   return typeof v === 'string' && (LOCALES as readonly string[]).includes(v);
 }
 
+/**
+ * Writing direction (K-9). Decided from the locale on the server and written on `<html dir>`
+ * before the first byte, like the language itself. Layouts and components use CSS logical
+ * properties (Tailwind `ms-/me-/ps-/pe-/start-/end-/text-start/text-end`), so one stylesheet
+ * serves both directions; only the few icons that point "forward" flip (`rtl:rotate-180`).
+ */
+export type Direction = 'ltr' | 'rtl';
+/** Language subtags written right-to-left; a locale tag like `ar-EG` matches by its language. */
+export const RTL_LANGUAGES: readonly string[] = [
+  'ar',
+  'he',
+  'fa',
+  'ur',
+  'ps',
+  'sd',
+  'ug',
+  'yi',
+  'dv',
+];
+export function directionOf(locale: string | null | undefined): Direction {
+  const lang = (locale ?? '').toLowerCase().split(/[-_]/)[0] ?? '';
+  return RTL_LANGUAGES.includes(lang) ? 'rtl' : 'ltr';
+}
+
 export type Params = Record<string, string | number>;
 
 /** `{name}` placeholders; unknown placeholders are left visible rather than swallowed. */

@@ -7,7 +7,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
 </script>
 
 <div class="min-h-dvh md:grid md:grid-cols-[16rem_1fr]">
-  <aside class="hidden border-r bg-card md:sticky md:top-0 md:flex md:h-dvh md:flex-col">
+  <aside class="hidden border-e bg-card md:sticky md:top-0 md:flex md:h-dvh md:flex-col">
     <div class="flex h-14 items-center border-b px-4">{@render brand()}</div>
     <nav class="flex-1 overflow-y-auto p-3" aria-label="Navigasi utama">{@render nav({ orientation: 'vertical' })}</nav>
   </aside>
@@ -18,12 +18,12 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>
-        <nav class="absolute left-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
+        <nav class="absolute start-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
           {@render nav({ orientation: 'vertical' })}
         </nav>
       </details>
       <div class="md:hidden">{@render brand()}</div>
-      <div class="ml-auto flex items-center gap-2">{@render header()}</div>
+      <div class="ms-auto flex items-center gap-2">{@render header()}</div>
     </header>
 
     <div class="px-4 pt-3 text-sm text-muted-foreground">{@render breadcrumb()}</div>

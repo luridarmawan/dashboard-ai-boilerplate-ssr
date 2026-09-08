@@ -2,7 +2,7 @@ import type { Handle } from '@sveltejs/kit';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
 import { cfgString, loadPublicConfig } from '$lib/server/config';
-import { resolveRequestLocale } from '$lib/server/locale';
+import { resolveRequestDirection, resolveRequestLocale } from '$lib/server/locale';
 import { loadSession } from '$lib/server/session';
 import { resolveRequestTheme } from '$lib/server/theme';
 
@@ -22,6 +22,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.config = await loadPublicConfig(event, event.locals.session?.clientId ?? null);
   event.locals.theme = resolveRequestTheme(event, event.locals.config);
   event.locals.locale = resolveRequestLocale(event, event.locals.config);
+  event.locals.dir = resolveRequestDirection(event, event.locals.locale.locale);
   const { theme, mode, css } = event.locals.theme;
   const themeCss = css ? `<style data-custom-theme="${theme.id}">${css}</style>` : '';
 
@@ -49,6 +50,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     transformPageChunk: ({ html }) =>
       html
         .replace('%lang%', event.locals.locale.locale)
+        .replace('%dir%', event.locals.dir)
         .replace('%theme%', theme.id)
         .replace('%mode%', mode)
         .replace('%theme_css%', themeCss),

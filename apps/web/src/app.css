@@ -176,7 +176,7 @@
   }
   table:not([class]) th,
   table:not([class]) td {
-    @apply border-b px-2.5 py-2 text-left align-top;
+    @apply border-b px-2.5 py-2 text-start align-top;
   }
   table:not([class]) th {
     @apply text-xs font-semibold text-muted-foreground;

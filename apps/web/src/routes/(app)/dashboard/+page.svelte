@@ -25,7 +25,7 @@ const context = $derived({
         <p><span class="text-muted-foreground">{t('dashboard.email')}</span><br />{data.user.email}{#if data.user.isSuperadmin} · <code>superadmin</code>{/if}</p>
         <p><span class="text-muted-foreground">{t('dashboard.active_tenant')}</span><br />{data.tenants.find((x) => x.id === data.clientId)?.name ?? '—'}</p>
         <p><span class="text-muted-foreground">{t('dashboard.permissions')}</span><br />
-          {#if data.permissions.length}{#each data.permissions as p (p)}<code class="mr-1">{p}</code>{/each}{:else}<span class="text-muted-foreground">{t('common.none')}</span>{/if}
+          {#if data.permissions.length}{#each data.permissions as p (p)}<code class="me-1">{p}</code>{/each}{:else}<span class="text-muted-foreground">{t('common.none')}</span>{/if}
         </p>
       </div>
     </Card>

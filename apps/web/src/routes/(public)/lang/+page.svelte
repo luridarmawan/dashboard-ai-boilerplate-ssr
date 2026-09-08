@@ -26,6 +26,11 @@ const label = (l: string) => (l === 'id' ? t('lang.id') : l === 'en' ? t('lang.e
         </label>
       {/each}
     </div>
+    <!-- K-9: force right-to-left without installing an RTL language — for checking themes and layouts -->
+    <label class="flex items-start gap-2 rounded-md border bg-card px-3 py-2 text-sm">
+      <input type="checkbox" name="rtl" value="1" checked={data.rtlPreview} class="mt-0.5 h-4 w-4 accent-primary" data-testid="rtl-preview" />
+      <span>{t('lang.rtl_preview')} <span class="block text-xs text-muted-foreground">{t('lang.rtl_hint', { dir: data.dir })}</span></span>
+    </label>
     <div class="flex items-center gap-3">
       <Button type="submit"><Icon name="save" size={16} />{t('common.apply')}</Button>
       {#if data.back}<a href={data.back} class="text-sm">{t('common.back')}</a>{/if}

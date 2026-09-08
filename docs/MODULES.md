@@ -310,6 +310,8 @@ Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak y
 
 **Widget berdata:** tambahkan `data: '/v1/m/billing/summary'` (path API di bawah `/v1/`, boleh dengan query string). Dasbor mengambilnya **di server** sebagai pengguna yang sedang login sebelum merender, lalu menyerahkan `data` dari envelope-nya sebagai prop `data` komponen (`null` bila API menolak atau gagal). Widget tidak pernah mengambil data sendiri, dan tidak bisa melihat lebih dari yang boleh dilihat penggunanya — RBAC dan tenancy tetap milik API. Contoh hidup: `modules/AI/widgets.ts` → `ai.usage` memakai `/v1/m/ai/analytics?days=30` dan `web/widgets/Usage.svelte` menerima `{ context, data }`.
 
+**Arah tulisan (K-9):** halaman dan widget modul harus memakai utilitas Tailwind **logis** — `ms-`/`me-` (bukan `ml-`/`mr-`), `ps-`/`pe-`, `start-`/`end-` (bukan `left-`/`right-`), `text-start`/`text-end`, `border-s`/`border-e`, `rounded-s`/`rounded-e` — dan menambahkan `rtl:rotate-180` pada ikon yang "menunjuk ke depan" (`chevron-right`, `arrow-right`). Dengan itu halaman ikut membalik saat `<html dir="rtl">` tanpa CSS tambahan; uji lewat **Pratinjau RTL** di halaman Bahasa (`/lang`). Gate M2 menolak kelas fisik di shell dasbor.
+
 ### `themes/<id>/`, `layouts.ts`, `icons.ts` — tema, layout, set ikon (titik perluasan 14–16)
 
 Modul bisa menyumbang ketiganya (§4.8, L-7, L-14). Semuanya divalidasi `modules:sync` dan `bun run theme:validate`, lalu **otomatis muncul di pemilih tema**; tidak ada berkas core yang disentuh.

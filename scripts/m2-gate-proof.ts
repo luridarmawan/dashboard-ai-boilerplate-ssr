@@ -294,6 +294,34 @@ const admin = new Jar();
   });
   const back = await get(admin, '/dashboard');
   check('switching back to id restores the Indonesian menu', back.html.includes('>Pengguna<'));
+  // K-9: direction is decided on the server too — ltr for id/en, rtl on request (preview cookie).
+  check('K-9 <html dir="ltr"> for id', htmlAttr(back.html, 'dir') === 'ltr');
+  await post(admin, '/lang', {
+    _csrf: csrfOf((await get(admin, '/lang')).html),
+    lang: 'id',
+    rtl: '1',
+    back: '/dashboard',
+  });
+  const rtl = await get(admin, '/dashboard');
+  check(
+    'K-9 RTL preview → first HTML has dir="rtl" (shell rendered server-side, no flip on the client)',
+    htmlAttr(rtl.html, 'dir') === 'rtl' && rtl.html.includes('>Pengguna<'),
+  );
+  check(
+    'K-9 dashboard shell uses logical CSS only (no ml-/mr-/pl-/pr-/left-/right-/text-left/text-right)',
+    !/class="[^"]*\b(ml|mr|pl|pr|left|right)-[0-9a-z]|class="[^"]*\btext-(left|right)\b/.test(
+      rtl.html,
+    ),
+  );
+  await post(admin, '/lang', {
+    _csrf: csrfOf((await get(admin, '/lang')).html),
+    lang: 'id',
+    back: '/dashboard',
+  });
+  check(
+    'K-9 unticking the preview restores dir="ltr"',
+    htmlAttr((await get(admin, '/dashboard')).html, 'dir') === 'ltr',
+  );
 }
 
 // ---- G-19: dashboard widgets are permission-filtered on the server ----

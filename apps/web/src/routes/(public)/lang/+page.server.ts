@@ -1,6 +1,6 @@
 import { isLocale, LOCALES } from '@core/i18n';
 import { redirect } from '@sveltejs/kit';
-import { rememberLocale } from '$lib/server/locale';
+import { rememberDirection, rememberLocale } from '$lib/server/locale';
 import { apiFor, checkCsrf, csrfToken, str } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -12,6 +12,9 @@ export const load: PageServerLoad = async (event) => {
     current: event.locals.locale.locale,
     source: event.locals.locale.source,
     locales: [...LOCALES],
+    /** K-9: the direction in force, and whether the RTL preview cookie is what forces it. */
+    dir: event.locals.dir,
+    rtlPreview: event.cookies.get('dab_dir') === 'rtl',
     back: back?.startsWith('/') && !back.startsWith('//') ? back : null,
   };
 };
@@ -22,6 +25,8 @@ export const actions: Actions = {
     const back = str(form, 'back');
     const target = back.startsWith('/') && !back.startsWith('//') ? back : '/lang';
     if (!checkCsrf(event, form)) redirect(303, target);
+    // K-9: "RTL preview" forces dir=rtl regardless of the locale (theme/layout checks); off = follow the locale.
+    rememberDirection(event, str(form, 'rtl') === '1' ? 'rtl' : null);
     const lang = str(form, 'lang');
     if (isLocale(lang)) {
       rememberLocale(event, lang);

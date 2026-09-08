@@ -27,7 +27,7 @@ let {
 </script>
 
 <div class="min-h-dvh md:grid md:grid-cols-[13rem_1fr]" data-layout="dummy.two-column">
-  <aside class="border-r bg-muted/40 p-3 md:sticky md:top-0 md:h-dvh md:overflow-y-auto">
+  <aside class="border-e bg-muted/40 p-3 md:sticky md:top-0 md:h-dvh md:overflow-y-auto">
     <div class="mb-4">{@render brand()}</div>
     <nav aria-label="Navigasi utama">{@render nav({ orientation: 'vertical' })}</nav>
   </aside>

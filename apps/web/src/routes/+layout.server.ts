@@ -17,5 +17,6 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
     faviconUrl: usableAsset(locals.theme.theme.assets?.favicon),
   },
   locale: locals.locale.locale,
+  dir: locals.dir,
   messages: messagesFor(locals.locale.locale),
 });

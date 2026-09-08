@@ -99,5 +99,7 @@
   "auth.mfa.back": "Kembali",
   "auth.mfa.recovery_hint": "Tidak punya akses ke aplikasi? Masukkan salah satu kode pemulihan Anda; setiap kode hanya berlaku sekali.",
   "shell.impersonating": "Anda melihat sebagai {name} — impersonasi oleh {admin}",
-  "shell.impersonate_stop": "Berhenti"
+  "shell.impersonate_stop": "Berhenti",
+  "lang.rtl_preview": "Pratinjau kanan-ke-kiri (RTL)",
+  "lang.rtl_hint": "Arah tulisan saat ini: {dir}. Bahasa RTL (Arab, Ibrani, Persia, Urdu) otomatis dir=\"rtl\"; centang ini memaksanya untuk menguji tema dan layout."
 }

@@ -99,5 +99,7 @@
   "auth.mfa.back": "Back",
   "auth.mfa.recovery_hint": "No access to the app? Enter one of your recovery codes; each works once.",
   "shell.impersonating": "Viewing as {name} — impersonated by {admin}",
-  "shell.impersonate_stop": "Stop"
+  "shell.impersonate_stop": "Stop",
+  "lang.rtl_preview": "Right-to-left (RTL) preview",
+  "lang.rtl_hint": "Current writing direction: {dir}. RTL languages (Arabic, Hebrew, Persian, Urdu) get dir=\"rtl\" automatically; tick this to force it for checking themes and layouts."
 }

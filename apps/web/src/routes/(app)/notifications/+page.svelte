@@ -45,7 +45,7 @@ const iconFor = (type: string) =>
         </div>
         <div class="flex shrink-0 gap-1">
           {#if n.link}
-            <form method="POST" action="?/read"><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="link" value={n.link} /><Button type="submit" size="sm" variant="outline"><Icon name="arrow-right" size={14} />{t('notifications.open')}</Button></form>
+            <form method="POST" action="?/read"><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="link" value={n.link} /><Button type="submit" size="sm" variant="outline"><Icon name="arrow-right" class="rtl:rotate-180" size={14} />{t('notifications.open')}</Button></form>
           {/if}
           {#if !n.readAt}
             <form method="POST" action="?/read"><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('notifications.mark_read')}</Button></form>

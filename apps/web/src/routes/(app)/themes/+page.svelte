@@ -41,7 +41,7 @@ const swatch = (t: (typeof data.themes)[number]) =>
         <Card class="overflow-hidden">
           <div class="-m-5 mb-4 grid grid-cols-2 border-b">
             <div class="overflow-hidden [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[t.id]?.light ?? ''}</div>
-            <div class="overflow-hidden border-l [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[t.id]?.dark ?? ''}</div>
+            <div class="overflow-hidden border-s [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[t.id]?.dark ?? ''}</div>
           </div>
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">

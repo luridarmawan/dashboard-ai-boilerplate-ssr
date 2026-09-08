@@ -10,12 +10,12 @@ let { brand, nav, content, footer }: PublicRegions = $props();
   <header class="absolute inset-x-0 top-0 z-30">
     <div class="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
       {@render brand()}
-      <nav class="ml-auto hidden md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
-      <details class="relative ml-auto md:hidden">
+      <nav class="ms-auto hidden md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
+      <details class="relative ms-auto md:hidden">
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>
-        <nav class="absolute right-0 top-11 z-40 w-56 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi">
+        <nav class="absolute end-0 top-11 z-40 w-56 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi">
           {@render nav({ orientation: 'vertical' })}
         </nav>
       </details>

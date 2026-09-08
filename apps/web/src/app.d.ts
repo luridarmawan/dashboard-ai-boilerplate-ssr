@@ -1,4 +1,4 @@
-import type { LocaleResolution } from '@core/i18n';
+import type { Direction, LocaleResolution } from '@core/i18n';
 import type { PublicConfig } from '$lib/server/config';
 import type { Session } from '$lib/server/session';
 import type { ResolvedTheme } from '$lib/server/theme';
@@ -16,6 +16,8 @@ declare global {
       config: PublicConfig;
       /** Language for this request (K-2), resolved before render. */
       locale: LocaleResolution;
+      /** Writing direction (K-9): from the locale, or the `dab_dir` preview cookie. */
+      dir: Direction;
     }
   }
 }

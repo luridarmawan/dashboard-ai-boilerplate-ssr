@@ -45,7 +45,7 @@ let {
       </div>
       {@render children?.()}
       {#if footer}<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{@render footer()}</div>{/if}
-      <Dialog.Close class="absolute top-4 right-4 rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label="Tutup">
+      <Dialog.Close class="absolute top-4 end-4 rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label="Tutup">
         <Icon name="close" size={16} />
       </Dialog.Close>
     </Dialog.Content>

@@ -297,7 +297,7 @@ const kindLabel: Record<string, string> = {
       </div>
       <div class="max-h-72 overflow-auto rounded-md border">
         <table class="w-full text-xs">
-          <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th class="px-2 py-1 text-left">Pasangan</th><th class="px-2 py-1 text-right">Terang</th><th class="px-2 py-1 text-right">Gelap</th></tr></thead>
+          <thead class="sticky top-0 bg-muted text-muted-foreground"><tr><th class="px-2 py-1 text-start">Pasangan</th><th class="px-2 py-1 text-end">Terang</th><th class="px-2 py-1 text-end">Gelap</th></tr></thead>
           <tbody>
             {#each CONTRAST_PAIRS as [fg, bg, minimum] (fg + bg)}
               {@const l = report.find((r) => r.mode === 'light' && r.fg === fg && r.bg === bg)}
@@ -305,7 +305,7 @@ const kindLabel: Record<string, string> = {
               <tr class="border-t">
                 <td class="px-2 py-1"><code>{fg}</code> / <code>{bg}</code> <span class="text-muted-foreground">≥ {minimum}</span></td>
                 {#each [l, d] as r, i (i)}
-                  <td class={`px-2 py-1 text-right font-mono ${r?.ok ? 'text-success' : 'text-destructive'} ${serverFailing.has(`${r?.mode}:${fg}:${bg}`) ? 'font-semibold' : ''}`}>{r?.ratio === null || r?.ratio === undefined ? '—' : r.ratio.toFixed(2)}</td>
+                  <td class={`px-2 py-1 text-end font-mono ${r?.ok ? 'text-success' : 'text-destructive'} ${serverFailing.has(`${r?.mode}:${fg}:${bg}`) ? 'font-semibold' : ''}`}>{r?.ratio === null || r?.ratio === undefined ? '—' : r.ratio.toFixed(2)}</td>
                 {/each}
               </tr>
             {/each}
@@ -313,7 +313,7 @@ const kindLabel: Record<string, string> = {
         </table>
       </div>
       {#if contrast.length}
-        <ul class="mt-2 list-disc pl-5 text-xs text-destructive" data-testid="contrast-problems">{#each contrast as c, i (i)}<li>{c.message}</li>{/each}</ul>
+        <ul class="mt-2 list-disc ps-5 text-xs text-destructive" data-testid="contrast-problems">{#each contrast as c, i (i)}<li>{c.message}</li>{/each}</ul>
       {/if}
     </Card>
     <Card title="Pratinjau dasbor" description="Kerangka layout default dari token ini (yang dilihat pengguna di pemilih tema).">

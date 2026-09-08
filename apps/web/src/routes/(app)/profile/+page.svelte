@@ -211,7 +211,7 @@ const mfaError = $derived(
               <td>{#if tk.scopes?.length}{#each tk.scopes as s (s)}<Badge variant="outline">{s}</Badge> {/each}{:else}<span class="text-muted-foreground">semua izin Anda</span>{/if}</td>
               <td>{tk.expiresAt ? fmt(tk.expiresAt) : 'tanpa batas'}</td>
               <td>{fmt(tk.lastUsedAt)}</td>
-              <td class="text-right">
+              <td class="text-end">
                 <form method="POST" action="?/revokeToken"><Csrf token={data.csrf} /><input type="hidden" name="id" value={tk.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />Cabut</Button></form>
               </td>
             </tr>

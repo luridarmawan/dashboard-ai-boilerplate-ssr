@@ -32,9 +32,9 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
             {#if m.lastStatus === 'ok'}<Badge variant="success">ok</Badge>
             {:else if m.lastStatus === 'error'}<span title={m.lastError ?? ''}><Badge variant="destructive">error</Badge></span>
             {:else}<span class="text-muted-foreground">{t('ai.mcps.never')}</span>{/if}
-            <span class="ml-1 text-xs text-muted-foreground">{fmt(m.lastSyncedAt)}</span>
+            <span class="ms-1 text-xs text-muted-foreground">{fmt(m.lastSyncedAt)}</span>
           </td>
-          <td class="text-right"><a href={`/m/ai/mcps/${m.id}`}>{can('ai.mcp.manage') ? t('common.edit') : t('common.view')}</a></td>
+          <td class="text-end"><a href={`/m/ai/mcps/${m.id}`}>{can('ai.mcp.manage') ? t('common.edit') : t('common.view')}</a></td>
         </tr>
       {:else}
         <tr><td colspan="6" class="py-8 text-center text-muted-foreground">{t('ai.mcps.empty')}</td></tr>

@@ -66,8 +66,8 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
       {#if data.ledger?.length}
         <details class="mt-3 text-sm"><summary class="cursor-pointer text-muted-foreground">{t('ai.quota.ledger')} ({data.ledger.length})</summary>
           <Table caption={t('ai.quota.ledger')}>
-            <thead><tr><th>Waktu</th><th class="text-right">{t('ai.quota.amount')}</th><th class="text-right">{t('ai.quota.balance')}</th><th>{t('ai.quota.note')}</th></tr></thead>
-            <tbody>{#each data.ledger as l (l.id)}<tr><td class="whitespace-nowrap text-muted-foreground">{new Date(l.createdAt).toLocaleString('id-ID')}</td><td class="text-right">{money(l.amountMicro)}</td><td class="text-right">{l.balanceAfterMicro === null ? t('ai.quota.unlimited') : money(l.balanceAfterMicro)}</td><td class="text-muted-foreground">{l.note ?? '—'}</td></tr>{/each}</tbody>
+            <thead><tr><th>Waktu</th><th class="text-end">{t('ai.quota.amount')}</th><th class="text-end">{t('ai.quota.balance')}</th><th>{t('ai.quota.note')}</th></tr></thead>
+            <tbody>{#each data.ledger as l (l.id)}<tr><td class="whitespace-nowrap text-muted-foreground">{new Date(l.createdAt).toLocaleString('id-ID')}</td><td class="text-end">{money(l.amountMicro)}</td><td class="text-end">{l.balanceAfterMicro === null ? t('ai.quota.unlimited') : money(l.balanceAfterMicro)}</td><td class="text-muted-foreground">{l.note ?? '—'}</td></tr>{/each}</tbody>
           </Table>
         </details>
       {/if}
@@ -88,10 +88,10 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
   <div class="grid gap-4 xl:grid-cols-2">
     <Card title={t('ai.analytics.per_model')}>
       <Table caption={t('ai.analytics.per_model')}>
-        <thead><tr><th>{t('ai.analytics.provider')}</th><th>Model</th><th class="text-right">{t('ai.analytics.calls')}</th><th class="text-right">Token</th><th class="text-right">{t('ai.analytics.cost')}</th></tr></thead>
+        <thead><tr><th>{t('ai.analytics.provider')}</th><th>Model</th><th class="text-end">{t('ai.analytics.calls')}</th><th class="text-end">Token</th><th class="text-end">{t('ai.analytics.cost')}</th></tr></thead>
         <tbody>
           {#each s.byModel as m (`${m.provider}|${m.model}`)}
-            <tr><td>{#if m.provider}<code>{m.provider}</code>{:else}<Badge variant="secondary">{t('ai.analytics.legacy')}</Badge>{/if}</td><td><code>{m.model ?? '—'}</code></td><td class="text-right">{num(m.calls)}</td><td class="text-right">{num(m.tokensIn + m.tokensOut)}</td><td class="text-right">{money(m.costMicro)}</td></tr>
+            <tr><td>{#if m.provider}<code>{m.provider}</code>{:else}<Badge variant="secondary">{t('ai.analytics.legacy')}</Badge>{/if}</td><td><code>{m.model ?? '—'}</code></td><td class="text-end">{num(m.calls)}</td><td class="text-end">{num(m.tokensIn + m.tokensOut)}</td><td class="text-end">{money(m.costMicro)}</td></tr>
           {:else}
             <tr><td colspan="5" class="py-6 text-center text-muted-foreground">{t('common.none')}</td></tr>
           {/each}
@@ -100,10 +100,10 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
     </Card>
     <Card title={t('ai.analytics.per_user')}>
       <Table caption={t('ai.analytics.per_user')}>
-        <thead><tr><th>{t('ai.analytics.user')}</th><th class="text-right">{t('ai.analytics.calls')}</th><th class="text-right">Token</th><th class="text-right">{t('ai.analytics.cost')}</th></tr></thead>
+        <thead><tr><th>{t('ai.analytics.user')}</th><th class="text-end">{t('ai.analytics.calls')}</th><th class="text-end">Token</th><th class="text-end">{t('ai.analytics.cost')}</th></tr></thead>
         <tbody>
           {#each s.byUser as u (u.userId ?? '')}
-            <tr><td>{u.name ?? u.email ?? u.userId ?? '—'}{#if u.name && u.email} <span class="text-xs text-muted-foreground">{u.email}</span>{/if}</td><td class="text-right">{num(u.calls)}</td><td class="text-right">{num(u.tokensIn + u.tokensOut)}</td><td class="text-right">{money(u.costMicro)}</td></tr>
+            <tr><td>{u.name ?? u.email ?? u.userId ?? '—'}{#if u.name && u.email} <span class="text-xs text-muted-foreground">{u.email}</span>{/if}</td><td class="text-end">{num(u.calls)}</td><td class="text-end">{num(u.tokensIn + u.tokensOut)}</td><td class="text-end">{money(u.costMicro)}</td></tr>
           {:else}
             <tr><td colspan="4" class="py-6 text-center text-muted-foreground">{t('common.none')}</td></tr>
           {/each}

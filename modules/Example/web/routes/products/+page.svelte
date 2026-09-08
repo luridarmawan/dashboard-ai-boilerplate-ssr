@@ -28,15 +28,15 @@ const money = (n: number, cur: string) =>
   </div>
   {#if data.saved === 'deleted'}<p class="notice">{t('example.admin.deleted')}</p>{/if}
   <Table caption={t('example.admin.products')}>
-    <thead><tr><th>{t('example.admin.slug')}</th><th>Nama</th><th class="text-right">{t('example.admin.price')}</th><th>{t('example.admin.featured')}</th><th></th></tr></thead>
+    <thead><tr><th>{t('example.admin.slug')}</th><th>Nama</th><th class="text-end">{t('example.admin.price')}</th><th>{t('example.admin.featured')}</th><th></th></tr></thead>
     <tbody>
       {#each data.products as p (p.id)}
         <tr>
           <td><code>{p.slug}</code></td>
           <td class="font-medium">{p.name}</td>
-          <td class="text-right">{money(p.price, p.currency)}</td>
+          <td class="text-end">{money(p.price, p.currency)}</td>
           <td>{#if p.featured}<Badge variant="success">{t('example.admin.featured')}</Badge>{/if}</td>
-          <td class="text-right"><a href={`/m/example/products/${p.id}`}>{can('example.product.edit') ? t('common.edit') : t('common.view')}</a> · <a href={`/product/${p.slug}`}>↗</a></td>
+          <td class="text-end"><a href={`/m/example/products/${p.id}`}>{can('example.product.edit') ? t('common.edit') : t('common.view')}</a> · <a href={`/product/${p.slug}`}>↗</a></td>
         </tr>
       {:else}
         <tr><td colspan="5" class="py-8 text-center text-muted-foreground">{t('example.products.empty')}</td></tr>

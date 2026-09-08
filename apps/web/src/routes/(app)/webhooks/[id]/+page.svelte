@@ -65,17 +65,17 @@ const badge = (s: string) =>
   <Card title="50 pengiriman terakhir">
     {#if form?.retried}<p class="notice mb-3">Percobaan ulang dijalankan.</p>{/if}
     <Table caption="Pengiriman">
-      <thead><tr><th>Waktu</th><th>Event</th><th>Status</th><th class="text-right">Percobaan</th><th>Respons</th><th>Berikutnya</th><th></th></tr></thead>
+      <thead><tr><th>Waktu</th><th>Event</th><th>Status</th><th class="text-end">Percobaan</th><th>Respons</th><th>Berikutnya</th><th></th></tr></thead>
       <tbody>
         {#each w.deliveries as d (d.id)}
           <tr data-testid="delivery-row">
             <td class="whitespace-nowrap text-muted-foreground">{fmt(d.createdAt)}</td>
             <td><code>{d.event}</code></td>
             <td><Badge variant={badge(d.status)}>{d.status}</Badge></td>
-            <td class="text-right">{d.attempts}</td>
+            <td class="text-end">{d.attempts}</td>
             <td class="max-w-[16rem] truncate" title={d.lastError ?? ''}>{d.responseStatus ?? '—'}{#if d.lastError} <span class="text-xs text-destructive">{d.lastError}</span>{/if}</td>
             <td class="whitespace-nowrap text-muted-foreground">{d.status === 'pending' ? fmt(d.nextAttemptAt) : d.status === 'delivered' ? fmt(d.deliveredAt) : '—'}</td>
-            <td class="text-right">
+            <td class="text-end">
               {#if can('webhook.manage') && d.status !== 'delivered'}
                 <form method="POST" action="?/retry"><Csrf token={data.csrf} /><input type="hidden" name="deliveryId" value={d.id} /><Button type="submit" variant="ghost" size="sm"><Icon name="refresh" size={14} />Coba lagi</Button></form>
               {/if}

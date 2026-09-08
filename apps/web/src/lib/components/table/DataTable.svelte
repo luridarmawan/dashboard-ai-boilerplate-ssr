@@ -83,7 +83,7 @@ const sortHref = (c: ColumnDef<Row>) => {
   return withParams(state, { sort: c.sortKey, order: nextOrder, page: 1 });
 };
 const align = (c: ColumnDef<Row>) =>
-  c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : 'text-left';
+  c.align === 'right' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start';
 const hasBulk = $derived(bulkActions.length > 0 && csrf !== '');
 const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
 </script>
@@ -111,7 +111,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
         <Button type="submit" size="sm" class="mt-1">{L.apply}</Button>
       </form>
     </details>
-    {#if toolbar}<div class="ml-auto flex items-center gap-2">{@render toolbar()}</div>{/if}
+    {#if toolbar}<div class="ms-auto flex items-center gap-2">{@render toolbar()}</div>{/if}
   </div>
 
   {#if error}
@@ -138,7 +138,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
                 {:else}{c.label}{/if}
               </th>
             {/each}
-            {#if rowActions.length}<th scope="col" class="h-10 px-3 text-right font-medium text-muted-foreground">{L.actions}</th>{/if}
+            {#if rowActions.length}<th scope="col" class="h-10 px-3 text-end font-medium text-muted-foreground">{L.actions}</th>{/if}
           </tr>
         </thead>
         <tbody>
@@ -168,13 +168,13 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
                   </td>
                 {/each}
                 {#if rowActions.length}
-                  <td class="px-3 py-2 text-right whitespace-nowrap">
+                  <td class="px-3 py-2 text-end whitespace-nowrap">
                     {#each rowActions as a (a.label)}
                       {#if !a.when || a.when(row)}
                         {#if a.href}
-                          <a href={a.href(row)} class={cn('ml-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={14} />{/if}{a.label}</a>
+                          <a href={a.href(row)} class={cn('ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={14} />{/if}{a.label}</a>
                         {:else if a.action && csrf}
-                          <form method="POST" action={a.action(row)} class="ml-2 inline">
+                          <form method="POST" action={a.action(row)} class="ms-2 inline">
                             <Csrf token={csrf} />
                             <button type="submit" class={cn('inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={14} />{/if}{a.label}</button>
                           </form>
@@ -201,8 +201,8 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
       {:else}<span></span>{/if}
       <nav class="flex items-center gap-2" aria-label="Paginasi">
         <span>{state.total} {L.rows} · {L.page} {state.page} {L.of} {state.totalPages}</span>
-        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.max(1, state.page - 1) })} aria-disabled={state.page <= 1}><Icon name="chevron-left" size={14} /><span class="sr-only">{L.prev}</span></a>
-        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page >= state.totalPages && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.min(state.totalPages, state.page + 1) })} aria-disabled={state.page >= state.totalPages}><Icon name="chevron-right" size={14} /><span class="sr-only">{L.next}</span></a>
+        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.max(1, state.page - 1) })} aria-disabled={state.page <= 1}><Icon name="chevron-left" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.prev}</span></a>
+        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page >= state.totalPages && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.min(state.totalPages, state.page + 1) })} aria-disabled={state.page >= state.totalPages}><Icon name="chevron-right" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.next}</span></a>
         <form method="GET" class="flex items-center gap-1">
           {#if state.q}<input type="hidden" name="q" value={state.q} />{/if}
           <input type="hidden" name="sort" value={state.sort} /><input type="hidden" name="order" value={state.order} />
