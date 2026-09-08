@@ -24,6 +24,12 @@ import { Elysia } from 'elysia';
  */
 
 export const SESSION_COOKIE = 'dab_session';
+/**
+ * Impersonation (D-6): a second cookie names a session the superadmin opened AS another user. It
+ * only counts while the superadmin's own `dab_session` is still valid and matches the session's
+ * `impersonator_id`, so the admin never loses their own login and stopping is just dropping it.
+ */
+export const IMPERSONATE_COOKIE = 'dab_impersonate';
 
 export interface AuthState {
   /** The cookie session; null when the request authenticated with an API token (A-4). */
@@ -35,6 +41,8 @@ export interface AuthState {
   readonly clientId: string | null;
   /** Permission strings a token is limited to (A-4); null = the user's full permissions. */
   readonly scopes: readonly string[] | null;
+  /** The superadmin behind this request when it is impersonated (D-6); null otherwise. */
+  readonly impersonator: UserRow | null;
 }
 
 export const authContext = new Elysia({ name: 'auth-context' }).derive(
@@ -57,6 +65,7 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
           user: found.user,
           clientId: found.token.client_id ?? (await defaultTenantOf(db, found.user.id)),
           scopes,
+          impersonator: null,
         },
       };
     }
@@ -64,6 +73,22 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
     if (typeof token !== 'string' || !looksLikeToken(token)) return { auth: null };
     const found = await findSession(db, token);
     if (!found) return { auth: null };
+    const impToken = cookie[IMPERSONATE_COOKIE]?.value;
+    if (typeof impToken === 'string' && looksLikeToken(impToken) && found.user.is_superadmin) {
+      const imp = await findSession(db, impToken);
+      if (imp && imp.session.impersonator_id === found.user.id)
+        return {
+          auth: {
+            session: imp.session,
+            token: null,
+            user: imp.user,
+            clientId: imp.session.client_id,
+            scopes: null,
+            impersonator: found.user,
+          },
+        };
+      // Stale or foreign impersonation cookie: ignored — the admin's own session stands.
+    }
     return {
       auth: {
         session: found.session,
@@ -71,10 +96,28 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
         user: found.user,
         clientId: found.session.client_id,
         scopes: null,
+        impersonator: null,
       },
     };
   },
 );
+
+/** Guard: refuse while impersonating — the admin must not change the user's credentials (D-6). */
+export function notImpersonating({
+  auth,
+  set,
+  requestId,
+}: {
+  auth: AuthState | null;
+  set: { status?: number | string };
+  requestId: string;
+}) {
+  if (!auth?.impersonator) return;
+  set.status = 403;
+  return fail('forbidden', 'Tidak tersedia selama impersonasi', requestId, {
+    reason: 'impersonating',
+  });
+}
 
 /**
  * Route guard for actions that only make sense for a cookie session — logout, switching the

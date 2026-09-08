@@ -18,6 +18,8 @@ export const sessions = defineTable({
     ip: col.identifier(45).nullable(),
     user_agent: col.varchar(512).nullable(),
     revoked_at: col.datetime().nullable(),
+    /** Set when a superadmin opened this session AS the user (D-6); the banner and audit read it. */
+    impersonator_id: col.uuid().references('users', 'set null').nullable(),
   },
   indexes: [
     { columns: ['token_hash'], unique: true },

@@ -97,5 +97,7 @@
   "auth.mfa.code": "Kode verifikasi",
   "auth.mfa.submit": "Verifikasi",
   "auth.mfa.back": "Kembali",
-  "auth.mfa.recovery_hint": "Tidak punya akses ke aplikasi? Masukkan salah satu kode pemulihan Anda; setiap kode hanya berlaku sekali."
+  "auth.mfa.recovery_hint": "Tidak punya akses ke aplikasi? Masukkan salah satu kode pemulihan Anda; setiap kode hanya berlaku sekali.",
+  "shell.impersonating": "Anda melihat sebagai {name} — impersonasi oleh {admin}",
+  "shell.impersonate_stop": "Berhenti"
 }

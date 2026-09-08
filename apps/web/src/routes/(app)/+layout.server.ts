@@ -32,6 +32,7 @@ export const load: LayoutServerLoad = async (event) => {
   return {
     csrf: csrfToken(event),
     user: s.user,
+    impersonator: s.impersonator,
     clientId: s.clientId,
     tenants: s.tenants,
     permissions: s.permissions,

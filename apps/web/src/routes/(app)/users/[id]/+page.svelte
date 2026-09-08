@@ -8,7 +8,7 @@ import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
-const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
+const can = (p: string) => data.viewer.isSuperadmin || hasPermission(data.permissions, p);
 const u = $derived(data.user);
 const editable = $derived(can('user.edit'));
 const fields: FieldDef[] = $derived([
@@ -23,7 +23,7 @@ const fields: FieldDef[] = $derived([
     ],
   },
   { name: 'active', type: 'boolean', label: 'Aktif' },
-  ...(data.user.isSuperadmin
+  ...(data.viewer.isSuperadmin
     ? [
         {
           name: 'isSuperadmin',
@@ -62,6 +62,15 @@ const fieldErrors = $derived(
     <Badge variant={u.statusId === 1 ? 'success' : 'secondary'}>{u.statusId === 1 ? 'aktif' : 'nonaktif'}</Badge>
   </div>
   {#if data.created}<p class="notice">Pengguna dibuat.</p>{/if}
+  {#if data.viewer.isSuperadmin && !data.impersonator && !u.isSuperadmin && u.id !== data.viewer.id && u.statusId === 1}
+    <!-- Impersonation (D-6): one click, then the banner on every page and a way back. -->
+    <form method="POST" action="?/impersonate" class="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="impersonate-form">
+      <Csrf token={data.csrf} />
+      <Icon name="eye" size={16} />
+      <span>Lihat dasbor seperti yang dilihat pengguna ini (1 jam, tercatat di audit).</span>
+      <Button type="submit" variant="outline" size="sm">Masuk sebagai {u.name}</Button>
+    </form>
+  {/if}
 
   <Card>
     <FormBuilder

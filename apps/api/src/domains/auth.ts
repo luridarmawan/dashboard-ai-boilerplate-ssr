@@ -3,6 +3,7 @@ import {
   consumeRateLimit,
   createSession,
   effectivePermissions,
+  findSession,
   hashPassword,
   hashRecoveryCode,
   hashToken,
@@ -25,7 +26,14 @@ import { Email, errorResponses, fail, MfaLoginBody, OkSchema, ok, Password } fro
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
 import { publicLink, sendTemplate } from '../mail.ts';
-import { authContext, clientIp, publicUser, requireAuth, SESSION_COOKIE } from '../plugins/auth.ts';
+import {
+  authContext,
+  clientIp,
+  IMPERSONATE_COOKIE,
+  publicUser,
+  requireAuth,
+  SESSION_COOKIE,
+} from '../plugins/auth.ts';
 import { cookieAttributes, issueCsrfToken } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { requirePermission, TENANT_HEADER, tenantContext } from '../plugins/tenancy.ts';
@@ -593,7 +601,14 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         async ({ auth, cookie, request, server, requestId }) => {
           const a = auth as NonNullable<typeof auth>;
           if (a.session) await revokeSession(unsafeAcrossTenants(), a.session.id);
+          // Logging out while impersonating (D-6) ends the admin's own session too, not just the mask.
+          const own = cookie[SESSION_COOKIE]?.value;
+          if (a.impersonator && typeof own === 'string') {
+            const base = await findSession(unsafeAcrossTenants(), own);
+            if (base) await revokeSession(unsafeAcrossTenants(), base.session.id);
+          }
           cookie[SESSION_COOKIE]?.set({ value: '', ...cookieAttributes(request), maxAge: 0 });
+          cookie[IMPERSONATE_COOKIE]?.set({ value: '', ...cookieAttributes(request), maxAge: 0 });
           await writeAudit(unsafeAcrossTenants(), {
             clientId: a.clientId,
             actorId: a.user.id,
@@ -619,6 +634,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             user: publicUser(a.user),
             clientId: a.clientId,
             tenants,
+            impersonator: a.impersonator
+              ? { id: a.impersonator.id, name: a.impersonator.name, email: a.impersonator.email }
+              : null,
             session: a.session
               ? {
                   id: a.session.id,
@@ -639,6 +657,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
               t.Object({
                 user: PublicUser,
                 clientId: t.Nullable(t.String()),
+                impersonator: t.Nullable(
+                  t.Object({ id: t.String(), name: t.String(), email: t.String() }),
+                ),
                 tenants: t.Array(
                   t.Object({
                     id: t.String(),

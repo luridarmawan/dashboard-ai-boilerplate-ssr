@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { CSRF_COOKIE, checkCsrf, SESSION_COOKIE } from '$lib/server/session';
+import { CSRF_COOKIE, checkCsrf, IMPERSONATE_COOKIE, SESSION_COOKIE } from '$lib/server/session';
 
 /**
  * Streaming bridge (H-3): browser → SvelteKit → API → provider, token by token. The API's SSE
@@ -17,6 +17,7 @@ export const POST: RequestHandler = async (event) => {
   }[];
   const session = event.cookies.get(SESSION_COOKIE) ?? '';
   const csrf = event.cookies.get(CSRF_COOKIE) ?? '';
+  const imp = event.cookies.get(IMPERSONATE_COOKIE);
   let ip = '';
   try {
     ip = event.getClientAddress();
@@ -26,7 +27,7 @@ export const POST: RequestHandler = async (event) => {
   const base = env.API_URL ?? 'http://127.0.0.1:3001';
   const headers = {
     'content-type': 'application/json',
-    cookie: `${SESSION_COOKIE}=${session}; ${CSRF_COOKIE}=${csrf}`,
+    cookie: `${SESSION_COOKIE}=${session}; ${CSRF_COOKIE}=${csrf}${imp ? `; ${IMPERSONATE_COOKIE}=${imp}` : ''}`,
     'x-csrf-token': csrf,
     origin: event.url.origin,
     'x-forwarded-proto': event.url.protocol.replace(':', ''),

@@ -1,0 +1,2 @@
+ALTER TABLE `sessions` ADD `impersonator_id` char(36) CHARACTER SET ascii COLLATE ascii_bin;--> statement-breakpoint
+ALTER TABLE `sessions` ADD CONSTRAINT `sessions_impersonator_id_users_id_fk` FOREIGN KEY (`impersonator_id`) REFERENCES `users`(`id`) ON DELETE set null ON UPDATE no action;

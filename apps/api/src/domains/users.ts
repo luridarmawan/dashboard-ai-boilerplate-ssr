@@ -1,4 +1,6 @@
 import {
+  createSession,
+  defaultTenantOf,
   detachTenantFromSessions,
   generateRecoveryCodes,
   generateTotpSecret,
@@ -11,6 +13,7 @@ import {
   passwordProblems,
   randomToken,
   revokeAllSessions,
+  revokeSession,
   verifyPassword,
   verifyTotp,
   writeAudit,
@@ -48,7 +51,14 @@ import { Elysia, t } from 'elysia';
 import { fileIdFromUrl, findAvatarFile, removeFile, storeUpload } from '../files.ts';
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
 import { publicLink, sendTemplate } from '../mail.ts';
-import { type AuthState, clientIp, publicUser } from '../plugins/auth.ts';
+import {
+  type AuthState,
+  clientIp,
+  IMPERSONATE_COOKIE,
+  notImpersonating,
+  publicUser,
+} from '../plugins/auth.ts';
+import { cookieAttributes } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
 import { emit, settings } from '../services.ts';
@@ -113,6 +123,25 @@ function mfaStatus(row: typeof schema.userMfa.$inferSelect | undefined) {
     recoveryCodesLeft: row?.enabled_at ? left : 0,
   };
 }
+/** Impersonated sessions live one hour at most (D-6). */
+const IMPERSONATION_TTL_S = 3600;
+const superadminOnly = ({
+  auth,
+  set,
+  requestId,
+}: {
+  auth: AuthState | null;
+  set: { status?: number | string };
+  requestId: string;
+}) => {
+  if (auth?.user.is_superadmin) return;
+  set.status = auth ? 403 : 401;
+  return fail(
+    auth ? 'forbidden' : 'unauthorized',
+    auth ? 'Hanya superadmin' : 'Sesi tidak ada atau sudah berakhir',
+    requestId,
+  );
+};
 const sessionGuard = ({
   auth,
   set,
@@ -264,6 +293,104 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       detail: { summary: 'Edit my profile: name, locale, theme, avatar (D-4)' },
     },
   )
+  // ---- impersonation (D-6): superadmin acts as a user, with banner + audit --------------------
+  .post(
+    '/:id/impersonate',
+    async ({ auth, params, set, request, server, requestId, cookie, tenantState }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const [target] = await db
+        .select()
+        .from(schema.users)
+        .where(and(eq(schema.users.id, params.id), isNull(schema.users.deleted_at)))
+        .limit(1);
+      if (!target) {
+        set.status = 404;
+        return fail('not_found', 'Pengguna tidak ditemukan', requestId);
+      }
+      if (target.id === a.user.id || target.is_superadmin) {
+        set.status = 409;
+        return fail(
+          'conflict',
+          'Tidak bisa berperan sebagai diri sendiri atau superadmin lain',
+          requestId,
+        );
+      }
+      if (target.status_id !== STATUS.ACTIVE) {
+        set.status = 409;
+        return fail('conflict', 'Pengguna nonaktif', requestId);
+      }
+      const ip = clientIp(request, server) ?? 'unknown';
+      const session = await createSession(db, {
+        userId: target.id,
+        clientId: await defaultTenantOf(db, target.id),
+        ip,
+        userAgent: request.headers.get('user-agent'),
+        ttlSeconds: IMPERSONATION_TTL_S,
+        impersonatorId: a.user.id,
+      });
+      cookie[IMPERSONATE_COOKIE]?.set({
+        value: session.token,
+        ...cookieAttributes(request),
+        expires: session.expiresAt,
+      });
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.impersonate_start',
+        resource: 'user',
+        resourceId: target.id,
+        ip,
+        requestId,
+        after: { sessionId: session.id, expiresAt: session.expiresAt.toISOString() },
+      });
+      return ok({ user: publicUser(target), expiresAt: session.expiresAt.toISOString() });
+    },
+    {
+      beforeHandle: [notImpersonating, superadminOnly],
+      params: t.Object({ id: Id }),
+      response: {
+        200: OkSchema(t.Object({ user: PublicUser, expiresAt: t.String() })),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Superadmin: act as this user for one hour (second cookie; own session kept); audited (D-6)',
+      },
+    },
+  )
+  .post(
+    '/impersonate/stop',
+    async ({ auth, set, request, server, requestId, cookie, tenantState }) => {
+      const a = actor(auth);
+      if (!a.impersonator || !a.session) {
+        set.status = 409;
+        return fail('conflict', 'Tidak sedang berperan sebagai pengguna lain', requestId);
+      }
+      const db = unsafeAcrossTenants();
+      await revokeSession(db, a.session.id);
+      cookie[IMPERSONATE_COOKIE]?.set({ value: '', ...cookieAttributes(request), maxAge: 0 });
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.impersonator.id,
+        action: 'user.impersonate_stop',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      return ok({ stopped: true as const, user: publicUser(a.impersonator) });
+    },
+    {
+      beforeHandle: sessionGuard,
+      response: {
+        200: OkSchema(t.Object({ stopped: t.Literal(true), user: PublicUser })),
+        ...errorResponses,
+      },
+      detail: { summary: 'End impersonation: revoke the impersonated session, back to the admin' },
+    },
+  )
+
   // ---- 2FA TOTP (A-11): setup → enable (recovery codes shown once) → disable / regenerate -------
   .get(
     '/profile/mfa',
@@ -330,7 +457,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       });
     },
     {
-      beforeHandle: sessionGuard,
+      beforeHandle: [sessionGuard, notImpersonating],
       response: {
         200: OkSchema(
           t.Intersect([
@@ -399,7 +526,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       });
     },
     {
-      beforeHandle: sessionGuard,
+      beforeHandle: [sessionGuard, notImpersonating],
       body: MfaCodeBody,
       response: {
         200: OkSchema(t.Intersect([MfaStatus, t.Object({ recoveryCodes: t.Array(t.String()) })])),
@@ -454,7 +581,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       });
     },
     {
-      beforeHandle: sessionGuard,
+      beforeHandle: [sessionGuard, notImpersonating],
       body: MfaCodeBody,
       response: {
         200: OkSchema(t.Intersect([MfaStatus, t.Object({ recoveryCodes: t.Array(t.String()) })])),
@@ -485,7 +612,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       return ok({ enabled: false, pending: false, recoveryCodesLeft: 0 });
     },
     {
-      beforeHandle: sessionGuard,
+      beforeHandle: [sessionGuard, notImpersonating],
       body: MfaDisableBody,
       response: { 200: OkSchema(MfaStatus), ...errorResponses },
       detail: {
@@ -665,11 +792,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       return ok({ changed: true as const, revokedOtherSessions: revoked });
     },
     {
-      beforeHandle: ({ auth, set, requestId }) => {
-        if (auth) return;
-        set.status = 401;
-        return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
-      },
+      beforeHandle: [sessionGuard, notImpersonating],
       body: PasswordChangeBody,
       response: {
         200: OkSchema(t.Object({ changed: t.Literal(true), revokedOtherSessions: t.Integer() })),

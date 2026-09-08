@@ -49,6 +49,16 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 {/snippet}
 
 {#snippet header()}
+  {#if data.impersonator}
+    <!-- Impersonation (D-6): unmistakable, on every page, with the way out. -->
+    <form method="POST" action="/auth/stop-impersonate" class="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1 text-xs" role="status" data-testid="impersonation-banner">
+      <Csrf token={data.csrf} />
+      <input type="hidden" name="back" value={`/users/${data.user.id}`} />
+      <Icon name="eye" size={14} />
+      <span>{t('shell.impersonating', { name: data.user.name, admin: data.impersonator.name })}</span>
+      <Button type="submit" variant="destructive" size="sm">{t('shell.impersonate_stop')}</Button>
+    </form>
+  {/if}
   {#if data.tenants.length > 1}
     <!-- Tenant switcher (B-4): a POST and a full server-side navigation; hidden for one tenant (B-5). -->
     <form method="POST" action="/auth/switch-tenant" class="flex items-center gap-1">

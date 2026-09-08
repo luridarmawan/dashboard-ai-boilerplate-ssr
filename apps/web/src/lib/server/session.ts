@@ -14,6 +14,8 @@ import { hasPermission } from '$lib/permissions';
  */
 
 export const SESSION_COOKIE = 'dab_session';
+/** Impersonation (D-6): rides along with the admin's own session cookie. */
+export const IMPERSONATE_COOKIE = 'dab_impersonate';
 export const CSRF_COOKIE = 'dab_csrf';
 export const CSRF_FIELD = '_csrf';
 
@@ -40,6 +42,8 @@ export interface Session {
   clientId: string | null;
   tenants: TenantSummary[];
   permissions: string[];
+  /** The superadmin acting as `user` (D-6); null normally. */
+  impersonator: { id: string; name: string; email: string } | null;
   /** Cosmetic check for the UI (C-6b); the API is the authority. */
   can: (permission: string) => boolean;
 }
@@ -91,8 +95,10 @@ function cookieHeader(cookies: Cookies): string | undefined {
   const parts: string[] = [];
   const s = cookies.get(SESSION_COOKIE);
   const c = cookies.get(CSRF_COOKIE);
+  const i = cookies.get(IMPERSONATE_COOKIE);
   if (s) parts.push(`${SESSION_COOKIE}=${s}`);
   if (c) parts.push(`${CSRF_COOKIE}=${c}`);
+  if (i) parts.push(`${IMPERSONATE_COOKIE}=${i}`);
   return parts.length ? parts.join('; ') : undefined;
 }
 
@@ -195,7 +201,14 @@ export async function loadSession(event: RequestEvent): Promise<Session | null> 
   const permissions = perms.data?.success ? perms.data.data.permissions : [];
   const user = me.data.data.user;
   const can = (p: string) => user.isSuperadmin || hasPermission(permissions, p);
-  return { user, clientId: me.data.data.clientId, tenants: me.data.data.tenants, permissions, can };
+  return {
+    user,
+    clientId: me.data.data.clientId,
+    tenants: me.data.data.tenants,
+    permissions,
+    impersonator: me.data.data.impersonator ?? null,
+    can,
+  };
 }
 
 /** Shape of the API failure envelope as Eden hands it back. */

@@ -97,5 +97,7 @@
   "auth.mfa.code": "Verification code",
   "auth.mfa.submit": "Verify",
   "auth.mfa.back": "Back",
-  "auth.mfa.recovery_hint": "No access to the app? Enter one of your recovery codes; each works once."
+  "auth.mfa.recovery_hint": "No access to the app? Enter one of your recovery codes; each works once.",
+  "shell.impersonating": "Viewing as {name} — impersonated by {admin}",
+  "shell.impersonate_stop": "Stop"
 }

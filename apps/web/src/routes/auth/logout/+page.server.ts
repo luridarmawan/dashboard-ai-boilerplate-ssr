@@ -1,5 +1,11 @@
 import { redirect } from '@sveltejs/kit';
-import { apiFor, checkCsrf, forwardSetCookies, SESSION_COOKIE } from '$lib/server/session';
+import {
+  apiFor,
+  checkCsrf,
+  forwardSetCookies,
+  IMPERSONATE_COOKIE,
+  SESSION_COOKIE,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
@@ -14,6 +20,7 @@ export const actions: Actions = {
       forwardSetCookies(event, res.response);
     }
     event.cookies.delete(SESSION_COOKIE, { path: '/' });
+    event.cookies.delete(IMPERSONATE_COOKIE, { path: '/' });
     redirect(303, '/auth/login');
   },
 };

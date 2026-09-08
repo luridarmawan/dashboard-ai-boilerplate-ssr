@@ -94,6 +94,8 @@ export interface NewSession {
   readonly ip: string | null;
   readonly userAgent: string | null;
   readonly ttlSeconds: number;
+  /** Superadmin acting as this user (D-6). */
+  readonly impersonatorId?: string | null;
 }
 
 export interface CreatedSession {
@@ -123,6 +125,7 @@ export async function createSession(db: Db, s: NewSession): Promise<CreatedSessi
     last_seen_at: now,
     ip: s.ip,
     user_agent: s.userAgent?.slice(0, 512) ?? null,
+    impersonator_id: s.impersonatorId ?? null,
   });
   return { id, token, expiresAt };
 }
