@@ -229,5 +229,29 @@ const anon = new Jar();
   check('reset applied immediately (base again)', htmlAttr(back.html, 'data-app-theme') === 'base');
 }
 
+// ---- E-1: tenant branding (name + logo) from configuration, in the brand region of every shell ----
+{
+  const LOGO = 'https://example.test/logo.png';
+  await saveApp(admin, 'global', { 'app.name': 'Kopi Nusantara', 'app.logo_url': LOGO });
+  const dash = await get(admin, '/dashboard');
+  check(
+    'app.name from configuration is the brand of the dashboard shell',
+    dash.html.includes('Kopi Nusantara'),
+  );
+  check('app.logo_url from configuration is the brand logo', dash.html.includes(LOGO));
+  const anonLogin = await get(new Jar(), '/auth/login');
+  check(
+    'the same branding reaches a visitor who is not signed in (auth shell)',
+    anonLogin.html.includes('Kopi Nusantara') && anonLogin.html.includes(LOGO),
+  );
+  // reset: an empty value falls back to the registry default (name) and to no logo
+  await saveApp(admin, 'global', { 'app.name': '', 'app.logo_url': '' });
+  const reset = await get(admin, '/dashboard');
+  check(
+    'clearing both restores the built-in name and brand icon',
+    !reset.html.includes('Kopi Nusantara') && !reset.html.includes(LOGO),
+  );
+}
+
 console.log(failures === 0 ? '\nGATE M3 #1 #3: LOLOS' : `\nGATE M3: GAGAL (${failures})`);
 process.exit(failures === 0 ? 0 : 1);
