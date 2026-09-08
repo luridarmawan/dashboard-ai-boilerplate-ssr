@@ -11,7 +11,7 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 | 5 | Dashboard lengkap & alur CRUD/tema/bahasa tanpa JavaScript | `scripts/m1…m6-gate-proof.ts` (HTTP murni) | — |
 | 6 | Tidak ada rahasia di bundle klien | `ci:bundle-secrets` | — |
 | 7 | Audit dependensi bersih dari kerentanan tinggi | `bun audit --audit-level=high` di job `check` | — |
-| 8 | Lighthouse ≥ 90 ×4 di landing; ≥ 90 Perf & A11y di dashboard | job `lighthouse` (landing) | ☐ dashboard: jalankan Lighthouse dengan sesi login |
+| 8 | Lighthouse ≥ 90 ×4 di landing; ≥ 90 Perf & A11y di dashboard | job `lighthouse` (landing) | ☑ 2026-09-08 di VPS: landing (mobile) 95/100/100/100; dashboard `/users` dengan sesi login Performance 98, Accessibility 100, Best Practices 100, SEO 91 |
 | 9 | Chat AI streaming, riwayat, token & latensi tercatat | `scripts/m5-gate-proof.ts`, tes integrasi modul AI | — |
 | 10 | Semua endpoint pengubah state terproteksi CSRF; lintas-origin ditolak | tes integrasi `auth.test.ts` (Origin salah → 403) | — |
 | 11 | Modul `bun modgen` langsung berfungsi (hook, job, widget) tanpa ubah core | `ci:modgen-guard` + proof M6 | — |
