@@ -20,7 +20,36 @@ ALTER TABLE "outbox_email" ADD CONSTRAINT "outbox_email_client_id_clients_id_fk"
 CREATE INDEX "outbox_email_status_next_attempt_at_idx" ON "outbox_email" USING btree ("status","next_attempt_at");
 CREATE TABLE "outbox_email" ("id" uuid);`;
 
+const removal = `-- Uninstall modul AI (G-15)
+DROP TABLE IF EXISTS \`ai_messages\`;--> statement-breakpoint
+DROP TABLE IF EXISTS \`ai_conversations\`;--> statement-breakpoint
+DELETE FROM \`modules\` WHERE \`module\` = 'AI';--> statement-breakpoint
+DELETE FROM \`configurations\` WHERE \`key\` LIKE 'ai.%';--> statement-breakpoint
+UPDATE \`users\` SET \`theme\` = NULL WHERE \`theme\` LIKE 'ai.%';--> statement-breakpoint
+UPDATE \`cache_versions\` SET \`version\` = \`version\` + 1 WHERE \`name\` IN ('modules', 'configurations');`;
+
 describe('TABLE_PREFIX for migrations (O-2)', () => {
+  test('a G-15 removal migration is rewritten table by table, values untouched', () => {
+    const tables = new Set([
+      'ai_messages',
+      'ai_conversations',
+      'modules',
+      'configurations',
+      'users',
+      'cache_versions',
+    ]);
+    const out = prefixSql(removal, 'x_', tables);
+    expect(out).toContain('DROP TABLE IF EXISTS `x_ai_messages`;');
+    expect(out).toContain('DROP TABLE IF EXISTS `x_ai_conversations`;');
+    expect(out).toContain("DELETE FROM `x_modules` WHERE `module` = 'AI';");
+    expect(out).toContain("DELETE FROM `x_configurations` WHERE `key` LIKE 'ai.%';");
+    expect(out).toContain("UPDATE `x_users` SET `theme` = NULL WHERE `theme` LIKE 'ai.%';");
+    expect(out).toContain(
+      "UPDATE `x_cache_versions` SET `version` = `version` + 1 WHERE `name` IN ('modules', 'configurations');",
+    );
+    // the string literal 'modules' inside IN (...) is a value, not an identifier
+    expect(out).not.toContain("'x_modules'");
+  });
   test('collects every created table across files', () => {
     expect([...collectTableNames([mysql, pg])].sort()).toEqual([
       'clients',

@@ -64,7 +64,8 @@
     "typecheck": "bun run scripts/typecheck-all.ts",
     "favicon:render": "bun run --cwd apps/web scripts/favicon-render.ts",
     "modules:search": "bun run scripts/modules-catalog.ts search",
-    "modules:install": "bun run scripts/modules-catalog.ts install"
+    "modules:install": "bun run scripts/modules-catalog.ts install",
+    "modules:remove": "bun run scripts/modules-remove.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

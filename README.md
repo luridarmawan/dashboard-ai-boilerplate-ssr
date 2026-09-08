@@ -53,6 +53,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 | `bun modgen <Nama> --fields "name:string!,qty:number"` | modul CRUD lengkap yang langsung jalan |
 | `bun create module ../mod-x` | repositori modul standalone dengan harness sendiri |
 | `bun modules:add <git-url> --ref <tag>` | pasang modul dari repositori lain |
+| `bun modules:remove <Nama>` | uninstall bersih: lepas registrasi, hapus folder/submodule, migrasi turun untuk tabelnya (G-15) |
 | `bun run db:generate` | migrasi baru (mysql + pg) setelah mengubah tabel |
 | `bun run db:matrix:docker` | migrasi + smoke di MySQL 8, MariaDB 11, PostgreSQL 16 |
 

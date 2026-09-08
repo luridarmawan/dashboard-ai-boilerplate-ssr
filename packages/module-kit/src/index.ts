@@ -75,6 +75,21 @@ export {
   satisfiesCore,
 } from './manifest.ts';
 export {
+  BREAKPOINT,
+  cleanupStatements,
+  type DrizzleSnapshotLike,
+  dropStatements,
+  moduleTablesFromSnapshot,
+  orderForDrop,
+  type RemovalDialect,
+  type RemovalMigration,
+  removalHeader,
+  renderRemovalMigration,
+  type SnapshotTable,
+  splitStatements,
+  unrelatedStatements,
+} from './remove.ts';
+export {
   defineTools,
   type RegisteredTool,
   TOOL_WIRE_MAX,

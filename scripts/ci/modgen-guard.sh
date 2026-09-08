@@ -45,17 +45,16 @@ echo "== typecheck + lint the generated module"
 bunx biome check "$DIR"
 bun run scripts/ci/layout-contract.ts >/dev/null 2>&1 || true
 
-echo "== remove the module, re-sync, regenerate migrations → tree identical to HEAD"
-rm -rf "$DIR"
-git checkout -- modules.json bun.lock packages/db/migrations
-git clean -fdq packages/db/migrations
-bun install --no-summary >/dev/null
-bun run bootstrap >/dev/null
-bun run db:generate >/dev/null 2>&1
+echo "== bun modules:remove $NAME --yes (G-15) → tree identical to HEAD"
+# The module was never released: its migration is still untracked, so the command must restore
+# packages/db/migrations to HEAD instead of writing a DROP migration, and delete the folder.
+bun run modules:remove "$NAME" --yes >"${TMPDIR:-/tmp}/modgen-remove.log" 2>&1 || { cat "${TMPDIR:-/tmp}/modgen-remove.log"; echo "modgen-guard: GAGAL — modules:remove"; exit 1; }
+grep -q "belum pernah dirilis" "${TMPDIR:-/tmp}/modgen-remove.log" || { cat "${TMPDIR:-/tmp}/modgen-remove.log"; echo "modgen-guard: GAGAL — modules:remove tidak mengenali migrasi yang belum dirilis"; exit 1; }
+git checkout -- bun.lock 2>/dev/null || true
 LEFT="$(git status --porcelain --untracked-files=all)"
 if [ -n "$LEFT" ]; then echo "modgen-guard: GAGAL — sisa setelah modul dihapus:"; echo "$LEFT"; exit 1; fi
 # orphan check inside the gitignored generated output: nothing may still mention the namespace
 if grep -rIl -E "(^|[^a-z])$NS([^a-z]|$)" apps/web/src/generated packages/module-kit/src/generated packages/db/src/generated apps/api/src/generated packages/i18n/src/generated packages/settings/src/generated "apps/web/src/routes/(app)/m" "apps/web/src/routes/(public)/(modules)" 2>/dev/null; then
   echo "modgen-guard: GAGAL — jejak modul $NAME tertinggal di output generate"; exit 1
 fi
-echo "GATE M6 G-6: LOLOS — modgen $NAME hanya menyentuh modules/, modules.json, bun.lock, migrasi (tool ikut terdaftar & tercabut); penghapusan bersih"
+echo "GATE M6 G-6 + G-15: LOLOS — modgen $NAME hanya menyentuh modules/, modules.json, bun.lock, migrasi (tool ikut terdaftar & tercabut); bun modules:remove mengembalikan pohon ke HEAD"

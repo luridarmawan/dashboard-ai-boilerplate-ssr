@@ -89,6 +89,10 @@ const catalogEntries = $derived(
             </div>
             {#if m.description}<p class="mt-1 text-sm text-muted-foreground">{m.description[locale]}</p>{/if}
             <p class="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground"><span>{sourceLabel(m.source)}</span><span aria-hidden="true">·</span><code>{m.path}</code></p>
+            {#if can('module.manage')}
+              <!-- G-15: uninstalling is a build-time act like installing (submodule, migration, new image) — the command, verbatim -->
+              <p class="mt-1 text-xs text-muted-foreground">Cabut: <code>bun modules:remove {m.name}</code> <span title="Melepas registrasi, menulis migrasi yang menjatuhkan tabelnya dan membersihkan baris core; minta konfirmasi">(migrasi turun + konfirmasi)</span></p>
+            {/if}
           </div>
         </div>
 

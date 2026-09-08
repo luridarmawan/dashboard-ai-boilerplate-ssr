@@ -529,23 +529,23 @@ Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modul
 | `bun modules:install <Nama>` | Memasang dari katalog: menyelesaikan repo + ref lalu menjalankan `modules:add` (§7c) |
 | `bun modules:sync` | Setelah menambah/mengubah/mencabut modul. Otomatis sebelum `dev`, `build`, `check`, `test` |
 | `bun db:generate` | Setelah mengubah `db/tables.ts` — menulis migrasi baru untuk kedua dialect |
+| `bun modules:remove <Nama>` | Uninstall bersih (G-15): lepas registrasi + hapus folder/submodule + migrasi turun untuk tabelnya; minta konfirmasi. `--dry-run` untuk melihat rencananya |
 | `bun db:migrate` | Menerapkan migrasi ke database dari `DATABASE_URL`. Satu-satunya jalur produksi (Q-4) |
 | `bun check` | Lint + typecheck semua paket, termasuk modul Anda (dua dialect untuk db) |
 | `bun test` | Semua test workspace — taruh test modul di `modules/<Nama>/test/*.test.ts` |
 | `bun run db:matrix:docker` | Migrasi + smoke di MySQL 8, MariaDB 11, PostgreSQL 16 sekaligus |
 
-Mencabut modul: hapus entrinya dari `modules.json`, jalankan `bun modules:sync` — route API, halaman, menu, dan izinnya hilang; **tabelnya tetap ada** (G-8; uninstall bersih dengan migrasi turun **[menyusul, G-15]**).
+Mencabut modul (G-15): `bun modules:remove <Nama>` — tampilkan rencananya lebih dulu dengan `--dry-run`. Perintah ini (1) melepas entrinya dari `modules.json`; (2) untuk `submodule`: `git submodule deinit` + `git rm`, `.gitmodules`, salinan di `.git/modules`, dan pengecualian di `biome.json`; untuk `local`: menghapus foldernya (`--keep-files` mempertahankannya); (3) `bun install` + `bun run bootstrap` sehingga route API, halaman, menu, izin, i18n, tema, widget, job, dan tool-nya hilang dari semua registry; (4) **migrasi turun**: bila tabel modul sudah dirilis (CREATE-nya ada di migrasi yang ter-commit), `bun run db:generate` dijalankan dan migrasinya **ditulis ulang** — `DROP TABLE IF EXISTS` anak → induk (urutan aman-FK dari snapshot drizzle; drizzle-kit sendiri menulisnya alfabetis dan gagal di MySQL) diikuti pembersihan baris yang ditinggalkan modul di tabel core: `modules`, `configurations` (`<ns>.*`, plus `app.default_theme`/`app.home_route`/`app.landing_route` yang menunjuk ke modul), `group_permissions`, `scheduler_jobs`/`scheduler_runs`, `queue_jobs`, `notifications`, `users.theme`, dan bump `cache_versions`. Tabel yang **belum pernah dirilis** (migrasinya masih *untracked*, mis. hasil `modgen` yang dibatalkan) tidak mendapat DROP — berkas migrasinya dikembalikan ke HEAD. Perintah ini **tidak menyentuh database**: terapkan migrasinya seperti biasa setelah backup, *sesudah* image baru tanpa modul itu ter-deploy (`bun db:migrate` / `dc run --rm migrate`, [`DEPLOY.md` §8](./DEPLOY.md)). Yang sengaja dibiarkan: `audit_log` (append-only), baris `files` beserta objeknya di storage (`kind '<ns>.*'`), `app.allowed_themes` dan tema kustom yang merujuk set ikon/layout modul (L-14 sudah menurunkannya ke baku). Konfirmasi: ketik nama modul, atau `--yes` untuk skrip. Dibuktikan di CI oleh `ci:modgen-guard` dan `ci:cross-repo` (keduanya kini mencabut lewat perintah ini).
 
 ---
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua 16 titik perluasan di §2a **tersedia**. Yang belum ada:
+Semua 16 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
 
 | Hal | Status |
 |---|---|
 | Modul sebagai paket npm (`source: "package"`) | M7. Hari ini: `local` atau `submodule` |
-| Uninstall bersih dengan migrasi turun (G-15) | M7. Mencabut modul hari ini meninggalkan tabelnya (G-8) |
 | Playwright E2E untuk halaman modul (P-8) | M7. Bukti hari ini lewat HTTP tanpa browser (`scripts/m6-gate-proof.ts`) |
 
 ---

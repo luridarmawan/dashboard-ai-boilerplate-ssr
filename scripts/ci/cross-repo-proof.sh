@@ -47,16 +47,11 @@ grep -q "$NS" apps/api/src/generated/modules.ts && grep -q "${NS}_notes" package
 ls "apps/web/src/routes/(app)/m/$NS/notes/+page.svelte" >/dev/null || { echo "cross-repo: shim halaman tidak dibuat"; exit 1; }
 echo "  modul $NAME terpasang dari git, terkunci v0.1.0 — registry, tabel, shim halaman hadir"
 
-echo "== 4. uninstall → tree identical to HEAD"
-git submodule deinit -f -q "modules/$NAME"
-git rm -f -q "modules/$NAME"
-rm -rf ".git/modules/modules/$NAME" "modules/$NAME"
-git checkout -- modules.json biome.json bun.lock packages/db/migrations 2>/dev/null || true
-# .gitmodules: back to HEAD's version, or gone entirely when HEAD had none (submodule add staged it)
-if git cat-file -e HEAD:.gitmodules 2>/dev/null; then git checkout HEAD -- .gitmodules; else git rm -q -f --cached .gitmodules 2>/dev/null || true; rm -f .gitmodules; fi
-git clean -fdq packages/db/migrations
-bun install --no-summary >/dev/null
-bun run bootstrap >/dev/null
+echo "== 4. bun modules:remove $NAME --yes (G-15) → tree identical to HEAD"
+# Submodule deinit + rm, .gitmodules, .git/modules, the biome.json exclusion, bun install, bootstrap,
+# and — since the module's migration was never committed — packages/db/migrations back to HEAD.
+bun run modules:remove "$NAME" --yes >"$TMP/remove.log" 2>&1 || { cat "$TMP/remove.log"; echo "cross-repo: GAGAL — modules:remove"; exit 1; }
+git checkout -- bun.lock 2>/dev/null || true
 LEFT="$(git status --porcelain --untracked-files=all)"
 [ -z "$LEFT" ] || { echo "cross-repo: GAGAL — sisa setelah uninstall:"; echo "$LEFT"; exit 1; }
-echo "GATE M6 #2: LOLOS — modul dari repositori terpisah dibangun & dites sendiri, dipasang lewat git URL, dicabut bersih"
+echo "GATE M6 #2 + G-15: LOLOS — modul dari repositori terpisah dibangun & dites sendiri, dipasang lewat git URL, dicabut bersih oleh bun modules:remove"
