@@ -317,3 +317,15 @@ systemctl status dab-api dab-web; journalctl -u dab-api -f
 ```
 
 `dab-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `dab-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/dab.next`, `api migrate`, tukar simlink/folder, `systemctl restart dab-api dab-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker.
+
+### 8d. Pipeline CD contoh (Q-15)
+
+[`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) adalah contoh *continuous deployment* yang memakai jalur upgrade yang sama dengan §8a, hanya tanpa build di VPS:
+
+1. **build + push**: kedua target Dockerfile dibangun di runner GitHub dan didorong ke GitHub Container Registry sebagai `ghcr.io/<owner>/<repo>/api:<commit>` dan `…/web:<commit>` (plus `latest`), dengan cache layer di registry.
+2. **deploy**: SSH ke VPS, lalu `sh deploy/upgrade.sh --pull <commit>` — pull image, backup, migrate, seed, preflight, rollout api dan web tanpa downtime. `IMAGE_PREFIX` dan `IMAGE_TAG` ditulis kembali ke `.env.prod`, sehingga `dc up -d` berikutnya tetap memakai versi itu.
+
+Dipicu manual dari tab **Actions** (pilih commit/tag) atau otomatis saat tag `v*` didorong; job `deploy` memakai *environment* `production`, jadi Anda bisa mewajibkan persetujuan reviewer di pengaturan repo. Rahasia yang dibutuhkan: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH` (checkout di VPS yang berisi `.env.prod`), dan `GHCR_PULL_TOKEN` bila paket dibiarkan privat (PAT `read:packages`); paket publik tidak butuh login. Sekali saja di VPS: `IMAGE_PREFIX=ghcr.io/<owner>/<repo>` (huruf kecil) di `.env.prod`, dan user SSH anggota grup `docker`.
+
+Mode `--pull` juga berguna tanpa GitHub: dorong image dari mesin build mana pun ke registry apa pun, lalu jalankan perintah yang sama di VPS.
+

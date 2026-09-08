@@ -293,6 +293,19 @@ Ini **satu-satunya rumah** untuk P1/P2 (invarian §3). Urutan yang disarankan, b
 
 P2 (2FA, SSO tambahan, impersonasi, job queue, marketplace modul) sebaiknya menunggu pemakaian nyata. Menambahkannya lebih awal berarti menebak kebutuhan yang belum ada — persis risiko "cakupan membengkak" di §10 PRD.
 
+**P2 yang dikerjakan atas keputusan pemilik (2026-09-08)**, urutan berdasar nilai per usaha:
+
+1. **Pipeline CD contoh** (Q-15) — **selesai**: `.github/workflows/deploy.yml` (build + push ke GHCR → SSH → `deploy/upgrade.sh --pull <tag>`), mode `--pull` di upgrade.sh ([`DEPLOY.md` §8d](./DEPLOY.md))
+2. Webhook keluar (J-5)
+3. Kuota AI per tenant/user (H-14)
+4. 2FA TOTP + recovery codes (A-11)
+5. Impersonasi user oleh superadmin (D-6)
+6. Floating chat button dengan konteks halaman (H-13)
+7. Lampiran pesan AI (H-11) dan threading (H-12)
+8. Dukungan RTL (K-9)
+9. Registry/marketplace modul sederhana (G-16)
+10. Queue pekerjaan ad-hoc
+
 ---
 
 ## 9. Cara membaca kemajuan

@@ -1,0 +1,96 @@
+# CD contoh (PRD Q-15): build kedua image → push ke GitHub Container Registry → SSH ke VPS →
+# `sh deploy/upgrade.sh --pull <tag>` (pull, backup, migrate, seed, preflight, rollout tanpa downtime).
+#
+# Jalankan manual dari tab Actions (workflow_dispatch) atau otomatis saat tag `v*` didorong.
+# Rahasia repo yang dibutuhkan:
+#   DEPLOY_HOST   host/IP VPS            DEPLOY_USER  user SSH (anggota grup docker)
+#   DEPLOY_SSH_KEY kunci privat SSH      DEPLOY_PATH  direktori checkout di VPS (berisi .env.prod), mis. /opt/dab
+#   GHCR_PULL_TOKEN (opsional) PAT read:packages untuk `docker login ghcr.io` di VPS bila paket privat;
+#                  tanpa itu paket harus publik (Settings → Packages → Change visibility).
+# Di VPS, .env.prod harus memuat IMAGE_PREFIX=ghcr.io/<owner>/<repo> (huruf kecil) — upgrade.sh
+# menuliskannya kembali setelah deploy pertama.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit/tag yang dideploy (kosong = ref workflow ini)'
+        required: false
+        default: ''
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    name: build + push image ke GHCR
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      prefix: ${{ steps.meta.outputs.prefix }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          submodules: true
+      - id: meta
+        name: nama image (huruf kecil) + tag = commit pendek
+        run: |
+          echo "prefix=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build api + web (target Dockerfile yang sama dengan compose.prod.yml) dan push
+        env:
+          PREFIX: ${{ steps.meta.outputs.prefix }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          for target in api web; do
+            docker buildx build --target "$target" \
+              --build-arg DB_DIALECT="${DB_DIALECT:-mysql}" \
+              --build-arg APP_COMMIT="$TAG" --build-arg APP_BUILT_AT="$(date -u +%FT%TZ)" \
+              --cache-from "type=registry,ref=$PREFIX/$target:buildcache" \
+              --cache-to "type=registry,ref=$PREFIX/$target:buildcache,mode=max" \
+              -t "$PREFIX/$target:$TAG" -t "$PREFIX/$target:latest" --push .
+          done
+
+  deploy:
+    name: rollout di VPS (upgrade.sh --pull)
+    runs-on: ubuntu-latest
+    needs: build-push
+    environment: production
+    steps:
+      - name: SSH → pull image → backup → migrate → seed → preflight → rollout tanpa downtime
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: IMAGE_PREFIX,IMAGE_TAG,GHCR_PULL_TOKEN,GHCR_USER
+          script_stop: true
+          script: |
+            set -eu
+            cd "${{ secrets.DEPLOY_PATH }}"
+            if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
+              echo "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            fi
+            git fetch --quiet origin && git checkout --quiet "$IMAGE_TAG" 2>/dev/null || true   # compose/deploy scripts of the same version, when the tag exists locally
+            IMAGE_PREFIX="$IMAGE_PREFIX" sh deploy/upgrade.sh --pull "$IMAGE_TAG"
+            docker compose --env-file .env.prod -f compose.prod.yml run --rm --no-deps api version
+        env:
+          IMAGE_PREFIX: ${{ needs.build-push.outputs.prefix }}
+          IMAGE_TAG: ${{ needs.build-push.outputs.tag }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
