@@ -332,6 +332,25 @@ services:
       - '127.0.0.1:9090:9090'
     <<: *logging
 
+  # Alertmanager (M-6): receives the rules' alerts from Prometheus; deploy/alertmanager.yml picks the
+  # channel (email/Slack/Telegram/webhook). UI on 127.0.0.1:9093 only.
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    profiles: ['monitoring']
+    restart: unless-stopped
+    mem_limit: ${ALERTMANAGER_MEM_LIMIT:-128m}
+    cpus: ${ALERTMANAGER_CPUS:-0.25}
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.listen-address=0.0.0.0:9093'
+    volumes:
+      - ${ALERTMANAGER_CONFIG:-./deploy/alertmanager.yml}:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - '127.0.0.1:9093:9093'
+    <<: *logging
+
   # Grafana with the Prometheus datasource and the api dashboard provisioned (deploy/grafana/);
   # UI on 127.0.0.1:3300 only (tunnel: ssh -L 3300:127.0.0.1:3300 <vps>), login admin / GRAFANA_ADMIN_PASSWORD.
   grafana:
@@ -364,4 +383,5 @@ volumes:
   valkey-data:
   uploads:
   prometheus-data:
+  alertmanager-data:
   grafana-data:

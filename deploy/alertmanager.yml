@@ -1,0 +1,52 @@
+# Alertmanager for the `monitoring` profile (PRD M-6). Prometheus (deploy/prometheus.yml) sends the
+# alerts from deploy/prometheus-rules.yml here; THIS file decides who gets told. Alertmanager does
+# not read environment variables, so credentials live in this file — keep it out of git once you
+# fill it in (copy to deploy/alertmanager.local.yml and point compose at it), or mount it from a
+# secret store. UI: 127.0.0.1:9093 (ssh -L 9093:127.0.0.1:9093 <vps>).
+global:
+  resolve_timeout: 5m
+  # Email (uncomment and fill; the same SMTP account as the app works):
+  # smtp_smarthost: smtp.example.com:587
+  # smtp_from: alerts@example.com
+  # smtp_auth_username: alerts@example.com
+  # smtp_auth_password: change-me
+  # smtp_require_tls: true
+
+route:
+  receiver: default
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: ['severity = critical']
+      receiver: default
+      repeat_interval: 1h
+
+receivers:
+  # The default receiver only logs at Alertmanager; nothing leaves the host until you pick one below.
+  - name: default
+    # --- pick one or more, then move the block's contents up here ---
+    # email_configs:
+    #   - to: ops@example.com
+    #     send_resolved: true
+    # slack_configs:
+    #   - api_url: https://hooks.slack.com/services/T000/B000/XXXX
+    #     channel: '#alerts'
+    #     send_resolved: true
+    #     title: '{{ .CommonLabels.alertname }} ({{ .Status }})'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}'
+    # telegram_configs:
+    #   - bot_token: 123456:ABC-DEF
+    #     chat_id: -1001234567890
+    #     send_resolved: true
+    #     message: '{{ range .Alerts }}{{ .Labels.severity | toUpper }} {{ .Annotations.summary }}\n{{ end }}'
+    # webhook_configs:
+    #   - url: https://hooks.example.com/dab-alerts
+    #     send_resolved: true
+
+inhibit_rules:
+  # When a replica is down, its error-rate/latency alerts are noise.
+  - source_matchers: ['alertname = ApiInstanceDown']
+    target_matchers: ['alertname =~ "ApiHighErrorRate|ApiSlowP95|DbPoolSaturated"']
+    equal: ['instance']
