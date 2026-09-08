@@ -1,5 +1,5 @@
 {
-  "$comment": "Module sources (PRD \u00a74.9, Decision L). `bun modules:sync` reads this, validates each module.json and its namespaces, and regenerates the registries. Add a module here, never in core.",
+  "$comment": "Module sources (PRD §4.9, Decision L). `bun modules:sync` reads this, validates each module.json and its namespaces, and regenerates the registries. Add a module here, never in core.",
   "modules": [
     {
       "name": "Dummy",

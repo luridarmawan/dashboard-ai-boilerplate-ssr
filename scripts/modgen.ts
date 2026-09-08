@@ -97,9 +97,16 @@ export async function resolveSpec(): Promise<ModuleSpec> {
   });
 }
 
+// `bun run scripts/…` loads .env into this process; children must not inherit runtime-only
+// values — with TABLE_PREFIX set, drizzle-kit sees every table renamed and wants an interactive
+// prompt, so `db:generate` would silently write no migration (codegen targets the empty prefix, O-2).
+const childEnv: Record<string, string> = {};
+for (const [k, v] of Object.entries(process.env))
+  if (v !== undefined && k !== 'TABLE_PREFIX' && k !== 'DATABASE_URL') childEnv[k] = v;
+
 function run(cmd: string[], label: string): void {
   console.log(`→ ${label}`);
-  const p = Bun.spawnSync(cmd, { cwd: root, stdout: 'inherit', stderr: 'inherit' });
+  const p = Bun.spawnSync(cmd, { cwd: root, env: childEnv, stdout: 'inherit', stderr: 'inherit' });
   if (p.exitCode !== 0) {
     console.error(`modgen: "${cmd.join(' ')}" gagal (exit ${p.exitCode})`);
     process.exit(p.exitCode ?? 1);
