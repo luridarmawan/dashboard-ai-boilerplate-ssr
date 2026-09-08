@@ -14,7 +14,7 @@ const t = useT();
   {#if form?.error}<p class="error">{form.error}</p>{/if}
   {#if form?.mfa}
     <!-- Second factor (A-11): password accepted, now a TOTP or recovery code; works without JavaScript. -->
-    <form method="POST" action="?/mfa" class="stack" data-testid="mfa-form">
+    <form method="POST" class="stack" data-testid="mfa-form">
       <Csrf token={data.csrf} />
       <input type="hidden" name="challenge" value={form.mfa.challenge} />
       <input type="hidden" name="next" value={form.mfa.next || data.next} />
