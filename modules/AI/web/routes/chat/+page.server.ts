@@ -22,9 +22,14 @@ export const load: ServerLoad = async (event) => {
         ? 'Anda tidak punya izin memakai asisten AI'
         : 'Percakapan tidak bisa dimuat',
     );
+  // H-10: the provider/model picker; empty when the tenant has no profiles (legacy ai.* settings).
+  const opts = await api.v1.m.ai.providers.options.get();
+  const providers = opts.data?.success ? opts.data.data : [];
   let conversation: {
     id: string;
     title: string;
+    providerId: string | null;
+    model: string | null;
     messages: { id: string; role: string; content: string; html: string; createdAt: string }[];
   } | null = null;
   if (selected) {
@@ -34,6 +39,8 @@ export const load: ServerLoad = async (event) => {
       conversation = {
         id: c.id,
         title: c.title,
+        providerId: c.providerId,
+        model: c.model,
         messages: await Promise.all(
           c.messages.map(async (m) => ({
             ...m,
@@ -48,6 +55,7 @@ export const load: ServerLoad = async (event) => {
     q,
     conversations: list.data.data,
     conversation,
+    providers,
     aiEnabled: cfg['ai.enable'] !== false,
     error: event.url.searchParams.get('error'),
   };
@@ -104,6 +112,24 @@ export const actions: Actions = {
         : 'failed';
       redirect(303, `/m/ai/chat?c=${id}&error=${encodeURIComponent(code)}`);
     }
+    redirect(303, `/m/ai/chat?c=${id}`);
+  },
+  /** H-10: pin a provider + model on the conversation; `default` = tenant default. */
+  model: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const id = str(form, 'c');
+    const [provider, model] = str(form, 'pm').split('::');
+    const r = unwrap(
+      await apiFor(event)
+        .v1.m.ai.conversations({ id })
+        .patch(
+          !provider || provider === 'default'
+            ? { provider: null, model: null }
+            : { provider, model: model || null },
+        ),
+    );
+    if (!r.ok) redirect(303, `/m/ai/chat?c=${id}&error=${encodeURIComponent(r.failure.code)}`);
     redirect(303, `/m/ai/chat?c=${id}`);
   },
   archive: async (event) => {

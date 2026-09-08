@@ -1,7 +1,7 @@
 import { publicLink } from '@app/api/mail';
 import { type AuthState, clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
-import { permission, tenantContext } from '@app/api/plugins/tenancy';
+import { permission, type TenantState, tenantContext } from '@app/api/plugins/tenancy';
 import { settings } from '@app/api/services';
 import {
   callTool,
@@ -21,13 +21,43 @@ import {
   page,
   pageMeta,
 } from '@core/contracts';
-import { and, count, desc, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  newId,
+  schema,
+  type TenantDb,
+  unsafeAcrossTenants,
+} from '@core/db';
 import { logger } from '@core/logger';
 import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 import { discoverRemoteTools, wireSuffix } from './mcp-client.ts';
 import { maskedHeaders, mcpToolSource, mergeHeaders, toolNameFor } from './mcp-tools.ts';
-import { ChatCompletionBody, ConversationPatch, McpBody, McpUpdateBody } from './schemas.ts';
+import {
+  costMicro,
+  enabledProviders,
+  modelsOf,
+  ProviderNotFound,
+  type ProviderRow,
+  probeProvider,
+  resolveProvider,
+  toPriceMicro,
+} from './providers.ts';
+import {
+  ChatCompletionBody,
+  ConversationCreate,
+  ConversationPatch,
+  McpBody,
+  McpUpdateBody,
+  ProviderBody,
+  ProviderUpdateBody,
+} from './schemas.ts';
 
 /** Provider-side message: OpenAI shape, including the tool round-trip (I-3). */
 interface ProviderMessage {
@@ -74,6 +104,7 @@ type Row = typeof schema.aiConversations.$inferSelect;
 const Conversation = t.Object({
   id: t.String(),
   title: t.String(),
+  providerId: t.Nullable(t.String()),
   model: t.Nullable(t.String()),
   archivedAt: t.Nullable(t.String()),
   lastMessageAt: t.Nullable(t.String()),
@@ -88,40 +119,19 @@ const Message = t.Object({
 const view = (c: Row) => ({
   id: c.id,
   title: c.title,
+  providerId: c.provider_id,
   model: c.model,
   archivedAt: c.archived_at?.toISOString() ?? null,
   lastMessageAt: c.last_message_at?.toISOString() ?? null,
   createdAt: c.created_at.toISOString(),
 });
 
-interface Provider {
-  baseurl: string;
-  key: string | null;
-  model: string;
-  systemPrompt: string | null;
-  maxTokens: number;
-  priceIn: number;
-  priceOut: number;
-}
-async function providerFor(clientId: string | null): Promise<Provider> {
-  return {
-    baseurl: (
-      (await settings.get<string | null>(clientId, 'ai.baseurl')) ?? 'https://api.openai.com/v1'
-    ).replace(/\/$/, ''),
-    key: (await settings.get<string | null>(clientId, 'ai.key')) || null,
-    model: (await settings.get<string | null>(clientId, 'ai.model')) ?? 'gpt-4o-mini',
-    systemPrompt: (await settings.get<string | null>(clientId, 'ai.system_prompt')) || null,
-    maxTokens: (await settings.get<number | null>(clientId, 'ai.max_tokens')) ?? 1024,
-    priceIn: (await settings.get<number | null>(clientId, 'ai.price_in_per_mtok')) ?? 0,
-    priceOut: (await settings.get<number | null>(clientId, 'ai.price_out_per_mtok')) ?? 0,
-  };
-}
-
 interface CallLog {
   clientId: string;
   userId: string | null;
   conversationId: string | null;
   endpoint: string;
+  provider: string | null;
   model: string | null;
   tokensIn: number | null;
   tokensOut: number | null;
@@ -130,15 +140,12 @@ interface CallLog {
   status: 'ok' | 'error' | 'cancelled';
   error?: string | null;
   streamed: boolean;
-  priceIn: number;
-  priceOut: number;
+  priceInMicro: number;
+  priceOutMicro: number;
 }
 /** H-9: fire-and-forget — the response is already on its way; a failed log line is logged, never thrown. */
 function logCall(c: CallLog): void {
-  const cost =
-    c.tokensIn !== null && c.tokensOut !== null && (c.priceIn || c.priceOut)
-      ? Math.round(((c.tokensIn * c.priceIn + c.tokensOut * c.priceOut) / 1_000_000) * 1_000_000)
-      : null;
+  const cost = costMicro(c.tokensIn, c.tokensOut, c.priceInMicro, c.priceOutMicro);
   queueMicrotask(() => {
     unsafeAcrossTenants()
       .insert(schema.aiCalls)
@@ -148,6 +155,7 @@ function logCall(c: CallLog): void {
         user_id: c.userId,
         conversation_id: c.conversationId,
         endpoint: c.endpoint,
+        provider: c.provider,
         model: c.model,
         tokens_in: c.tokensIn,
         tokens_out: c.tokensOut,
@@ -220,6 +228,121 @@ const mcpToolView = (code: string) => (r: McpToolRow) => ({
   enabled: r.enabled,
 });
 
+// ---- provider profiles (H-10) + analytics (H-15) ----
+const ModelView = t.Object({
+  id: t.String(),
+  model: t.String(),
+  label: t.Nullable(t.String()),
+  /** Currency units per 1M tokens (stored as micro-units). */
+  priceIn: t.Number(),
+  priceOut: t.Number(),
+  enabled: t.Boolean(),
+});
+const ProviderView = t.Object({
+  id: t.String(),
+  code: t.String(),
+  name: t.String(),
+  baseUrl: t.String(),
+  /** Whether a key is stored; the key itself never leaves the server. */
+  apiKeySet: t.Boolean(),
+  defaultModel: t.String(),
+  enabled: t.Boolean(),
+  isDefault: t.Boolean(),
+  lastStatus: t.Nullable(t.String()),
+  lastError: t.Nullable(t.String()),
+  lastTestedAt: t.Nullable(t.String()),
+  models: t.Array(ModelView),
+  createdAt: t.String(),
+});
+const ProviderOption = t.Object({
+  id: t.String(),
+  code: t.String(),
+  name: t.String(),
+  isDefault: t.Boolean(),
+  defaultModel: t.String(),
+  models: t.Array(t.Object({ model: t.String(), label: t.Nullable(t.String()) })),
+});
+async function providerView(r: ProviderRow) {
+  return {
+    id: r.id,
+    code: r.code,
+    name: r.name,
+    baseUrl: r.base_url,
+    apiKeySet: !!r.api_key,
+    defaultModel: r.default_model,
+    enabled: r.enabled,
+    isDefault: r.is_default,
+    lastStatus: r.last_status,
+    lastError: r.last_error,
+    lastTestedAt: r.last_tested_at?.toISOString() ?? null,
+    models: (await modelsOf(r.id)).map((m) => ({
+      id: m.id,
+      model: m.model,
+      label: m.label,
+      priceIn: Number(m.price_in_micro) / 1_000_000,
+      priceOut: Number(m.price_out_micro) / 1_000_000,
+      enabled: m.enabled,
+    })),
+    createdAt: r.created_at.toISOString(),
+  };
+}
+async function findProvider(
+  state: TenantState | undefined,
+  id: string,
+): Promise<ProviderRow | null> {
+  const tenant = state?.tenant;
+  if (!tenant) return null;
+  return tenant.selectOne(
+    schema.aiProviders,
+    and(eq(schema.aiProviders.id, id), isNull(schema.aiProviders.deleted_at)),
+  );
+}
+/** Replace the price list; the default model is always present so the picker can offer it. */
+async function replaceModels(
+  tenant: TenantDb,
+  providerId: string,
+  models: (typeof ProviderBody.static)['models'],
+  defaultModel: string,
+) {
+  const list = [...(models ?? [])];
+  if (!list.some((m) => m.model === defaultModel)) list.push({ model: defaultModel });
+  await tenant.delete(schema.aiModels, eq(schema.aiModels.provider_id, providerId));
+  const seen = new Set<string>();
+  for (const m of list) {
+    if (seen.has(m.model)) continue;
+    seen.add(m.model);
+    await tenant.insert(schema.aiModels, {
+      id: newId(),
+      provider_id: providerId,
+      model: m.model,
+      label: m.label ?? null,
+      price_in_micro: toPriceMicro(m.priceIn),
+      price_out_micro: toPriceMicro(m.priceOut),
+      enabled: m.enabled ?? true,
+    });
+  }
+}
+interface Stat {
+  calls: number;
+  tokensIn: number;
+  tokensOut: number;
+  costMicro: number;
+}
+interface DayStat extends Stat {
+  day: string;
+}
+interface ModelStat extends Stat {
+  provider: string | null;
+  model: string | null;
+}
+interface UserStat extends Stat {
+  userId: string | null;
+  name: string | null;
+  email: string | null;
+}
+/** Analytics aggregate in memory over at most this many rows of the window (dialect-neutral). */
+const ANALYTICS_ROW_CAP = 100_000;
+
 export default defineApiRoutes(
   'AI',
   new Elysia({ name: 'module:ai', tags: ['module:ai'] })
@@ -245,27 +368,11 @@ export default defineApiRoutes(
             { reason: 'ai_disabled' },
           );
         }
-        const p = await providerFor(clientId);
-        if (!p.key) {
-          // H-4: actionable, not generic.
-          set.status = 422;
-          return fail(
-            'validation_failed',
-            'API key AI belum diisi — isi ai.key di Pengaturan → AI',
-            requestId,
-            { reason: 'no_api_key', settings: publicLink('/settings') },
-          );
-        }
-        const messages = [...body.messages];
-        if (p.systemPrompt && !messages.some((m) => m.role === 'system'))
-          messages.unshift({ role: 'system', content: p.systemPrompt });
-        const model = body.model ?? p.model;
         const tenant = tenantState?.tenant;
-
-        // Persistence (H-6): the user's message now; the assistant's when the reply is complete.
-        let conversationId: string | null = null;
+        // The conversation decides provider + model unless the request names them (H-10).
+        let conv: Row | null = null;
         if (body.conversation_id && tenant) {
-          const conv = await tenant.selectOne(
+          conv = await tenant.selectOne(
             schema.aiConversations,
             and(
               eq(schema.aiConversations.id, body.conversation_id),
@@ -277,6 +384,44 @@ export default defineApiRoutes(
             set.status = 404;
             return fail('not_found', 'Percakapan tidak ditemukan', requestId);
           }
+        }
+        let p: Awaited<ReturnType<typeof resolveProvider>>;
+        try {
+          p = await resolveProvider(clientId, {
+            code: body.provider ?? null,
+            providerId: conv?.provider_id ?? null,
+            model: body.model ?? conv?.model ?? null,
+          });
+        } catch (err) {
+          if (!(err instanceof ProviderNotFound)) throw err;
+          set.status = 422;
+          return fail('validation_failed', err.message, requestId, {
+            reason: 'provider_not_found',
+          });
+        }
+        if (!p.key) {
+          // H-4: actionable, not generic.
+          set.status = 422;
+          return fail(
+            'validation_failed',
+            p.code
+              ? `API key penyedia "${p.code}" belum diisi — lengkapi di Penyedia AI`
+              : 'API key AI belum diisi — isi ai.key di Pengaturan → AI',
+            requestId,
+            {
+              reason: 'no_api_key',
+              settings: publicLink(p.code ? '/m/ai/providers' : '/settings'),
+            },
+          );
+        }
+        const messages = [...body.messages];
+        if (p.systemPrompt && !messages.some((m) => m.role === 'system'))
+          messages.unshift({ role: 'system', content: p.systemPrompt });
+        const model = p.model;
+
+        // Persistence (H-6): the user's message now; the assistant's when the reply is complete.
+        let conversationId: string | null = null;
+        if (conv && tenant) {
           conversationId = conv.id;
           const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
           if (lastUser) {
@@ -290,6 +435,7 @@ export default defineApiRoutes(
             const patch: Partial<typeof schema.aiConversations.$inferInsert> = {
               last_message_at: new Date(),
               model,
+              provider_id: p.id,
             };
             if (conv.title === 'Percakapan baru' || conv.title === 'New conversation')
               patch.title = lastUser.content.replace(/\s+/g, ' ').trim().slice(0, 80) || conv.title;
@@ -364,6 +510,7 @@ export default defineApiRoutes(
             userId: a.user.id,
             conversationId,
             endpoint: 'chat.completions',
+            provider: p.code,
             model,
             tokensIn,
             tokensOut,
@@ -372,8 +519,8 @@ export default defineApiRoutes(
             status,
             error: error ?? null,
             streamed: !!body.stream,
-            priceIn: p.priceIn,
-            priceOut: p.priceOut,
+            priceInMicro: p.priceInMicro,
+            priceOutMicro: p.priceOutMicro,
           });
         };
 
@@ -387,7 +534,9 @@ export default defineApiRoutes(
               res === null
                 ? `Penyedia AI tidak terjangkau (${p.baseurl})`
                 : denied
-                  ? 'API key AI ditolak penyedia — periksa ai.key'
+                  ? p.code
+                    ? `API key penyedia "${p.code}" ditolak — periksa di Penyedia AI`
+                    : 'API key AI ditolak penyedia — periksa ai.key'
                   : `Penyedia AI menjawab ${res.status}`,
             details: res === null ? undefined : { upstream: detail.slice(0, 300) },
           };
@@ -705,18 +854,32 @@ export default defineApiRoutes(
     )
     .post(
       '/conversations',
-      async ({ auth, set, requestId, tenantState }) => {
+      async ({ auth, body, set, requestId, tenantState }) => {
         const a = auth as AuthState;
-        if (!tenantState?.tenant) {
+        if (!tenantState?.tenant || !tenantState.clientId) {
           set.status = 409;
           return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        // H-10: pin the chosen profile (validated) — or leave null so the tenant default applies.
+        let providerId: string | null = null;
+        if (body?.provider) {
+          try {
+            providerId = (await resolveProvider(tenantState.clientId, { code: body.provider })).id;
+          } catch (err) {
+            if (!(err instanceof ProviderNotFound)) throw err;
+            set.status = 422;
+            return fail('validation_failed', err.message, requestId, {
+              reason: 'provider_not_found',
+            });
+          }
         }
         const id = newId();
         await tenantState.tenant.insert(schema.aiConversations, {
           id,
           user_id: a.user.id,
           title: 'Percakapan baru',
-          model: null,
+          provider_id: providerId,
+          model: body?.model || null,
         });
         const row = (await tenantState.tenant.selectOne(
           schema.aiConversations,
@@ -727,8 +890,12 @@ export default defineApiRoutes(
       },
       {
         beforeHandle: permission('ai.chat.create'),
+        body: t.Optional(ConversationCreate),
         response: { 201: OkSchema(Conversation), ...errorResponses },
-        detail: { summary: 'Start a conversation (title is set from the first message)' },
+        detail: {
+          summary:
+            'Start a conversation (title is set from the first message); optional provider code + model (H-10)',
+        },
       },
     )
     .get(
@@ -797,6 +964,23 @@ export default defineApiRoutes(
         const patch: Partial<typeof schema.aiConversations.$inferInsert> = {};
         if (body.title !== undefined) patch.title = body.title;
         if (body.archived !== undefined) patch.archived_at = body.archived ? new Date() : null;
+        if (body.provider !== undefined) {
+          if (body.provider === null) patch.provider_id = null;
+          else {
+            try {
+              patch.provider_id = (
+                await resolveProvider(tenantState?.clientId ?? '', { code: body.provider })
+              ).id;
+            } catch (err) {
+              if (!(err instanceof ProviderNotFound)) throw err;
+              set.status = 422;
+              return fail('validation_failed', err.message, requestId, {
+                reason: 'provider_not_found',
+              });
+            }
+          }
+        }
+        if (body.model !== undefined) patch.model = body.model || null;
         if (Object.keys(patch).length)
           await tenant.update(
             schema.aiConversations,
@@ -817,7 +1001,7 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         body: ConversationPatch,
         response: { 200: OkSchema(Conversation), ...errorResponses },
-        detail: { summary: 'Rename or (un)archive a conversation' },
+        detail: { summary: 'Rename, (un)archive, or switch provider/model of a conversation' },
       },
     )
     .delete(
@@ -880,6 +1064,7 @@ export default defineApiRoutes(
           rows.map((r) => ({
             id: r.id,
             endpoint: r.endpoint,
+            provider: r.provider,
             model: r.model,
             tokensIn: r.tokens_in,
             tokensOut: r.tokens_out,
@@ -903,6 +1088,7 @@ export default defineApiRoutes(
             t.Object({
               id: t.String(),
               endpoint: t.String(),
+              provider: t.Nullable(t.String()),
               model: t.Nullable(t.String()),
               tokensIn: t.Nullable(t.Integer()),
               tokensOut: t.Nullable(t.Integer()),
@@ -919,6 +1105,488 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: { summary: 'AI call log of the active tenant (tokens, latency, status, cost)' },
+      },
+    )
+
+    // ---- provider profiles + price list (H-10): secrets never echo; every chat user sees options ----
+    .get(
+      '/providers/options',
+      async ({ tenantState }) => {
+        if (!tenantState?.clientId) return ok([]);
+        const rows = await enabledProviders(tenantState.clientId);
+        return ok(
+          await Promise.all(
+            rows.map(async (p) => ({
+              id: p.id,
+              code: p.code,
+              name: p.name,
+              isDefault: p.is_default,
+              defaultModel: p.default_model,
+              models: (await modelsOf(p.id))
+                .filter((m) => m.enabled)
+                .map((m) => ({ model: m.model, label: m.label })),
+            })),
+          ),
+        );
+      },
+      {
+        beforeHandle: permission('ai.chat.read'),
+        response: { 200: OkSchema(t.Array(ProviderOption)), ...errorResponses },
+        detail: {
+          summary:
+            'Enabled provider profiles + models a chat user may pick (H-10); empty = legacy ai.* settings apply',
+        },
+      },
+    )
+    .get(
+      '/providers',
+      async ({ tenantState }) => {
+        const tenant = tenantState?.tenant;
+        if (!tenant) return ok([]);
+        const rows = await tenant.select(schema.aiProviders, isNull(schema.aiProviders.deleted_at));
+        return ok(
+          await Promise.all(
+            rows.sort((a, b) => a.name.localeCompare(b.name)).map((r) => providerView(r)),
+          ),
+        );
+      },
+      {
+        beforeHandle: permission('ai.provider.read'),
+        response: { 200: OkSchema(t.Array(ProviderView)), ...errorResponses },
+        detail: { summary: 'Provider profiles of the active tenant with their price lists (H-10)' },
+      },
+    )
+    .get(
+      '/providers/:id',
+      async ({ params, set, requestId, tenantState }) => {
+        const row = await findProvider(tenantState, params.id);
+        if (!row) {
+          set.status = 404;
+          return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
+        }
+        return ok(await providerView(row));
+      },
+      {
+        beforeHandle: permission('ai.provider.read'),
+        params: t.Object({ id: Id }),
+        response: { 200: OkSchema(ProviderView), ...errorResponses },
+        detail: { summary: 'One provider profile (API key masked)' },
+      },
+    )
+    .post(
+      '/providers',
+      async ({ auth, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        if (!tenant || !tenantState.clientId) {
+          set.status = 409;
+          return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        const dup = await tenant.selectOne(
+          schema.aiProviders,
+          and(eq(schema.aiProviders.code, body.code), isNull(schema.aiProviders.deleted_at)),
+        );
+        if (dup) {
+          set.status = 409;
+          return fail('conflict', `Kode "${body.code}" sudah dipakai`, requestId, {
+            code: 'sudah dipakai',
+          });
+        }
+        const others = await tenant.select(
+          schema.aiProviders,
+          isNull(schema.aiProviders.deleted_at),
+        );
+        // The first profile becomes the default; asking for default demotes the others.
+        const isDefault = body.isDefault === true || others.length === 0;
+        if (isDefault && others.length)
+          await tenant.update(
+            schema.aiProviders,
+            { is_default: false },
+            isNull(schema.aiProviders.deleted_at),
+          );
+        const id = newId();
+        await tenant.insert(schema.aiProviders, {
+          id,
+          code: body.code,
+          name: body.name,
+          base_url: body.baseUrl.replace(/\/$/, ''),
+          api_key: body.apiKey && body.apiKey !== '***' ? body.apiKey : null,
+          default_model: body.defaultModel,
+          enabled: body.enabled ?? true,
+          is_default: isDefault,
+        });
+        await replaceModels(tenant, id, body.models, body.defaultModel);
+        const row = (await tenant.selectOne(
+          schema.aiProviders,
+          eq(schema.aiProviders.id, id),
+        )) as ProviderRow;
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.provider.create',
+          resource: 'ai.provider',
+          resourceId: id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { code: row.code, name: row.name, baseUrl: row.base_url, apiKey: '***' },
+        });
+        set.status = 201;
+        return ok(await providerView(row));
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        body: ProviderBody,
+        response: { 201: OkSchema(ProviderView), ...errorResponses },
+        detail: {
+          summary:
+            'Create a provider profile with its priced model list (H-10); the first one becomes the default',
+        },
+      },
+    )
+    .put(
+      '/providers/:id',
+      async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = await findProvider(tenantState, params.id);
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
+        }
+        if (body.code && body.code !== row.code) {
+          const dup = await tenant.selectOne(
+            schema.aiProviders,
+            and(eq(schema.aiProviders.code, body.code), isNull(schema.aiProviders.deleted_at)),
+          );
+          if (dup) {
+            set.status = 409;
+            return fail('conflict', `Kode "${body.code}" sudah dipakai`, requestId, {
+              code: 'sudah dipakai',
+            });
+          }
+        }
+        if (body.isDefault === true && !row.is_default)
+          await tenant.update(
+            schema.aiProviders,
+            { is_default: false },
+            isNull(schema.aiProviders.deleted_at),
+          );
+        const patch: Partial<typeof schema.aiProviders.$inferInsert> = {};
+        if (body.name !== undefined) patch.name = body.name;
+        if (body.code !== undefined) patch.code = body.code;
+        if (body.baseUrl !== undefined) patch.base_url = body.baseUrl.replace(/\/$/, '');
+        // Secret semantics like MCP headers: omitted or `***` keeps, '' clears, anything else replaces.
+        if (body.apiKey !== undefined && body.apiKey !== '***') patch.api_key = body.apiKey || null;
+        if (body.defaultModel !== undefined) patch.default_model = body.defaultModel;
+        if (body.enabled !== undefined) patch.enabled = body.enabled;
+        if (body.isDefault !== undefined) patch.is_default = body.isDefault || row.is_default;
+        if (Object.keys(patch).length)
+          await tenant.update(schema.aiProviders, patch, eq(schema.aiProviders.id, row.id));
+        if (body.models !== undefined)
+          await replaceModels(tenant, row.id, body.models, body.defaultModel ?? row.default_model);
+        const after = (await tenant.selectOne(
+          schema.aiProviders,
+          eq(schema.aiProviders.id, row.id),
+        )) as ProviderRow;
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.provider.update',
+          resource: 'ai.provider',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          before: { code: row.code, baseUrl: row.base_url, enabled: row.enabled },
+          after: { code: after.code, baseUrl: after.base_url, enabled: after.enabled },
+        });
+        return ok(await providerView(after));
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        params: t.Object({ id: Id }),
+        body: ProviderUpdateBody,
+        response: { 200: OkSchema(ProviderView), ...errorResponses },
+        detail: {
+          summary:
+            'Update a provider profile; apiKey omitted/*** keeps the stored secret; models replaces the price list',
+        },
+      },
+    )
+    .delete(
+      '/providers/:id',
+      async ({ auth, params, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = await findProvider(tenantState, params.id);
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
+        }
+        await tenant.update(
+          schema.aiProviders,
+          { deleted_at: new Date(), enabled: false, is_default: false },
+          eq(schema.aiProviders.id, row.id),
+        );
+        // Conversations pinned to it fall back to the tenant default.
+        await tenant.update(
+          schema.aiConversations,
+          { provider_id: null },
+          eq(schema.aiConversations.provider_id, row.id),
+        );
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.provider.delete',
+          resource: 'ai.provider',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          before: { code: row.code, name: row.name },
+        });
+        return ok({ deleted: true as const });
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        params: t.Object({ id: Id }),
+        response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
+        detail: {
+          summary: 'Remove a provider profile; pinned conversations fall back to the default',
+        },
+      },
+    )
+    .post(
+      '/providers/:id/test',
+      async ({ auth, params, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = await findProvider(tenantState, params.id);
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
+        }
+        const r = await probeProvider(row.base_url, row.api_key);
+        await tenant.update(
+          schema.aiProviders,
+          {
+            last_status: r.ok ? 'ok' : 'error',
+            last_error: r.error,
+            last_tested_at: new Date(),
+          },
+          eq(schema.aiProviders.id, row.id),
+        );
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.provider.test',
+          resource: 'ai.provider',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { ok: r.ok, models: r.models.length, ms: r.ms },
+        });
+        return ok(r);
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        params: t.Object({ id: Id }),
+        response: {
+          200: OkSchema(
+            t.Object({
+              ok: t.Boolean(),
+              error: t.Nullable(t.String()),
+              models: t.Array(t.String()),
+              ms: t.Integer(),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'Call the provider’s GET /models with the stored key: proves URL + key, lists model ids to price (H-10)',
+        },
+      },
+    )
+
+    // ---- analytics (H-15): tokens & cost per day / model / user over a window ----
+    .get(
+      '/analytics',
+      async ({ query, tenantState }) => {
+        const days = Math.min(365, Math.max(1, Number(query.days ?? 30) || 30));
+        // The window is `days` calendar days (UTC) ending today, so the chart's last bar is today.
+        const from = new Date(Date.now() - (days - 1) * 86_400_000);
+        from.setUTCHours(0, 0, 0, 0);
+        const empty = {
+          days,
+          from: from.toISOString(),
+          totals: {
+            calls: 0,
+            ok: 0,
+            errors: 0,
+            cancelled: 0,
+            tokensIn: 0,
+            tokensOut: 0,
+            costMicro: 0,
+          },
+          byDay: [] as DayStat[],
+          byModel: [] as ModelStat[],
+          byUser: [] as UserStat[],
+          truncated: false,
+        };
+        if (!tenantState?.clientId) return ok(empty);
+        const db = unsafeAcrossTenants(); // aggregate over the tenant's rows; condition explicit
+        const rows = await db
+          .select({
+            created_at: schema.aiCalls.created_at,
+            provider: schema.aiCalls.provider,
+            model: schema.aiCalls.model,
+            user_id: schema.aiCalls.user_id,
+            tokens_in: schema.aiCalls.tokens_in,
+            tokens_out: schema.aiCalls.tokens_out,
+            cost_micro: schema.aiCalls.cost_micro,
+            status: schema.aiCalls.status,
+          })
+          .from(schema.aiCalls)
+          .where(
+            and(
+              eq(schema.aiCalls.client_id, tenantState.clientId),
+              gte(schema.aiCalls.created_at, from),
+            ),
+          )
+          .orderBy(desc(schema.aiCalls.created_at))
+          .limit(ANALYTICS_ROW_CAP + 1);
+        const truncated = rows.length > ANALYTICS_ROW_CAP;
+        if (truncated) rows.length = ANALYTICS_ROW_CAP;
+        const totals = { ...empty.totals };
+        const byDay = new Map<string, DayStat>();
+        const byModel = new Map<string, ModelStat>();
+        const byUser = new Map<string, UserStat>();
+        const bump = (s: Stat, r: (typeof rows)[number]) => {
+          s.calls++;
+          s.tokensIn += r.tokens_in ?? 0;
+          s.tokensOut += r.tokens_out ?? 0;
+          s.costMicro += r.cost_micro ?? 0;
+        };
+        for (const r of rows) {
+          bump(totals, r);
+          if (r.status === 'ok') totals.ok++;
+          else if (r.status === 'cancelled') totals.cancelled++;
+          else totals.errors++;
+          const day = r.created_at.toISOString().slice(0, 10);
+          const d = byDay.get(day) ?? { day, calls: 0, tokensIn: 0, tokensOut: 0, costMicro: 0 };
+          bump(d, r);
+          byDay.set(day, d);
+          const mk = `${r.provider ?? ''}|${r.model ?? ''}`;
+          const m = byModel.get(mk) ?? {
+            provider: r.provider,
+            model: r.model,
+            calls: 0,
+            tokensIn: 0,
+            tokensOut: 0,
+            costMicro: 0,
+          };
+          bump(m, r);
+          byModel.set(mk, m);
+          const uk = r.user_id ?? '';
+          const u = byUser.get(uk) ?? {
+            userId: r.user_id,
+            name: null,
+            email: null,
+            calls: 0,
+            tokensIn: 0,
+            tokensOut: 0,
+            costMicro: 0,
+          };
+          bump(u, r);
+          byUser.set(uk, u);
+        }
+        // Fill the empty days so the chart has a bar per day.
+        for (let i = 0; i < days; i++) {
+          const day = new Date(from.getTime() + i * 86_400_000).toISOString().slice(0, 10);
+          if (!byDay.has(day))
+            byDay.set(day, { day, calls: 0, tokensIn: 0, tokensOut: 0, costMicro: 0 });
+        }
+        const userIds = [...byUser.keys()].filter(Boolean);
+        if (userIds.length) {
+          const users = await db
+            .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+            .from(schema.users)
+            .where(inArray(schema.users.id, userIds));
+          for (const u of users) {
+            const s = byUser.get(u.id);
+            if (s) {
+              s.name = u.name;
+              s.email = u.email;
+            }
+          }
+        }
+        const byCost = (a: Stat, b: Stat) =>
+          b.costMicro - a.costMicro || b.tokensIn + b.tokensOut - (a.tokensIn + a.tokensOut);
+        return ok({
+          days,
+          from: from.toISOString(),
+          totals,
+          byDay: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)),
+          byModel: [...byModel.values()].sort(byCost),
+          byUser: [...byUser.values()].sort(byCost).slice(0, 50),
+          truncated,
+        });
+      },
+      {
+        beforeHandle: permission('ai.log.read'),
+        query: t.Object({ days: t.Optional(t.String()) }),
+        response: {
+          200: OkSchema(
+            t.Object({
+              days: t.Integer(),
+              from: t.String(),
+              totals: t.Object({
+                calls: t.Integer(),
+                ok: t.Integer(),
+                errors: t.Integer(),
+                cancelled: t.Integer(),
+                tokensIn: t.Integer(),
+                tokensOut: t.Integer(),
+                costMicro: t.Integer(),
+              }),
+              byDay: t.Array(
+                t.Object({
+                  day: t.String(),
+                  calls: t.Integer(),
+                  tokensIn: t.Integer(),
+                  tokensOut: t.Integer(),
+                  costMicro: t.Integer(),
+                }),
+              ),
+              byModel: t.Array(
+                t.Object({
+                  provider: t.Nullable(t.String()),
+                  model: t.Nullable(t.String()),
+                  calls: t.Integer(),
+                  tokensIn: t.Integer(),
+                  tokensOut: t.Integer(),
+                  costMicro: t.Integer(),
+                }),
+              ),
+              byUser: t.Array(
+                t.Object({
+                  userId: t.Nullable(t.String()),
+                  name: t.Nullable(t.String()),
+                  email: t.Nullable(t.String()),
+                  calls: t.Integer(),
+                  tokensIn: t.Integer(),
+                  tokensOut: t.Integer(),
+                  costMicro: t.Integer(),
+                }),
+              ),
+              truncated: t.Boolean(),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'AI usage analytics of the active tenant: totals, per day, per provider/model, per user (H-15). ?days=7|30|90',
+        },
       },
     )
 

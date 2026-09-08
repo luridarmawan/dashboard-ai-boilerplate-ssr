@@ -47,6 +47,13 @@ const groups = $derived.by(() => {
   }
   return g;
 });
+/** Picker value `code::model`; the conversation's current pick, else the tenant default. */
+const currentPick = $derived.by(() => {
+  const c = data.conversation;
+  if (!c?.providerId) return 'default';
+  const p = data.providers.find((x: { id: string }) => x.id === c.providerId);
+  return p ? `${p.code}::${c.model ?? p.defaultModel}` : 'default';
+});
 const errorText = $derived(
   data.error === 'no_api_key'
     ? t('ai.chat.no_key')
@@ -217,7 +224,22 @@ function copy(text: string) {
     <header class="flex items-center justify-between gap-2 border-b px-4 py-2">
       <h1 class="truncate text-base font-semibold">{data.conversation?.title ?? t('ai.chat.title')}</h1>
       {#if data.conversation}
-        <div class="flex gap-1">
+        <div class="flex flex-wrap items-center gap-1">
+          {#if data.providers.length}
+            <form method="POST" action="?/model" class="flex items-center gap-1" data-testid="model-picker">
+              <Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} />
+              <label class="sr-only" for="pm">{t('ai.chat.model')}</label>
+              <select id="pm" name="pm" value={currentPick} class="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-xs" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
+                <option value="default">{t('ai.chat.model_default')}</option>
+                {#each data.providers as p (p.id)}
+                  <optgroup label={p.name}>
+                    {#each p.models as m (m.model)}<option value={`${p.code}::${m.model}`}>{m.label ?? m.model}</option>{/each}
+                  </optgroup>
+                {/each}
+              </select>
+              <noscript><Button type="submit" variant="ghost" size="sm">{t('ai.chat.model_change')}</Button></noscript>
+            </form>
+          {/if}
           <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button type="submit" variant="ghost" size="sm"><Icon name="folder" size={14} />{t('ai.chat.archive')}</Button></form>
           <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('ai.chat.delete')}</Button></form>
         </div>

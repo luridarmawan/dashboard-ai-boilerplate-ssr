@@ -199,7 +199,8 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
         headers['content-security-policy'] =
           "default-src 'none'; style-src 'unsafe-inline'; sandbox";
       }
-      return new Response(obj.bytes, { headers });
+      // Wrapped in a Blob: the web project's DOM lib does not accept Uint8Array as a body; Bun does.
+      return new Response(new Blob([obj.bytes as unknown as ArrayBuffer]), { headers });
     },
     {
       params: t.Object({ id: Id }),

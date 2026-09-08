@@ -16,7 +16,7 @@ const t = useT();
       {#each data.logs as l (l.id)}
         <tr>
           <td class="whitespace-nowrap text-muted-foreground">{new Date(l.createdAt).toLocaleString('id-ID')}</td>
-          <td><code>{l.model ?? '—'}</code>{#if l.streamed} <Badge variant="outline">stream</Badge>{/if}</td>
+          <td>{#if l.provider}<span class="text-xs text-muted-foreground">{l.provider} /</span> {/if}<code>{l.model ?? '—'}</code>{#if l.streamed} <Badge variant="outline">stream</Badge>{/if}</td>
           <td class="text-right">{l.tokensIn ?? '—'} / {l.tokensOut ?? '—'}</td>
           <td class="text-right">{l.latencyMs ?? '—'} ms{#if l.firstTokenMs !== null} <span class="text-muted-foreground">(1st {l.firstTokenMs} ms)</span>{/if}</td>
           <td><Badge variant={l.status === 'ok' ? 'success' : l.status === 'cancelled' ? 'secondary' : 'destructive'}>{l.status}</Badge>{#if l.error} <span class="text-xs text-muted-foreground" title={l.error}>!</span>{/if}</td>
@@ -27,5 +27,5 @@ const t = useT();
       {/each}
     </tbody>
   </Table>
-  <p class="text-sm text-muted-foreground">{data.meta.total} · {data.meta.page}/{data.meta.totalPages}</p>
+  <p class="text-sm text-muted-foreground">{data.meta.total} · {data.meta.page}/{data.meta.totalPages} · <a href="/m/ai/analytics">{t('ai.analytics.title')} →</a></p>
 </div>

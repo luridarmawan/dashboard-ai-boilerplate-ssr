@@ -18,6 +18,22 @@ export default defineMenu('AI', [
     order: 120,
   },
   {
+    id: 'ai.providers',
+    label: { id: 'Penyedia AI', en: 'AI providers' },
+    href: '/m/ai/providers',
+    icon: 'server',
+    permission: 'ai.provider.read',
+    order: 125,
+  },
+  {
+    id: 'ai.analytics',
+    label: { id: 'Analitik AI', en: 'AI analytics' },
+    href: '/m/ai/analytics',
+    icon: 'chart-bar',
+    permission: 'ai.log.read',
+    order: 128,
+  },
+  {
     id: 'ai.logs',
     label: { id: 'Log AI', en: 'AI log' },
     href: '/m/ai/logs',

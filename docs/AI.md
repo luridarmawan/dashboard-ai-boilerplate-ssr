@@ -22,9 +22,26 @@ Semua di **Pengaturan → AI** (per tenant, fallback global; berlaku pada reques
 | `ai.key` | API key — tipe `secret`: tidak pernah dikirim ke browser, disamarkan di log & audit |
 | `ai.model` | Model baku; klien boleh menimpa lewat field `model` |
 | `ai.system_prompt` | Disuntikkan bila request belum punya pesan `system` (H-5) |
-| `ai.max_tokens`, `ai.price_*_per_mtok`, `ai.log_retention_days` | Batas keluaran, estimasi biaya, retensi log (M-3) |
+| `ai.max_tokens`, `ai.price_*_per_mtok`, `ai.log_retention_days` | Batas keluaran, estimasi biaya (untuk penyedia implisit ini; profil penyedia punya daftar harga sendiri, H-10), retensi log (M-3) |
 
 Tanpa API key, permintaan dijawab **422** dengan alasan `no_api_key` dan tautan ke Pengaturan — bukan galat generik (H-4).
+
+## Lebih dari satu penyedia & model (H-10)
+
+**Pengaturan → AI** adalah penyedia *implisit* — cukup untuk satu provider. Untuk beberapa provider atau model dengan harga berbeda, admin (`ai.provider.manage`) membuat **profil penyedia** di **Penyedia AI** (`/m/ai/providers`): nama, kode, base URL kompatibel-OpenAI, API key (rahasia: tidak pernah ditampilkan lagi; `***`/kosong = pertahankan), model baku, dan **daftar model berharga** — satu baris per model: `model | label | harga input per 1M token | harga output per 1M token`. Tombol **Uji koneksi** memanggil `GET /models` di penyedia dengan key tersimpan: membuktikan URL + key dan menampilkan id model yang bisa dimasukkan ke daftar.
+
+Aturannya:
+
+- Profil pertama otomatis **baku**; percakapan baru memakainya. Selama belum ada profil, Pengaturan → AI yang dipakai (kode penyedia di log = kosong) — perilaku lama utuh.
+- Pengguna memilih **provider + model per percakapan** dari pemilih di header chat (`PATCH /v1/m/ai/conversations/:id` dengan `provider` (kode) dan `model`; `POST /v1/m/ai/conversations` menerima keduanya). Request `chat/completions` boleh menamai `provider` langsung; `model` menimpa model baku profil. Profil nonaktif hilang dari pemilih dan ditolak `422 provider_not_found`.
+- **Biaya** tiap panggilan dihitung dari baris harga model yang menjawab (tersimpan sebagai `price_*_micro` = mikro-unit mata uang per 1M token; `cost_micro` = token × harga ÷ 1M). Model tanpa baris harga → biaya `null`. Kolom `ai_calls.provider` mencatat kode profilnya.
+- Pemilih (`GET /v1/m/ai/providers/options`, izin `ai.chat.read`) hanya membawa kode, nama, dan model — bukan URL atau key. Menghapus profil melepaskan percakapan yang menggunakannya kembali ke baku.
+
+Tabel: `ai_providers`, `ai_models` (per tenant), kolom `ai_conversations.provider_id`, `ai_calls.provider` (migrasi 0012). Bukti: `modules/AI/test/integration/providers.test.ts` (dua provider tiruan; routing per percakapan, biaya dari daftar harga, key tak pernah bocor, uji `/models`, profil nonaktif, hapus).
+
+## Analitik penggunaan (H-15)
+
+**Analitik AI** (`/m/ai/analytics`, izin `ai.log.read`) merangkum log panggilan: total panggilan (ok/gagal/dibatalkan), token masuk/keluar, biaya estimasi; grafik token per hari (CSS, tanpa pustaka, jalan tanpa JavaScript); tabel per penyedia & model dan per pengguna, diurutkan biaya. Rentang 7/30/90 hari (`GET /v1/m/ai/analytics?days=`; hari kalender UTC, batang terakhir = hari ini). Agregasi dilakukan di API dari baris `ai_calls` tenant aktif — netral dialect — dengan batas 100.000 baris terbaru per rentang (`truncated: true` bila terpotong). Retensi log (M-3) membatasi seberapa jauh analitik bisa melihat ke belakang.
 
 ## Streaming end-to-end (H-3)
 
@@ -56,4 +73,4 @@ Isi `ai.baseurl` dengan URL itu dan `ai.key` dengan nilai apa pun. Proof `bun ru
 
 ## Kompatibilitas API
 
-Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah dua field opsional: `conversation_id` untuk persistensi (H-6) dan `tools: boolean` untuk menawarkan tool modul ke model (I-3; baku mengikuti `ai.tools_enable`). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`) dan tenancy.
+Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah dua field opsional: `conversation_id` untuk persistensi (H-6) dan `tools: boolean` untuk menawarkan tool modul ke model (I-3; baku mengikuti `ai.tools_enable`). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Profil penyedia: `GET /v1/m/ai/providers/options` (pemilih), `GET/POST /v1/m/ai/providers`, `GET/PUT/DELETE /v1/m/ai/providers/:id`, `POST /v1/m/ai/providers/:id/test`. Analitik: `GET /v1/m/ai/analytics?days=`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`, `ai.provider.*`) dan tenancy.

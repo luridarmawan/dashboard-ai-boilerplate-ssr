@@ -20,7 +20,8 @@ export async function attachLogo(
     visibility: 'public',
   });
   if (!r.data?.success) {
-    const err = (r.error?.value as { error?: { message?: string } } | undefined)?.error?.message;
+    const err = (r.error as { value?: { error?: { message?: string } } } | null)?.value?.error
+      ?.message;
     return err ?? 'Logo tidak bisa diunggah';
   }
   values.logoId = r.data.data.id;
