@@ -114,5 +114,15 @@
   "ai.float.open_full": "Open full conversation",
   "ai.float.close": "Close",
   "ai.float.new": "Start over",
-  "ai.float.empty": "The assistant knows which page you are on. Ask anything."
+  "ai.float.empty": "The assistant knows which page you are on. Ask anything.",
+  "ai.chat.regenerate": "Regenerate",
+  "ai.chat.edit": "Edit",
+  "ai.chat.edit_send": "Send as a new branch",
+  "ai.chat.cancel": "Cancel",
+  "ai.chat.version": "Version {index} of {count}",
+  "ai.chat.prev_version": "Previous version",
+  "ai.chat.next_version": "Next version",
+  "ai.chat.attach": "Attach files",
+  "ai.chat.attach_hint": "Images, text, CSV, JSON, Markdown — up to 5 files @ 5 MB",
+  "ai.chat.attachments": "Attachments"
 }

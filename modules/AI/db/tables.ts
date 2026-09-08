@@ -64,12 +64,43 @@ export default defineTables('AI', [
     softDelete: false,
     columns: {
       conversation_id: col.uuid().references('ai_conversations', 'cascade'),
+      /**
+       * Threading (H-12): the message this one answers or follows. A user message's parent is the
+       * previous assistant reply (null at the root); an assistant reply's parent is its user
+       * message. Regenerate = a second assistant child; edit = a second user child of the same
+       * parent. No FK on purpose (self-reference); the chain is owned by the conversation.
+       */
+      parent_id: col.uuid().nullable(),
       role: col.identifier(16),
       content: col.text(),
       tokens_in: col.int().nullable(),
       tokens_out: col.int().nullable(),
     },
-    indexes: [{ columns: ['client_id', 'conversation_id', 'created_at'] }],
+    indexes: [
+      { columns: ['client_id', 'conversation_id', 'created_at'] },
+      { columns: ['client_id', 'parent_id'] },
+    ],
+  }),
+  // Short name on purpose: MySQL caps identifiers at 64 chars and the generated FK name
+  // `<prefix><table>_conversation_id_ai_conversations_id_fk` must still fit with a TABLE_PREFIX.
+  defineTable({
+    name: 'ai_attachments',
+    tenant: true,
+    softDelete: false,
+    columns: {
+      /** Attachments (H-11) hang off the USER message they were sent with. */
+      message_id: col.uuid().references('ai_messages', 'cascade'),
+      conversation_id: col.uuid().references('ai_conversations', 'cascade'),
+      /** The stored file (Q-16; kind `ai.attachment`, private, owned by the sender). */
+      file_id: col.uuid().references('files', 'cascade'),
+      name: col.varchar(255),
+      mime: col.identifier(128),
+      size: col.int(),
+    },
+    indexes: [
+      { columns: ['client_id', 'conversation_id'] },
+      { columns: ['client_id', 'message_id'] },
+    ],
   }),
   defineTable({
     name: 'ai_calls',

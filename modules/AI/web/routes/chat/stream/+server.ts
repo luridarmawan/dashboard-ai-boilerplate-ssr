@@ -11,6 +11,10 @@ export const POST: RequestHandler = async (event) => {
   const form = await event.request.formData();
   if (!checkCsrf(event, form)) return new Response('csrf', { status: 403 });
   const content = String(form.get('content') ?? '').trim();
+  // H-12: where the message hangs. '' = after the latest; 'root' = a new first message; else an id.
+  const parentField = String(form.get('parent') ?? '');
+  const parentId = parentField === '' ? undefined : parentField === 'root' ? null : parentField;
+  const regenerate = form.get('regenerate') === '1';
   // H-13: the floating chat sends what the user is looking at; capped like the API's field.
   const context = String(form.get('context') ?? '')
     .trim()
@@ -39,6 +43,27 @@ export const POST: RequestHandler = async (event) => {
     ...(ip ? { 'x-forwarded-for': ip } : {}),
     'x-request-id': event.locals.requestId,
   };
+  // H-11: files ride along in the same multipart form; upload them as this user, then name the ids.
+  const attachments: string[] = [];
+  for (const f of form.getAll('files')) {
+    if (!(f instanceof File) || f.size === 0) continue;
+    const fd = new FormData();
+    fd.set('file', f);
+    const { 'content-type': _ct, ...rest } = headers;
+    const up = await fetch(`${base}/v1/m/ai/attachments`, {
+      method: 'POST',
+      headers: rest,
+      body: fd,
+    });
+    if (!up.ok) {
+      return new Response(await up.text(), {
+        status: up.status,
+        headers: { 'content-type': up.headers.get('content-type') ?? 'application/json' },
+      });
+    }
+    const body = (await up.json()) as { data?: { id?: string } };
+    if (body.data?.id) attachments.push(body.data.id);
+  }
   // First message of a fresh chat: create the conversation first so the exchange is persisted (H-6)
   // exactly like the no-JS path does; the id goes back in a header so the page can land on it.
   let conversationId = String(form.get('c') ?? '');
@@ -61,6 +86,9 @@ export const POST: RequestHandler = async (event) => {
       stream: true,
       conversation_id: conversationId || undefined,
       ...(context ? { context } : {}),
+      ...(conversationId && parentId !== undefined ? { parent_id: parentId } : {}),
+      ...(conversationId && regenerate ? { regenerate: true } : {}),
+      ...(attachments.length ? { attachments } : {}),
     }),
     signal: event.request.signal,
   });

@@ -88,7 +88,7 @@ describe.skipIf(!enabled)('module admin listing (G-14)', () => {
     expect(ai?.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(ai?.description?.id).toContain('AI');
     // Counted by modules:sync, not guessed: tables, jobs, tools, hooks, themes/layouts/icon sets.
-    expect(ai?.contributes.tables).toBe(9); // providers, models, conversations, messages, calls, mcps, mcp_tools, credits, credit_ledger
+    expect(ai?.contributes.tables).toBe(10); // providers, models, conversations, messages, message_attachments, calls, mcps, mcp_tools, credits, credit_ledger
     expect(ai?.contributes.api).toBe(true);
     expect(ai?.contributes.jobs).toEqual(['ai.log_retention']);
     expect(ai?.contributes.tools).toEqual([]);

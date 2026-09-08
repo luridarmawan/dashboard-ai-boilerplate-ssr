@@ -120,6 +120,13 @@
       "when": 1788864733434,
       "tag": "0016_goofy_korath",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1788866474865,
+      "tag": "0017_first_mauler",
+      "breakpoints": true
     }
   ]
 }

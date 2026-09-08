@@ -15,7 +15,17 @@ let { data, form } = $props();
 const t = useT();
 
 type ToolChip = { name: string; status: 'running' | 'ok' | 'error' };
-type Msg = { id: string; role: string; content: string; html: string; tools?: ToolChip[] };
+type Att = { id: string; fileId: string; name: string; mime: string; size: number; url: string };
+type Msg = {
+  id: string;
+  role: string;
+  content: string;
+  html: string;
+  tools?: ToolChip[];
+  parentId?: string | null;
+  attachments?: Att[];
+};
+const STORED = /^[0-9a-f-]{36}$/; // ids of persisted messages (streamed bubbles get temp ids first)
 // Seeded from server data so the first HTML already carries the history (no-JS path, H-6/H-8).
 // svelte-ignore state_referenced_locally -- the $effect below re-syncs on navigation
 let messages = $state<Msg[]>(data.conversation?.messages ?? []);
@@ -24,10 +34,15 @@ let streaming = $state(false);
 let streamError = $state<string | null>(null);
 let controller: AbortController | null = null;
 let listEl: HTMLElement | undefined = $state();
+// H-12: the parent of the next message = the last message on the shown path; updated after a stream.
+// svelte-ignore state_referenced_locally -- the $effect below re-syncs on navigation
+let leafId = $state<string>(data.conversation?.leafId ?? '');
 
 $effect(() => {
   messages = data.conversation?.messages ?? [];
+  leafId = data.conversation?.leafId ?? '';
 });
+const versionOf = (id: string) => data.conversation?.siblings?.[id];
 const groups = $derived.by(() => {
   const now = Date.now();
   const day = 86_400_000;
@@ -89,6 +104,9 @@ async function streamSend(e: SubmitEvent) {
     { id: `a-${Date.now()}`, role: 'assistant', content: '', html: '' },
   ];
   draft = '';
+  // The files went into `fd` already; clear the picker so they are not sent twice.
+  const picker = formEl.querySelector<HTMLInputElement>('input[type="file"]');
+  if (picker) picker.value = '';
   scrollDown();
   streaming = true;
   controller = new AbortController();
@@ -139,11 +157,21 @@ async function streamSend(e: SubmitEvent) {
         try {
           const j = JSON.parse(d) as {
             choices?: { delta?: { content?: string } }[];
-            dab?: { tool?: ToolChip };
+            dab?: { tool?: ToolChip; messages?: { user: string | null; assistant: string } };
             error?: { message?: string };
           };
           if (j.error) {
             streamError = t('ai.chat.error');
+            continue;
+          }
+          const stored = j.dab?.messages;
+          if (stored) {
+            // H-12: the pair is persisted — give the bubbles their real ids so Regenerate/Edit work.
+            const n = messages.length;
+            if (n >= 2 && stored.user)
+              messages[n - 2] = { ...(messages[n - 2] as Msg), id: stored.user };
+            if (n >= 1) messages[n - 1] = { ...(messages[n - 1] as Msg), id: stored.assistant };
+            leafId = stored.assistant;
             continue;
           }
           const tool = j.dab?.tool;
@@ -277,18 +305,62 @@ function copy(text: string) {
                 </ul>
               {/if}
               {#if m.content}<div class="prose-chat">{@html m.html}</div>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
-              {#if m.content}<button type="button" class="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onclick={() => copy(m.content)}><Icon name="copy" size={12} />{t('ai.chat.copy')}</button>{/if}
-            {:else}<p class="whitespace-pre-wrap">{m.content}</p>{/if}
+              {#if m.content}
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" onclick={() => copy(m.content)}><Icon name="copy" size={12} />{t('ai.chat.copy')}</button>
+                  {#if data.conversation && STORED.test(m.id) && !streaming}
+                    <!-- H-12: a second answer to the same question becomes a sibling version -->
+                    <form method="POST" action="?/regenerate" class="inline"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="m" value={m.id} /><button type="submit" class="inline-flex items-center gap-1 hover:text-foreground" data-testid="regenerate"><Icon name="refresh" size={12} />{t('ai.chat.regenerate')}</button></form>
+                    {@render versions(m.id)}
+                  {/if}
+                </div>
+              {/if}
+            {:else}
+              <p class="whitespace-pre-wrap">{m.content}</p>
+              {#if m.attachments?.length}
+                <ul class="mt-2 flex flex-wrap gap-2" aria-label={t('ai.chat.attachments')} data-testid="attachments">
+                  {#each m.attachments as att (att.id)}
+                    <li>
+                      {#if att.mime.startsWith('image/')}
+                        <a href={att.url} target="_blank" rel="noopener"><img src={att.url} alt={att.name} class="max-h-32 rounded-md border border-primary-foreground/30" /></a>
+                      {:else}
+                        <a href={att.url} class="inline-flex items-center gap-1 rounded-md border border-primary-foreground/30 px-2 py-1 text-xs no-underline hover:bg-primary-foreground/10"><Icon name="file" size={12} />{att.name} <span class="opacity-70">({Math.ceil(att.size / 1024)} KB)</span></a>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+              {#if data.conversation && STORED.test(m.id) && !streaming}
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs opacity-80">
+                  <!-- H-12: editing makes a sibling of this message and a fresh branch below it -->
+                  <details class="inline">
+                    <summary class="inline-flex cursor-pointer list-none items-center gap-1 hover:opacity-100" data-testid="edit"><Icon name="edit" size={12} />{t('ai.chat.edit')}</summary>
+                    <form method="POST" action="?/edit" class="mt-2 grid gap-2 text-foreground">
+                      <Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="m" value={m.id} />
+                      <textarea name="content" required rows="3" class="min-h-16 w-64 max-w-full rounded-md border border-input bg-background px-2 py-1 text-sm">{m.content}</textarea>
+                      <Button type="submit" size="sm" variant="secondary">{t('ai.chat.edit_send')}</Button>
+                    </form>
+                  </details>
+                  {@render versions(m.id)}
+                </div>
+              {/if}
+            {/if}
           </div>
         </article>
       {:else}
         <p class="py-12 text-center text-muted-foreground">{t('ai.chat.empty')}</p>
       {/each}
     </div>
-    <form method="POST" action="?/send" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="flex gap-2 border-t p-3">
+    <form method="POST" action="?/send" enctype="multipart/form-data" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="flex flex-wrap gap-2 border-t p-3">
       <Csrf token={data.csrf} />
       <input type="hidden" name="c" value={data.conversation?.id ?? ''} />
-      <textarea name="content" bind:value={draft} required rows="2" placeholder={t('ai.chat.placeholder')} class="min-h-10 flex-1 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
+      <input type="hidden" name="parent" value={leafId} />
+      <textarea name="content" bind:value={draft} required rows="2" placeholder={t('ai.chat.placeholder')} class="min-h-10 flex-1 basis-64 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
+      <!-- H-11: attachments ride in the same form; without JavaScript the action uploads them first -->
+      <label class="inline-flex h-10 cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground hover:bg-accent" title={t('ai.chat.attach_hint')}>
+        <Icon name="upload" size={14} /><span class="sr-only">{t('ai.chat.attach')}</span>
+        <input type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="max-w-40 text-xs" data-testid="attach" />
+      </label>
       {#if streaming}
         <Button type="button" variant="outline" onclick={stop}><Icon name="stop" size={16} />{t('ai.chat.stop')}</Button>
       {:else}
@@ -297,6 +369,17 @@ function copy(text: string) {
     </form>
   </section>
 </div>
+
+{#snippet versions(id: string)}
+  {@const v = versionOf(id)}
+  {#if v && v.count > 1 && data.conversation}
+    <span class="inline-flex items-center gap-1" data-testid="versions" aria-label={t('ai.chat.version', { index: v.index, count: v.count })}>
+      {#if v.prev}<a href={`/m/ai/chat?c=${data.conversation.id}&m=${v.prev}`} class="no-underline hover:text-foreground" aria-label={t('ai.chat.prev_version')}>‹</a>{:else}<span class="opacity-40">‹</span>{/if}
+      <span>{v.index}/{v.count}</span>
+      {#if v.next}<a href={`/m/ai/chat?c=${data.conversation.id}&m=${v.next}`} class="no-underline hover:text-foreground" aria-label={t('ai.chat.next_version')}>›</a>{:else}<span class="opacity-40">›</span>{/if}
+    </span>
+  {/if}
+{/snippet}
 
 <style>
   :global(.prose-chat p) { margin: 0.25rem 0; }

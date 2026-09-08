@@ -1,3 +1,4 @@
+import { type FileRow, fileUrl, findFile, readFile, storeUpload } from '@app/api/files';
 import { publicLink } from '@app/api/mail';
 import { metrics } from '@app/api/metrics';
 import { type AuthState, clientIp } from '@app/api/plugins/auth';
@@ -61,10 +62,14 @@ import {
   ProviderUpdateBody,
 } from './schemas.ts';
 
+/** OpenAI content parts: text plus images (H-11 attachments reach vision models this way). */
+type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string } };
 /** Provider-side message: OpenAI shape, including the tool round-trip (I-3). */
 interface ProviderMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | null | ContentPart[];
   tool_calls?: ToolCall[];
   tool_call_id?: string;
 }
@@ -112,12 +117,60 @@ const Conversation = t.Object({
   lastMessageAt: t.Nullable(t.String()),
   createdAt: t.String(),
 });
+const Attachment = t.Object({
+  id: t.String(),
+  fileId: t.String(),
+  name: t.String(),
+  mime: t.String(),
+  size: t.Integer(),
+  url: t.String(),
+});
 const Message = t.Object({
   id: t.String(),
   role: t.String(),
   content: t.String(),
+  /** H-12: null at a root; siblings share a parent (regenerate / edit-branch). */
+  parentId: t.Nullable(t.String()),
+  attachments: t.Array(Attachment),
   createdAt: t.String(),
 });
+/** Attachments (H-11): what a chat user may send along; a text-like file is quoted, an image is shown. */
+const ATTACHMENT_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+] as const;
+const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_TEXT_MAX = 20_000;
+const attachmentView = (r: typeof schema.aiAttachments.$inferSelect) => ({
+  id: r.id,
+  fileId: r.file_id,
+  name: r.name,
+  mime: r.mime,
+  size: r.size,
+  url: `/v1/files/${r.file_id}/content`,
+});
+/** What the model gets for the attachments: quoted text, and images as data URLs (H-11). */
+async function attachmentContent(rows: FileRow[]): Promise<{ text: string; images: string[] }> {
+  let text = '';
+  const images: string[] = [];
+  for (const row of rows) {
+    const obj = await readFile(row);
+    if (!obj) continue;
+    if (row.mime.startsWith('image/')) {
+      images.push(`data:${row.mime};base64,${Buffer.from(obj.bytes).toString('base64')}`);
+    } else {
+      const body = new TextDecoder().decode(obj.bytes);
+      text += `\n\n[Lampiran: ${row.name}]\n${body.length > ATTACHMENT_TEXT_MAX ? `${body.slice(0, ATTACHMENT_TEXT_MAX)}… [dipotong]` : body}`;
+    }
+  }
+  return { text, images };
+}
 const view = (c: Row) => ({
   id: c.id,
   title: c.title,
@@ -497,19 +550,89 @@ export default defineApiRoutes(
         }
         const model = p.model;
 
+        // Attachments (H-11): the sender's own uploads of kind ai.attachment, nothing else.
+        const attachmentRows: FileRow[] = [];
+        for (const fid of body.attachments ?? []) {
+          const row = clientId ? await findFile(clientId, fid) : null;
+          if (!row || row.user_id !== a.user.id || row.kind !== 'ai.attachment') {
+            set.status = 422;
+            return fail('validation_failed', 'Lampiran tidak dikenal', requestId, {
+              reason: 'attachment_invalid',
+              id: fid,
+            });
+          }
+          attachmentRows.push(row);
+        }
+
         // Persistence (H-6): the user's message now; the assistant's when the reply is complete.
+        // Threading (H-12): every stored message knows its parent; regenerate/edit make siblings.
         let conversationId: string | null = null;
+        let userMsgId: string | null = null;
+        const assistantMsgId = newId();
+        let assistantParent: string | null = null;
         if (conv && tenant) {
           conversationId = conv.id;
           const lastUser = [...body.messages].reverse().find((m) => m.role === 'user');
-          if (lastUser) {
+          const stored = await tenant.select(
+            schema.aiMessages,
+            eq(schema.aiMessages.conversation_id, conv.id),
+          );
+          stored.sort((x, y) => x.created_at.getTime() - y.created_at.getTime());
+          if (body.parent_id) {
+            const parent = stored.find((m) => m.id === body.parent_id);
+            if (!parent || (body.regenerate && parent.role !== 'user')) {
+              set.status = 422;
+              return fail(
+                'validation_failed',
+                'Pesan induk tidak ada di percakapan ini',
+                requestId,
+                {
+                  reason: 'parent_not_found',
+                },
+              );
+            }
+          } else if (body.regenerate) {
+            set.status = 422;
+            return fail(
+              'validation_failed',
+              'regenerate membutuhkan parent_id pesan pengguna',
+              requestId,
+              {
+                reason: 'parent_not_found',
+              },
+            );
+          }
+          if (body.regenerate) {
+            // A second answer to the same user message: no new user row.
+            assistantParent = body.parent_id ?? null;
+          } else if (lastUser) {
+            userMsgId = newId();
+            const userParent =
+              body.parent_id === undefined ? (stored.at(-1)?.id ?? null) : body.parent_id;
+            assistantParent = userMsgId;
             await tenant.insert(schema.aiMessages, {
-              id: newId(),
+              id: userMsgId,
               conversation_id: conv.id,
+              parent_id: userParent,
               role: 'user',
               content: lastUser.content,
               tokens_in: estimateTokens(lastUser.content),
             });
+            if (attachmentRows.length)
+              await tenant.insert(
+                schema.aiAttachments,
+                attachmentRows.map((r) => ({
+                  id: newId(),
+                  message_id: userMsgId as string,
+                  conversation_id: conv.id,
+                  file_id: r.id,
+                  name: r.name,
+                  mime: r.mime,
+                  size: r.size,
+                })),
+              );
+          }
+          if (lastUser) {
             const patch: Partial<typeof schema.aiConversations.$inferInsert> = {
               last_message_at: new Date(),
               model,
@@ -543,6 +666,19 @@ export default defineApiRoutes(
           role: m.role,
           content: m.content,
         }));
+        if (attachmentRows.length) {
+          const { text, images } = await attachmentContent(attachmentRows);
+          const last = [...convo].reverse().find((m) => m.role === 'user');
+          if (last) {
+            const base = `${typeof last.content === 'string' ? last.content : ''}${text}`;
+            last.content = images.length
+              ? [
+                  { type: 'text', text: base },
+                  ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+                ]
+              : base;
+          }
+        }
         const traces: ToolTrace[] = [];
 
         const started = performance.now();
@@ -662,8 +798,9 @@ export default defineApiRoutes(
           if (!(conversationId && tenant && assistant)) return;
           await tenant
             .insert(schema.aiMessages, {
-              id: newId(),
+              id: assistantMsgId,
               conversation_id: conversationId,
+              parent_id: assistantParent,
               role: 'assistant',
               content: assistant,
               tokens_out: tokensOut,
@@ -710,7 +847,19 @@ export default defineApiRoutes(
             transcript += content;
             // Awaited on purpose: the no-JS page reloads the conversation right after this reply.
             await persist(transcript, json.usage?.completion_tokens ?? estimateTokens(transcript));
-            return { ...json, x_tools: traces } as unknown as Record<string, unknown>;
+            return {
+              ...json,
+              x_tools: traces,
+              // H-12: the stored ids, so a client can regenerate / branch from them.
+              ...(conversationId
+                ? {
+                    x_messages: {
+                      user: userMsgId ?? body.parent_id ?? null,
+                      assistant: assistantMsgId,
+                    },
+                  }
+                : {}),
+            } as unknown as Record<string, unknown>;
           }
           // unreachable: the last round is issued without tools
           set.status = 502;
@@ -847,6 +996,16 @@ export default defineApiRoutes(
                   );
                   continue;
                 }
+                if (conversationId)
+                  frame({
+                    choices: [{ index: 0, delta: {} }],
+                    dab: {
+                      messages: {
+                        user: userMsgId ?? body.parent_id ?? null,
+                        assistant: assistantMsgId,
+                      },
+                    },
+                  });
                 raw('data: [DONE]');
                 return;
               }
@@ -889,6 +1048,60 @@ export default defineApiRoutes(
         detail: {
           summary:
             'OpenAI-compatible chat completions proxied to the configured provider; stream: true streams SSE (H-2, H-3)',
+        },
+      },
+    )
+
+    // ---- attachments (H-11): upload first, then name the ids in chat/completions ----
+    .post(
+      '/attachments',
+      async ({ auth, body, set, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const clientId = tenantState?.clientId ?? null;
+        if (!clientId) {
+          set.status = 409;
+          return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        const r = await storeUpload({
+          clientId,
+          userId: a.user.id,
+          file: body.file,
+          kind: 'ai.attachment',
+          visibility: 'private',
+          allowedTypes: ATTACHMENT_TYPES,
+          maxBytes: ATTACHMENT_MAX_BYTES,
+        });
+        if (!r.ok) {
+          set.status = r.code === 'too_large' ? 413 : 422;
+          return fail('validation_failed', r.message, requestId, { reason: r.code });
+        }
+        set.status = 201;
+        return ok({
+          id: r.row.id,
+          name: r.row.name,
+          mime: r.row.mime,
+          size: r.row.size,
+          url: fileUrl(r.row),
+        });
+      },
+      {
+        beforeHandle: permission('ai.chat.create'),
+        body: t.Object({ file: t.File() }),
+        response: {
+          201: OkSchema(
+            t.Object({
+              id: t.String(),
+              name: t.String(),
+              mime: t.String(),
+              size: t.Integer(),
+              url: t.String(),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'Upload a chat attachment (images, text, csv, json, markdown; 5 MB) owned by me; private (H-11)',
         },
       },
     )
@@ -994,20 +1207,42 @@ export default defineApiRoutes(
           set.status = 404;
           return fail('not_found', 'Percakapan tidak ditemukan', requestId);
         }
-        const msgs = await tenantState.tenant.select(
-          schema.aiMessages,
-          eq(schema.aiMessages.conversation_id, conv.id),
+        const msgs = (
+          await tenantState.tenant.select(
+            schema.aiMessages,
+            eq(schema.aiMessages.conversation_id, conv.id),
+          )
+        ).sort((x, y) => x.created_at.getTime() - y.created_at.getTime());
+        // Pre-threading rows (H-12) have no parents: link them once, in order, so the tree invariant
+        // (every assistant reply has a parent) holds for every conversation from here on.
+        if (msgs.some((m) => m.role === 'assistant' && !m.parent_id)) {
+          let prev: string | null = null;
+          for (const m of msgs) {
+            if (!m.parent_id && prev) {
+              await tenantState.tenant.update(
+                schema.aiMessages,
+                { parent_id: prev },
+                eq(schema.aiMessages.id, m.id),
+              );
+              m.parent_id = prev;
+            }
+            prev = m.id;
+          }
+        }
+        const atts = await tenantState.tenant.select(
+          schema.aiAttachments,
+          eq(schema.aiAttachments.conversation_id, conv.id),
         );
         return ok({
           ...view(conv),
-          messages: msgs
-            .sort((x, y) => x.created_at.getTime() - y.created_at.getTime())
-            .map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.created_at.toISOString(),
-            })),
+          messages: msgs.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            parentId: m.parent_id,
+            attachments: atts.filter((x) => x.message_id === m.id).map(attachmentView),
+            createdAt: m.created_at.toISOString(),
+          })),
         });
       },
       {

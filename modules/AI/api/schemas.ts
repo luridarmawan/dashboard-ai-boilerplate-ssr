@@ -29,6 +29,16 @@ export const ChatCompletionBody = t.Object({
    * extra `system` message AFTER the tenant's system prompt, never persisted into the conversation.
    */
   context: t.Optional(t.String({ maxLength: 4000 })),
+  /**
+   * Our extension (H-12): where the new user message hangs in the conversation tree. Omit = after
+   * the latest message; `null` = a new root (editing the first message); an id = under that message
+   * (edit → branch). Ignored without `conversation_id`.
+   */
+  parent_id: t.Optional(t.Nullable(t.String({ maxLength: 36 }))),
+  /** Our extension (H-12): answer the user message `parent_id` again — no new user row, a sibling reply. */
+  regenerate: t.Optional(t.Boolean()),
+  /** Our extension (H-11): ids from `POST /m/ai/attachments`, attached to the user message (max 5). */
+  attachments: t.Optional(t.Array(t.String({ maxLength: 36 }), { maxItems: 5 })),
 });
 /** External MCP server registration (I-4, I-5). `headers` values are secrets: never echoed back. */
 export const McpBody = t.Object({

@@ -114,5 +114,15 @@
   "ai.float.open_full": "Buka percakapan penuh",
   "ai.float.close": "Tutup",
   "ai.float.new": "Mulai baru",
-  "ai.float.empty": "Asisten tahu halaman mana yang sedang Anda buka. Tanyakan apa saja."
+  "ai.float.empty": "Asisten tahu halaman mana yang sedang Anda buka. Tanyakan apa saja.",
+  "ai.chat.regenerate": "Buat ulang",
+  "ai.chat.edit": "Ubah",
+  "ai.chat.edit_send": "Kirim sebagai cabang baru",
+  "ai.chat.cancel": "Batal",
+  "ai.chat.version": "Versi {index} dari {count}",
+  "ai.chat.prev_version": "Versi sebelumnya",
+  "ai.chat.next_version": "Versi berikutnya",
+  "ai.chat.attach": "Lampirkan berkas",
+  "ai.chat.attach_hint": "Gambar, teks, CSV, JSON, Markdown — maks. 5 berkas @ 5 MB",
+  "ai.chat.attachments": "Lampiran"
 }
