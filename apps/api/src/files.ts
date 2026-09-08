@@ -149,6 +149,32 @@ export async function findFile(clientId: string, id: string): Promise<FileRow | 
   return row ?? null;
 }
 
+/**
+ * Avatars belong to a USER, who may work in several tenants, so a public `avatar` file is readable
+ * from any tenant context. Only kind `avatar` + public rows qualify; everything else stays tenant-bound.
+ */
+export async function findAvatarFile(id: string): Promise<FileRow | null> {
+  const [row] = await unsafeAcrossTenants()
+    .select()
+    .from(schema.files)
+    .where(
+      and(
+        eq(schema.files.id, id),
+        eq(schema.files.kind, 'avatar'),
+        eq(schema.files.visibility, 'public'),
+        isNull(schema.files.deleted_at),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+/** The file id behind a `/v1/files/<id>/content` URL we issued ourselves; null for external URLs. */
+export function fileIdFromUrl(url: string | null | undefined): string | null {
+  const m = /^\/v1\/files\/([0-9a-f-]{36})\/content$/i.exec(url ?? '');
+  return m?.[1] ?? null;
+}
+
 /** The bytes + content type of a file, from whichever adapter stored it. */
 export async function readFile(row: FileRow) {
   return storage().get(row.key);

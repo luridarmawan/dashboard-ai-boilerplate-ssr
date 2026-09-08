@@ -50,6 +50,29 @@ export const actions: Actions = {
     if (!r.ok) return actionFailure(r.failure, input);
     return { saved: 'profile' as const };
   },
+  /** Avatar upload (Q-16): multipart `avatar` → PUT /v1/users/profile/avatar; the session user refreshes on next load. */
+  avatar: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const file = form.get('avatar');
+    if (!(file instanceof File) || file.size === 0)
+      return actionFailure({
+        status: 422,
+        code: 'validation_failed',
+        message: 'Pilih berkas gambar dulu',
+        details: { avatar: 'Pilih berkas gambar dulu' },
+      });
+    const r = unwrap(await apiFor(event).v1.users.profile.avatar.put({ file }));
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'avatar' as const };
+  },
+  avatarRemove: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap(await apiFor(event).v1.users.profile.avatar.delete());
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'avatar' as const };
+  },
   password: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail();

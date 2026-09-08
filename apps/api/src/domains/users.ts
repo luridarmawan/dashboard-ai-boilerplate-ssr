@@ -36,12 +36,16 @@ import {
   unsafeAcrossTenants,
 } from '@core/db';
 import { Elysia, t } from 'elysia';
+import { fileIdFromUrl, findAvatarFile, removeFile, storeUpload } from '../files.ts';
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
 import { publicLink, sendTemplate } from '../mail.ts';
 import { type AuthState, clientIp, publicUser } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
 import { emit } from '../services.ts';
+
+/** Avatars are small by construction: 2 MB caps even a generous PNG. */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * Users inside the ACTIVE tenant (PRD D-1) and the caller's own profile (D-4).
@@ -218,6 +222,106 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       body: ProfileBody,
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
       detail: { summary: 'Edit my profile: name, locale, theme, avatar (D-4)' },
+    },
+  )
+  // ---- avatar (Q-16): uploaded through the file service, public, user-global -----------------
+  .put(
+    '/profile/avatar',
+    async ({ auth, body, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const clientId = tenantState?.clientId ?? null;
+      if (!clientId) {
+        set.status = 409;
+        return fail('conflict', 'Tidak ada tenant aktif', requestId);
+      }
+      const r = await storeUpload({
+        clientId,
+        userId: a.user.id,
+        file: body.file,
+        kind: 'avatar',
+        visibility: 'public',
+        // Avatars: images only, small — independent of the tenant's general upload allowlist.
+        allowedTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
+        maxBytes: AVATAR_MAX_BYTES,
+      });
+      if (!r.ok) {
+        set.status = r.code === 'too_large' ? 413 : 422;
+        return fail('validation_failed', r.message, requestId, { reason: r.code, file: r.message });
+      }
+      const db = unsafeAcrossTenants(); // users is a global table
+      const previous = fileIdFromUrl(a.user.avatar_url);
+      const url = `/v1/files/${r.row.id}/content`;
+      await db.update(schema.users).set({ avatar_url: url }).where(eq(schema.users.id, a.user.id));
+      // The old uploaded avatar goes with it; an external URL is simply replaced.
+      if (previous) {
+        const old = await findAvatarFile(previous);
+        if (old && old.user_id === a.user.id) await removeFile(old);
+      }
+      await writeAudit(db, {
+        clientId,
+        actorId: a.user.id,
+        action: 'user.avatar_edit',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+        before: { avatarUrl: a.user.avatar_url },
+        after: { avatarUrl: url },
+      });
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, a.user.id));
+      return ok({ user: publicUser(after as typeof a.user) });
+    },
+    {
+      beforeHandle: ({ auth, set, requestId }) => {
+        if (auth) return;
+        set.status = 401;
+        return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
+      },
+      body: t.Object({ file: t.File() }),
+      response: {
+        200: OkSchema(t.Object({ user: PublicUser })),
+        ...errorResponses,
+        413: errorResponses[422],
+      },
+      detail: {
+        summary:
+          'Upload my avatar (multipart `file`, PNG/JPEG/WebP/GIF ≤ 2 MB); replaces the previous one',
+      },
+    },
+  )
+  .delete(
+    '/profile/avatar',
+    async ({ auth, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const previous = fileIdFromUrl(a.user.avatar_url);
+      await db.update(schema.users).set({ avatar_url: null }).where(eq(schema.users.id, a.user.id));
+      if (previous) {
+        const old = await findAvatarFile(previous);
+        if (old && old.user_id === a.user.id) await removeFile(old);
+      }
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.avatar_edit',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+        before: { avatarUrl: a.user.avatar_url },
+        after: { avatarUrl: null },
+      });
+      const [after] = await db.select().from(schema.users).where(eq(schema.users.id, a.user.id));
+      return ok({ user: publicUser(after as typeof a.user) });
+    },
+    {
+      beforeHandle: ({ auth, set, requestId }) => {
+        if (auth) return;
+        set.status = 401;
+        return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
+      },
+      response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
+      detail: { summary: 'Remove my avatar (the uploaded file is deleted too)' },
     },
   )
   .put(

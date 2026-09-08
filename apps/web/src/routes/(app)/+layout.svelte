@@ -73,7 +73,7 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
   <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('shell.theme_link')}><Icon name="palette" size={18} /></a>
   <a href={`/lang?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('nav.language')}><Icon name="language" size={18} /></a>
   <a href="/profile" class="hidden items-center gap-2 rounded-md px-2 py-1 text-sm no-underline hover:bg-accent hover:no-underline sm:flex">
-    <Icon name="user" size={18} /><span>{data.user.name}</span>
+    {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}<span>{data.user.name}</span>
   </a>
   <form method="POST" action="/auth/logout">
     <Csrf token={data.csrf} />

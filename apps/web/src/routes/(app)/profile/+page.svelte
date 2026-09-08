@@ -26,8 +26,22 @@ const profileFields: FieldDef[] = $derived([
     options: data.themes.map((t) => ({ value: t.id, label: t.name })),
     hint: 'Pratinjau dan mode terang/gelap ada di Tema & tampilan.',
   },
-  { name: 'avatarUrl', type: 'string', label: 'URL avatar', maxlength: 512 },
+  {
+    name: 'avatarUrl',
+    type: 'string',
+    label: 'URL avatar (opsional)',
+    maxlength: 512,
+    hint: 'Diisi otomatis saat Anda mengunggah foto di bawah; boleh juga URL gambar eksternal.',
+  },
 ]);
+const initials = $derived(
+  data.user.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0]?.toUpperCase() ?? '')
+    .join('') || '?',
+);
 const passwordFields: FieldDef[] = [
   {
     name: 'currentPassword',
@@ -92,6 +106,26 @@ const apiError = $derived(form?.error && Object.keys(fieldErrors).length === 0 ?
 
 <div class="page">
   <h1>Profil saya</h1>
+  <Card title="Foto profil" description="PNG, JPEG, WebP, atau GIF hingga 2 MB; tampil di header di semua tenant Anda.">
+    <div class="flex flex-wrap items-center gap-4" data-testid="avatar-card">
+      {#if data.user.avatarUrl}
+        <img src={data.user.avatarUrl} alt="" class="h-16 w-16 rounded-full border object-cover" />
+      {:else}
+        <span class="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground">{initials}</span>
+      {/if}
+      <form method="POST" action="?/avatar" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+        <Csrf token={data.csrf} />
+        <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required class="text-sm" />
+        <Button type="submit" size="sm"><Icon name="upload" size={14} />Unggah</Button>
+      </form>
+      {#if data.user.avatarUrl}
+        <form method="POST" action="?/avatarRemove"><Csrf token={data.csrf} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />Hapus foto</Button></form>
+      {/if}
+    </div>
+    {#if form?.saved === 'avatar'}<p class="notice mt-3">Foto profil diperbarui.</p>{/if}
+    {#if form?.saved === undefined && fieldErrors.avatar}<p class="error mt-3" role="alert">{fieldErrors.avatar}</p>{/if}
+    {#if form?.saved === undefined && fieldErrors.file}<p class="error mt-3" role="alert">{fieldErrors.file}</p>{/if}
+  </Card>
   <Card title="Data diri & preferensi" description={data.user.email}>
     <FormBuilder
       fields={profileFields}

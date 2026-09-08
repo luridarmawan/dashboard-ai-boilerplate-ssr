@@ -3,7 +3,15 @@ import { errorResponses, fail, Id, OkSchema, ok } from '@core/contracts';
 import { and, eq, isNull, schema, unsafeAcrossTenants } from '@core/db';
 import { INLINE_SAFE } from '@core/storage';
 import { Elysia, t } from 'elysia';
-import { fileUrl, findFile, readFile, removeFile, storeUpload, uploadLimits } from '../files.ts';
+import {
+  fileUrl,
+  findAvatarFile,
+  findFile,
+  readFile,
+  removeFile,
+  storeUpload,
+  uploadLimits,
+} from '../files.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
@@ -156,7 +164,9 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
     '/:id',
     async ({ auth, params, set, requestId, tenantState }) => {
       const clientId = tenantState?.clientId ?? null;
-      const row = clientId ? await findFile(clientId, params.id) : null;
+      const row =
+        (clientId ? await findFile(clientId, params.id) : null) ??
+        (await findAvatarFile(params.id));
       if (!row || !canRead(row, auth as AuthState | null, tenantState)) {
         set.status = 404;
         return fail('not_found', 'Berkas tidak ditemukan', requestId);
@@ -173,7 +183,11 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
     '/:id/content',
     async ({ auth, params, set, requestId, tenantState }) => {
       const clientId = tenantState?.clientId ?? null;
-      const row = clientId ? await findFile(clientId, params.id) : null;
+      // Avatars are user-global (a user works in several tenants): public `avatar` files resolve
+      // from any tenant context, or none.
+      const row =
+        (clientId ? await findFile(clientId, params.id) : null) ??
+        (await findAvatarFile(params.id));
       if (!row || !canRead(row, auth as AuthState | null, tenantState)) {
         set.status = 404;
         return fail('not_found', 'Berkas tidak ditemukan', requestId);
