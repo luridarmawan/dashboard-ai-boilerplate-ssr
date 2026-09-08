@@ -1,5 +1,6 @@
 <script lang="ts">
 import { LOCALES } from '@core/i18n';
+import { dropdown } from '$lib/actions/dropdown';
 import { useT } from '$lib/i18n';
 import Csrf from './Csrf.svelte';
 import Flag from './Flag.svelte';
@@ -22,7 +23,7 @@ const t = useT();
 const name = (l: string) => (l === 'id' ? t('lang.id') : l === 'en' ? t('lang.en') : l);
 </script>
 
-<details class={`group relative ${className}`} data-testid="language-picker">
+<details class={`group relative ${className}`} data-testid="language-picker" use:dropdown>
   <summary class="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent" aria-label={`${t('nav.language')}: ${name(current)}`} title={name(current)}>
     <Flag locale={current} />
     {#if !compact}<span>{name(current)}</span>{/if}

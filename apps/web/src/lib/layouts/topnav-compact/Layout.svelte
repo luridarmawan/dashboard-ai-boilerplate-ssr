@@ -1,4 +1,5 @@
 <script lang="ts">
+import { dropdown } from '$lib/actions/dropdown';
 import Icon from '$lib/components/Icon.svelte';
 import type { DashboardRegions } from '$lib/layouts/types';
 
@@ -12,7 +13,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
       {@render brand()}
       <nav class="hidden md:block" aria-label="Navigasi utama">{@render nav({ orientation: 'horizontal' })}</nav>
       <div class="ms-auto flex items-center gap-2">{@render header()}</div>
-      <details class="relative md:hidden">
+      <details class="relative md:hidden" use:dropdown>
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>

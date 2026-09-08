@@ -1,4 +1,6 @@
 <script lang="ts">
+import { afterNavigate } from '$app/navigation';
+import { closeAllDropdowns, dropdown } from '$lib/actions/dropdown';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import LanguagePicker from '$lib/components/LanguagePicker.svelte';
@@ -16,6 +18,9 @@ let { data, children }: { data: LayoutData; children: import('svelte').Snippet }
 const Layout = $derived(data.Layout);
 const t = useT();
 const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
+// Client-side navigation keeps the DOM: a top-nav group or the language dropdown left open would
+// stay open over the new page. Without JavaScript every navigation is a full load and this never runs.
+afterNavigate(() => closeAllDropdowns());
 /** What a shell widget (H-13) learns about the page it floats over — nothing it could not see itself. */
 const shellContext = $derived({
   locale: data.locale,
@@ -69,7 +74,14 @@ const shellContext = $derived({
     {#each data.menu as item (item.id)}
       <li>
         {#if item.kind === 'group'}
-          <details open={item.active} class="group relative" data-testid={`nav-${item.id}`}>
+          <!-- vertical: a tree, open when it holds the current page; horizontal: a popover, never
+               left open by the server — the active group is marked on its summary instead -->
+          <details
+            open={orientation === 'vertical' && item.active}
+            class="group relative"
+            data-testid={`nav-${item.id}`}
+            use:dropdown={orientation === 'horizontal'}
+          >
             <summary
               aria-current={item.active && orientation === 'horizontal' ? 'page' : undefined}
               class="flex cursor-pointer list-none items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-accent hover:text-accent-foreground aria-[current=page]:font-medium"

@@ -1,4 +1,5 @@
 <script lang="ts">
+import { dropdown } from '$lib/actions/dropdown';
 import Icon from '$lib/components/Icon.svelte';
 import type { DashboardRegions } from '$lib/layouts/types';
 
@@ -14,7 +15,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
 
   <div class="flex min-w-0 flex-col">
     <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
-      <details class="relative md:hidden">
+      <details class="relative md:hidden" use:dropdown>
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>

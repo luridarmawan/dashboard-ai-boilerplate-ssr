@@ -1,4 +1,5 @@
 <script lang="ts">
+import { dropdown } from '$lib/actions/dropdown';
 import Icon from '$lib/components/Icon.svelte';
 import type { PublicRegions } from '$lib/layouts/types';
 
@@ -11,7 +12,7 @@ let { brand, nav, content, footer }: PublicRegions = $props();
     <div class="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
       {@render brand()}
       <nav class="ms-auto hidden md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
-      <details class="relative ms-auto md:hidden">
+      <details class="relative ms-auto md:hidden" use:dropdown>
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>
