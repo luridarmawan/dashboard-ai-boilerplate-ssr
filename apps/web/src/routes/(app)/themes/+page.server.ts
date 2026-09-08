@@ -1,5 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import { previewsFor } from './_editor.server.ts';
+import { valuesOf } from './_editor.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Custom themes of the active tenant (or global with ?scope=global, superadmin) — PRD L-24. */
@@ -15,10 +17,13 @@ export const load: PageServerLoad = async (event) => {
       res.status,
       res.status === 403 ? 'Anda tidak punya izin mengelola tema' : 'Tema tidak bisa dimuat',
     );
+  const previews: Record<string, { light: string; dark: string }> = {};
+  for (const t of res.data.data.themes) previews[t.id] = previewsFor(valuesOf(t));
   return {
     scope,
     canGlobal: !!event.locals.session?.user.isSuperadmin,
     themes: res.data.data.themes,
+    previews,
     bases: res.data.data.bases,
     defaultTheme: String(event.locals.config.values['app.default_theme'] ?? 'base'),
     saved: event.url.searchParams.get('saved'),

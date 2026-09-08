@@ -151,6 +151,41 @@ export function checkContrast(tokens: ThemeTokens): ContrastProblem[] {
   return problems;
 }
 
+export interface ContrastRow {
+  readonly mode: 'light' | 'dark';
+  readonly fg: string;
+  readonly bg: string;
+  readonly ratio: number | null;
+  readonly minimum: number;
+  readonly ok: boolean;
+}
+
+/** Every pair in both modes with its ratio — what the editor shows, pass or fail (L-21). */
+export function contrastReport(tokens: ThemeTokens): ContrastRow[] {
+  const rows: ContrastRow[] = [];
+  const modes: [ContrastRow['mode'], TokenMap][] = [
+    ['light', tokens.light],
+    ['dark', { ...tokens.light, ...tokens.dark }],
+  ];
+  for (const [mode, map] of modes) {
+    for (const [fg, bg, minimum] of CONTRAST_PAIRS) {
+      const fgv = map[fg];
+      const bgv = map[bg];
+      const ratio = isHexColor(fgv) && isHexColor(bgv) ? contrastRatio(fgv, bgv) : null;
+      rows.push({ mode, fg, bg, ratio, minimum, ok: ratio !== null && ratio >= minimum });
+    }
+  }
+  return rows;
+}
+
+/** Inline `--token: value;` declarations for a preview wrapper (values sanitised). */
+export function tokensToInlineStyle(map: TokenMap): string {
+  return Object.entries(map)
+    .filter(([name]) => ALL_TOKENS.includes(name))
+    .map(([name, value]) => `--${name}: ${sanitizeValue(value)}`)
+    .join('; ');
+}
+
 /** Read a `tokens.css` (same rules as validate.mjs): first block = light, `data-mode="dark"` = dark. */
 export function parseTokensCss(css: string): ThemeTokens {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');

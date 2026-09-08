@@ -25,7 +25,21 @@ export const load: PageServerLoad = async (event) => {
     })),
   );
   if (!values) error(404, `Tema dasar "${base}" tidak ditemukan`);
-  return { scope, vocab: vocab.data.data, values, previews: previewsFor(values) };
+  const custom = vocab.data.data.themes.map((t) => ({
+    code: t.code,
+    tokens: t.tokens,
+    icons: t.icons,
+    layouts: t.layouts,
+  }));
+  // Every starting point as a card: file themes and this scope's custom themes.
+  const baseCards = [
+    ...vocab.data.data.bases.map((b) => ({ id: b.id, name: b.name.id })),
+    ...vocab.data.data.themes.map((t) => ({ id: t.code, name: t.name.id })),
+  ].map((b) => {
+    const seed = seedFromBase(b.id, custom);
+    return { ...b, preview: seed ? previewsFor(seed).light : '' };
+  });
+  return { scope, vocab: vocab.data.data, values, previews: previewsFor(values), baseCards };
 };
 
 export const actions: Actions = {

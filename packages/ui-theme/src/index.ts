@@ -16,6 +16,7 @@ export {
   type ThemeTokens,
   type TokenMap,
   tokensToCss,
+  tokensToInlineStyle,
 } from './custom.ts';
 export {
   CORE_ICONS,
