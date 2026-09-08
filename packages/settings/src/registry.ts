@@ -226,6 +226,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
           'image/gif',
           'image/webp',
           'image/svg+xml',
+          'image/x-icon',
           'application/pdf',
           'text/plain',
           'text/csv',

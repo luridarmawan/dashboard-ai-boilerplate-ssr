@@ -1,8 +1,8 @@
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
+import { attachAssets } from '../_assets.server.ts';
 import { previewsFor } from '../_editor.server.ts';
 import { readEditorForm, toApiBody, valuesOf } from '../_editor.ts';
-import { attachLogo } from '../_logo.server.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Edit / delete a custom theme (L-24). Saving re-validates the full contract on the API. */
@@ -40,14 +40,14 @@ export const actions: Actions = {
     const id = String(event.params.id ?? '');
     const values = readEditorForm(form);
     if (!checkCsrf(event, form)) return csrfFail({ values });
-    const logoError = await attachLogo(event, form, values);
-    if (logoError)
+    const assetErrors = await attachAssets(event, form, values);
+    if (Object.keys(assetErrors).length)
       return actionFailure(
         {
           status: 422,
           code: 'validation_failed',
-          message: logoError,
-          details: { logo: logoError },
+          message: Object.values(assetErrors).join('; '),
+          details: assetErrors,
         },
         { values, previews: previewsFor(values) },
       );

@@ -131,6 +131,12 @@ export interface WidgetDef {
   readonly order?: number;
   /** Grid span: sm = 1 column, md = 2, lg = full row. */
   readonly size?: 'sm' | 'md' | 'lg';
+  /**
+   * Optional API path (`/v1/...`, query string allowed) the dashboard fetches SERVER-SIDE as the
+   * signed-in user before rendering; its `data` payload reaches the component as the `data` prop.
+   * RBAC and tenancy are the API's — a widget cannot see more than its user can.
+   */
+  readonly data?: string;
 }
 
 /** Declare the dashboard widgets a module contributes (extension point 11). */
@@ -161,6 +167,11 @@ export function defineWidgets(
           `widget "${w.id}" memakai izin milik modul lain: "${w.permission}"`,
         );
       }
+    }
+    if (w.data !== undefined && !/^\/v1\/[A-Za-z0-9/_.:?&=%-]+$/.test(w.data)) {
+      throw new ModuleContractError(
+        `widget "${w.id}": data harus path API di bawah /v1/, mis. /v1/m/${ns}/summary`,
+      );
     }
   }
   return list;

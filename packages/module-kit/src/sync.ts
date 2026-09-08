@@ -1373,6 +1373,8 @@ export interface WidgetEntry {
   readonly permission?: string;
   readonly order?: number;
   readonly size?: 'sm' | 'md' | 'lg';
+  /** API path fetched server-side by the dashboard; its payload becomes the component's data prop. */
+  readonly data?: string;
   readonly module: string;
   readonly load: () => Promise<{ default: Component<Record<string, unknown>> }>;
 }

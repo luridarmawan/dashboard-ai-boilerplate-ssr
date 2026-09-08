@@ -17,7 +17,7 @@ export interface StoreUploadInput {
   readonly userId: string | null;
   readonly file: File | Blob;
   readonly name?: string;
-  /** `generic` | `theme-logo` | `avatar` | `<ns>.<purpose>` — filters and per-kind rules. */
+  /** `generic` | `theme-logo` | `theme-favicon` | `avatar` | `<ns>.<purpose>` — filters and per-kind rules. */
   readonly kind?: string;
   readonly visibility?: 'public' | 'private';
   readonly meta?: Record<string, unknown> | null;
@@ -55,6 +55,7 @@ export async function uploadLimits(clientId: string | null) {
     'image/gif',
     'image/webp',
     'image/svg+xml',
+    'image/x-icon',
     'application/pdf',
     'text/plain',
     'text/csv',

@@ -1,8 +1,8 @@
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
+import { attachAssets } from '../_assets.server.ts';
 import { previewsFor, seedFromBase } from '../_editor.server.ts';
 import { readEditorForm, toApiBody } from '../_editor.ts';
-import { attachLogo } from '../_logo.server.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 /** New custom theme: seeded from a registered theme (`?base=`), assembled, validated by the API (L-24). */
@@ -58,14 +58,14 @@ export const actions: Actions = {
         },
         { values },
       );
-    const logoError = await attachLogo(event, form, values);
-    if (logoError)
+    const assetErrors = await attachAssets(event, form, values);
+    if (Object.keys(assetErrors).length)
       return actionFailure(
         {
           status: 422,
           code: 'validation_failed',
-          message: logoError,
-          details: { logo: logoError },
+          message: Object.values(assetErrors).join('; '),
+          details: assetErrors,
         },
         { values, previews: previewsFor(values) },
       );

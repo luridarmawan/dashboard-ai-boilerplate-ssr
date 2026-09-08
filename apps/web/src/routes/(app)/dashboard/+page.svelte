@@ -32,7 +32,7 @@ const context = $derived({
     {#each data.widgets as w (w.id)}
       <Card title={w.title} description={w.module} class={span(w.size)}>
         {#if w.Component}
-          <w.Component {context} />
+          <w.Component {context} data={w.data} />
         {/if}
       </Card>
     {:else}

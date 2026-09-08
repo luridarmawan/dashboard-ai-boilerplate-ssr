@@ -40,6 +40,8 @@ export function seedFromBase(
       enabled: true,
       logoId: '',
       logoUrl: null,
+      faviconId: '',
+      faviconUrl: null,
     };
   }
   const manifest = themeById(baseId);
@@ -63,6 +65,8 @@ export function seedFromBase(
     enabled: true,
     logoId: '',
     logoUrl: null,
+    faviconId: '',
+    faviconUrl: null,
   };
 }
 

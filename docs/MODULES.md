@@ -304,7 +304,9 @@ export default defineWidgets('Billing', [
 <p class="text-3xl font-semibold">…</p>
 ```
 
-Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core. Widget **tidak mengambil data saat SSR**; angka yang butuh API diambil halaman modul sendiri (hook data widget menyusul).
+Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core.
+
+**Widget berdata:** tambahkan `data: '/v1/m/billing/summary'` (path API di bawah `/v1/`, boleh dengan query string). Dasbor mengambilnya **di server** sebagai pengguna yang sedang login sebelum merender, lalu menyerahkan `data` dari envelope-nya sebagai prop `data` komponen (`null` bila API menolak atau gagal). Widget tidak pernah mengambil data sendiri, dan tidak bisa melihat lebih dari yang boleh dilihat penggunanya — RBAC dan tenancy tetap milik API. Contoh hidup: `modules/AI/widgets.ts` → `ai.usage` memakai `/v1/m/ai/analytics?days=30` dan `web/widgets/Usage.svelte` menerima `{ context, data }`.
 
 ### `themes/<id>/`, `layouts.ts`, `icons.ts` — tema, layout, set ikon (titik perluasan 14–16)
 

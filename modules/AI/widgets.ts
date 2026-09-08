@@ -9,4 +9,14 @@ export default defineWidgets('AI', [
     order: 90,
     size: 'sm',
   },
+  {
+    id: 'ai.usage',
+    title: { id: 'Penggunaan AI (30 hari)', en: 'AI usage (30 days)' },
+    component: 'web/widgets/Usage.svelte',
+    permission: 'ai.log.read',
+    order: 95,
+    size: 'sm',
+    // Fetched server-side per user (H-15): the dashboard passes the analytics payload as `data`.
+    data: '/v1/m/ai/analytics?days=30',
+  },
 ]);

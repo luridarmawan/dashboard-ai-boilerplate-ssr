@@ -1,5 +1,6 @@
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { api } from '$lib/api/client';
 import { hasPermission } from '$lib/permissions';
 
@@ -112,6 +113,43 @@ export function apiFor(event: RequestEvent, clientId?: string | null) {
     // The API rate-limits per client IP (A-2); without this every browser would share the web server's IP.
     clientIp: ip,
   });
+}
+
+/**
+ * Plain fetch to an API path (`/v1/...`) with the same identity headers as `apiFor` — for paths
+ * only known at runtime (widget `data` hooks). Returns the envelope's `data`, or null on any failure.
+ */
+export async function apiFetchData<T = unknown>(
+  event: RequestEvent,
+  path: string,
+  clientId?: string | null,
+): Promise<T | null> {
+  if (!path.startsWith('/v1/')) return null;
+  const headers: Record<string, string> = {
+    'x-request-id': event.locals.requestId,
+    accept: 'application/json',
+  };
+  const cookie = cookieHeader(event.cookies);
+  if (cookie) headers.cookie = cookie;
+  const csrf = event.cookies.get(CSRF_COOKIE);
+  if (csrf) headers['x-csrf-token'] = csrf;
+  headers.origin = event.url.origin;
+  headers['x-forwarded-proto'] = event.url.protocol.replace(':', '');
+  headers['x-forwarded-host'] = event.url.host;
+  if (clientId) headers['x-client-id'] = clientId;
+  try {
+    headers['x-forwarded-for'] = event.getClientAddress();
+  } catch {
+    /* not available (prerender) */
+  }
+  try {
+    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, { headers });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { success?: boolean; data?: T };
+    return body.success ? (body.data ?? null) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Copy `Set-Cookie` from an API response onto the browser (session issued / cleared). */

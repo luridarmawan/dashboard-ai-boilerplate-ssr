@@ -155,6 +155,17 @@ const envSchema = z
           });
       }
     }
+    // Only the cache has a Redis adapter today (ROADMAP §8 item 7 is conditional on database
+    // pressure). Refuse the other two loudly rather than silently falling back to the database.
+    for (const key of ['SESSION_DRIVER', 'RATELIMIT_DRIVER'] as const) {
+      if (env[key] === 'redis')
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message:
+            'adapter redis untuk sesi/rate limit belum tersedia (ROADMAP §8 butir 7) — pakai `database`; CACHE_DRIVER=redis yang didukung',
+        });
+    }
     for (const key of drivers) {
       // Anti-pattern D1 must not be bypassed through configuration (Decision M, rule 2).
       if (env.NODE_ENV === 'production' && env[key] === 'memory') {

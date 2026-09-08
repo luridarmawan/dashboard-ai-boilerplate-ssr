@@ -171,6 +171,23 @@ const kindLabel: Record<string, string> = {
           </div>
           {#if errors.logo}<span class="text-xs text-destructive">{errors.logo}</span>{/if}
         </div>
+        <div class="grid gap-2 rounded-md border p-3 text-sm sm:col-span-2" data-testid="theme-favicon">
+          <div class="flex flex-wrap items-center gap-3">
+            {#if values.faviconUrl}
+              <img src={values.faviconUrl} alt="Favicon tema" class="h-8 w-8 rounded bg-background object-contain p-0.5" />
+            {:else}
+              <span class="flex h-8 w-8 items-center justify-center rounded bg-muted text-muted-foreground"><Icon name="star" size={14} /></span>
+            {/if}
+            <label class="grid flex-1 gap-1">
+              <span class="font-medium">Favicon (opsional)</span>
+              <input type="file" name="favicon" accept="image/png,image/svg+xml,image/x-icon,image/vnd.microsoft.icon" class="text-sm" disabled={readonly} />
+              <span class="text-xs text-muted-foreground">PNG/SVG/ICO persegi (32–512 px); menggantikan favicon baku aplikasi saat tema ini aktif.</span>
+            </label>
+            <input type="hidden" name="faviconId" value={values.faviconId} />
+            {#if values.faviconId}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="removeFavicon" class="accent-primary" disabled={readonly} /> hapus favicon</label>{/if}
+          </div>
+          {#if errors.favicon}<span class="text-xs text-destructive">{errors.favicon}</span>{/if}
+        </div>
       </div>
     </Card>
 

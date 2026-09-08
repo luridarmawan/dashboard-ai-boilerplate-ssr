@@ -158,6 +158,7 @@ dc run --rm -e CONFIRM_RESTORE=yes restore latest
 
 # Redis/Valkey opsional (Keputusan M) — percepatan cache konfigurasi, bukan kebutuhan
 #   di .env.prod: CACHE_DRIVER=redis, REDIS_URL=redis://valkey:6379
+#   (SESSION_DRIVER/RATELIMIT_DRIVER=redis ditolak saat start: adapternya belum ada, ROADMAP §8 butir 7)
 dc --profile redis up -d --wait --scale api=3
 ```
 

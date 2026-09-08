@@ -28,6 +28,9 @@ export interface EditorValues {
   /** Public file id of the logo (Q-16); '' = none. Set by the action after uploading `logo`. */
   logoId: string;
   logoUrl: string | null;
+  /** Public file id of the favicon (Q-16); '' = none. */
+  faviconId: string;
+  faviconUrl: string | null;
 }
 
 export interface ThemeApiBody {
@@ -39,7 +42,7 @@ export interface ThemeApiBody {
   layouts: Record<string, Record<string, string>>;
   tokens: { light: Record<string, string>; dark: Record<string, string> };
   enabled: boolean;
-  assets?: { logo: string | null } | null;
+  assets?: { logo: string | null; favicon: string | null } | null;
 }
 
 const str = (form: FormData, key: string) => {
@@ -80,6 +83,8 @@ export function readEditorForm(form: FormData): EditorValues {
     // The current logo survives a resubmit unless "remove" is ticked; a new upload replaces it (action).
     logoId: form.get('removeLogo') !== null ? '' : str(form, 'logoId'),
     logoUrl: null,
+    faviconId: form.get('removeFavicon') !== null ? '' : str(form, 'faviconId'),
+    faviconUrl: null,
   };
 }
 
@@ -94,7 +99,7 @@ export function toApiBody(v: EditorValues): ThemeApiBody {
     layouts: v.layouts as Record<string, Record<string, string>>,
     tokens: { light: { ...v.tokens.light }, dark: { ...v.tokens.dark } },
     enabled: v.enabled,
-    assets: { logo: v.logoId || null },
+    assets: { logo: v.logoId || null, favicon: v.faviconId || null },
   };
 }
 
@@ -123,5 +128,7 @@ export function valuesOf(t: {
     enabled: t.enabled,
     logoId: t.assets?.logo ?? '',
     logoUrl: t.assets?.logo ? `/v1/files/${t.assets.logo}/content` : null,
+    faviconId: t.assets?.favicon ?? '',
+    faviconUrl: t.assets?.favicon ? `/v1/files/${t.assets.favicon}/content` : null,
   };
 }
