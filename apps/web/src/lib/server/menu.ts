@@ -71,6 +71,22 @@ export const CORE_MENU: readonly Entry[] = [
     order: 40,
   },
   {
+    id: 'core.settings',
+    label: { id: 'Pengaturan', en: 'Settings' },
+    href: '/settings',
+    icon: 'settings',
+    permission: 'config.read',
+    order: 42,
+  },
+  {
+    id: 'core.modules',
+    label: { id: 'Modul', en: 'Modules' },
+    href: '/modules',
+    icon: 'puzzle',
+    permission: 'module.read',
+    order: 44,
+  },
+  {
     id: 'core.webhooks',
     label: { id: 'Webhook keluar', en: 'Outgoing webhooks' },
     href: '/webhooks',
