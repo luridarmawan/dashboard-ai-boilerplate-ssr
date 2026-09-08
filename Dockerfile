@@ -11,7 +11,9 @@
 # generated schema (and the embedded migrations) bind one driver — build one image per dialect.
 
 ARG BUN_VERSION=1.4
-ARG ALPINE_VERSION=3.21
+# Must match the Alpine release inside oven/bun:${BUN_VERSION}-alpine (`cat /etc/alpine-release`):
+# the api binary and the two shared libraries it needs are copied from that image (see the api stage).
+ARG ALPINE_VERSION=3.22
 ARG DB_DIALECT=mysql
 # Build identity for /version (M-5): pass --build-arg APP_COMMIT=$(git rev-parse HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
 ARG APP_COMMIT=dev
@@ -45,11 +47,13 @@ FROM alpine:${ALPINE_VERSION} AS api
 ARG APP_COMMIT
 ARG APP_BUILT_AT
 ENV APP_COMMIT=${APP_COMMIT} APP_BUILT_AT=${APP_BUILT_AT}
-# libstdc++/libgcc: Bun's musl build links them dynamically. ca-certificates: outbound TLS
-# (SMTP, AI providers). uid 1000 = the `bun` user of the previous image, so an existing uploads
-# volume keeps its owner.
-RUN apk add --no-cache ca-certificates libstdc++ libgcc \
- && addgroup -g 1000 app && adduser -D -H -u 1000 -G app app \
+# No `apk add` here: this stage needs no network, so a flaky DNS/mirror on the build host cannot
+# fail the deploy (upgrade.sh). libstdc++/libgcc: Bun's musl build links them dynamically — copied
+# from the build image, which is the same Alpine release. Outbound TLS (SMTP, AI providers) uses
+# the CA bundle that the alpine base image already ships (/etc/ssl/certs/ca-certificates.crt).
+# uid 1000 = the `bun` user of the previous image, so an existing uploads volume keeps its owner.
+COPY --from=build /usr/lib/libstdc++.so.6 /usr/lib/libgcc_s.so.1 /usr/lib/
+RUN addgroup -g 1000 app && adduser -D -H -u 1000 -G app app \
  && mkdir -p /data/uploads && chown app:app /data/uploads
 WORKDIR /app
 ENV NODE_ENV=production API_HOST=0.0.0.0 API_PORT=3001

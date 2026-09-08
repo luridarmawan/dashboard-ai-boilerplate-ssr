@@ -46,7 +46,9 @@ if [ "$MODE" = "pull" ]; then
   $DC pull --quiet api web
 else
   echo "== build image $IMAGE_TAG (commit $COMMIT)"
-  $DC build --quiet
+  # --quiet hides the failing step's output; on failure build again with the full log (cached
+  # layers make the rerun fast) — a transient network hiccup then simply succeeds on the retry.
+  $DC build --quiet || { echo "upgrade: build gagal — mengulang dengan log lengkap:"; $DC build --progress=plain; }
 fi
 
 echo "== backup sebelum menyentuh database (Q-8)"
