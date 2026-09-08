@@ -83,7 +83,8 @@ export class CustomThemeStore {
 
   private async rows(): Promise<Rows> {
     const cached = await this.cache.get();
-    if (cached) return cached;
+    // A Redis cache round-trips through JSON, which turns Date columns into strings (M7 #4).
+    if (cached) return cached.map(reviveDates);
     const fresh = await this.db.select().from(schema.themes);
     await this.cache.set(fresh);
     return fresh;
@@ -312,6 +313,18 @@ function assetsOf(r: CustomThemeRow): { logo: string | null; favicon: string | n
   return {
     logo: typeof a.logo === 'string' ? a.logo : null,
     favicon: typeof a.favicon === 'string' ? a.favicon : null,
+  };
+}
+
+/** Date columns come back as ISO strings from a JSON cache; make them Dates again. */
+function reviveDates(r: CustomThemeRow): CustomThemeRow {
+  const d = (v: unknown) =>
+    v instanceof Date || v === null || v === undefined ? v : new Date(String(v));
+  return {
+    ...r,
+    created_at: d(r.created_at) as Date,
+    updated_at: d(r.updated_at) as Date,
+    deleted_at: d(r.deleted_at) as Date | null,
   };
 }
 

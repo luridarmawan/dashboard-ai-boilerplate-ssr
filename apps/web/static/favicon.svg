@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512" role="img" aria-labelledby="favicon-title">
+  <title id="favicon-title">Dashboard</title>
   <!-- Brand mark (docs/favicon.svg): the dashboard glyph on a rounded tile so it reads at 16 px in
        both browser themes. Admins can override it per theme in the theme editor (assets.favicon). -->
   <rect width="24" height="24" rx="5" fill="#1d4ed8"/>

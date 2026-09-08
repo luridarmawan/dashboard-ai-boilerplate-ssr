@@ -35,7 +35,13 @@ describe.skipIf(!enabled)('api preflight (Q-13)', () => {
     // Run from the repo root: modules.json is present and must agree with the built registry.
     expect(byName(r, 'modules')[0]?.status).toBe('ok');
     expect(byName(r, 'modules')[0]?.detail).toContain('AI');
-    expect(byName(r, 'redis')[0]?.status).toBe('skip');
+    // Redis is only a dependency when a driver uses it (M-4): checked in the Redis CI job, skipped otherwise.
+    const usesRedis = [
+      process.env.SESSION_DRIVER,
+      process.env.CACHE_DRIVER,
+      process.env.RATELIMIT_DRIVER,
+    ].includes('redis');
+    expect(byName(r, 'redis')[0]?.status).toBe(usesRedis ? 'ok' : 'skip');
     expect(text).toContain('preflight: LOLOS');
   });
 
