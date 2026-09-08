@@ -76,9 +76,9 @@
                 "paths": {
                   "@core/db": {
                     "importNames": ["getDb"],
-                    "message": "Domain code must not take the raw connection: use forTenant(clientId) for tenant tables, or unsafeAcrossTenants() \u2014 explicit and greppable (PRD B-3)."
+                    "message": "Domain code must not take the raw connection: use forTenant(clientId) for tenant tables, or unsafeAcrossTenants() — explicit and greppable (PRD B-3)."
                   },
-                  "drizzle-orm": "Import query operators from @core/db, not drizzle-orm (one ORM version; Kysely fallback stays open, PRD \u00a710)."
+                  "drizzle-orm": "Import query operators from @core/db, not drizzle-orm (one ORM version; Kysely fallback stays open, PRD §10)."
                 }
               }
             }
@@ -95,8 +95,8 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@lucide/svelte": "Components never import glyphs (PRD L-5): use <Icon name=\"\u2026\" /> \u2014 the active theme's icon set decides the glyph.",
-                  "phosphor-svelte": "Components never import glyphs (PRD L-5): use <Icon name=\"\u2026\" /> \u2014 the active theme's icon set decides the glyph."
+                  "@lucide/svelte": "Components never import glyphs (PRD L-5): use <Icon name=\"…\" /> — the active theme's icon set decides the glyph.",
+                  "phosphor-svelte": "Components never import glyphs (PRD L-5): use <Icon name=\"…\" /> — the active theme's icon set decides the glyph."
                 }
               }
             }
