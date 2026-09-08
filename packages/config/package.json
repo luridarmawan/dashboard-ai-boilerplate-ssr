@@ -2,6 +2,7 @@
   "name": "@core/config",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Loader env tervalidasi — gagal cepat dengan pesan jelas (PRD P-4, E-6)",
   "exports": {

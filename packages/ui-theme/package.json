@@ -2,6 +2,7 @@
   "name": "@core/ui-theme",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Theme contract: tokens, icon & layout registries, resolution chain, validator (PRD \u00a74.8, FR-L)",
   "exports": {

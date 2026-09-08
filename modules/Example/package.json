@@ -2,6 +2,7 @@
   "name": "@modules/example",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Example module \u2014 the contract reference (PRD R-1): every extension point, written to be read and copied",
   "scripts": {

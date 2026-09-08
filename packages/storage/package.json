@@ -2,6 +2,7 @@
   "name": "@core/storage",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "File storage behind one interface: local volume (Q-9) or any S3-compatible bucket via Bun's built-in client (Q-16)",
   "exports": {

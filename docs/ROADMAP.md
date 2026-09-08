@@ -231,7 +231,7 @@ Pertanyaan terbuka §11.2, dipetakan ke kapan jawabannya benar-benar dibutuhkan.
 | 1 | Gaya landing `Example` (company profile / e-commerce) | **M4, sebelum mulai** | Memblokir — bentuk tabel & halamannya berbeda |
 | 2 | Aset merek per tema (logo, favicon, pratinjau) | M2 | Pakai placeholder; tidak memblokir |
 | 3 | Pemilik registry harga model AI | M5 | Hardcode dulu di tabel konfigurasi; pindah belakangan murah |
-| 4 | Lisensi rilis template | Sebelum rilis | Tidak memblokir pengembangan |
+| 4 | Lisensi rilis template | Sebelum rilis | **Diputuskan 2026-09-09: internal (proprietary)** — `LICENSE`, `"license": "UNLICENSED"` (PRD §11.1) |
 
 Hanya #1 yang benar-benar mengikat. Sisanya bisa berjalan dengan nilai sementara.
 

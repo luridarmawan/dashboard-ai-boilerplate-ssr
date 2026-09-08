@@ -930,6 +930,7 @@ Milestone hanya memuat kebutuhan **P0**; rujukan grup (`FR-X`) sengaja tidak dip
 | Layout kustom | **Developer bisa membuat layout sendiri** dan mendaftarkannya lewat titik perluasan 15, termasuk dari modul di repositori lain | Halaman hanya mengisi region `content` dan tidak boleh tahu layout aktif; layout tidak boleh mengambil data sendiri (§4.8) |
 | Kebebasan user memilih tema | **User bebas memilih dari allowlist yang ditentukan admin** (`app.allowed_themes`, per tenant) | Tidak perlu mekanisme "kunci" terpisah — daftar berisi satu tema sudah berarti terkunci. Menghapus tema dari daftar memindahkan pemakainya ke tema baku tanpa galat (L-11) |
 | Layout per halaman | **Boleh berbeda tiap halaman, lewat varian semantik** (`layoutVariant`), bukan lewat id layout | Halaman menyebut kebutuhan (`wide`, `focused`), tema yang memetakannya ke layout konkret — sehingga halaman tetap netral tema. Varian tak terpetakan jatuh ke `default` tema, bukan galat (Keputusan K, L-9) |
+| Lisensi rilis template | **Internal (proprietary)**, diputuskan 2026-09-09 — berkas `LICENSE` di root, `"license": "UNLICENSED"` di setiap `package.json` workspace | Repositori tidak dipublikasikan sebagai sumber terbuka; modul di repositori terpisah boleh berlisensi sendiri (hanya bergantung pada `@core/*` lewat kontrak modul). Dependensi tetap wajib permisif (§9 Lisensi) |
 | Multi-tenant & RBAC | **Tetap bagian inti boilerplate**, bukan opsional | Penjaga tenant di lapisan data (B-3) dan instalasi single-tenant harus tetap terasa ringan (B-5) |
 | Bentuk isolasi tenant | **Per kolom `client_id`, satu database untuk seluruh tenant.** Tidak ada database/schema/koneksi per tenant | Satu pool, satu migrasi, satu backup; tapi B-3 naik jadi pengaman keamanan utama karena tidak ada batas fisik. Tenant yang butuh isolasi fisik dilayani lewat instalasi terpisah, bukan mode baru di template (§4.3, B-0) |
 | Pilihan database server | **Mengikuti dialect yang didukung Drizzle; MySQL 8 sebagai baku dan image `compose.prod.yml`.** MariaDB 11 dan PostgreSQL 16 diuji sejajar di CI; SQLite best-effort; sisanya terbuka tanpa jaminan | Tier ditentukan cakupan uji, bukan preferensi. Menambah dialect = menambah generator di `packages/db`, bukan menyentuh kode domain (§4.3) |
@@ -942,7 +943,6 @@ Milestone hanya memuat kebutuhan **P0**; rujukan grup (`FR-X`) sengaja tidak dip
 1. **Siapa pemilik registry harga model AI** untuk perhitungan biaya — hardcoded, tabel konfigurasi, atau ambil dari provider?
 2. **Aset merek per tema** (logo, favicon, gambar pratinjau) menunggu identitas visual proyek ditetapkan. Token, set ikon, dan layout keempat tema bawaan sudah final — lihat [`THEMES.md`](./THEMES.md).
 3. **Landing page `Example` bergaya apa** — company profile atau e-commerce? Keduanya dicakup §4.6; kalau harus pilih satu untuk MVP, e-commerce sederhana menuntut lebih banyak (katalog, detail, harga) sehingga lebih meyakinkan sebagai bukti kemampuan.
-4. **Lisensi rilis template** — internal, atau open source?
 
 ---
 

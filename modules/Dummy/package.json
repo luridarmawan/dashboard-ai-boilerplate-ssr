@@ -2,6 +2,7 @@
   "name": "@modules/dummy",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "M0 gate-4 probe: a module that contributes a table, permissions and a menu entry without touching any core file",
   "dependencies": {

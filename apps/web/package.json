@@ -2,6 +2,7 @@
   "name": "@app/web",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "SvelteKit SSR front-end; talks to the API only through the typed Eden client (Decision A, B)",
   "scripts": {

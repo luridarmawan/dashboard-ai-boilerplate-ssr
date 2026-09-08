@@ -2,6 +2,7 @@
   "name": "@core/settings",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Runtime configuration: section registry, per-tenant resolution with global fallback, versioned cache, typed validation, secret masking (PRD FR-E)",
   "exports": {

@@ -117,4 +117,4 @@ Ini persis yang dijalankan job CI (`.github/workflows/ci.yml`) — di runner Git
 
 Menambah atau mencabut modul tidak mengubah berkas core (`ci:modgen-guard`, `ci:cross-repo`); sync modul yang tercatat adalah no-op (`ci:sync-pure`); tanpa modul AI aplikasi tetap ter-build (`proof:m5:gate4`); tidak ada rahasia di bundle klien (`ci:bundle-secrets`); suite yang sama lulus di tiga dialect; backup → hapus database → restore diuji setiap push.
 
-Lisensi dan kontribusi: lihat berkas `LICENSE` bila ada; gaya kode diatur Biome (`bun run lint`). Komentar kode berbahasa Inggris, dokumen dan teks antarmuka berbahasa Indonesia.
+Lisensi: **internal, bukan sumber terbuka** — lihat [`LICENSE`](./LICENSE); `"license": "UNLICENSED"` di setiap `package.json`. Kontribusi: gaya kode diatur Biome (`bun run lint`). Komentar kode berbahasa Inggris, dokumen dan teks antarmuka berbahasa Indonesia.

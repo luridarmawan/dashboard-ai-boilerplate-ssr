@@ -2,6 +2,7 @@
   "name": "@core/db",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Deskriptor skema netral-dialect, codegen Drizzle per dialect, UUIDv7, satu instance koneksi (PRD §4.3, O-*, P-6)",
   "exports": {

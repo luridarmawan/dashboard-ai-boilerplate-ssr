@@ -1,6 +1,7 @@
 {
   "name": "dashboard-ai-boilerplate",
   "private": true,
+  "license": "UNLICENSED",
   "version": "0.0.0",
   "description": "Boilerplate dashboard admin ber-AI — API-first, SSR, modular, database-agnostic, self-hosted",
   "workspaces": [

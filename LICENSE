@@ -1,0 +1,33 @@
+LISENSI INTERNAL — HAK CIPTA DILINDUNGI
+
+Hak cipta © 2026 pemilik repositori ini. Seluruh hak dilindungi.
+
+Perangkat lunak ini (kode sumber, dokumentasi, aset, dan berkas konfigurasi
+di repositori ini — "Perangkat Lunak") adalah milik internal dan BUKAN
+perangkat lunak sumber terbuka.
+
+1. Penggunaan. Perangkat Lunak hanya boleh digunakan, disalin, diubah, dan
+   dijalankan oleh pemilik hak cipta dan pihak yang secara tertulis diberi
+   izin olehnya, untuk keperluan internal pihak tersebut.
+
+2. Distribusi. Dilarang mendistribusikan, mempublikasikan, menyewakan,
+   menyublisensikan, atau menyediakan Perangkat Lunak — seluruhnya atau
+   sebagian, dalam bentuk sumber maupun terkompilasi — kepada pihak ketiga
+   tanpa izin tertulis dari pemilik hak cipta.
+
+3. Turunan. Aplikasi, modul, dan tema yang dibangun di atas Perangkat Lunak
+   oleh pihak yang berizin tetap tunduk pada ketentuan ini sepanjang memuat
+   bagian dari Perangkat Lunak. Modul di repositori terpisah yang hanya
+   bergantung pada paket `@core/*` lewat kontrak modul boleh berlisensi
+   sendiri.
+
+4. Dependensi pihak ketiga. Dependensi yang dipakai Perangkat Lunak
+   berlisensi masing-masing (MIT, Apache-2.0, ISC, BSD — lihat
+   `bun.lock` dan `node_modules/*/LICENSE`); ketentuan ini tidak mengubah
+   lisensi tersebut.
+
+5. Tanpa jaminan. Perangkat Lunak disediakan "sebagaimana adanya", tanpa
+   jaminan apa pun, tersurat maupun tersirat. Pemilik hak cipta tidak
+   bertanggung jawab atas kerugian yang timbul dari penggunaannya.
+
+Keputusan lisensi ini dicatat di docs/PRD.md §11.1 dan docs/ROADMAP.md §5.

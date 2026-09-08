@@ -107,4 +107,4 @@ Target yang mengikat pilihan desain: TTFB < 200 ms p95 · API p95 < 150 ms · JS
 
 ## 11. Yang masih terbuka
 
-Pemilik registry harga model AI · aset merek per tema (token/ikon/layout sudah final) · gaya landing page `Example` (company profile vs e-commerce) · lisensi rilis template.
+Pemilik registry harga model AI · aset merek per tema (token/ikon/layout sudah final) · gaya landing page `Example` (company profile vs e-commerce). Lisensi rilis sudah diputuskan: internal (`LICENSE`).

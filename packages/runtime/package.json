@@ -2,6 +2,7 @@
   "name": "@core/runtime",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Core runtime services: event bus (G-17) and the multi-instance-safe scheduler (G-18)",
   "exports": {

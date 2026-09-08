@@ -2,6 +2,7 @@
   "name": "@core/contracts",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "type": "module",
   "description": "Shared API contract pieces: the response envelope (N-4), pagination meta (N-5), stable error codes",
   "exports": {
