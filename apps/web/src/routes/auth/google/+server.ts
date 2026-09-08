@@ -1,15 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { cfgBool } from '$lib/server/config';
+import { OAUTH_COOKIE, OAUTH_COOKIE_PATH, safeNext } from '$lib/server/oauth';
 import { apiFor, csrfToken, unwrap } from '$lib/server/session';
 import type { RequestHandler } from './$types';
-
-/** The transient OAuth state (state + PKCE verifier + where to go afterwards), httpOnly, 10 minutes. */
-export const OAUTH_COOKIE = 'dab_oauth';
-export const OAUTH_COOKIE_PATH = '/auth/google';
-
-export function safeNext(next: string | null | undefined, home = '/dashboard'): string {
-  return next?.startsWith('/') && !next.startsWith('//') ? next : home;
-}
 
 /**
  * Sign in with Google, step 1 (A-8): a plain link from the login page lands here; the API mints

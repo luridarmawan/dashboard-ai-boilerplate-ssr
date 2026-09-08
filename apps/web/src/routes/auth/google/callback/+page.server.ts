@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { cfgString } from '$lib/server/config';
+import { OAUTH_COOKIE, OAUTH_COOKIE_PATH, safeNext } from '$lib/server/oauth';
 import { apiFor, csrfToken, forwardSetCookies, unwrap } from '$lib/server/session';
-import { OAUTH_COOKIE, OAUTH_COOKIE_PATH, safeNext } from '../+server.ts';
 import type { PageServerLoad } from './$types';
 
 /**
