@@ -1,10 +1,12 @@
 import { formToObject, GroupCreateBody, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import { redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
   default: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const input = formToObject(form, { nullable: ['description'] });
     if (!checkCsrf(event, form)) {
@@ -12,7 +14,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: t('common.form_expired'),
         },
         input,
       );
@@ -23,7 +25,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         input,

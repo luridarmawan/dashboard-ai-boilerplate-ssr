@@ -1,9 +1,11 @@
 <script lang="ts">
+import { useT } from '$lib/i18n';
 import type { EditorValues } from '../_editor.ts';
 import ThemeEditor from '../ThemeEditor.svelte';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData; form: ActionData } = $props();
+const t = useT();
 type Details = {
   errors?: Record<string, string>;
   contrast?: { mode: string; fg: string; bg: string; message: string }[];
@@ -19,14 +21,14 @@ const previews = $derived(
 const scopeQ = $derived(data.scope === 'global' ? '&scope=global' : '');
 </script>
 
-<svelte:head><title>Buat tema</title></svelte:head>
+<svelte:head><title>{t('themes.new.title')}</title></svelte:head>
 
 <div class="page">
   <div>
-    <h1>Buat tema {#if data.scope === 'global'}<span class="text-sm font-normal text-muted-foreground">(global — berlaku di semua tenant)</span>{/if}</h1>
-    <p class="mt-1 text-sm text-muted-foreground">Pilih titik awal; seluruh token-nya disalin ke formulir di bawah. Ganti titik awal kapan saja sebelum menyimpan.</p>
+    <h1>{t('themes.new.title')} {#if data.scope === 'global'}<span class="text-sm font-normal text-muted-foreground">{t('themes.new.global_note')}</span>{/if}</h1>
+    <p class="mt-1 text-sm text-muted-foreground">{t('themes.new.lead')}</p>
   </div>
-  <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Titik awal">
+  <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label={t('themes.new.bases')}>
     {#each data.baseCards as b (b.id)}
       <li>
         <a href={`/themes/new?base=${b.id}${scopeQ}`} class={`grid gap-2 rounded-lg border bg-card p-2 text-card-foreground no-underline transition-colors hover:border-primary hover:no-underline ${b.id === data.values.base ? 'border-primary ring-2 ring-ring/40' : ''}`} aria-current={b.id === data.values.base ? 'true' : undefined}>

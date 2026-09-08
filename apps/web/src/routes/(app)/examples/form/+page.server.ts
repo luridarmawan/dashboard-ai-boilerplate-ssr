@@ -1,4 +1,5 @@
 import { formToObject, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import { t } from 'elysia';
 import { actionFailure, checkCsrf } from '$lib/server/session';
 import type { Actions } from './$types';
@@ -19,6 +20,7 @@ const ProductBody = t.Object({
 
 export const actions: Actions = {
   default: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const input = formToObject(form, { arrays: ['tags'] });
     if (input.published !== undefined) input.published = true;
@@ -27,7 +29,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: t('common.form_expired'),
         },
         input,
       );
@@ -37,7 +39,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         input,

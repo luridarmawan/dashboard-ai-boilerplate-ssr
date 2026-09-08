@@ -2,6 +2,7 @@
 import type { Snippet } from 'svelte';
 import Csrf from '$lib/components/Csrf.svelte';
 import { Button, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import type { FieldDef, FormErrors, FormValues } from './fields.ts';
 
@@ -29,6 +30,7 @@ interface Props {
   extra?: Snippet;
   footer?: Snippet;
 }
+const t = useT();
 let {
   fields,
   values = {},
@@ -36,9 +38,9 @@ let {
   csrf,
   action,
   method = 'POST',
-  submitLabel = 'Simpan',
+  submitLabel = t('common.save'),
   cancelHref,
-  cancelLabel = 'Batal',
+  cancelLabel = t('common.cancel'),
   columns = 1,
   class: className,
   readonly = false,

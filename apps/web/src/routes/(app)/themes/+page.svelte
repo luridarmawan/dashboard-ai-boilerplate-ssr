@@ -2,72 +2,79 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card } from '$lib/components/ui';
+import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
 
 /** Custom themes as a gallery (L-24): preview, swatches, where it comes from, what it uses. */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
+const t = useT();
+const locale = useLocale() === 'en' ? 'en' : 'id';
 const fmt = (iso: string) =>
-  new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-const swatch = (t: (typeof data.themes)[number]) =>
+  new Date(iso).toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+const swatch = (th: (typeof data.themes)[number]) =>
   ['primary', 'accent', 'secondary', 'success', 'warning', 'destructive'].map((k) => [
     k,
-    t.tokens.light[k] ?? '#ccc',
+    th.tokens.light[k] ?? '#ccc',
   ]);
 </script>
 
-<svelte:head><title>Tema kustom</title></svelte:head>
+<svelte:head><title>{t('themes.title')}</title></svelte:head>
 
 <div class="page">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="flex items-center gap-2">Tema kustom {#if data.scope === 'global'}<Badge variant="outline">global</Badge>{/if}</h1>
-      <p class="mt-1 max-w-3xl text-sm text-muted-foreground">Rakit tema dari nilai token, set ikon, dan layout yang sudah terdaftar. Tersimpan = berlaku seketika di semua instance, tanpa deploy (L-24). Setiap tema wajib lolos kontras WCAG AA (L-21). Tema dari berkas (core dan modul) menjadi titik awal, bukan diubah di sini.</p>
+      <h1 class="flex items-center gap-2">{t('themes.title')} {#if data.scope === 'global'}<Badge variant="outline">{t('themes.global')}</Badge>{/if}</h1>
+      <p class="mt-1 max-w-3xl text-sm text-muted-foreground">{t('themes.lead')}</p>
     </div>
     <div class="flex flex-wrap gap-2">
       {#if data.canGlobal}
-        <Button href={data.scope === 'global' ? '/themes' : '/themes?scope=global'} variant="outline" size="sm"><Icon name="building" size={16} />{data.scope === 'global' ? 'Tema tenant' : 'Tema global'}</Button>
+        <Button href={data.scope === 'global' ? '/themes' : '/themes?scope=global'} variant="outline" size="sm"><Icon name="building" size={16} />{data.scope === 'global' ? t('themes.tenant_themes') : t('themes.global_themes')}</Button>
       {/if}
-      <Button href={`/themes/new${data.scope === 'global' ? '?scope=global' : ''}`} size="sm"><Icon name="plus" size={16} />Buat tema</Button>
+      <Button href={`/themes/new${data.scope === 'global' ? '?scope=global' : ''}`} size="sm"><Icon name="plus" size={16} />{t('themes.new.title')}</Button>
     </div>
   </div>
-  {#if data.saved === 'created'}<p class="notice">Tema dibuat dan sudah bisa dipilih.</p>{:else if data.saved === 'deleted'}<p class="notice">Tema dihapus.</p>{:else if data.saved === 'default'}<p class="notice">Tema baku diperbarui.</p>{/if}
+  {#if data.saved === 'created'}<p class="notice">{t('themes.notice_created')}</p>{:else if data.saved === 'deleted'}<p class="notice">{t('themes.notice_deleted')}</p>{:else if data.saved === 'default'}<p class="notice">{t('themes.notice_default')}</p>{/if}
   {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 
   {#if data.themes.length}
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {#each data.themes as t (t.id)}
+      {#each data.themes as th (th.id)}
         <div data-testid="custom-theme-row" class="contents">
         <Card class="overflow-hidden">
           <div class="-m-5 mb-4 grid grid-cols-2 border-b">
-            <div class="overflow-hidden [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[t.id]?.light ?? ''}</div>
-            <div class="overflow-hidden border-s [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[t.id]?.dark ?? ''}</div>
+            <div class="overflow-hidden [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[th.id]?.light ?? ''}</div>
+            <div class="overflow-hidden border-s [&_svg]:h-auto [&_svg]:w-full">{@html data.previews[th.id]?.dark ?? ''}</div>
           </div>
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <h2 class="truncate text-base">{t.name.id}</h2>
-              <p class="truncate text-xs text-muted-foreground"><code>{t.code}</code></p>
+              <h2 class="truncate text-base">{th.name[locale]}</h2>
+              <p class="truncate text-xs text-muted-foreground"><code>{th.code}</code></p>
             </div>
             <div class="flex shrink-0 flex-wrap justify-end gap-1">
-              {#if data.defaultTheme === t.code}<Badge variant="success">baku</Badge>{/if}
-              <Badge variant={t.enabled ? 'outline' : 'secondary'}>{t.enabled ? 'aktif' : 'nonaktif'}</Badge>
+              {#if data.defaultTheme === th.code}<Badge variant="success">{t('themes.default_badge')}</Badge>{/if}
+              <Badge variant={th.enabled ? 'outline' : 'secondary'}>{th.enabled ? t('common.active') : t('common.inactive')}</Badge>
             </div>
           </div>
           <div class="mt-3 flex h-6 overflow-hidden rounded-md border" aria-hidden="true">
-            {#each swatch(t) as [k, c] (k)}<span class="flex-1" style={`background:${c}`} title={`--${k}: ${c}`}></span>{/each}
+            {#each swatch(th) as [k, c] (k)}<span class="flex-1" style={`background:${c}`} title={`--${k}: ${c}`}></span>{/each}
           </div>
           <dl class="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <div><dt class="text-muted-foreground">Turunan</dt><dd class="truncate font-medium">{t.base}</dd></div>
-            <div><dt class="text-muted-foreground">Ikon</dt><dd class="truncate font-medium">{t.icons}</dd></div>
-            <div><dt class="text-muted-foreground">Layout</dt><dd class="truncate font-medium">{t.layouts.dashboard?.default ?? '—'}</dd></div>
+            <div><dt class="text-muted-foreground">{t('themes.base')}</dt><dd class="truncate font-medium">{th.base}</dd></div>
+            <div><dt class="text-muted-foreground">{t('themes.icons')}</dt><dd class="truncate font-medium">{th.icons}</dd></div>
+            <div><dt class="text-muted-foreground">{t('themes.layout')}</dt><dd class="truncate font-medium">{th.layouts.dashboard?.default ?? '—'}</dd></div>
           </dl>
           <div class="mt-4 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-            <span class="text-xs text-muted-foreground">diubah {fmt(t.updatedAt)}</span>
+            <span class="text-xs text-muted-foreground">{t('themes.updated', { date: fmt(th.updatedAt) })}</span>
             <div class="flex gap-1">
-              {#if t.enabled && data.defaultTheme !== t.code}
-                <form method="POST" action="?/setDefault"><Csrf token={data.csrf} /><input type="hidden" name="theme" value={t.code} /><input type="hidden" name="scope" value={data.scope} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />Jadikan baku</Button></form>
+              {#if th.enabled && data.defaultTheme !== th.code}
+                <form method="POST" action="?/setDefault"><Csrf token={data.csrf} /><input type="hidden" name="theme" value={th.code} /><input type="hidden" name="scope" value={data.scope} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('themes.set_default')}</Button></form>
               {/if}
-              <Button href={`/themes/${t.id}`} size="sm" variant="outline"><Icon name="edit" size={14} />Ubah</Button>
+              <Button href={`/themes/${th.id}`} size="sm" variant="outline"><Icon name="edit" size={14} />{t('common.edit')}</Button>
             </div>
           </div>
         </Card>
@@ -78,10 +85,10 @@ const swatch = (t: (typeof data.themes)[number]) =>
     <Card>
       <div class="grid gap-3 py-6 text-center">
         <Icon name="palette" size={32} class="mx-auto text-muted-foreground" />
-        <p class="font-medium">Belum ada tema kustom</p>
-        <p class="text-sm text-muted-foreground">Mulai dari salah satu tema bawaan — semua token disalin, lalu ubah yang Anda mau.</p>
+        <p class="font-medium">{t('themes.empty_title')}</p>
+        <p class="text-sm text-muted-foreground">{t('themes.empty_lead')}</p>
         <div class="flex flex-wrap justify-center gap-2">
-          {#each data.bases as b (b.id)}<Button href={`/themes/new?base=${b.id}${data.scope === 'global' ? '&scope=global' : ''}`} variant="outline" size="sm">{b.name.id}</Button>{/each}
+          {#each data.bases as b (b.id)}<Button href={`/themes/new?base=${b.id}${data.scope === 'global' ? '&scope=global' : ''}`} variant="outline" size="sm">{b.name[locale]}</Button>{/each}
         </div>
       </div>
     </Card>

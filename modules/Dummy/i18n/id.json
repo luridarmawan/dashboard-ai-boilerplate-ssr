@@ -1,4 +1,15 @@
 {
   "dummy.notes.title": "Catatan",
-  "dummy.notes.lead": "Halaman modul contoh, ter-SSR di bawah /m/dummy."
+  "dummy.notes.lead": "Halaman modul contoh, ter-SSR di bawah /m/dummy.",
+  "dummy.notes.module": "Modul {name}",
+  "dummy.notes.from": "Halaman ini datang dari",
+  "dummy.notes.served_at": "dan disajikan di",
+  "dummy.notes.rendered_at": "SSR pada {at}",
+  "dummy.hello.title": "Hello from Dummy",
+  "dummy.hello.description": "A public page contributed by the Dummy module (extension point 13).",
+  "dummy.hello.heading": "Halo dari modul Dummy",
+  "dummy.hello.lead_1": "Halaman publik ini disumbang modul lewat ",
+  "dummy.hello.lead_2": " dan tampil di ",
+  "dummy.hello.lead_3": " — di luar ",
+  "dummy.hello.lead_4": ", tanpa sesi, dengan layout publik tema aktif."
 }

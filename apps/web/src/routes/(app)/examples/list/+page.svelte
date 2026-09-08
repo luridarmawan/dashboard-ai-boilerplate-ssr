@@ -2,10 +2,12 @@
 import Icon from '$lib/components/Icon.svelte';
 import { type ColumnDef, DataTable } from '$lib/components/table';
 import { Badge, Button } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
+const t = useT();
 type Row = (typeof data.rows)[number];
 const idr = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -13,16 +15,22 @@ const idr = new Intl.NumberFormat('id-ID', {
   maximumFractionDigits: 0,
 });
 const columns: ColumnDef<Row>[] = [
-  { key: 'name', label: 'Produk', sortKey: 'name', value: (r) => r.name },
-  { key: 'category', label: 'Kategori', sortKey: 'category', value: (r) => r.category },
+  { key: 'name', label: t('examples.product'), sortKey: 'name', value: (r) => r.name },
+  { key: 'category', label: t('examples.category'), sortKey: 'category', value: (r) => r.category },
   {
     key: 'price',
-    label: 'Harga',
+    label: t('examples.price'),
     sortKey: 'price',
     align: 'right',
     value: (r) => idr.format(r.price),
   },
-  { key: 'stock', label: 'Stok', sortKey: 'stock', align: 'right', value: (r) => r.stock },
+  {
+    key: 'stock',
+    label: t('examples.stock'),
+    sortKey: 'stock',
+    align: 'right',
+    value: (r) => r.stock,
+  },
   { key: 'status', label: 'Status' },
   {
     key: 'id',
@@ -34,25 +42,25 @@ const columns: ColumnDef<Row>[] = [
 ];
 </script>
 
-<svelte:head><title>Contoh · Daftar</title></svelte:head>
+<svelte:head><title>{t('examples.prefix')} · {t('examples.list.short')}</title></svelte:head>
 
 <div class="page">
-  <h1>Daftar CRUD</h1>
-  {#if form?.archived !== undefined}<p class="notice">{form.archived} item diarsipkan (contoh — tidak ada perubahan nyata).</p>{/if}
+  <h1>{t('examples.list.title')}</h1>
+  {#if form?.archived !== undefined}<p class="notice">{t('examples.list.archived', { n: form.archived })}</p>{/if}
   <DataTable
     rows={data.rows}
     {columns}
     state={data.state}
     csrf={data.csrf}
-    caption="Contoh daftar produk"
-    searchPlaceholder="Cari produk / kategori"
+    caption={t('examples.list.caption')}
+    searchPlaceholder={t('examples.list.search_placeholder')}
     rowActions={[
-      { label: 'Detail', icon: 'eye', href: (r) => `/examples/detail?id=${r.id}` },
-      { label: 'Ubah', icon: 'edit', href: (r) => `/examples/form?id=${r.id}` },
+      { label: t('common.detail'), icon: 'eye', href: (r) => `/examples/detail?id=${r.id}` },
+      { label: t('common.edit'), icon: 'edit', href: (r) => `/examples/form?id=${r.id}` },
     ]}
-    bulkActions={[{ action: '?/archive', label: 'Arsipkan', icon: 'folder' }]}
+    bulkActions={[{ action: '?/archive', label: t('examples.list.archive'), icon: 'folder' }]}
   >
-    {#snippet toolbar()}<Button href="/examples/form" size="sm"><Icon name="plus" size={16} />Produk baru</Button>{/snippet}
+    {#snippet toolbar()}<Button href="/examples/form" size="sm"><Icon name="plus" size={16} />{t('examples.list.new_product')}</Button>{/snippet}
     {#snippet cell(row, col)}
       {#if col.key === 'status'}<Badge variant={row.status === 'aktif' ? 'success' : 'secondary'}>{row.status}</Badge>
       {:else if col.key === 'stock'}<span class={row.stock === 0 ? 'text-destructive' : ''}>{row.stock}</span>

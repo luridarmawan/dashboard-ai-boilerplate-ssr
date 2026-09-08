@@ -1,9 +1,11 @@
+import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Job queue (P2): what is pending, running, done and dead-lettered in my scope. */
 export const load: PageServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const status = event.url.searchParams.get('status');
   const ok = ['pending', 'running', 'done', 'dead'] as const;
   const res = await apiFor(event).v1.queue.get({
@@ -15,24 +17,21 @@ export const load: PageServerLoad = async (event) => {
     },
   });
   if (!res.data?.success)
-    error(
-      res.status,
-      res.status === 403 ? 'Anda tidak punya izin melihat antrean' : 'Antrean tidak bisa dimuat',
-    );
+    error(res.status, res.status === 403 ? t('queue.forbidden') : t('queue.load_failed'));
   return { ...res.data.data, status: status ?? '', saved: event.url.searchParams.get('saved') };
 };
 
-const csrfFail = () =>
+const csrfFail = (locale: Locale) =>
   actionFailure({
     status: 403,
     code: 'csrf_failed',
-    message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+    message: createTranslator(locale)('common.form_expired'),
   });
 
 export const actions: Actions = {
   retry: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.queue({ id: str(form, 'id') })
@@ -46,7 +45,7 @@ export const actions: Actions = {
   },
   delete: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.queue({ id: str(form, 'id') })

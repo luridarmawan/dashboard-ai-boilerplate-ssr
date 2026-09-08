@@ -2,17 +2,19 @@
 import { page } from '$app/state';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 
 /** Root error page (L-19: 404/403/500). Deeper layouts have their own so errors keep the shell. */
+const t = useT();
 const status = $derived(page.status);
 const title = $derived(
   status === 404
-    ? 'Halaman tidak ditemukan'
+    ? t('error.root.not_found')
     : status === 403
-      ? 'Akses ditolak'
+      ? t('error.root.forbidden')
       : status === 401
-        ? 'Perlu masuk'
-        : 'Terjadi kesalahan',
+        ? t('error.root.unauthorized')
+        : t('error.generic'),
 );
 </script>
 
@@ -24,7 +26,7 @@ const title = $derived(
   <h1>{title}</h1>
   {#if page.error?.message && status !== 404}<p class="max-w-md text-muted-foreground">{page.error.message}</p>{/if}
   <div class="flex gap-3">
-    <Button href="/">Beranda</Button>
-    {#if status === 401 || status === 403}<Button href="/auth/login" variant="outline">Masuk</Button>{/if}
+    <Button href="/">{t('common.home')}</Button>
+    {#if status === 401 || status === 403}<Button href="/auth/login" variant="outline">{t('nav.login')}</Button>{/if}
   </div>
 </div>

@@ -1,7 +1,9 @@
 <script lang="ts">
 import { Card } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 
 /** Bars drawn with CSS from --chart-1..5 (L-23 later wraps a library behind one call-site). */
+const t = useT();
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu'];
 const series = [
   { name: 'Penjualan', color: 'var(--chart-1)', values: [42, 55, 61, 48, 72, 80, 76, 91] },
@@ -15,13 +17,13 @@ const share = [
 ];
 </script>
 
-<svelte:head><title>Contoh · Bagan</title></svelte:head>
+<svelte:head><title>{t('examples.prefix')} · {t('examples.chart.title')}</title></svelte:head>
 
 <div class="page">
-  <h1>Bagan</h1>
+  <h1>{t('examples.chart.title')}</h1>
   <div class="grid gap-4 lg:grid-cols-3">
-    <Card title="Penjualan per bulan" description="Batang dari token --chart-n; warnanya ikut tema." class="lg:col-span-2">
-      <div class="flex h-56 items-end gap-3" role="img" aria-label="Bagan batang penjualan dan retur per bulan">
+    <Card title={t('examples.chart.sales_by_month')} description={t('examples.chart.sales_desc')} class="lg:col-span-2">
+      <div class="flex h-56 items-end gap-3" role="img" aria-label={t('examples.chart.aria')}>
         {#each months as m, i (m)}
           <div class="flex flex-1 flex-col items-center gap-1">
             <div class="flex h-48 w-full items-end justify-center gap-1">
@@ -35,7 +37,7 @@ const share = [
       </div>
       <ul class="mt-3 flex gap-4 text-sm">{#each series as s (s.name)}<li class="flex items-center gap-2"><span class="h-3 w-3 rounded-sm" style={`background:${s.color}`}></span>{s.name}</li>{/each}</ul>
     </Card>
-    <Card title="Komposisi kategori">
+    <Card title={t('examples.chart.category_share')}>
       <ul class="grid gap-3">
         {#each share as s (s.name)}
           <li>

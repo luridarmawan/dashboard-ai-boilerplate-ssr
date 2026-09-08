@@ -2,6 +2,7 @@
 import { Dialog } from 'bits-ui';
 import type { Snippet } from 'svelte';
 import Icon from '$lib/components/Icon.svelte';
+import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 
 /**
@@ -27,6 +28,7 @@ let {
   children,
   footer,
 }: Props = $props();
+const t = useT();
 </script>
 
 <Dialog.Root bind:open>
@@ -45,7 +47,7 @@ let {
       </div>
       {@render children?.()}
       {#if footer}<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{@render footer()}</div>{/if}
-      <Dialog.Close class="absolute top-4 end-4 rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label="Tutup">
+      <Dialog.Close class="absolute top-4 end-4 rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label={t('common.close')}>
         <Icon name="close" size={16} />
       </Dialog.Close>
     </Dialog.Content>

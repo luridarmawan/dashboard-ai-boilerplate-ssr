@@ -1,4 +1,5 @@
 import { formToObject, PasswordChangeBody, ProfileBody, validateForm } from '@core/contracts';
+import { createTranslator, type Locale } from '@core/i18n';
 import { themes } from '@core/ui-theme';
 import QRCode from 'qrcode';
 import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
@@ -33,17 +34,18 @@ export const load: PageServerLoad = async (event) => {
   };
 };
 
-const csrfFail = () =>
+const csrfFail = (locale: Locale) =>
   actionFailure({
     status: 403,
     code: 'csrf_failed',
-    message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+    message: createTranslator(locale)('common.form_expired'),
   });
 
 export const actions: Actions = {
   profile: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const input = formToObject(form, { nullable: ['theme', 'avatarUrl'] });
     const v = validateForm(ProfileBody, input);
     if (!v.ok)
@@ -51,7 +53,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         input,
@@ -62,15 +64,16 @@ export const actions: Actions = {
   },
   /** Avatar upload (Q-16): multipart `avatar` → PUT /v1/users/profile/avatar; the session user refreshes on next load. */
   avatar: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const file = form.get('avatar');
     if (!(file instanceof File) || file.size === 0)
       return actionFailure({
         status: 422,
         code: 'validation_failed',
-        message: 'Pilih berkas gambar dulu',
-        details: { avatar: 'Pilih berkas gambar dulu' },
+        message: t('profile.avatar.pick_file'),
+        details: { avatar: t('profile.avatar.pick_file') },
       });
     const r = unwrap(await apiFor(event).v1.users.profile.avatar.put({ file }));
     if (!r.ok) return actionFailure(r.failure);
@@ -78,20 +81,21 @@ export const actions: Actions = {
   },
   avatarRemove: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.users.profile.avatar.delete());
     if (!r.ok) return actionFailure(r.failure);
     return { saved: 'avatar' as const };
   },
   password: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     if (str(form, 'newPassword') !== str(form, 'confirm')) {
       return actionFailure({
         status: 422,
         code: 'validation_failed',
-        message: 'Periksa isian yang ditandai',
-        details: { confirm: 'Konfirmasi kata sandi tidak sama' },
+        message: t('common.check_fields'),
+        details: { confirm: t('profile.password.mismatch') },
       });
     }
     const v = validateForm(PasswordChangeBody, formToObject(form));
@@ -99,7 +103,7 @@ export const actions: Actions = {
       return actionFailure({
         status: 422,
         code: 'validation_failed',
-        message: 'Periksa isian yang ditandai',
+        message: t('common.check_fields'),
         details: v.errors,
       });
     const r = unwrap(await apiFor(event).v1.users.profile.password.put(v.value));
@@ -109,14 +113,14 @@ export const actions: Actions = {
   // ---- 2FA TOTP (A-11) ----
   mfaSetup: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.users.profile.mfa.setup.post());
     if (!r.ok) return actionFailure(r.failure);
     return { saved: 'mfaSetup' as const }; // the reloaded page shows the pending QR
   },
   mfaEnable: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{ success: true; data: { recoveryCodes: string[] } }>(
       await apiFor(event).v1.users.profile.mfa.enable.post({ code: str(form, 'code') }),
     );
@@ -125,7 +129,7 @@ export const actions: Actions = {
   },
   mfaCodes: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{ success: true; data: { recoveryCodes: string[] } }>(
       await apiFor(event).v1.users.profile.mfa['recovery-codes'].post({ code: str(form, 'code') }),
     );
@@ -134,7 +138,7 @@ export const actions: Actions = {
   },
   mfaDisable: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event).v1.users.profile.mfa.disable.post({ password: str(form, 'password') }),
     );
@@ -143,8 +147,9 @@ export const actions: Actions = {
   },
   // ---- API tokens (A-4): minted for MCP clients and other non-browser callers ----
   createToken: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const name = str(form, 'name').trim();
     const days = Number(optStr(form, 'expiresInDays') ?? '0');
     const scopes = str(form, 'scopes')
@@ -156,8 +161,8 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
-          details: { name: 'Nama token wajib diisi' },
+          message: t('common.check_fields'),
+          details: { name: t('profile.tokens.name_required') },
         },
         { name, scopes: scopes.join(' ') },
       );
@@ -176,7 +181,7 @@ export const actions: Actions = {
   },
   revokeToken: async (event) => {
     const form = await event.request.formData();
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.tokens({ id: str(form, 'id') })

@@ -1,39 +1,41 @@
 <script lang="ts">
 import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { useT } from '$lib/i18n';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
+const t = useT();
 const fields: FieldDef[] = $derived([
-  { name: 'name', type: 'string', label: 'Nama', required: true, maxlength: 191 },
+  { name: 'name', type: 'string', label: t('users.name'), required: true, maxlength: 191 },
   {
     name: 'email',
     type: 'email',
-    label: 'Email',
+    label: t('users.email'),
     required: true,
-    hint: 'Akun yang sudah ada dengan email ini akan ditambahkan ke tenant ini.',
+    hint: t('users.new.email_hint'),
   },
   {
     name: 'password',
     type: 'password',
-    label: 'Kata sandi',
+    label: t('auth.login.password'),
     minlength: 12,
     autocomplete: 'new-password',
-    hint: 'Kosongkan agar pengguna mengatur sendiri lewat tautan set kata sandi.',
+    hint: t('users.new.password_hint'),
   },
   {
     name: 'locale',
     type: 'select',
-    label: 'Bahasa',
+    label: t('nav.language'),
     options: [
-      { value: 'id', label: 'Bahasa Indonesia' },
-      { value: 'en', label: 'English' },
+      { value: 'id', label: t('lang.id') },
+      { value: 'en', label: t('lang.en') },
     ],
   },
   {
     name: 'groupIds',
     type: 'multiselect',
-    label: 'Grup',
+    label: t('users.groups'),
     span: 2,
     options: data.groups.map((g) => ({ value: g.id, label: g.name })),
   },
@@ -43,17 +45,17 @@ const fieldErrors = $derived(
 );
 </script>
 
-<svelte:head><title>Tambah pengguna</title></svelte:head>
+<svelte:head><title>{t('users.add')}</title></svelte:head>
 
 <div class="page">
-  <h1>Tambah pengguna</h1>
+  <h1>{t('users.add')}</h1>
   <FormBuilder
     {fields}
     values={(form?.values as Record<string, unknown> | undefined) ?? { locale: 'id' }}
     errors={fieldErrors}
     csrf={data.csrf}
     columns={2}
-    submitLabel="Simpan"
+    submitLabel={t('common.save')}
     cancelHref="/users"
     error={form?.error && form.code !== 'validation_failed' ? form.error : form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null}
   />

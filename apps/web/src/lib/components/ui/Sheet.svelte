@@ -2,6 +2,7 @@
 import { Dialog } from 'bits-ui';
 import type { Snippet } from 'svelte';
 import Icon from '$lib/components/Icon.svelte';
+import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 
 /** Side panel (drawer) — a dialog anchored to an edge. Used for filters and mobile nav. */
@@ -21,6 +22,7 @@ let {
   trigger,
   children,
 }: Props = $props();
+const t = useT();
 </script>
 
 <Dialog.Root bind:open>
@@ -36,7 +38,7 @@ let {
     >
       <div class="flex items-center justify-between">
         <Dialog.Title class="text-base font-semibold">{title}</Dialog.Title>
-        <Dialog.Close class="rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label="Tutup">
+        <Dialog.Close class="rounded-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-ring" aria-label={t('common.close')}>
           <Icon name="close" size={16} />
         </Dialog.Close>
       </div>

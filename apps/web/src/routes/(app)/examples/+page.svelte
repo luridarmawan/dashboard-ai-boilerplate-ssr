@@ -1,53 +1,55 @@
 <script lang="ts">
 import Icon from '$lib/components/Icon.svelte';
 import { Card } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 
 /** L-19: the patterns a module author copies from — one page each. */
+const t = useT();
 const items = [
   {
     href: '/examples/list',
     icon: 'list',
-    title: 'Daftar CRUD',
-    text: 'DataTable: cari, urut, kolom, aksi baris & massal — tanpa JavaScript.',
+    title: t('examples.list.title'),
+    text: t('examples.list.text'),
   },
   {
     href: '/examples/form',
     icon: 'edit',
-    title: 'Form',
-    text: 'FormBuilder dengan semua tipe field dan validasi skema bersama.',
+    title: t('examples.form.title'),
+    text: t('examples.form.text'),
   },
   {
     href: '/examples/detail',
     icon: 'file',
-    title: 'Detail',
-    text: 'Halaman detail: header, badge, tab, kartu ringkasan.',
+    title: t('common.detail'),
+    text: t('examples.detail.text'),
   },
   {
     href: '/examples/chart',
     icon: 'chart-bar',
-    title: 'Bagan',
-    text: 'Bagan batang dari token warna tema, tanpa pustaka.',
+    title: t('examples.chart.title'),
+    text: t('examples.chart.text'),
   },
   {
     href: '/examples/empty',
     icon: 'folder',
-    title: 'Kosong',
-    text: 'State kosong dengan ajakan bertindak.',
+    title: t('examples.empty.title'),
+    text: t('examples.empty.text'),
   },
   {
     href: '/examples/errors',
     icon: 'warning',
     title: '404 · 403 · 500',
-    text: 'Halaman galat di dalam shell.',
+    text: t('examples.errors.text'),
   },
 ] as const;
 </script>
 
-<svelte:head><title>Contoh pola</title></svelte:head>
+<svelte:head><title>{t('nav.examples')}</title></svelte:head>
 
 <div class="page">
-  <h1>Contoh pola</h1>
-  <p class="text-muted-foreground">Halaman-halaman referensi (PRD L-19). Salin polanya ke modul Anda.</p>
+  <h1>{t('nav.examples')}</h1>
+  <p class="text-muted-foreground">{t('examples.lead')}</p>
   <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     {#each items as it (it.href)}
       <a href={it.href} class="no-underline hover:no-underline">

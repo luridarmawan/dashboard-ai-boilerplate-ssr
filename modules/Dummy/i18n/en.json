@@ -1,4 +1,15 @@
 {
   "dummy.notes.title": "Notes",
-  "dummy.notes.lead": "Sample module page, server-rendered under /m/dummy."
+  "dummy.notes.lead": "Sample module page, server-rendered under /m/dummy.",
+  "dummy.notes.module": "{name} module",
+  "dummy.notes.from": "This page comes from",
+  "dummy.notes.served_at": "and is served at",
+  "dummy.notes.rendered_at": "SSR at {at}",
+  "dummy.hello.title": "Hello from Dummy",
+  "dummy.hello.description": "A public page contributed by the Dummy module (extension point 13).",
+  "dummy.hello.heading": "Hello from the Dummy module",
+  "dummy.hello.lead_1": "This public page is contributed by the module through ",
+  "dummy.hello.lead_2": " and appears at ",
+  "dummy.hello.lead_3": " — outside ",
+  "dummy.hello.lead_4": ", without a session, in the active theme’s public layout."
 }

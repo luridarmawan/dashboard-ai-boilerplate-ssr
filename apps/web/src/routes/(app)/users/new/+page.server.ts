@@ -1,16 +1,19 @@
 import { formToObject, UserCreateBody, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const groups = await apiFor(event).v1.groups.get({ query: { limit: 100 } });
-  if (!groups.data?.success) error(groups.status, 'Grup tidak bisa dimuat');
+  if (!groups.data?.success) error(groups.status, t('groups.load_failed'));
   return { groups: groups.data.data };
 };
 
 export const actions: Actions = {
   default: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const input = formToObject(form, { arrays: ['groupIds'] });
     if (!checkCsrf(event, form)) {
@@ -18,7 +21,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: t('common.form_expired'),
         },
         input,
       );
@@ -30,7 +33,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         input,

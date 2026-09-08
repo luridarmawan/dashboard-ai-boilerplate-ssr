@@ -1,26 +1,25 @@
 import { formToObject, validateForm, WebhookBody } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const ev = await apiFor(event).v1.webhooks.events.get();
-  if (!ev.data?.success) error(ev.status, 'Daftar event tidak bisa dimuat');
+  if (!ev.data?.success) error(ev.status, t('webhooks.events_load_failed'));
   return { events: ev.data.data.events };
 };
 
 export const actions: Actions = {
   default: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const raw = formToObject(form, { arrays: ['events'] });
     const input = { ...raw, enabled: raw.enabled !== undefined };
     if (!checkCsrf(event, form))
       return actionFailure(
-        {
-          status: 403,
-          code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
-        },
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
         raw,
       );
     const v = validateForm(WebhookBody, input);
@@ -29,7 +28,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         raw,

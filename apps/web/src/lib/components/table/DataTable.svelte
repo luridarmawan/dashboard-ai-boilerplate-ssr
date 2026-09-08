@@ -3,6 +3,7 @@ import type { Snippet } from 'svelte';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button, Skeleton } from '$lib/components/ui';
+import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import {
   type BulkAction,
@@ -36,21 +37,23 @@ interface Props {
   toolbar?: Snippet;
   labels?: Partial<typeof defaultLabels>;
 }
+const t = useT();
 const defaultLabels = {
-  search: 'Cari',
-  columns: 'Kolom',
-  apply: 'Terapkan',
-  actions: 'Aksi',
-  selectAll: 'Pilih semua',
-  select: 'Pilih',
-  prev: 'Sebelumnya',
-  next: 'Berikutnya',
-  of: 'dari',
-  page: 'Halaman',
-  rows: 'baris',
-  perPage: 'per halaman',
-  retry: 'Muat ulang',
-  withSelected: 'Dengan yang dipilih',
+  search: t('common.search'),
+  columns: t('table.columns'),
+  apply: t('common.apply'),
+  actions: t('common.actions'),
+  selectAll: t('table.select_all'),
+  select: t('table.select'),
+  prev: t('table.prev'),
+  next: t('table.next'),
+  of: t('table.of'),
+  page: t('table.page'),
+  rows: t('table.rows'),
+  perPage: t('table.per_page'),
+  retry: t('table.retry'),
+  withSelected: t('table.with_selected'),
+  pagination: t('table.pagination'),
 };
 let {
   rows,
@@ -60,7 +63,7 @@ let {
   rowActions = [],
   bulkActions = [],
   searchPlaceholder,
-  emptyTitle = 'Tidak ada data',
+  emptyTitle = t('table.empty_title'),
   emptyHint,
   loading = false,
   error = null,
@@ -199,7 +202,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
           {/each}
         </div>
       {:else}<span></span>{/if}
-      <nav class="flex items-center gap-2" aria-label="Paginasi">
+      <nav class="flex items-center gap-2" aria-label={L.pagination}>
         <span>{state.total} {L.rows} · {L.page} {state.page} {L.of} {state.totalPages}</span>
         <a class={cn('rounded-md border px-2 py-1 no-underline', state.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.max(1, state.page - 1) })} aria-disabled={state.page <= 1}><Icon name="chevron-left" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.prev}</span></a>
         <a class={cn('rounded-md border px-2 py-1 no-underline', state.page >= state.totalPages && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.min(state.totalPages, state.page + 1) })} aria-disabled={state.page >= state.totalPages}><Icon name="chevron-right" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.next}</span></a>

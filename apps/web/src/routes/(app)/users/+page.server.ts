@@ -1,3 +1,4 @@
+import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { tableStateFrom } from '$lib/components/table';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
@@ -34,12 +35,13 @@ export const load: PageServerLoad = async (event) => {
 export const actions: Actions = {
   /** Bulk action (L-16): deactivate the selected users — one PUT each, through the same API guard. */
   deactivate: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     if (!checkCsrf(event, form))
       return actionFailure({
         status: 403,
         code: 'csrf_failed',
-        message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+        message: t('common.form_expired'),
       });
     const ids = form.getAll('ids').filter((v): v is string => typeof v === 'string');
     const client = apiFor(event);

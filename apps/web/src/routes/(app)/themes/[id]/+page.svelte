@@ -2,12 +2,15 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card } from '$lib/components/ui';
+import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../../$types';
 import type { EditorValues } from '../_editor.ts';
 import ThemeEditor from '../ThemeEditor.svelte';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
+const t = useT();
+const locale = useLocale() === 'en' ? 'en' : 'id';
 type Details = {
   errors?: Record<string, string>;
   contrast?: {
@@ -39,18 +42,18 @@ const previews = $derived(
 );
 </script>
 
-<svelte:head><title>{data.theme.name.id}</title></svelte:head>
+<svelte:head><title>{data.theme.name[locale]}</title></svelte:head>
 
 <div class="page">
   <div class="flex flex-wrap items-center gap-3">
-    <h1>{data.theme.name.id}</h1>
+    <h1>{data.theme.name[locale]}</h1>
     <code class="text-sm">{data.theme.code}</code>
-    {#if data.theme.scope === 'global'}<Badge variant="outline">global</Badge>{/if}
-    <a href={`/theme?back=/themes/${data.theme.id}`} class="text-sm">Coba di pemilih tema ↗</a>
+    {#if data.theme.scope === 'global'}<Badge variant="outline">{t('themes.global')}</Badge>{/if}
+    <a href={`/theme?back=/themes/${data.theme.id}`} class="text-sm">{t('themes.edit.try_picker')} ↗</a>
   </div>
-  <ThemeEditor {values} vocab={data.vocab} csrf={data.csrf} action="?/save" isNew={false} errors={details.errors ?? {}} contrast={details.contrast ?? []} {previews} notice={submitted?.saved || data.saved ? 'Tema tersimpan dan sudah berlaku.' : null} error={form?.error ?? null} />
+  <ThemeEditor {values} vocab={data.vocab} csrf={data.csrf} action="?/save" isNew={false} errors={details.errors ?? {}} contrast={details.contrast ?? []} {previews} notice={submitted?.saved || data.saved ? t('themes.edit.saved') : null} error={form?.error ?? null} />
   <Card>
-    <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />Hapus tema</Button></form>
-    <p class="mt-2 text-xs text-muted-foreground">Pengguna yang memakainya akan jatuh ke tema baku lewat rantai resolusi (L-12) — tanpa galat.</p>
+    <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('themes.edit.delete')}</Button></form>
+    <p class="mt-2 text-xs text-muted-foreground">{t('themes.edit.delete_note')}</p>
   </Card>
 </div>

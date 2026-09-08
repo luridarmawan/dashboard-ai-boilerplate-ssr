@@ -1,16 +1,18 @@
 import { formToObject, validateForm, WebhookUpdateBody } from '@core/contracts';
+import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const id = String(event.params.id ?? '');
   const api = apiFor(event);
   const [res, ev] = await Promise.all([
     api.v1.webhooks({ id }).get(),
     api.v1.webhooks.events.get(),
   ]);
-  if (!res.data?.success) error(res.status === 404 ? 404 : res.status, 'Webhook tidak ditemukan');
+  if (!res.data?.success) error(res.status === 404 ? 404 : res.status, t('webhooks.not_found'));
   return {
     webhook: res.data.data,
     events: ev.data?.success ? ev.data.data.events : [],
@@ -20,9 +22,9 @@ export const load: PageServerLoad = async (event) => {
   };
 };
 
-const csrfFail = (values: Record<string, unknown> = {}) =>
+const csrfFail = (locale: Locale, values: Record<string, unknown> = {}) =>
   actionFailure(
-    { status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' },
+    { status: 403, code: 'csrf_failed', message: createTranslator(locale)('common.form_expired') },
     values,
   );
 
@@ -32,14 +34,14 @@ export const actions: Actions = {
     const id = String(event.params.id ?? '');
     const raw = formToObject(form, { arrays: ['events'] });
     const input = { ...raw, enabled: raw.enabled !== undefined };
-    if (!checkCsrf(event, form)) return csrfFail(raw);
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale, raw);
     const v = validateForm(WebhookUpdateBody, input);
     if (!v.ok)
       return actionFailure(
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: createTranslator(event.locals.locale.locale)('common.check_fields'),
           details: v.errors,
         },
         raw,
@@ -51,7 +53,7 @@ export const actions: Actions = {
   test: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{
       success: true;
       data: { ok: boolean; status: number | null; error: string | null; ms: number };
@@ -62,7 +64,7 @@ export const actions: Actions = {
   rotate: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{ success: true; data: { secret: string } }>(
       await apiFor(event).v1.webhooks({ id })['rotate-secret'].post(),
     );
@@ -72,7 +74,7 @@ export const actions: Actions = {
   retry: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.webhooks({ id })
@@ -85,7 +87,7 @@ export const actions: Actions = {
   delete: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.webhooks({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/webhooks?saved=deleted');
