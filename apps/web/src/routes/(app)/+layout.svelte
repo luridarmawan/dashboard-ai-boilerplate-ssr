@@ -18,6 +18,12 @@ let { data, children }: { data: LayoutData; children: import('svelte').Snippet }
 const Layout = $derived(data.Layout);
 const t = useT();
 const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
+/**
+ * Branding (E-1): the name comes from Pengaturan → Aplikasi (the i18n key is only the fallback),
+ * and the logo is the active theme's own asset when it has one (L-24), else `app.logo_url`.
+ */
+const brandName = $derived(data.app.name || t('app.name'));
+const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
 // Client-side navigation keeps the DOM: a top-nav group or the language dropdown left open would
 // stay open over the new page. Without JavaScript every navigation is a full load and this never runs.
 afterNavigate(() => closeAllDropdowns());
@@ -29,14 +35,14 @@ const shellContext = $derived({
   csrf: data.csrf,
   path: data.path,
   breadcrumb: data.breadcrumb.map((c) => c.label),
-  appName: data.appName,
+  appName: brandName,
 });
 </script>
 
 {#snippet brand()}
   <a href="/dashboard" class="flex items-center gap-2 font-semibold text-foreground no-underline hover:no-underline">
-    {#if data.theme.logoUrl}<img src={data.theme.logoUrl} alt="" class="h-7 w-auto max-w-32 object-contain" />{:else}<Icon name="sparkles" class="text-primary" />{/if}
-    <span>{t('app.name')}</span>
+    {#if brandLogo}<img src={brandLogo} alt="" class="h-7 w-auto max-w-32 object-contain" />{:else}<Icon name="sparkles" class="text-primary" />{/if}
+    <span>{brandName}</span>
   </a>
 {/snippet}
 

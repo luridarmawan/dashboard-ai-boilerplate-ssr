@@ -20,6 +20,10 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'app.name',
         type: 'string',
         title: { id: 'Nama aplikasi', en: 'Application name' },
+        note: {
+          id: 'Tampil di kiri atas setiap halaman, judul tab halaman depan, dan email keluar.',
+          en: 'Shown top-left on every page, in the landing page tab title, and in outgoing e-mail.',
+        },
         default: 'Dashboard',
         public: true,
         max: 120,
@@ -29,6 +33,10 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'app.logo_url',
         type: 'string',
         title: { id: 'URL logo', en: 'Logo URL' },
+        note: {
+          id: 'URL absolut atau path (mis. /files/…/content). Tema kustom yang mengunggah logonya sendiri menimpa ini selama tema itu aktif.',
+          en: 'Absolute URL or path (e.g. /files/…/content). A custom theme that uploaded its own logo overrides this while that theme is active.',
+        },
         default: null,
         public: true,
         max: 512,

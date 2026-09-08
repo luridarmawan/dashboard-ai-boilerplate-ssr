@@ -7,7 +7,7 @@ const t = useT();
 </script>
 
 <svelte:head>
-  <title>Dashboard AI Boilerplate</title>
+  <title>{data.app.name || t('app.name')}</title>
 </svelte:head>
 
 <div class="page">

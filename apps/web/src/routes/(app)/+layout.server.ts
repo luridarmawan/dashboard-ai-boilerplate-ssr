@@ -57,7 +57,6 @@ export const load: LayoutServerLoad = async (event) => {
     breadcrumb: buildBreadcrumb(event.url.pathname, menu, locale),
     layoutId: layout.layout.id,
     layoutVariant: variant,
-    appName: (event.locals.config.values['app.name'] as string | undefined) ?? 'Dashboard',
     unreadNotifications: unread,
     shellWidgets,
   };

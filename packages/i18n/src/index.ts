@@ -113,7 +113,43 @@ export function parseAcceptLanguage(header: string | null | undefined): string[]
     .map((x) => x.tag);
 }
 
-/** Only the ACTIVE locale's messages travel to the browser — never the whole catalogue. */
-export function messagesFor(locale: Locale): Readonly<Record<string, string>> {
-  return messages[locale] as Record<string, string>;
+/**
+ * Namespaces a visitor can need BEFORE signing in: the shell chrome, the landing, the auth pages,
+ * the theme and language pickers, the shared table/form components, and the error pages. Everything
+ * else belongs to the dashboard, and the public landing page has the tightest budget of the app
+ * (PRD §9), so an anonymous response does not carry it. Module namespaces are added by the caller
+ * for the modules that contribute public routes. `apps/web` has a test that fails when a page an
+ * anonymous visitor can reach uses a key outside this set.
+ */
+export const ANONYMOUS_NAMESPACES: readonly string[] = [
+  'app',
+  'auth',
+  'common',
+  'error',
+  'landing',
+  'lang',
+  'nav',
+  'shell',
+  'table',
+  'theme',
+];
+
+/**
+ * Only the ACTIVE locale's messages travel to the browser — never the whole catalogue. With
+ * `namespaces`, only those namespaces travel (K-4 renders a missing key as the key itself, so a
+ * filter that is too tight is visible, never fatal).
+ */
+export function messagesFor(
+  locale: Locale,
+  namespaces?: readonly string[],
+): Readonly<Record<string, string>> {
+  const all = messages[locale] as Record<string, string>;
+  if (!namespaces) return all;
+  const allow = new Set(namespaces);
+  const out: Record<string, string> = {};
+  for (const [key, text] of Object.entries(all)) {
+    const dot = key.indexOf('.');
+    if (allow.has(dot < 0 ? key : key.slice(0, dot))) out[key] = text;
+  }
+  return out;
 }
