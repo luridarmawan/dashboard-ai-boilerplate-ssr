@@ -1,10 +1,7 @@
 {
   "uid": "dab-api",
   "title": "Dashboard AI Boilerplate \u2014 API",
-  "tags": [
-    "dab",
-    "api"
-  ],
+  "tags": ["dab", "api"],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
@@ -449,9 +446,7 @@
       },
       "options": {
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+          "calcs": ["lastNotNull"]
         },
         "colorMode": "value",
         "graphMode": "none"
