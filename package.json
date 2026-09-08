@@ -60,7 +60,8 @@
     "test:integration:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app -e INTEGRATION=1 oven/bun:1.4 sh -c \"bun run bootstrap && bun run --cwd packages/db migrate && BOOTSTRAP_ADMIN_EMAIL=admin@example.test BOOTSTRAP_ADMIN_PASSWORD='bootstrap admin password' bun run db:seed && bun test integration\"",
     "test:unit": "bun --env-file=/dev/null test",
     "theme:validate": "bun run scripts/ci/theme-validate.ts",
-    "typecheck": "bun run scripts/typecheck-all.ts"
+    "typecheck": "bun run scripts/typecheck-all.ts",
+    "favicon:render": "bun run --cwd apps/web scripts/favicon-render.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

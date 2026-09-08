@@ -35,7 +35,14 @@ provideI18n({
 
 <svelte:head>
   <meta name="color-scheme" content={data.theme.mode === 'dark' ? 'dark' : data.theme.mode === 'light' ? 'light' : 'light dark'} />
-  {#if data.theme.faviconUrl}<link rel="icon" href={data.theme.faviconUrl} />{/if}
+  {#if data.theme.faviconUrl}
+    <link rel="icon" href={data.theme.faviconUrl} />
+  {:else}
+    <!-- Brand favicon (static/favicon.svg + PNG fallbacks from `bun run favicon:render`); a custom theme's favicon (assets.favicon) replaces it. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  {/if}
 </svelte:head>
 
 {@render children()}
