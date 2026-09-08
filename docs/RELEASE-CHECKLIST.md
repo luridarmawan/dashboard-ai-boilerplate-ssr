@@ -41,7 +41,11 @@ dc stop api web
 dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE <DATABASE_NAME>; CREATE DATABASE <DATABASE_NAME>'   # nama dari .env.prod (baku app)
 dc run --rm -e CONFIRM_RESTORE=yes restore latest
 # build image
-dc up -d --scale api=3 && curl -s https://DOMAIN/v1/ready
+dc up -d --scale api=3
+dc run --rm preflight
+dc run --rm migrate
+dc run --rm seed
+curl -s https://DOMAIN/v1/ready
 # 25: setelah 10 menit idle
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
