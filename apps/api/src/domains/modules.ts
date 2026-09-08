@@ -4,6 +4,7 @@ import { inArray, schema, unsafeAcrossTenants } from '@core/db';
 import { modules } from '@core/module-kit/registry';
 import { GLOBAL } from '@core/settings';
 import { Elysia, t } from 'elysia';
+import { moduleCatalog } from '../module-catalog.ts';
 import { notify } from '../notifications.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
@@ -70,9 +71,54 @@ function actor(auth: AuthState | null): AuthState {
   return auth;
 }
 
+const CatalogEntryView = t.Object({
+  name: t.String(),
+  version: t.String(),
+  description: t.Nullable(Localized),
+  repo: t.String(),
+  ref: t.String(),
+  path: t.Nullable(t.String()),
+  bundled: t.Boolean(),
+  homepage: t.Nullable(t.String()),
+  engines: t.Object({ core: t.String() }),
+  tags: t.Array(t.String()),
+  /** installed | update | available | incompatible */
+  status: t.String(),
+  installedVersion: t.Nullable(t.String()),
+  installCommand: t.Nullable(t.String()),
+});
+
 export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags: ['module'] })
   .use(requestContext)
   .use(tenantContext)
+  // ---- catalog (G-16): browse what can be installed; installing stays a build-time command ----
+  .get(
+    '/catalog',
+    async ({ auth }) => {
+      actor(auth);
+      return ok(await moduleCatalog());
+    },
+    {
+      beforeHandle: permission('module.manage'),
+      response: {
+        200: OkSchema(
+          t.Object({
+            source: t.String(),
+            url: t.Nullable(t.String()),
+            fetchedAt: t.String(),
+            coreVersion: t.Nullable(t.String()),
+            error: t.Nullable(t.String()),
+            entries: t.Array(CatalogEntryView),
+          }),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Module catalog vs installed modules: status per entry and the install command (G-16)',
+      },
+    },
+  )
   .get(
     '/enabled',
     async ({ tenantState }) => {

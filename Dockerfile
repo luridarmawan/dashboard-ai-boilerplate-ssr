@@ -54,6 +54,8 @@ RUN apk add --no-cache ca-certificates libstdc++ libgcc \
 WORKDIR /app
 ENV NODE_ENV=production API_HOST=0.0.0.0 API_PORT=3001
 COPY --from=build --chown=app:app /out/api /app/api
+# Module catalog (G-16) + root package.json (core version) are read from the working directory.
+COPY --from=build --chown=app:app /app/modules.catalog.json /app/package.json /app/
 USER app
 EXPOSE 3001
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 CMD ["/app/api", "health"]

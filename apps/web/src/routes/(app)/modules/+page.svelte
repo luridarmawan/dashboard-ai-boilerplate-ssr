@@ -41,6 +41,20 @@ const sourceLabel = (s: string) =>
 const total = $derived(data.modules.length);
 const active = $derived(data.modules.filter((m) => m.effective).length);
 const unhealthy = $derived(data.modules.filter((m) => m.health.status === 'failed').length);
+type CatalogEntry = NonNullable<typeof data.catalog>['entries'][number];
+const statusBadge = (s: string): [string, 'success' | 'secondary' | 'outline' | 'destructive'] =>
+  s === 'installed'
+    ? ['terpasang', 'success']
+    : s === 'update'
+      ? ['pembaruan', 'secondary']
+      : s === 'incompatible'
+        ? ['tidak cocok', 'destructive']
+        : ['tersedia', 'outline'];
+const catalogEntries = $derived(
+  [...(data.catalog?.entries ?? [])].sort((a: CatalogEntry, b: CatalogEntry) =>
+    a.name.localeCompare(b.name),
+  ),
+);
 </script>
 
 <svelte:head><title>Modul</title></svelte:head>
@@ -138,4 +152,37 @@ const unhealthy = $derived(data.modules.filter((m) => m.health.status === 'faile
       </div>
     {/each}
   </div>
+
+  {#if data.catalog}
+    <!-- G-16: browse the catalog; installing is a build-time command, shown verbatim -->
+    <section class="mt-8" data-testid="module-catalog">
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2>Katalog modul</h2>
+          <p class="mt-1 max-w-3xl text-sm text-muted-foreground">Modul adalah kode: memasangnya berarti submodule terkunci + migrasi + build baru, jadi katalog menunjukkan perintah yang dijalankan di host (<code>bun modules:install &lt;Nama&gt;</code>), bukan tombol pasang. Sumber: {data.catalog.source === 'url' ? data.catalog.url : data.catalog.source === 'file' ? 'modules.catalog.json' : 'tidak ada'}{#if data.catalog.coreVersion} · core v{data.catalog.coreVersion}{/if}.</p>
+        </div>
+      </div>
+      {#if data.catalog.error}<p class="error mt-3" role="alert">Katalog tidak bisa dimuat: {data.catalog.error}</p>{/if}
+      <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {#each catalogEntries as e (e.name)}
+          {@const [label, variant] = statusBadge(e.status)}
+          <Card class={e.status === 'incompatible' ? 'opacity-70' : ''}>
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-base">{e.name}</h3>
+              <Badge variant="outline">v{e.version}</Badge>
+              <Badge {variant}>{label}{#if e.status === 'update'} dari v{e.installedVersion}{/if}</Badge>
+              {#if e.bundled}<Badge variant="secondary">bawaan core</Badge>{/if}
+            </div>
+            {#if e.description}<p class="mt-1 text-sm text-muted-foreground">{e.description[locale]}</p>{/if}
+            {#if e.tags.length}<p class="mt-2 flex flex-wrap gap-1">{#each e.tags as tg (tg)}<code class="text-xs">{tg}</code>{/each}</p>{/if}
+            <p class="mt-2 text-xs text-muted-foreground">butuh core <code>{e.engines.core}</code>{#if e.homepage} · <a href={e.homepage} rel="noopener" target="_blank">beranda</a>{/if}</p>
+            {#if e.installCommand}
+              <pre class="mt-3 overflow-x-auto rounded-md border bg-muted/40 p-2 text-xs"><code>bun modules:install {e.name}
+# = {e.installCommand}</code></pre>
+            {/if}
+          </Card>
+        {/each}
+      </div>
+    </section>
+  {/if}
 </div>

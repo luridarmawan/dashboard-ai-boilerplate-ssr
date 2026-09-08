@@ -503,6 +503,8 @@ Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modul
 | `bun modgen <Nama> --fields …` | Membuat modul lengkap + daftar + sync + migrasi (§2). `--dry-run` untuk melihat daftar berkas, `--no-register` untuk berkas saja |
 | `bun create module <folder>` | Repositori modul standalone dari templat `.bun-create/module` (§7) |
 | `bun modules:add <git-url> --ref <tag>` | Memasang modul dari repositori lain sebagai submodule terkunci (§7) |
+| `bun modules:search [teks]` | Menelusuri katalog modul (`modules.catalog.json` / `MODULES_CATALOG_URL`) dengan status terhadap host ini (§7c) |
+| `bun modules:install <Nama>` | Memasang dari katalog: menyelesaikan repo + ref lalu menjalankan `modules:add` (§7c) |
 | `bun modules:sync` | Setelah menambah/mengubah/mencabut modul. Otomatis sebelum `dev`, `build`, `check`, `test` |
 | `bun db:generate` | Setelah mengubah `db/tables.ts` — menulis migrasi baru untuk kedua dialect |
 | `bun db:migrate` | Menerapkan migrasi ke database dari `DATABASE_URL`. Satu-satunya jalur produksi (Q-4) |
@@ -580,6 +582,18 @@ Aturan yang dijaga `modules:sync` untuk sumber `submodule`:
 - Host **tidak** me-lint/memformat kode modul eksternal; modul itu tanggung jawab reponya sendiri — CI di repo modul (`harness --web`) yang melakukannya.
 
 Seluruh alur ini dibuktikan otomatis di CI oleh `bun run ci:cross-repo` (`scripts/ci/cross-repo-proof.sh`): `bun create module` → rename → harness terhadap clone core → `modules:add` dari URL git pada tag → hanya `modules.json`, `.gitmodules`, `biome.json`, `bun.lock`, `modules/<Nama>` dan migrasi yang berubah → uninstall → pohon identik.
+
+### 7c. Katalog modul — `bun modules:search` / `bun modules:install` (G-16)
+
+Katalog adalah berkas JSON `modules.catalog.json` (skema `catalogSchema` di `@core/module-kit`): per modul `name`, `version`, `description`, `repo` (URL git), `ref` (tag/commit — bukan branch), `engines.core`, `tags`, `homepage`, dan `bundled` untuk modul yang sudah ada di core. Untuk berbagi satu katalog antar instalasi, taruh salinannya di web dan isi `MODULES_CATALOG_URL` (API mengambilnya dengan batas waktu 5 detik dan cache 10 menit); `MODULES_CATALOG_FILE` menunjuk berkas lain.
+
+```bash
+bun modules:search              # semua entri: terpasang / pembaruan / tersedia / tidak cocok
+bun modules:search tagihan      # cari di nama, deskripsi, tag
+bun modules:install Billing     # = bun modules:add <repo> --ref <ref> --name Billing, lalu lanjutkan §7b
+```
+
+Halaman **Modul** (izin `module.manage`) menampilkan bagian *Katalog modul* dari `GET /v1/module/catalog` dengan status yang sama dan **perintah pasang apa adanya** — memasang modul adalah tindakan waktu-build (submodule terkunci, migrasi, image baru), bukan tombol di runtime; katalog tidak pernah menjalankan kode. Entri yang `engines.core`-nya tidak cocok ditandai *tidak cocok* dan tidak diberi perintah (G-11). Bukti: `packages/module-kit/test/catalog.test.ts`, `apps/api/test/integration/modules-catalog.test.ts`.
 
 ---
 

@@ -1,0 +1,48 @@
+{
+  "$comment": "Module catalog (PRD G-16). Browse with `bun modules:search`, install with `bun modules:install <Name>` (resolves repo + ref, then runs `bun modules:add`). Point MODULES_CATALOG_URL at a hosted copy to share one catalog across installations.",
+  "updatedAt": "2026-09-08",
+  "modules": [
+    {
+      "name": "AI",
+      "version": "0.1.0",
+      "description": {
+        "id": "Asisten AI: chat streaming kompatibel-OpenAI, riwayat, lampiran, threading, kuota, penyedia, MCP",
+        "en": "AI assistant: OpenAI-compatible streaming chat, history, attachments, threading, quotas, providers, MCP"
+      },
+      "repo": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git",
+      "ref": "main",
+      "path": "modules/AI",
+      "bundled": true,
+      "engines": { "core": ">=0.0.0" },
+      "tags": ["ai", "chat", "mcp"]
+    },
+    {
+      "name": "Example",
+      "version": "0.1.0",
+      "description": {
+        "id": "Referensi kontrak lengkap: landing publik, CRUD produk, form kontak, widget, konfigurasi, seed, i18n",
+        "en": "Full contract reference: public landing, product CRUD, contact form, widget, config, seed, i18n"
+      },
+      "repo": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git",
+      "ref": "main",
+      "path": "modules/Example",
+      "bundled": true,
+      "engines": { "core": ">=0.0.0" },
+      "tags": ["example", "reference"]
+    },
+    {
+      "name": "Dummy",
+      "version": "0.1.0",
+      "description": {
+        "id": "Contoh tema, layout, dan set ikon dari modul (titik perluasan 14–16)",
+        "en": "Sample theme, layout and icon set contributed by a module (extension points 14–16)"
+      },
+      "repo": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git",
+      "ref": "main",
+      "path": "modules/Dummy",
+      "bundled": true,
+      "engines": { "core": ">=0.0.0" },
+      "tags": ["theme", "layout", "icons"]
+    }
+  ]
+}

@@ -61,7 +61,9 @@
     "test:unit": "bun --env-file=/dev/null test",
     "theme:validate": "bun run scripts/ci/theme-validate.ts",
     "typecheck": "bun run scripts/typecheck-all.ts",
-    "favicon:render": "bun run --cwd apps/web scripts/favicon-render.ts"
+    "favicon:render": "bun run --cwd apps/web scripts/favicon-render.ts",
+    "modules:search": "bun run scripts/modules-catalog.ts search",
+    "modules:install": "bun run scripts/modules-catalog.ts install"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

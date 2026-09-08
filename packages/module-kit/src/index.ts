@@ -4,6 +4,18 @@
  * A module lives in its own folder (and may live in its own repository, §4.9). It depends on
  * this package and on `@core/db` as real packages — never on relative paths into core.
  */
+
+export {
+  type Catalog,
+  type CatalogEntry,
+  type CatalogStatus,
+  type CatalogView,
+  catalogEntrySchema,
+  catalogSchema,
+  compareCatalog,
+  compareSemver,
+  searchCatalog,
+} from './catalog.ts';
 export {
   type ApiRoutesLike,
   CORE_ACTIONS,

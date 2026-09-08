@@ -10,7 +10,16 @@ export const load: PageServerLoad = async (event) => {
       res.status,
       res.status === 403 ? 'Anda tidak punya izin melihat modul' : 'Modul tidak bisa dimuat',
     );
-  return { modules: res.data.data, canGlobal: !!event.locals.session?.user.isSuperadmin };
+  // G-16: the catalog needs module.manage; anyone else simply gets no catalog section.
+  const cat = await apiFor(event)
+    .v1.module.catalog.get()
+    .then((r) => (r.data?.success ? r.data.data : null))
+    .catch(() => null);
+  return {
+    modules: res.data.data,
+    catalog: cat,
+    canGlobal: !!event.locals.session?.user.isSuperadmin,
+  };
 };
 
 export const actions: Actions = {
