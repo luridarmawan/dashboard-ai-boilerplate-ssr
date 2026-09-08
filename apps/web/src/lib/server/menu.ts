@@ -36,8 +36,6 @@ interface Entry {
   parent?: string;
   /** undefined → the owning module's group; null → top level; string → a core group id. */
   group?: string | null;
-  /** Module name for module entries; absent for core. */
-  module?: string;
 }
 
 interface GroupDef {
@@ -194,9 +192,10 @@ export function buildMenu(
   const byId = new Map<string, MenuItem>();
   for (const e of allowed) byId.set(e.id, toItem(e));
 
-  // Effective group of an entry: explicit id, null for the top level, else the owning module.
+  // Effective group of an entry: explicit id, null for the top level, else the owning module's
+  // NAMESPACE (`dummy.notes` → `dummy`), which is how module groups are keyed.
   const groupOf = (e: Entry): string | null =>
-    e.group === undefined ? (e.module ?? e.id.split('.')[0] ?? null) : e.group;
+    e.group === undefined ? (e.id.split('.')[0] ?? null) : e.group;
   const groups = new Map<string, MenuItem>();
   const groupDefs = new Map(allGroups().map((g) => [g.id, g]));
   const roots: MenuItem[] = [];
