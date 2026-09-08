@@ -1,18 +1,25 @@
 import {
   detachTenantFromSessions,
+  generateRecoveryCodes,
+  generateTotpSecret,
   hashPassword,
+  hashRecoveryCode,
   hashToken,
   invalidateUserSessions,
   isMemberOf,
+  otpauthUrl,
   passwordProblems,
   randomToken,
   revokeAllSessions,
   verifyPassword,
+  verifyTotp,
   writeAudit,
 } from '@core/auth';
 import {
   errorResponses,
   fail,
+  MfaCodeBody,
+  MfaDisableBody,
   OkSchema,
   ok,
   PageSchema,
@@ -44,7 +51,7 @@ import { publicLink, sendTemplate } from '../mail.ts';
 import { type AuthState, clientIp, publicUser } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, type TenantState, tenantContext } from '../plugins/tenancy.ts';
-import { emit } from '../services.ts';
+import { emit, settings } from '../services.ts';
 
 /** Avatars are small by construction: 2 MB caps even a generous PNG. */
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
@@ -89,6 +96,36 @@ const TenantUser = t.Intersect([
 ]);
 
 type UserRow = typeof schema.users.$inferSelect;
+
+// ---- 2FA (A-11) ----
+const MfaStatus = t.Object({
+  enabled: t.Boolean(),
+  /** Setup started (secret issued) but not yet confirmed with a code. */
+  pending: t.Boolean(),
+  recoveryCodesLeft: t.Integer(),
+});
+function mfaStatus(row: typeof schema.userMfa.$inferSelect | undefined) {
+  const codes = row?.recovery_codes;
+  const left = Array.isArray(codes) ? codes.length : 0;
+  return {
+    enabled: !!row?.enabled_at,
+    pending: !!row && !row.enabled_at,
+    recoveryCodesLeft: row?.enabled_at ? left : 0,
+  };
+}
+const sessionGuard = ({
+  auth,
+  set,
+  requestId,
+}: {
+  auth: AuthState | null;
+  set: { status?: number | string };
+  requestId: string;
+}) => {
+  if (auth) return;
+  set.status = 401;
+  return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
+};
 
 function actor(auth: AuthState | null): AuthState {
   if (!auth) throw new Error('guard missing: route reached without a session');
@@ -227,6 +264,236 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       detail: { summary: 'Edit my profile: name, locale, theme, avatar (D-4)' },
     },
   )
+  // ---- 2FA TOTP (A-11): setup → enable (recovery codes shown once) → disable / regenerate -------
+  .get(
+    '/profile/mfa',
+    async ({ auth }) => {
+      const a = actor(auth);
+      const [mfa] = await unsafeAcrossTenants()
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, a.user.id))
+        .limit(1);
+      // While setup is pending the secret is the user's own, not yet enforced: returning it lets the
+      // page keep showing the QR across reloads and failed attempts without rotating it.
+      const pending = !!mfa && !mfa.enabled_at;
+      const issuer = (await settings.get<string | null>(null, 'app.name')) || 'Dashboard';
+      return ok({
+        ...mfaStatus(mfa),
+        secret: pending ? mfa.secret : null,
+        otpauthUrl: pending ? otpauthUrl(issuer, a.user.email, mfa.secret) : null,
+      });
+    },
+    {
+      beforeHandle: sessionGuard,
+      response: {
+        200: OkSchema(
+          t.Intersect([
+            MfaStatus,
+            t.Object({ secret: t.Nullable(t.String()), otpauthUrl: t.Nullable(t.String()) }),
+          ]),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'My 2FA status: enabled, pending setup (with its secret + otpauth URL), recovery codes left',
+      },
+    },
+  )
+  .post(
+    '/profile/mfa/setup',
+    async ({ auth }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const [existing] = await db
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, a.user.id))
+        .limit(1);
+      if (existing?.enabled_at)
+        return ok({ ...mfaStatus(existing), secret: null, otpauthUrl: null });
+      const secret = generateTotpSecret();
+      if (existing)
+        await db
+          .update(schema.userMfa)
+          .set({ secret, last_step: null, recovery_codes: null })
+          .where(eq(schema.userMfa.id, existing.id));
+      else await db.insert(schema.userMfa).values({ id: newId(), user_id: a.user.id, secret });
+      const issuer = (await settings.get<string | null>(null, 'app.name')) || 'Dashboard';
+      return ok({
+        enabled: false,
+        pending: true,
+        recoveryCodesLeft: 0,
+        secret,
+        otpauthUrl: otpauthUrl(issuer, a.user.email, secret),
+      });
+    },
+    {
+      beforeHandle: sessionGuard,
+      response: {
+        200: OkSchema(
+          t.Intersect([
+            MfaStatus,
+            t.Object({ secret: t.Nullable(t.String()), otpauthUrl: t.Nullable(t.String()) }),
+          ]),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Start 2FA setup: a new secret (base32) + otpauth URL; nothing is enforced until /enable',
+      },
+    },
+  )
+  .post(
+    '/profile/mfa/enable',
+    async ({ auth, body, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const [mfa] = await db
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, a.user.id))
+        .limit(1);
+      if (!mfa) {
+        set.status = 409;
+        return fail('conflict', 'Mulai penyiapan dulu (POST /profile/mfa/setup)', requestId);
+      }
+      if (mfa.enabled_at) {
+        set.status = 409;
+        return fail('conflict', '2FA sudah aktif', requestId);
+      }
+      const step = await verifyTotp(mfa.secret, body.code);
+      if (step === null) {
+        set.status = 422;
+        return fail('validation_failed', 'Kode dari aplikasi autentikator tidak cocok', requestId, {
+          code: 'kode tidak cocok — periksa jam perangkat',
+        });
+      }
+      const codes = generateRecoveryCodes();
+      await db
+        .update(schema.userMfa)
+        .set({
+          enabled_at: new Date(),
+          last_step: step,
+          recovery_codes: codes.map(hashRecoveryCode),
+        })
+        .where(eq(schema.userMfa.id, mfa.id));
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.mfa_enabled',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      // Other devices must present the second factor from now on.
+      await revokeAllSessions(db, a.user.id, a.session?.id);
+      return ok({
+        enabled: true,
+        pending: false,
+        recoveryCodesLeft: codes.length,
+        recoveryCodes: codes,
+      });
+    },
+    {
+      beforeHandle: sessionGuard,
+      body: MfaCodeBody,
+      response: {
+        200: OkSchema(t.Intersect([MfaStatus, t.Object({ recoveryCodes: t.Array(t.String()) })])),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Confirm setup with a live code: 2FA becomes mandatory for my logins; recovery codes returned once',
+      },
+    },
+  )
+  .post(
+    '/profile/mfa/recovery-codes',
+    async ({ auth, body, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const [mfa] = await db
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, a.user.id))
+        .limit(1);
+      if (!mfa?.enabled_at) {
+        set.status = 409;
+        return fail('conflict', '2FA belum aktif', requestId);
+      }
+      const step = await verifyTotp(mfa.secret, body.code, { lastStep: mfa.last_step });
+      if (step === null) {
+        set.status = 422;
+        return fail('validation_failed', 'Kode tidak cocok', requestId, {
+          code: 'kode tidak cocok',
+        });
+      }
+      const codes = generateRecoveryCodes();
+      await db
+        .update(schema.userMfa)
+        .set({ last_step: step, recovery_codes: codes.map(hashRecoveryCode) })
+        .where(eq(schema.userMfa.id, mfa.id));
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.mfa_recovery_regenerated',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      return ok({
+        enabled: true,
+        pending: false,
+        recoveryCodesLeft: codes.length,
+        recoveryCodes: codes,
+      });
+    },
+    {
+      beforeHandle: sessionGuard,
+      body: MfaCodeBody,
+      response: {
+        200: OkSchema(t.Intersect([MfaStatus, t.Object({ recoveryCodes: t.Array(t.String()) })])),
+        ...errorResponses,
+      },
+      detail: { summary: 'Replace all recovery codes (needs a live TOTP code); returned once' },
+    },
+  )
+  .post(
+    '/profile/mfa/disable',
+    async ({ auth, body, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      if (!(await verifyPassword(body.password, a.user.password_hash ?? null))) {
+        set.status = 401;
+        return fail('invalid_credentials', 'Kata sandi salah', requestId);
+      }
+      await db.delete(schema.userMfa).where(eq(schema.userMfa.user_id, a.user.id));
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.mfa_disabled',
+        resource: 'user',
+        resourceId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      return ok({ enabled: false, pending: false, recoveryCodesLeft: 0 });
+    },
+    {
+      beforeHandle: sessionGuard,
+      body: MfaDisableBody,
+      response: { 200: OkSchema(MfaStatus), ...errorResponses },
+      detail: {
+        summary: 'Turn 2FA off (current password required); also discards a pending setup',
+      },
+    },
+  )
+
   // ---- avatar (Q-16): uploaded through the file service, public, user-global -----------------
   .put(
     '/profile/avatar',
@@ -327,6 +594,41 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       },
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
       detail: { summary: 'Remove my avatar (the uploaded file is deleted too)' },
+    },
+  )
+  .delete(
+    '/:id/mfa',
+    async ({ auth, params, set, request, server, requestId, tenantState }) => {
+      // Lock-out recovery by an administrator (A-11): removes the user's second factor; audited.
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const [target] = await db
+        .select()
+        .from(schema.users)
+        .where(and(eq(schema.users.id, params.id), isNull(schema.users.deleted_at)))
+        .limit(1);
+      if (!target) {
+        set.status = 404;
+        return fail('not_found', 'Pengguna tidak ditemukan', requestId);
+      }
+      await db.delete(schema.userMfa).where(eq(schema.userMfa.user_id, target.id));
+      await revokeAllSessions(db, target.id);
+      await writeAudit(db, {
+        clientId: tenantState?.clientId ?? null,
+        actorId: a.user.id,
+        action: 'user.mfa_reset_by_admin',
+        resource: 'user',
+        resourceId: target.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      return ok({ reset: true as const });
+    },
+    {
+      beforeHandle: permission('user.edit'),
+      params: t.Object({ id: Id }),
+      response: { 200: OkSchema(t.Object({ reset: t.Literal(true) })), ...errorResponses },
+      detail: { summary: 'Admin: remove a user’s 2FA (lock-out recovery) and end their sessions' },
     },
   )
   .put(

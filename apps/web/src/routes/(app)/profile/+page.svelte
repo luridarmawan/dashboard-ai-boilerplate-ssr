@@ -100,6 +100,12 @@ const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
 const apiError = $derived(form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null);
+// Failure of the "enable 2FA" step: shown next to the QR instead of the generic slot.
+const mfaError = $derived(
+  (form as { mfaStage?: string; error?: string } | null)?.mfaStage === 'enable'
+    ? ((form as { error?: string } | null)?.error ?? null)
+    : null,
+);
 </script>
 
 <svelte:head><title>Profil</title></svelte:head>
@@ -138,6 +144,50 @@ const apiError = $derived(form?.error && Object.keys(fieldErrors).length === 0 ?
       error={form?.saved === undefined ? apiError : null}
     />
     <p class="mt-3 text-sm text-muted-foreground"><a href="/theme?back=/profile">Tema &amp; tampilan</a> · <a href="/lang?back=/profile">Bahasa</a></p>
+  </Card>
+  <Card title="Autentikasi dua faktor (2FA)" description="Kode sekali pakai dari aplikasi autentikator (Google Authenticator, Aegis, 1Password, …) diminta setiap kali masuk.">
+    <div data-testid="mfa-card">
+      {#if form?.saved === 'mfaEnabled' || form?.saved === 'mfaCodes'}
+        <div class="notice" role="status" data-testid="recovery-codes">
+          <p class="font-medium">{form.saved === 'mfaEnabled' ? '2FA aktif.' : 'Kode pemulihan diganti.'} Simpan kode pemulihan ini di tempat aman — tidak akan ditampilkan lagi, dan masing-masing hanya berlaku sekali.</p>
+          <ul class="mt-2 grid grid-cols-2 gap-1 font-mono text-sm sm:grid-cols-5">{#each form.recoveryCodes ?? [] as c (c)}<li><code class="select-all">{c}</code></li>{/each}</ul>
+        </div>
+      {:else if data.mfa.pending}
+        <div class="grid gap-3 sm:grid-cols-[200px_1fr]" data-testid="mfa-setup">
+          {#if data.mfa.qr}<div class="rounded-md border bg-white p-2">{@html data.mfa.qr}</div>{/if}
+          <div class="grid gap-2 text-sm">
+            <p>Pindai kode QR dengan aplikasi autentikator, atau masukkan kunci ini secara manual:</p>
+            <code class="select-all break-all rounded-md border bg-background px-2 py-1">{data.mfa.secret}</code>
+            <form method="POST" action="?/mfaEnable" class="flex flex-wrap items-end gap-2">
+              <Csrf token={data.csrf} />
+              <label class="grid gap-1"><span>Kode 6 digit dari aplikasi</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
+              <Button type="submit" size="sm">Aktifkan 2FA</Button>
+            </form>
+            {#if mfaError}<p class="error" role="alert">{mfaError}</p>{/if}
+            <form method="POST" action="?/mfaSetup" class="text-xs text-muted-foreground"><Csrf token={data.csrf} />Kunci tidak terpindai? <button type="submit" class="underline">Mulai ulang dengan kunci baru</button></form>
+          </div>
+        </div>
+      {:else if data.mfa.enabled}
+        <p class="text-sm"><Badge variant="success">aktif</Badge> · {data.mfa.recoveryCodesLeft} kode pemulihan tersisa</p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <form method="POST" action="?/mfaCodes" class="flex flex-wrap items-end gap-2">
+            <Csrf token={data.csrf} />
+            <label class="grid gap-1 text-sm"><span>Kode saat ini</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
+            <Button type="submit" variant="outline" size="sm">Buat kode pemulihan baru</Button>
+          </form>
+          <form method="POST" action="?/mfaDisable" class="flex flex-wrap items-end gap-2">
+            <Csrf token={data.csrf} />
+            <label class="grid gap-1 text-sm"><span>Kata sandi saat ini</span><input name="password" type="password" autocomplete="current-password" required class="h-9 w-44 rounded-md border border-input bg-background px-2" /></label>
+            <Button type="submit" variant="destructive" size="sm">Matikan 2FA</Button>
+          </form>
+        </div>
+        {#if form?.saved === undefined && form?.error && !mfaError}<p class="error mt-2" role="alert">{form.error}</p>{/if}
+      {:else}
+        <p class="text-sm text-muted-foreground">Belum aktif.</p>
+        <form method="POST" action="?/mfaSetup" class="mt-3"><Csrf token={data.csrf} /><Button type="submit" size="sm"><Icon name="shield" size={14} />Siapkan 2FA</Button></form>
+      {/if}
+      {#if form?.saved === 'mfaDisabled'}<p class="notice mt-3">2FA dimatikan.</p>{/if}
+    </div>
   </Card>
   <Card title="Ganti kata sandi" description="Sesi di perangkat lain akan diakhiri.">
     <FormBuilder fields={passwordFields} errors={form?.saved === undefined && form?.code ? {} : fieldErrors} csrf={data.csrf} action="?/password" submitLabel="Ganti kata sandi" notice={form?.saved === 'password' ? 'Kata sandi diganti. Sesi di perangkat lain telah diakhiri.' : null} error={null} />

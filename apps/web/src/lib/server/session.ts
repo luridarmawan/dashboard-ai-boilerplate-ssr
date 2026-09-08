@@ -230,12 +230,18 @@ export function unwrap<T extends { success: true }>(r: {
 }
 
 /** Standard action failure: keep what the user typed, show the API's message. */
-export function actionFailure(f: ApiFailure, values: Record<string, unknown> = {}) {
+export function actionFailure(
+  f: ApiFailure,
+  values: Record<string, unknown> = {},
+  /** Extra page state to keep alongside the failure (e.g. which step of a flow the user is on). */
+  extra: Record<string, unknown> = {},
+) {
   return fail(f.status >= 400 && f.status < 600 ? f.status : 500, {
     error: f.message,
     code: f.code,
     details: f.details ?? null,
     values,
+    ...extra,
   });
 }
 

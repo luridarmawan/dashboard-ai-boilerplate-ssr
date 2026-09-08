@@ -69,3 +69,17 @@ export {
   type UserRow,
 } from './sessions.ts';
 export { hashToken, looksLikeToken, randomToken, timingSafeEqual } from './tokens.ts';
+export {
+  base32Decode,
+  base32Encode,
+  generateRecoveryCodes,
+  generateTotpSecret,
+  hashRecoveryCode,
+  normalizeRecoveryCode,
+  otpauthUrl,
+  TOTP_DIGITS,
+  TOTP_STEP_SECONDS,
+  totpAt,
+  totpStep,
+  verifyTotp,
+} from './totp.ts';

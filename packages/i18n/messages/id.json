@@ -92,5 +92,10 @@
   "lang.en": "English",
   "nav.examples": "Contoh pola",
   "nav.settings": "Pengaturan",
-  "nav.modules": "Modul"
+  "nav.modules": "Modul",
+  "auth.mfa.prompt": "Kata sandi diterima. Masukkan kode 6 digit dari aplikasi autentikator Anda.",
+  "auth.mfa.code": "Kode verifikasi",
+  "auth.mfa.submit": "Verifikasi",
+  "auth.mfa.back": "Kembali",
+  "auth.mfa.recovery_hint": "Tidak punya akses ke aplikasi? Masukkan salah satu kode pemulihan Anda; setiap kode hanya berlaku sekali."
 }

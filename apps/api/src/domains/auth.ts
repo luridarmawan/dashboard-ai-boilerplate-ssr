@@ -4,6 +4,7 @@ import {
   createSession,
   effectivePermissions,
   hashPassword,
+  hashRecoveryCode,
   hashToken,
   invalidateUserSessions,
   parseRateLimitRule,
@@ -16,10 +17,11 @@ import {
   setActiveTenant,
   tenantsOf,
   verifyPassword,
+  verifyTotp,
   writeAudit,
 } from '@core/auth';
 import { env } from '@core/config';
-import { Email, errorResponses, fail, OkSchema, ok, Password } from '@core/contracts';
+import { Email, errorResponses, fail, MfaLoginBody, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
 import { publicLink, sendTemplate } from '../mail.ts';
@@ -72,6 +74,52 @@ async function defaultTenantFor(userId: string): Promise<string | null> {
     );
   return rows.find((r) => r.is_default)?.client_id ?? rows[0]?.client_id ?? null;
 }
+
+/** A password-verified login becomes a session: cookie, last_login_at, audit (A-3, A-11). */
+async function issueSession(p: {
+  db: ReturnType<typeof unsafeAcrossTenants>;
+  user: typeof schema.users.$inferSelect;
+  ip: string;
+  request: Request;
+  cookie: Record<string, { set(v: Record<string, unknown>): void } | undefined>;
+  requestId: string;
+  mfa?: 'totp' | 'recovery';
+}) {
+  const e = env();
+  const clientId = await defaultTenantFor(p.user.id);
+  const session = await createSession(p.db, {
+    userId: p.user.id,
+    clientId,
+    ip: p.ip,
+    userAgent: p.request.headers.get('user-agent'),
+    ttlSeconds:
+      ((await settings.get<number | null>(null, 'security.session_hours')) ?? e.SESSION_TTL_HOURS) *
+      3600,
+  });
+  await p.db
+    .update(schema.users)
+    .set({ last_login_at: new Date() })
+    .where(eq(schema.users.id, p.user.id));
+  p.cookie[SESSION_COOKIE]?.set({
+    value: session.token,
+    ...cookieAttributes(p.request),
+    expires: session.expiresAt,
+  });
+  await writeAudit(p.db, {
+    clientId,
+    actorId: p.user.id,
+    action: 'auth.login',
+    resource: 'user',
+    resourceId: p.user.id,
+    ip: p.ip,
+    requestId: p.requestId,
+    after: p.mfa ? { mfa: p.mfa } : undefined,
+  });
+  return { user: publicUser(p.user), clientId };
+}
+/** A challenge lives five minutes and dies after five wrong codes. */
+const MFA_CHALLENGE_TTL_MS = 5 * 60_000;
+const MFA_MAX_ATTEMPTS = 5;
 
 export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] })
   .use(requestContext)
@@ -240,43 +288,143 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return fail('invalid_credentials', 'Email atau kata sandi salah', requestId);
       }
 
-      const clientId = await defaultTenantFor(user.id);
-      const session = await createSession(db, {
-        userId: user.id,
-        clientId,
-        ip,
-        userAgent: request.headers.get('user-agent'),
-        ttlSeconds:
-          ((await settings.get<number | null>(null, 'security.session_hours')) ??
-            e.SESSION_TTL_HOURS) * 3600,
-      });
-      await db
-        .update(schema.users)
-        .set({ last_login_at: new Date() })
-        .where(eq(schema.users.id, user.id));
-      cookie[SESSION_COOKIE]?.set({
-        value: session.token,
-        ...cookieAttributes(request),
-        expires: session.expiresAt,
-      });
-      await writeAudit(db, {
-        clientId,
-        actorId: user.id,
-        action: 'auth.login',
-        resource: 'user',
-        resourceId: user.id,
-        ip,
-        requestId,
-      });
-      return ok({ user: publicUser(user), clientId });
+      // Second factor (A-11): the password alone does not open a session — hand out a short-lived
+      // challenge the client completes at POST /auth/login/mfa.
+      const [mfa] = await db
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, user.id))
+        .limit(1);
+      if (mfa?.enabled_at) {
+        const token = randomToken();
+        await db.insert(schema.mfaChallenges).values({
+          id: newId(),
+          user_id: user.id,
+          token_hash: hashToken(token),
+          expires_at: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
+          ip,
+        });
+        await writeAudit(db, {
+          clientId: null,
+          actorId: user.id,
+          action: 'auth.mfa_challenge',
+          resource: 'user',
+          resourceId: user.id,
+          ip,
+          requestId,
+        });
+        return ok({ mfaRequired: true as const, challenge: token });
+      }
+      return ok(await issueSession({ db, user, ip, request, cookie, requestId }));
     },
     {
       body: t.Object({ email: Email, password: Password }),
       response: {
+        200: OkSchema(
+          t.Union([
+            t.Object({ user: PublicUser, clientId: t.Nullable(t.String()) }),
+            t.Object({ mfaRequired: t.Literal(true), challenge: t.String() }),
+          ]),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Login (A-2, A-3): rate-limited; sets the httpOnly session cookie, or returns an MFA challenge (A-11)',
+      },
+    },
+  )
+  .post(
+    '/login/mfa',
+    async ({ body, set, request, requestId, cookie, server }) => {
+      const db = unsafeAcrossTenants();
+      const ip = clientIp(request, server) ?? 'unknown';
+      const now = new Date();
+      const [ch] = await db
+        .select()
+        .from(schema.mfaChallenges)
+        .where(eq(schema.mfaChallenges.token_hash, hashToken(body.challenge)))
+        .limit(1);
+      const refuse = (
+        message: string,
+        code: 'invalid_credentials' | 'rate_limited' = 'invalid_credentials',
+      ) => {
+        set.status = code === 'rate_limited' ? 429 : 401;
+        return fail(code, message, requestId);
+      };
+      if (!ch || ch.expires_at.getTime() < now.getTime()) {
+        if (ch) await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+        return refuse('Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi');
+      }
+      if (ch.attempts >= MFA_MAX_ATTEMPTS) {
+        await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+        return refuse('Terlalu banyak kode salah — masuk lagi', 'rate_limited');
+      }
+      const [user] = await db
+        .select()
+        .from(schema.users)
+        .where(and(eq(schema.users.id, ch.user_id), isNull(schema.users.deleted_at)))
+        .limit(1);
+      const [mfa] = await db
+        .select()
+        .from(schema.userMfa)
+        .where(eq(schema.userMfa.user_id, ch.user_id))
+        .limit(1);
+      if (!user || user.status_id !== STATUS.ACTIVE || !mfa?.enabled_at) {
+        await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+        return refuse('Tantangan 2FA tidak valid — masuk lagi');
+      }
+      // TOTP first (with replay protection), then a single-use recovery code.
+      const step = await verifyTotp(mfa.secret, body.code, { now, lastStep: mfa.last_step });
+      let method: 'totp' | 'recovery' | null = step !== null ? 'totp' : null;
+      if (step !== null) {
+        await db
+          .update(schema.userMfa)
+          .set({ last_step: step })
+          .where(eq(schema.userMfa.id, mfa.id));
+      } else {
+        const hashes = Array.isArray(mfa.recovery_codes)
+          ? (mfa.recovery_codes as unknown[]).filter((h): h is string => typeof h === 'string')
+          : [];
+        const h = hashRecoveryCode(body.code);
+        if (hashes.includes(h)) {
+          method = 'recovery';
+          await db
+            .update(schema.userMfa)
+            .set({ recovery_codes: hashes.filter((x) => x !== h) })
+            .where(eq(schema.userMfa.id, mfa.id));
+        }
+      }
+      if (!method) {
+        await db
+          .update(schema.mfaChallenges)
+          .set({ attempts: ch.attempts + 1 })
+          .where(eq(schema.mfaChallenges.id, ch.id));
+        await writeAudit(db, {
+          clientId: null,
+          actorId: user.id,
+          action: 'auth.mfa_failed',
+          resource: 'user',
+          resourceId: user.id,
+          ip,
+          requestId,
+        });
+        return refuse('Kode 2FA salah');
+      }
+      await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+      const result = await issueSession({ db, user, ip, request, cookie, requestId, mfa: method });
+      return ok(result);
+    },
+    {
+      body: MfaLoginBody,
+      response: {
         200: OkSchema(t.Object({ user: PublicUser, clientId: t.Nullable(t.String()) })),
         ...errorResponses,
       },
-      detail: { summary: 'Login (A-2, A-3): rate-limited, sets the httpOnly session cookie' },
+      detail: {
+        summary:
+          'Second login step (A-11): challenge from /auth/login + TOTP or recovery code → session cookie',
+      },
     },
   )
 

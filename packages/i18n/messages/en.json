@@ -92,5 +92,10 @@
   "lang.en": "English",
   "nav.examples": "Patterns",
   "nav.settings": "Settings",
-  "nav.modules": "Modules"
+  "nav.modules": "Modules",
+  "auth.mfa.prompt": "Password accepted. Enter the 6-digit code from your authenticator app.",
+  "auth.mfa.code": "Verification code",
+  "auth.mfa.submit": "Verify",
+  "auth.mfa.back": "Back",
+  "auth.mfa.recovery_hint": "No access to the app? Enter one of your recovery codes; each works once."
 }

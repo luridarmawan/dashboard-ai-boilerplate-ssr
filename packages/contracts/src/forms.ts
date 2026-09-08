@@ -53,6 +53,16 @@ export const UserUpdateBody = t.Object({
   groupIds: t.Optional(t.Array(Id, { maxItems: 50 })),
 });
 
+// ---- 2FA TOTP (A-11) ----
+export const MfaCode = t.String({ minLength: 6, maxLength: 20 });
+/** Second login step: the challenge token from POST /auth/login plus a TOTP or recovery code. */
+export const MfaLoginBody = t.Object({
+  challenge: t.String({ minLength: 20, maxLength: 128 }),
+  code: MfaCode,
+});
+export const MfaCodeBody = t.Object({ code: MfaCode });
+export const MfaDisableBody = t.Object({ password: Password });
+
 // ---- outgoing webhooks (J-5) ----
 export const WebhookBody = t.Object({
   name: Name,

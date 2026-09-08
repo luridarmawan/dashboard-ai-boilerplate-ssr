@@ -12,6 +12,21 @@ const t = useT();
 <div class="page">
   <h1>{t('auth.login.title')}</h1>
   {#if form?.error}<p class="error">{form.error}</p>{/if}
+  {#if form?.mfa}
+    <!-- Second factor (A-11): password accepted, now a TOTP or recovery code; works without JavaScript. -->
+    <form method="POST" action="?/mfa" class="stack" data-testid="mfa-form">
+      <Csrf token={data.csrf} />
+      <input type="hidden" name="challenge" value={form.mfa.challenge} />
+      <input type="hidden" name="next" value={form.mfa.next || data.next} />
+      <p>{t('auth.mfa.prompt')}</p>
+      <label>{t('auth.mfa.code')} <input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="20" /></label>
+      <div class="row">
+        <button type="submit">{t('auth.mfa.submit')}</button>
+        <a href="/auth/login">{t('auth.mfa.back')}</a>
+      </div>
+      <p class="muted">{t('auth.mfa.recovery_hint')}</p>
+    </form>
+  {:else}
   <form method="POST" class="stack">
     <Csrf token={data.csrf} />
     <input type="hidden" name="next" value={data.next} />
@@ -23,4 +38,5 @@ const t = useT();
       <a href="/auth/register">{t('auth.login.register')}</a>
     </div>
   </form>
+  {/if}
 </div>

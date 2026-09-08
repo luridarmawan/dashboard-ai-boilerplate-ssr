@@ -1,5 +1,6 @@
 import { formToObject, PasswordChangeBody, ProfileBody, validateForm } from '@core/contracts';
 import { themes } from '@core/ui-theme';
+import QRCode from 'qrcode';
 import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -7,9 +8,18 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
   const locale = event.locals.locale.locale;
   const allowed = event.locals.theme.allowed;
-  const tokens = await apiFor(event).v1.tokens.get();
+  const api = apiFor(event);
+  const [tokens, mfaRes] = await Promise.all([api.v1.tokens.get(), api.v1.users.profile.mfa.get()]);
+  const mfa = mfaRes.data?.success
+    ? mfaRes.data.data
+    : { enabled: false, pending: false, recoveryCodesLeft: 0, secret: null, otpauthUrl: null };
+  // The QR is rendered server-side as SVG while setup is pending: no script, no third-party image.
+  const qr = mfa.otpauthUrl
+    ? await QRCode.toString(mfa.otpauthUrl, { type: 'svg', margin: 1, width: 200 })
+    : null;
   return {
     tokens: tokens.data?.success ? tokens.data.data : [],
+    mfa: { ...mfa, qr },
     appOrigin: event.url.origin,
     themes: [...themes(), ...event.locals.config.customThemes.map((c) => c.manifest)]
       .filter(
@@ -95,6 +105,41 @@ export const actions: Actions = {
     const r = unwrap(await apiFor(event).v1.users.profile.password.put(v.value));
     if (!r.ok) return actionFailure(r.failure);
     return { saved: 'password' as const };
+  },
+  // ---- 2FA TOTP (A-11) ----
+  mfaSetup: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap(await apiFor(event).v1.users.profile.mfa.setup.post());
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'mfaSetup' as const }; // the reloaded page shows the pending QR
+  },
+  mfaEnable: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap<{ success: true; data: { recoveryCodes: string[] } }>(
+      await apiFor(event).v1.users.profile.mfa.enable.post({ code: str(form, 'code') }),
+    );
+    if (!r.ok) return actionFailure(r.failure, {}, { mfaStage: 'enable' as const });
+    return { saved: 'mfaEnabled' as const, recoveryCodes: r.data.data.recoveryCodes };
+  },
+  mfaCodes: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap<{ success: true; data: { recoveryCodes: string[] } }>(
+      await apiFor(event).v1.users.profile.mfa['recovery-codes'].post({ code: str(form, 'code') }),
+    );
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'mfaCodes' as const, recoveryCodes: r.data.data.recoveryCodes };
+  },
+  mfaDisable: async (event) => {
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap(
+      await apiFor(event).v1.users.profile.mfa.disable.post({ password: str(form, 'password') }),
+    );
+    if (!r.ok) return actionFailure(r.failure);
+    return { saved: 'mfaDisabled' as const };
   },
   // ---- API tokens (A-4): minted for MCP clients and other non-browser callers ----
   createToken: async (event) => {

@@ -19,6 +19,7 @@ import { schedulerJobs } from './scheduler_jobs.def.ts';
 import { schedulerRuns } from './scheduler_runs.def.ts';
 import { sessions } from './sessions.def.ts';
 import { themes } from './themes.def.ts';
+import { mfaChallenges, userMfa } from './user_mfa.def.ts';
 import { users } from './users.def.ts';
 import { webhookDeliveries, webhooks } from './webhooks.def.ts';
 
@@ -50,5 +51,7 @@ export const tables: readonly TableDef[] = [
   files,
   webhooks,
   webhookDeliveries,
+  userMfa,
+  mfaChallenges,
   outboxEmail,
 ];

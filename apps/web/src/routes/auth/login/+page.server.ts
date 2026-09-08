@@ -40,12 +40,40 @@ export const actions: Actions = {
       email: values.email,
       password: str(form, 'password'),
     });
-    const r = unwrap(res);
+    const r = unwrap<{
+      success: true;
+      data: { mfaRequired?: true; challenge?: string; user?: unknown };
+    }>(res);
     if (!r.ok) return actionFailure(r.failure, values);
+    // Second factor (A-11): render the code form; the challenge token rides along as a hidden field.
+    if (r.data.data.mfaRequired && r.data.data.challenge)
+      return { mfa: { challenge: r.data.data.challenge, next: str(form, 'next') }, values };
     forwardSetCookies(event, res.response);
     redirect(
       303,
       safeNext(str(form, 'next'), cfgString(event.locals.config, 'app.home_route', '/dashboard')),
     );
+  },
+  /** Step two: TOTP or recovery code against the challenge from step one. */
+  mfa: async (event) => {
+    const form = await event.request.formData();
+    const challenge = str(form, 'challenge');
+    const next = str(form, 'next');
+    if (!checkCsrf(event, form))
+      return actionFailure({
+        status: 403,
+        code: 'csrf_failed',
+        message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+      });
+    const res = await apiFor(event).v1.auth.login.mfa.post({ challenge, code: str(form, 'code') });
+    const r = unwrap(res);
+    if (!r.ok) {
+      // A wrong code keeps the same challenge (attempts are counted server-side); an expired or
+      // exhausted one sends the user back to the password form.
+      const keep = r.failure.status === 401 && /salah/.test(r.failure.message);
+      return actionFailure(r.failure, {}, keep ? { mfa: { challenge, next } } : {});
+    }
+    forwardSetCookies(event, res.response);
+    redirect(303, safeNext(next, cfgString(event.locals.config, 'app.home_route', '/dashboard')));
   },
 };
