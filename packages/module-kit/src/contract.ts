@@ -43,7 +43,17 @@ export interface MenuEntryDef {
   readonly order?: number;
   /** Optional parent menu id for one level of nesting (F-3). */
   readonly parent?: string;
+  /**
+   * Where the entry sits in the sidebar (F-3): omitted → the module's own collapsible group
+   * (titled by `menu.label` in module.json, else the module name); `null` → top level next to
+   * Dashboard; a core group id → inside that shared group (`settings`, `integration`, `monitoring`).
+   */
+  readonly group?: CoreMenuGroup | null;
 }
+
+/** Shared sidebar groups a module entry may join; anything else is the module's own group. */
+export const CORE_MENU_GROUPS = ['settings', 'integration', 'monitoring'] as const;
+export type CoreMenuGroup = (typeof CORE_MENU_GROUPS)[number];
 
 const RESOURCE_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_]*)+$/;
 const ID_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$/;
@@ -95,6 +105,15 @@ export function defineMenu(
     seen.add(m.id);
     requirePrefix('href menu', m.href, `/m/${ns}`);
     if (m.parent !== undefined) requirePrefix('parent menu', m.parent, `${ns}.`);
+    if (
+      m.group !== undefined &&
+      m.group !== null &&
+      !(CORE_MENU_GROUPS as readonly string[]).includes(m.group)
+    ) {
+      throw new ModuleContractError(
+        `group menu "${m.group}" pada "${m.id}" tidak dikenal — pakai ${CORE_MENU_GROUPS.join('/')}, null (tingkat atas), atau hapus (grup modul sendiri)`,
+      );
+    }
     if (m.permission !== undefined && !m.permission.startsWith(`${ns}.`)) {
       // A module may gate its menu on a core permission too — but never on another module's.
       const owner = m.permission.split('.')[0];

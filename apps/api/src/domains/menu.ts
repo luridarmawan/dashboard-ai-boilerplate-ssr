@@ -32,6 +32,8 @@ export const menuDomain = new Elysia({ name: 'menu', prefix: '/menu', tags: ['me
             icon: m.icon ?? 'puzzle',
             order: m.order ?? 100,
             parent: m.parent ?? null,
+            // F-3: effective group — a core group id, the module namespace, or null for top level.
+            group: m.group === undefined ? (m.id.split('.')[0] ?? null) : m.group,
             module: m.module,
           })),
       );
@@ -48,6 +50,7 @@ export const menuDomain = new Elysia({ name: 'menu', prefix: '/menu', tags: ['me
               icon: t.String(),
               order: t.Integer(),
               parent: t.Nullable(t.String()),
+              group: t.Nullable(t.String()),
               module: t.String(),
             }),
           ),

@@ -1,6 +1,7 @@
 import { resolveLayout } from '@core/ui-theme';
 import { error } from '@sveltejs/kit';
 import { layoutVariants } from '$lib/../generated/layout-variants';
+import { csrfToken } from '$lib/server/session';
 import { moduleOwning } from '../../hooks.server';
 import type { LayoutServerLoad } from './$types';
 
@@ -18,5 +19,8 @@ export const load: LayoutServerLoad = async (event) => {
     layoutId: layout.layout.id,
     layoutVariant: variant,
     loggedIn: !!event.locals.session,
+    /** For the language dropdown in the nav (K-7): the form posts to /lang and comes back here. */
+    csrf: csrfToken(event),
+    path: event.url.pathname + event.url.search,
   };
 };

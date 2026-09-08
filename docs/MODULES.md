@@ -106,6 +106,7 @@ Semua opsional kecuali `package.json` dan `module.json`. Sync hanya memuat yang 
   "version": "0.1.0",                      // semver
   "description": { "id": "…", "en": "…" }, // opsional, minimal id+en (K-1)
   "engines": { "core": "^0.1.0" },         // rentang core yang didukung; sync menolak yang tidak cocok (G-11)
+  "menu": { "label": { "id": "Penagihan", "en": "Billing" }, "order": 120 },  // opsional: judul & urutan grup sidebar modul (F-3)
   "dependencies": ["Example"]              // modul lain yang dibutuhkan; menentukan urutan inisialisasi
 }
 ```
@@ -169,7 +170,22 @@ export default defineMenu('Billing', [
 ]);
 ```
 
-Satu tingkat sub-menu lewat `parent: 'billing.invoices'` (F-3). Render sidebar **[menyusul di M2]**.
+Satu tingkat sub-menu lewat `parent: 'billing.invoices'` (F-3).
+
+**Pengelompokan sidebar (F-3).** Sidebar menampilkan tingkat atas yang pendek (Dasbor, Asisten AI, Profil) lalu **grup yang bisa dilipat** (`<details>`, tanpa JavaScript; grup yang memuat halaman aktif terbuka). Pada layout top-nav (mis. tema *corporate*) setiap grup menjadi dropdown. Field `group` menentukan letak entri:
+
+| `group` | Letak |
+|---|---|
+| *(tidak diisi)* | grup milik modul sendiri — judulnya `menu.label` di `module.json` (baku: nama modul), urutan `menu.order` (baku 100) |
+| `null` | tingkat atas, di samping Dasbor (mis. `ai.chat`) |
+| `'settings'` / `'integration'` / `'monitoring'` | grup bersama milik core: Pengaturan (pengguna, grup, tenant, tema, pengaturan, modul), Integrasi (webhook, server MCP), Pemantauan (antrean, log AI) — Pemantauan selalu paling bawah |
+
+```json
+// module.json — judul & urutan grup modul sendiri
+{ "name": "AI", "menu": { "label": { "id": "Platform AI", "en": "AI Platform" }, "order": 150 } }
+```
+
+Nilai `group` lain ditolak `defineMenu` dan `modules:sync`. `GET /v1/menu` mengembalikan grup efektif (`group`: id grup core, namespace modul, atau `null`).
 
 ### `api/routes.ts` — route API (titik perluasan 2)
 

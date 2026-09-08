@@ -19,11 +19,13 @@ export {
 export {
   type ApiRoutesLike,
   CORE_ACTIONS,
+  CORE_MENU_GROUPS,
   CORE_PERMISSION_OWNERS,
   type ConfigFieldDef,
   type ConfigFieldType,
   type ConfigSectionDef,
   type CoreAction,
+  type CoreMenuGroup,
   defineApiRoutes,
   defineConfig,
   defineIconSets,

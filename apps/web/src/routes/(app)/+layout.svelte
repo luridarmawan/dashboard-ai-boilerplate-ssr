@@ -1,8 +1,10 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
+import LanguagePicker from '$lib/components/LanguagePicker.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
+import type { MenuItem } from '$lib/server/menu';
 import type { LayoutData } from './$types';
 
 /**
@@ -33,25 +35,62 @@ const shellContext = $derived({
   </a>
 {/snippet}
 
+{#snippet navLink(item: MenuItem, sub: boolean)}
+  <a
+    href={item.href}
+    aria-current={item.active ? 'page' : undefined}
+    class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:font-medium"
+  >
+    <Icon name={item.icon} size={sub ? 16 : 18} class={sub ? 'text-muted-foreground' : ''} />
+    <span>{item.label}</span>
+    {#if item.badge !== undefined}<span class="ms-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{item.badge}</span>{/if}
+  </a>
+{/snippet}
+
+{#snippet navChildren(list: MenuItem[], orientation: 'vertical' | 'horizontal')}
+  <ul class={orientation === 'horizontal' ? 'grid min-w-56 gap-0.5' : 'ms-3 mt-0.5 grid gap-0.5 border-s ps-2'}>
+    {#each list as c (c.id)}
+      <li>
+        {@render navLink(c, true)}
+        {#if c.children.length}
+          <ul class="ms-6 grid gap-0.5 border-s ps-2">
+            {#each c.children as g (g.id)}<li>{@render navLink(g, true)}</li>{/each}
+          </ul>
+        {/if}
+      </li>
+    {/each}
+  </ul>
+{/snippet}
+
 {#snippet nav({ orientation }: { orientation: 'vertical' | 'horizontal' })}
+  <!-- F-3: a short top level, then collapsible groups. <details> needs no JavaScript; a group holding
+       the current page is rendered open. Horizontal (top-nav layouts): each group is a dropdown. -->
   <ul class={orientation === 'horizontal' ? 'flex items-center gap-1' : 'grid gap-0.5'}>
     {#each data.menu as item (item.id)}
       <li>
-        <a
-          href={item.href}
-          aria-current={item.active ? 'page' : undefined}
-          class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:font-medium"
-        >
-          <Icon name={item.icon} size={18} />
-          <span>{item.label}</span>
-          {#if item.badge !== undefined}<span class="ms-auto rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{item.badge}</span>{/if}
-        </a>
-        {#if item.children.length && orientation === 'vertical'}
-          <ul class="ms-6 grid gap-0.5 border-s ps-2">
-            {#each item.children as c (c.id)}
-              <li><a href={c.href} aria-current={c.active ? 'page' : undefined} class="block rounded-md px-2 py-1 text-sm text-foreground no-underline hover:bg-accent hover:no-underline aria-[current=page]:font-medium">{c.label}</a></li>
-            {/each}
-          </ul>
+        {#if item.kind === 'group'}
+          <details open={item.active} class="group relative" data-testid={`nav-${item.id}`}>
+            <summary
+              aria-current={item.active && orientation === 'horizontal' ? 'page' : undefined}
+              class="flex cursor-pointer list-none items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-accent hover:text-accent-foreground aria-[current=page]:font-medium"
+            >
+              <Icon name={item.icon} size={18} />
+              <span>{item.label}</span>
+              <Icon name="chevron-down" size={14} class="ms-auto transition-transform group-open:rotate-180" />
+            </summary>
+            {#if orientation === 'horizontal'}
+              <div class="absolute start-0 top-full z-40 mt-1 rounded-md border bg-popover p-1 shadow-lg">
+                {@render navChildren(item.children, orientation)}
+              </div>
+            {:else}
+              {@render navChildren(item.children, orientation)}
+            {/if}
+          </details>
+        {:else}
+          {@render navLink(item, false)}
+          {#if item.children.length && orientation === 'vertical'}
+            {@render navChildren(item.children, orientation)}
+          {/if}
         {/if}
       </li>
     {/each}
@@ -91,7 +130,7 @@ const shellContext = $derived({
     {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
   </a>
   <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('shell.theme_link')}><Icon name="palette" size={18} /></a>
-  <a href={`/lang?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('nav.language')}><Icon name="language" size={18} /></a>
+  <LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact />
   <a href="/profile" class="hidden items-center gap-2 rounded-md px-2 py-1 text-sm no-underline hover:bg-accent hover:no-underline sm:flex">
     {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}<span>{data.user.name}</span>
   </a>

@@ -5,5 +5,14 @@
     "id": "Asisten AI: chat streaming kompatibel-OpenAI, riwayat percakapan, log panggilan (PRD FR-H)",
     "en": "AI assistant: OpenAI-compatible streaming chat, conversation history, call log (PRD FR-H)"
   },
-  "engines": { "core": ">=0.0.0" }
+  "engines": {
+    "core": ">=0.0.0"
+  },
+  "menu": {
+    "label": {
+      "id": "Platform AI",
+      "en": "AI Platform"
+    },
+    "order": 150
+  }
 }

@@ -20,6 +20,7 @@ import type {
   PublicRouteDef,
   WidgetDef,
 } from './contract.ts';
+import { CORE_MENU_GROUPS } from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
 import { parseEvery } from './jobs.ts';
 import {
@@ -407,6 +408,15 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           ) {
             problems.push(
               `${tag}: ikon "${entry.icon}" pada menu "${entry.id}" bukan nama core dan bukan "${ns}.*" (L-5)`,
+            );
+          }
+          if (
+            entry.group !== undefined &&
+            entry.group !== null &&
+            !(CORE_MENU_GROUPS as readonly string[]).includes(entry.group)
+          ) {
+            problems.push(
+              `${tag}: group menu "${entry.group}" pada "${entry.id}" tidak dikenal (${CORE_MENU_GROUPS.join('/')}, null, atau kosong)`,
             );
           }
           const owner = menuOwner.get(entry.id);
@@ -1177,6 +1187,8 @@ function emitRegistry(
     source,
     path,
     description: manifest.description ?? null,
+    /** F-3: title + order of the module's own sidebar group, when module.json sets `menu`. */
+    menuGroup: manifest.menu ?? null,
     contributes: contributions.get(name) ?? none,
   }));
   return `${GEN_HEADER}import type { ConfigSectionDef, MenuEntryDef, PermissionDef } from '../contract.ts';

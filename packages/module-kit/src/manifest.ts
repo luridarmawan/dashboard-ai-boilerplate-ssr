@@ -28,6 +28,13 @@ export const moduleManifestSchema = z.object({
   }),
   /** Other modules this one needs, by name; sync orders initialisation accordingly (G-11). */
   dependencies: z.array(z.string().regex(MODULE_NAME_RE)).default([]),
+  /**
+   * The module's own sidebar group (F-3): its title (default: the module name) and sort key among
+   * groups (default 100; core `settings`/`integration` come before, `monitoring` after).
+   */
+  menu: z
+    .object({ label: localizedText, order: z.number().int().min(0).max(999).optional() })
+    .optional(),
 });
 export type ModuleManifest = z.infer<typeof moduleManifestSchema>;
 

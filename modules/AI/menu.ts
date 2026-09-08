@@ -1,5 +1,10 @@
 import { defineMenu } from '@core/module-kit';
 
+/**
+ * Menu (extension point 4, F-3). The assistant sits at the top level next to Dashboard; the
+ * provider/analytics admin lives in the module's own group (titled "AI Platform" by module.json);
+ * MCP servers join the shared Integration group and the call log the shared Monitoring group.
+ */
 export default defineMenu('AI', [
   {
     id: 'ai.chat',
@@ -8,6 +13,7 @@ export default defineMenu('AI', [
     icon: 'sparkles',
     permission: 'ai.chat.read',
     order: 5,
+    group: null,
   },
   {
     id: 'ai.mcps',
@@ -16,6 +22,7 @@ export default defineMenu('AI', [
     icon: 'plug',
     permission: 'ai.mcp.read',
     order: 120,
+    group: 'integration',
   },
   {
     id: 'ai.providers',
@@ -40,5 +47,6 @@ export default defineMenu('AI', [
     icon: 'chart-line',
     permission: 'ai.log.read',
     order: 130,
+    group: 'monitoring',
   },
 ]);
