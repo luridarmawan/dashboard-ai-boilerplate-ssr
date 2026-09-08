@@ -55,6 +55,12 @@ Pemakaian ditulis setelah respons selesai, jadi satu panggilan bisa melampaui ba
 
 **Analitik AI** (`/m/ai/analytics`, izin `ai.log.read`) merangkum log panggilan: total panggilan (ok/gagal/dibatalkan), token masuk/keluar, biaya estimasi; grafik token per hari (CSS, tanpa pustaka, jalan tanpa JavaScript); tabel per penyedia & model dan per pengguna, diurutkan biaya. Rentang 7/30/90 hari (`GET /v1/m/ai/analytics?days=`; hari kalender UTC, batang terakhir = hari ini). Agregasi dilakukan di API dari baris `ai_calls` tenant aktif — netral dialect — dengan batas 100.000 baris terbaru per rentang (`truncated: true` bila terpotong). Retensi log (M-3) membatasi seberapa jauh analitik bisa melihat ke belakang.
 
+## Chat mengambang berkonteks halaman (H-13)
+
+Widget shell `ai.floating_chat` (izin `ai.chat.create`) menaruh tombol di pojok kanan bawah **semua halaman dasbor** kecuali halaman chat sendiri. Tanpa JavaScript tombol itu tautan ke `/m/ai/chat`; dengan JavaScript ia membuka panel yang memakai jembatan streaming yang sama (`/m/ai/chat/stream`) dan mengirim **konteks halaman** — nama aplikasi, breadcrumb, path URL, judul dokumen, dan teks yang sedang disorot pengguna (maks. 1500 karakter) — lewat field `context`. API menyisipkannya sebagai pesan `system` **kedua**, di belakang prompt system tenant (`ai.system_prompt`) atau prompt yang dikirim klien, dan **tidak pernah menyimpannya** ke riwayat percakapan (maks. 4000 karakter, 422 bila lebih). Percakapan yang dimulai dari panel tersimpan seperti biasa dan bisa dilanjutkan lewat tautan "Buka percakapan penuh".
+
+`context` juga terbuka untuk klien API lain (`POST /v1/m/ai/chat/completions`, ekstensi kami) — misalnya plugin editor yang ingin menyertakan berkas yang sedang dibuka.
+
 ## Streaming end-to-end (H-3)
 
 `POST /v1/m/ai/chat/completions` dengan `stream: true` meneruskan byte SSE provider apa adanya: **provider → API → SvelteKit (`/m/ai/chat/stream`) → UI**. Pembatalan mengalir balik: menutup tab atau menekan *Berhenti* membatalkan request browser → SvelteKit membatalkan request ke API → API membatalkan request ke provider; panggilan dicatat dengan status `cancelled`. Pesan pertama sebuah chat baru lewat jalur streaming membuat percakapannya lebih dulu (jembatan memanggil `POST /v1/m/ai/conversations`, mengembalikan id di header `x-conversation-id`), lalu halaman mendarat di `?c=<id>` — sehingga pertukaran pertama pun tersimpan (H-6), sama seperti jalur tanpa JavaScript.

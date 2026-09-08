@@ -106,5 +106,13 @@
   "ai.quota.apply": "Apply",
   "ai.quota.credited": "Balance updated.",
   "ai.quota.ledger": "Balance history",
-  "ai.quota.exhausted": "AI quota or balance exhausted; requests are refused until next month or a top-up."
+  "ai.quota.exhausted": "AI quota or balance exhausted; requests are refused until next month or a top-up.",
+  "ai.float.open": "Ask the AI assistant about this page",
+  "ai.float.title": "AI assistant",
+  "ai.float.context": "Context: {page}",
+  "ai.float.placeholder": "Ask about this page…",
+  "ai.float.open_full": "Open full conversation",
+  "ai.float.close": "Close",
+  "ai.float.new": "Start over",
+  "ai.float.empty": "The assistant knows which page you are on. Ask anything."
 }

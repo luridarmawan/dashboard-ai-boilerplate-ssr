@@ -132,6 +132,13 @@ export interface WidgetDef {
   /** Grid span: sm = 1 column, md = 2, lg = full row. */
   readonly size?: 'sm' | 'md' | 'lg';
   /**
+   * Where the widget lives (default `dashboard`): a card on the dashboard home, or `shell` — rendered
+   * once on EVERY dashboard page after the layout (a floating button, a global notice; H-13). Shell
+   * widgets get the page context (`path`, `breadcrumb`, `csrf`) in their `context` prop and must
+   * render nothing visible when the page is not theirs.
+   */
+  readonly slot?: 'dashboard' | 'shell';
+  /**
    * Optional API path (`/v1/...`, query string allowed) the dashboard fetches SERVER-SIDE as the
    * signed-in user before rendering; its `data` payload reaches the component as the `data` prop.
    * RBAC and tenancy are the API's — a widget cannot see more than its user can.
@@ -167,6 +174,11 @@ export function defineWidgets(
           `widget "${w.id}" memakai izin milik modul lain: "${w.permission}"`,
         );
       }
+    }
+    if (w.slot !== undefined && w.slot !== 'dashboard' && w.slot !== 'shell') {
+      throw new ModuleContractError(
+        `widget "${w.id}": slot harus "dashboard" atau "shell", bukan "${String(w.slot)}"`,
+      );
     }
     if (w.data !== undefined && !/^\/v1\/[A-Za-z0-9/_.:?&=%-]+$/.test(w.data)) {
       throw new ModuleContractError(

@@ -24,6 +24,11 @@ export const ChatCompletionBody = t.Object({
    * not accepted — tools are declared by modules, never by the request.
    */
   tools: t.Optional(t.Boolean()),
+  /**
+   * Our extension (H-13): what the user is looking at (page, breadcrumb, selection) — sent as an
+   * extra `system` message AFTER the tenant's system prompt, never persisted into the conversation.
+   */
+  context: t.Optional(t.String({ maxLength: 4000 })),
 });
 /** External MCP server registration (I-4, I-5). `headers` values are secrets: never echoed back. */
 export const McpBody = t.Object({

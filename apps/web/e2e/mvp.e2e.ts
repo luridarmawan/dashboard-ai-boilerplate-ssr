@@ -27,6 +27,20 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
   await expect(page).toHaveURL(/\/dashboard/);
   await expect(page.locator('a[href="/m/example/products"]').first()).toBeVisible();
 
+  // H-13: the floating chat is on every dashboard page; it streams with the page as context
+  await page.getByTestId('floating-chat-button').click();
+  const panel = page.getByTestId('floating-chat-panel');
+  await expect(panel).toBeVisible();
+  await panel.locator('textarea[name="content"]').fill(`Halaman apa ini? ${run}`);
+  await panel.locator('form button[type="submit"]').click();
+  await expect(page.getByTestId('floating-chat-messages')).toContainText(
+    new RegExp(`Echo[^:]*: Halaman apa ini\\? ${run}`),
+    { timeout: 15_000 },
+  );
+  await expect(page).toHaveURL(/\/dashboard/); // still on the page — no navigation
+  await panel.getByRole('button', { name: /Tutup|Close/ }).click();
+  await expect(panel).toHaveCount(0);
+
   // CRUD: create → edit → delete a product through the FormBuilder pages
   const slug = `e2e-${run}`;
   await page.goto('/m/example/products/new');

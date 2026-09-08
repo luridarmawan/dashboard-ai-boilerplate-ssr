@@ -486,6 +486,15 @@ export default defineApiRoutes(
         const messages = [...body.messages];
         if (p.systemPrompt && !messages.some((m) => m.role === 'system'))
           messages.unshift({ role: 'system', content: p.systemPrompt });
+        // H-13: page context rides behind the (tenant or caller) system prompt; history stays clean.
+        const pageContext = body.context?.trim();
+        if (pageContext) {
+          const at = messages[0]?.role === 'system' ? 1 : 0;
+          messages.splice(at, 0, {
+            role: 'system',
+            content: `Konteks halaman yang sedang dibuka pengguna (gunakan bila relevan):\n${pageContext}`,
+          });
+        }
         const model = p.model;
 
         // Persistence (H-6): the user's message now; the assistant's when the reply is complete.

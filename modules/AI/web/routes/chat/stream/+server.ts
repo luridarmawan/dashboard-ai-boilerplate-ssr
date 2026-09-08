@@ -11,6 +11,10 @@ export const POST: RequestHandler = async (event) => {
   const form = await event.request.formData();
   if (!checkCsrf(event, form)) return new Response('csrf', { status: 403 });
   const content = String(form.get('content') ?? '').trim();
+  // H-13: the floating chat sends what the user is looking at; capped like the API's field.
+  const context = String(form.get('context') ?? '')
+    .trim()
+    .slice(0, 4000);
   const prior = JSON.parse(String(form.get('history') ?? '[]')) as {
     role: string;
     content: string;
@@ -56,6 +60,7 @@ export const POST: RequestHandler = async (event) => {
       messages: [...prior, { role: 'user', content }],
       stream: true,
       conversation_id: conversationId || undefined,
+      ...(context ? { context } : {}),
     }),
     signal: event.request.signal,
   });

@@ -306,6 +306,8 @@ export default defineWidgets('Billing', [
 
 Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core.
 
+**Widget shell (`slot: 'shell'`, H-13):** bukan kartu di dasbor, melainkan dirender **sekali di setiap halaman dasbor** setelah layout — untuk tombol mengambang, pemberitahuan global, dan sejenisnya. Filter izin dan modul aktif sama persis dengan widget dasbor (dilakukan di server, komponennya tidak diunduh bila tidak boleh). Prop `context`-nya lebih kaya: `{ locale, clientId, permissions, csrf, path, breadcrumb: string[], appName }`. Widget shell wajib merender kosong di halaman yang bukan urusannya. Contoh hidup: `modules/AI/widgets.ts` → `ai.floating_chat` (`web/widgets/FloatingChat.svelte`) menyembunyikan diri di `/m/ai/chat`.
+
 **Widget berdata:** tambahkan `data: '/v1/m/billing/summary'` (path API di bawah `/v1/`, boleh dengan query string). Dasbor mengambilnya **di server** sebagai pengguna yang sedang login sebelum merender, lalu menyerahkan `data` dari envelope-nya sebagai prop `data` komponen (`null` bila API menolak atau gagal). Widget tidak pernah mengambil data sendiri, dan tidak bisa melihat lebih dari yang boleh dilihat penggunanya — RBAC dan tenancy tetap milik API. Contoh hidup: `modules/AI/widgets.ts` → `ai.usage` memakai `/v1/m/ai/analytics?days=30` dan `web/widgets/Usage.svelte` menerima `{ context, data }`.
 
 ### `themes/<id>/`, `layouts.ts`, `icons.ts` — tema, layout, set ikon (titik perluasan 14–16)

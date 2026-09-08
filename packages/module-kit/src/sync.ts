@@ -1373,6 +1373,8 @@ export interface WidgetEntry {
   readonly permission?: string;
   readonly order?: number;
   readonly size?: 'sm' | 'md' | 'lg';
+  /** dashboard (default) = a card on the dashboard home; shell = rendered on every dashboard page (H-13). */
+  readonly slot?: 'dashboard' | 'shell';
   /** API path fetched server-side by the dashboard; its payload becomes the component's data prop. */
   readonly data?: string;
   readonly module: string;

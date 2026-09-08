@@ -1,8 +1,9 @@
 import { resolveLayout } from '@core/ui-theme';
 import { redirect } from '@sveltejs/kit';
 import { layoutVariants } from '$lib/../generated/layout-variants';
+import { moduleWidgets } from '$lib/../generated/widgets';
 import { buildBreadcrumb, buildMenu } from '$lib/server/menu';
-import { apiFor, csrfToken } from '$lib/server/session';
+import { apiFetchData, apiFor, csrfToken } from '$lib/server/session';
 import type { LayoutServerLoad } from './$types';
 
 /**
@@ -22,6 +23,20 @@ export const load: LayoutServerLoad = async (event) => {
     .v1.notifications.count.get()
     .then((r) => (r.data?.success ? r.data.data.unread : 0))
     .catch(() => 0);
+  // Shell widgets (H-13): module-contributed, on every page, filtered here like the dashboard's —
+  // a widget the user may not see (or whose module is off for the tenant) never reaches the HTML.
+  const shellWidgets = await Promise.all(
+    moduleWidgets
+      .filter((w) => w.slot === 'shell')
+      .filter((w) => event.locals.config.enabledModules.has(w.module.toLowerCase()))
+      .filter((w) => !w.permission || s.can(w.permission))
+      .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
+      .map(async (w) => ({
+        id: w.id,
+        module: w.module,
+        data: w.data ? await apiFetchData(event, w.data, s.clientId) : null,
+      })),
+  );
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'dashboard', variant);
   if (layout.fellBack && variant !== 'default' && import.meta.env.DEV) {
@@ -44,5 +59,6 @@ export const load: LayoutServerLoad = async (event) => {
     layoutVariant: variant,
     appName: (event.locals.config.values['app.name'] as string | undefined) ?? 'Dashboard',
     unreadNotifications: unread,
+    shellWidgets,
   };
 };

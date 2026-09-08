@@ -14,6 +14,16 @@ let { data, children }: { data: LayoutData; children: import('svelte').Snippet }
 const Layout = $derived(data.Layout);
 const t = useT();
 const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
+/** What a shell widget (H-13) learns about the page it floats over — nothing it could not see itself. */
+const shellContext = $derived({
+  locale: data.locale,
+  clientId: data.clientId,
+  permissions: data.permissions,
+  csrf: data.csrf,
+  path: data.path,
+  breadcrumb: data.breadcrumb.map((c) => c.label),
+  appName: data.appName,
+});
 </script>
 
 {#snippet brand()}
@@ -114,3 +124,8 @@ const activeTenant = $derived(data.tenants.find((t) => t.id === data.clientId));
 {/snippet}
 
 <Layout {brand} {nav} {header} {breadcrumb} {content} {footer} />
+
+<!-- Shell widgets (H-13): module contributions on every dashboard page, permission-filtered on the server. -->
+{#each data.shellWidgets as w (w.id)}
+  {#if w.Component}<w.Component context={shellContext} data={w.data} />{/if}
+{/each}

@@ -106,5 +106,13 @@
   "ai.quota.apply": "Terapkan",
   "ai.quota.credited": "Saldo diperbarui.",
   "ai.quota.ledger": "Riwayat saldo",
-  "ai.quota.exhausted": "Kuota atau saldo AI habis; permintaan ditolak sampai bulan berikutnya atau saldo ditambah."
+  "ai.quota.exhausted": "Kuota atau saldo AI habis; permintaan ditolak sampai bulan berikutnya atau saldo ditambah.",
+  "ai.float.open": "Tanya asisten AI tentang halaman ini",
+  "ai.float.title": "Asisten AI",
+  "ai.float.context": "Konteks: {page}",
+  "ai.float.placeholder": "Tanya tentang halaman ini…",
+  "ai.float.open_full": "Buka percakapan penuh",
+  "ai.float.close": "Tutup",
+  "ai.float.new": "Mulai baru",
+  "ai.float.empty": "Asisten tahu halaman mana yang sedang Anda buka. Tanyakan apa saja."
 }

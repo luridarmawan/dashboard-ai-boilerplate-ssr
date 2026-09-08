@@ -60,6 +60,7 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
   let mockAborted = 0;
   /** Wire names of the tools the last request offered to the "model" (null = no `tools` field). */
   let mockToolsSeen: string[] | null = null;
+  let mockLastMessages: { role: string; content: string | null }[] = [];
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -84,6 +85,7 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
           tools?: { type: string; function: { name: string; parameters: unknown } }[];
         };
         const hasSystem = body.messages.some((m) => m.role === 'system');
+        mockLastMessages = body.messages;
         // ---- tool round-trip (I-3): offered tools must carry OpenAI-legal names; a user turn
         // containing PING makes the "model" call dummy_ping first, then answer from its result.
         mockToolsSeen = body.tools ? body.tools.map((t) => t.function.name) : null;
@@ -297,6 +299,48 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect(log?.tokens_in).toBe(11);
     expect(log?.tokens_out).toBe(7);
     expect((log?.latency_ms ?? -1) >= 0).toBe(true);
+  });
+
+  test('H-13: `context` reaches the provider as a second system message behind the tenant prompt and is never persisted', async () => {
+    const conv = await json(await call('/v1/m/ai/conversations', { method: 'POST' }, [admin]));
+    const id = String(conv.data?.id);
+    const res = await call(
+      '/v1/m/ai/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: 'Apa isi halaman ini?' }],
+          conversation_id: id,
+          context: 'Halaman: Pengguna › Detail\nURL path: /users/abc',
+        }),
+      },
+      [admin],
+    );
+    expect(res.status).toBe(200);
+    const roles = mockLastMessages.map((m) => m.role);
+    expect(roles).toEqual(['system', 'system', 'user']);
+    expect(mockLastMessages[1]?.content).toContain('/users/abc');
+    expect(mockLastMessages[1]?.content).toContain('Konteks halaman');
+    const one = await json(await call(`/v1/m/ai/conversations/${id}`, {}, [admin]));
+    const msgs = one.data?.messages as { role: string; content: string }[];
+    expect(msgs.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(JSON.stringify(msgs)).not.toContain('/users/abc');
+    // Over the cap → 422 at the contract, before any provider call.
+    expect(
+      (
+        await call(
+          '/v1/m/ai/chat/completions',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: 'x' }],
+              context: 'y'.repeat(4001),
+            }),
+          },
+          [admin],
+        )
+      ).status,
+    ).toBe(422);
   });
 
   test('#1 streaming: SSE flows through token by token; #2 the call is logged with usage and first-token latency', async () => {
