@@ -95,10 +95,12 @@ describe('Redis adapters (Decision M, ROADMAP §8 item 7)', () => {
     configureRateLimitRedis(() => r);
     const { db, hits } = dbStub();
     const rule = parseRule('3/60');
-    const t0 = new Date(Date.UTC(2026, 8, 8, 10, 0, 5));
+    // A window in the far future: the fake's expiry check uses the real clock, so a window that
+    // has already passed in real time would look expired and restart the count.
+    const t0 = new Date(Date.UTC(2100, 0, 1, 10, 0, 5));
     const a = await consume(db, 'login:ip:1.2.3.4', rule, t0);
     expect(a).toMatchObject({ allowed: true, limit: 3, remaining: 2 });
-    expect(a.resetAt.toISOString()).toBe('2026-09-08T10:01:00.000Z');
+    expect(a.resetAt.toISOString()).toBe('2100-01-01T10:01:00.000Z');
     await consume(db, 'login:ip:1.2.3.4', rule, t0);
     const third = await consume(db, 'login:ip:1.2.3.4', rule, t0);
     expect(third).toMatchObject({ allowed: true, remaining: 0 });
