@@ -12,6 +12,7 @@ const t = useT();
 <div class="page">
   <h1>{t('auth.login.title')}</h1>
   {#if form?.error}<p class="error">{form.error}</p>{/if}
+  {#if data.ssoError && !form?.mfa}<p class="error">{t('auth.google.failed')}</p>{/if}
   {#if form?.mfa}
     <!-- Second factor (A-11): password accepted, now a TOTP or recovery code; works without JavaScript. -->
     <form method="POST" class="stack" data-testid="mfa-form">
@@ -38,5 +39,10 @@ const t = useT();
       <a href="/auth/register">{t('auth.login.register')}</a>
     </div>
   </form>
+  {#if data.google}
+    <!-- Sign in with Google (A-8): a plain link — the redirect dance is server-side, no JavaScript. -->
+    <p class="muted sso-or">{t('auth.login.or')}</p>
+    <a class="btn secondary" href={`/auth/google?next=${encodeURIComponent(data.next)}`} data-testid="google-login">{t('auth.login.google')}</a>
+  {/if}
   {/if}
 </div>

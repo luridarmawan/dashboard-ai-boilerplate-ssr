@@ -954,7 +954,7 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 | Grup | Endpoint |
 |---|---|
-| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `POST /google-login` |
+| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `GET /google/start` · `POST /google-login` |
 | `auth-public` | `POST /reset-password/request` · `POST /reset-password/validate-token` · `POST /reset-password/confirm` |
 | `tokens` | `GET /` · `POST /` · `DELETE /:id` (API token untuk klien non-browser, A-4) |
 | `user` | `GET /` · `GET /:id` · `POST /` · `PUT /:id` · `DELETE /:id` · `GET /permission` · `GET /scope` · `GET /profile/me` · `PUT /profile/me` (termasuk preferensi tema & bahasa) |
@@ -973,7 +973,7 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 Tabel yang dimiliki core. Modul menambah tabelnya sendiri dengan prefix nama modul (G-9).
 
-`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `email_verification_tokens` · `rate_limits` · `outbox_email` · `audit_log`
+`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `email_verification_tokens` · `rate_limits` · `outbox_email` · `audit_log` · `oauth_accounts` (A-8 — identitas eksternal per user, kunci tautan `provider` + `provider_user_id`, bukan email)
 
 Dua di antaranya dituntut kebutuhan P0 dan sebelumnya belum tercatat di sini: `email_verification_tokens` (A-6 — token verifikasi email; alurnya sejajar `password_reset_tokens`, jadi tidak boleh menumpang tabel yang sama) dan `rate_limits` (penghitung ber-window untuk adapter `database`, yang merupakan driver **baku** rate limit — Keputusan M).
 

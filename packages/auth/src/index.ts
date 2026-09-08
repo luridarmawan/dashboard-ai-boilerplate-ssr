@@ -16,6 +16,19 @@ export {
   type TenantSummary,
   tenantsOf,
 } from './effective.ts';
+export {
+  emailDomainAllowed,
+  GOOGLE_AUTHORIZE_URL,
+  GOOGLE_TOKEN_URL,
+  GOOGLE_USERINFO_URL,
+  type GoogleAuthorizeParams,
+  googleAuthorizeUrl,
+  type OAuthIdentity,
+  parseDomainList,
+  parseGoogleUserinfo,
+  pkceChallenge,
+  pkcePair,
+} from './oauth.ts';
 export { hashPassword, needsRehash, passwordProblems, verifyPassword } from './password.ts';
 export {
   grantSatisfies,

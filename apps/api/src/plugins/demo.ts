@@ -7,7 +7,13 @@ import { Elysia } from 'elysia';
  * Demo mode (PRD E-7): every write is refused with a clear message. Signing in and out stays
  * possible — a demo you cannot enter is not a demo. Runs before body parsing.
  */
-const ALLOWED_WRITES = new Set(['/v1/auth/login', '/v1/auth/logout', '/v1/auth/switch-tenant']);
+const ALLOWED_WRITES = new Set([
+  '/v1/auth/login',
+  '/v1/auth/login/mfa',
+  '/v1/auth/google-login',
+  '/v1/auth/logout',
+  '/v1/auth/switch-tenant',
+]);
 
 export const demoMode = new Elysia({ name: 'demo-mode' }).onRequest(({ request, set }) => {
   if (!env().DEMO_MODE) return;

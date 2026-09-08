@@ -121,6 +121,15 @@ const envSchema = z
       .transform((v) => (v === undefined ? undefined : v === 'true')),
     MAIL_FROM_ADDRESS: z.email().optional(),
     MAIL_FROM_NAME: z.string().min(1).max(120).optional(),
+    /**
+     * Google sign-in bootstrap (A-8): used when `security.google_client_id` / `_secret` are EMPTY
+     * in the database, same rule as SMTP_*. The feature itself is switched on in Settings.
+     */
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    /** Test seams only: point the code exchange and identity lookup at a local stand-in for Google. */
+    GOOGLE_OAUTH_TOKEN_URL: z.url().optional(),
+    GOOGLE_OAUTH_USERINFO_URL: z.url().optional(),
     /** Login attempts per window, per IP and per email (A-2): `<limit>/<seconds>`. */
     LOGIN_RATE_LIMIT: z
       .string()

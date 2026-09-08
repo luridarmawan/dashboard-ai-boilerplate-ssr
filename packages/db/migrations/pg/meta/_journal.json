@@ -134,6 +134,13 @@
       "when": 1788867746633,
       "tag": "0018_common_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788900145795,
+      "tag": "0019_fluffy_menace",
+      "breakpoints": true
     }
   ]
 }

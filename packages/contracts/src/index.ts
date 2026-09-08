@@ -31,6 +31,10 @@ export const ERROR_CODES = [
   'token_expired',
   'session_expired',
   'tenant_forbidden',
+  // SSO (A-8): provider off, exchange/identity failed, identity refused by policy
+  'sso_disabled',
+  'sso_failed',
+  'sso_not_allowed',
   // configuration & modules (FR-E, G-8)
   'demo_mode',
   'module_disabled',

@@ -12,6 +12,7 @@ import { groupUserMaps } from './group_user_maps.def.ts';
 import { groups } from './groups.def.ts';
 import { modules } from './modules.def.ts';
 import { notifications } from './notifications.def.ts';
+import { oauthAccounts } from './oauth_accounts.def.ts';
 import { outboxEmail } from './outbox_email.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
 import { queueJobs } from './queue_jobs.def.ts';
@@ -54,6 +55,7 @@ export const tables: readonly TableDef[] = [
   webhookDeliveries,
   userMfa,
   mfaChallenges,
+  oauthAccounts,
   outboxEmail,
   queueJobs,
 ];

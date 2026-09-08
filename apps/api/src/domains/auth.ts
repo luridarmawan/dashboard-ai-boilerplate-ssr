@@ -49,7 +49,7 @@ import { emit, settings } from '../services.ts';
  * exactly as they will be, and the link is logged at warn level outside production.
  */
 
-const PublicUser = t.Object({
+export const PublicUser = t.Object({
   id: t.String(),
   email: t.String(),
   name: t.String(),
@@ -83,8 +83,28 @@ async function defaultTenantFor(userId: string): Promise<string | null> {
   return rows.find((r) => r.is_default)?.client_id ?? rows[0]?.client_id ?? null;
 }
 
-/** A password-verified login becomes a session: cookie, last_login_at, audit (A-3, A-11). */
-async function issueSession(p: {
+/**
+ * Membership in the `default` tenant when one exists (B-5); the seed creates it. Shared by
+ * self-service registration and first-login account creation through Google (A-8).
+ */
+export async function attachDefaultTenant(
+  db: ReturnType<typeof unsafeAcrossTenants>,
+  userId: string,
+): Promise<string | null> {
+  const [tenant] = await db
+    .select({ id: schema.clients.id })
+    .from(schema.clients)
+    .where(eq(schema.clients.code, 'default'))
+    .limit(1);
+  if (!tenant) return null;
+  await db
+    .insert(schema.clientUserMaps)
+    .values({ id: newId(), client_id: tenant.id, user_id: userId, is_default: true });
+  return tenant.id;
+}
+
+/** A verified login becomes a session: cookie, last_login_at, audit (A-3, A-8, A-11). */
+export async function issueSession(p: {
   db: ReturnType<typeof unsafeAcrossTenants>;
   user: typeof schema.users.$inferSelect;
   ip: string;
@@ -92,6 +112,8 @@ async function issueSession(p: {
   cookie: Record<string, { set(v: Record<string, unknown>): void } | undefined>;
   requestId: string;
   mfa?: 'totp' | 'recovery';
+  /** Which external provider vouched for the user (A-8); absent for a password login. */
+  sso?: 'google';
 }) {
   const e = env();
   const clientId = await defaultTenantFor(p.user.id);
@@ -121,13 +143,53 @@ async function issueSession(p: {
     resourceId: p.user.id,
     ip: p.ip,
     requestId: p.requestId,
-    after: p.mfa ? { mfa: p.mfa } : undefined,
+    after:
+      p.mfa || p.sso
+        ? { ...(p.mfa ? { mfa: p.mfa } : {}), ...(p.sso ? { sso: p.sso } : {}) }
+        : undefined,
   });
   return { user: publicUser(p.user), clientId };
 }
 /** A challenge lives five minutes and dies after five wrong codes. */
 const MFA_CHALLENGE_TTL_MS = 5 * 60_000;
 const MFA_MAX_ATTEMPTS = 5;
+
+/**
+ * Second factor (A-11): when the user has TOTP enabled, the first factor alone does not open a
+ * session — hand out a short-lived challenge the client completes at POST /auth/login/mfa.
+ * Returns null when no second factor is enrolled.
+ */
+export async function startMfaChallenge(p: {
+  db: ReturnType<typeof unsafeAcrossTenants>;
+  userId: string;
+  ip: string;
+  requestId: string;
+}): Promise<{ mfaRequired: true; challenge: string } | null> {
+  const [mfa] = await p.db
+    .select()
+    .from(schema.userMfa)
+    .where(eq(schema.userMfa.user_id, p.userId))
+    .limit(1);
+  if (!mfa?.enabled_at) return null;
+  const token = randomToken();
+  await p.db.insert(schema.mfaChallenges).values({
+    id: newId(),
+    user_id: p.userId,
+    token_hash: hashToken(token),
+    expires_at: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
+    ip: p.ip,
+  });
+  await writeAudit(p.db, {
+    clientId: null,
+    actorId: p.userId,
+    action: 'auth.mfa_challenge',
+    resource: 'user',
+    resourceId: p.userId,
+    ip: p.ip,
+    requestId: p.requestId,
+  });
+  return { mfaRequired: true as const, challenge: token };
+}
 
 export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] })
   .use(requestContext)
@@ -174,17 +236,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         name: body.name.trim(),
         password_hash: await hashPassword(body.password),
       });
-      // Attach to the default tenant when one exists (B-5); the seed creates it.
-      const [tenant] = await db
-        .select({ id: schema.clients.id })
-        .from(schema.clients)
-        .where(eq(schema.clients.code, 'default'))
-        .limit(1);
-      if (tenant) {
-        await db
-          .insert(schema.clientUserMaps)
-          .values({ id: newId(), client_id: tenant.id, user_id: userId, is_default: true });
-      }
+      const tenantId = await attachDefaultTenant(db, userId);
+      const tenant = tenantId ? { id: tenantId } : undefined;
       emit('user.created', { userId, clientId: tenant?.id ?? null }, { requestId });
       const verify = randomToken();
       await db.insert(schema.emailVerificationTokens).values({
@@ -296,33 +349,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return fail('invalid_credentials', 'Email atau kata sandi salah', requestId);
       }
 
-      // Second factor (A-11): the password alone does not open a session — hand out a short-lived
-      // challenge the client completes at POST /auth/login/mfa.
-      const [mfa] = await db
-        .select()
-        .from(schema.userMfa)
-        .where(eq(schema.userMfa.user_id, user.id))
-        .limit(1);
-      if (mfa?.enabled_at) {
-        const token = randomToken();
-        await db.insert(schema.mfaChallenges).values({
-          id: newId(),
-          user_id: user.id,
-          token_hash: hashToken(token),
-          expires_at: new Date(Date.now() + MFA_CHALLENGE_TTL_MS),
-          ip,
-        });
-        await writeAudit(db, {
-          clientId: null,
-          actorId: user.id,
-          action: 'auth.mfa_challenge',
-          resource: 'user',
-          resourceId: user.id,
-          ip,
-          requestId,
-        });
-        return ok({ mfaRequired: true as const, challenge: token });
-      }
+      const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
+      if (challenge) return ok(challenge);
       return ok(await issueSession({ db, user, ip, request, cookie, requestId }));
     },
     {

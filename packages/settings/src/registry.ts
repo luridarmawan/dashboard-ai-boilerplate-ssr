@@ -127,6 +127,58 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         max: 20,
         order: 2,
       },
+      // ---- Google sign-in (A-8). Client id + secret come from Google Cloud Console → Credentials →
+      // OAuth client (Web application); the authorised redirect URI is <origin>/auth/google/callback.
+      // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env are the bootstrap when these are empty (E-6).
+      {
+        key: 'security.google_enabled',
+        type: 'boolean',
+        title: { id: 'Masuk dengan Google', en: 'Sign in with Google' },
+        note: {
+          id: 'Menampilkan tombol Google di halaman masuk. Butuh client id dan secret di bawah (atau GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET di .env).',
+          en: 'Shows the Google button on the sign-in page. Needs the client id and secret below (or GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET in .env).',
+        },
+        default: false,
+        public: true,
+        order: 3,
+      },
+      {
+        key: 'security.google_client_id',
+        type: 'string',
+        title: { id: 'Google client id', en: 'Google client id' },
+        default: null,
+        max: 191,
+        order: 4,
+      },
+      {
+        key: 'security.google_client_secret',
+        type: 'secret',
+        title: { id: 'Google client secret', en: 'Google client secret' },
+        order: 5,
+      },
+      {
+        key: 'security.google_auto_create',
+        type: 'boolean',
+        title: { id: 'Buat akun otomatis dari Google', en: 'Auto-create accounts from Google' },
+        note: {
+          id: 'Bila mati, hanya email yang sudah terdaftar yang bisa masuk lewat Google.',
+          en: 'When off, only already-registered e-mails can sign in through Google.',
+        },
+        default: false,
+        order: 6,
+      },
+      {
+        key: 'security.google_allowed_domains',
+        type: 'string',
+        title: { id: 'Domain email Google yang diizinkan', en: 'Allowed Google e-mail domains' },
+        note: {
+          id: 'Dipisah koma, mis. perusahaan.id, anak-usaha.id. Kosong = semua domain.',
+          en: 'Comma-separated, e.g. company.com, subsidiary.com. Empty = any domain.',
+        },
+        default: null,
+        max: 500,
+        order: 7,
+      },
     ],
   },
   {

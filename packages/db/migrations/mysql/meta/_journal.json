@@ -134,6 +134,13 @@
       "when": 1788867746070,
       "tag": "0018_blushing_stature",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1788900145237,
+      "tag": "0019_many_hellfire_club",
+      "breakpoints": true
     }
   ]
 }
