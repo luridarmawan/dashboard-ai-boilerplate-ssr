@@ -17,5 +17,17 @@ export const load: ServerLoad = async (event) => {
         ? 'Anda tidak punya izin melihat analitik AI'
         : 'Analitik tidak bisa dimuat',
     );
-  return { stats: res.data.data, days };
+  // Eden Treaty turns ISO-looking strings into Date objects on the client side; `day` must stay
+  // the "YYYY-MM-DD" key the template slices and keys on.
+  const stats = res.data.data;
+  return {
+    stats: {
+      ...stats,
+      byDay: stats.byDay.map((d) => ({ ...d, day: dayKey(d.day) })),
+    },
+    days,
+  };
 };
+
+const dayKey = (v: unknown): string =>
+  typeof v === 'string' ? v.slice(0, 10) : new Date(v as string).toISOString().slice(0, 10);
