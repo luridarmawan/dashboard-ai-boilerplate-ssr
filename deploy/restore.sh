@@ -32,3 +32,4 @@ case "$DB_DIALECT" in
     gunzip -c "$file" | psql -q -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" >/dev/null ;;
 esac
 echo "restore: $(basename "$file") dimuat ke $DB_NAME@$DB_HOST"
+echo "restore: database dibuat ulang — proses api/web yang masih hidup memegang koneksi ke database lama (galat 1046 'No database selected' pada setiap kueri). Nyalakan ulang: dc up -d --force-recreate --scale api=3 web"

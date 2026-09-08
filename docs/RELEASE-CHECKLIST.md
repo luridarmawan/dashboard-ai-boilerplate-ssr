@@ -44,7 +44,7 @@ dc stop api web
 dc exec mysql mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -e 'DROP DATABASE <DATABASE_NAME>; CREATE DATABASE <DATABASE_NAME>'   # nama dari .env.prod (baku app)
 dc run --rm -e CONFIRM_RESTORE=yes restore latest
 dc run --rm preflight        # harus LOLOS: migrations mutakhir, seed ada — bila tidak, dump-nya cacat
-dc up -d --scale api=3
+dc up -d --force-recreate --scale api=3 web   # WAJIB recreate: pool koneksi lama masih menunjuk database yang di-drop (galat 1046 di setiap kueri)
 curl -s https://DOMAIN/v1/ready
 # 25: setelah 10 menit idle (ukur dalam kondisi sudah migrate + seed, bukan stack kosong)
 docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m

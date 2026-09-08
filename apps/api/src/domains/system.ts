@@ -8,6 +8,7 @@ import { Elysia, t } from 'elysia';
 import rootPkg from '../../../../package.json' with { type: 'json' };
 import { instanceId } from '../instance.ts';
 import { registerAppMetrics } from '../metrics.ts';
+import { describeCause } from '../plugins/request-context.ts';
 
 /**
  * System endpoints (PRD M-4, M-5).
@@ -57,10 +58,11 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
         await unsafeAcrossTenants().select({ id: schema.clients.id }).from(schema.clients).limit(1);
         checks.database = { ok: true, ms: Math.round(performance.now() - t0) };
       } catch (err) {
+        const cause = describeCause(err);
         checks.database = {
           ok: false,
           ms: Math.round(performance.now() - t0),
-          error: err instanceof Error ? err.message : String(err),
+          error: `${err instanceof Error ? err.message : String(err)}${cause ? ` — ${cause}` : ''}`,
         };
       }
 

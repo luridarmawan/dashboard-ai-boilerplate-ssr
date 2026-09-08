@@ -73,6 +73,9 @@ export const requestContext = new Elysia({ name: 'request-context' })
         logger.error('unhandled', {
           requestId: rid,
           error: error instanceof Error ? error.message : String(error),
+          // Drizzle wraps driver errors as "Failed query: …"; the actionable part (ER_NO_DB_ERROR,
+          // "Table … doesn't exist", ECONNREFUSED, "Access denied") lives in the cause chain.
+          cause: describeCause(error),
           stack: !isProd && error instanceof Error ? error.stack : undefined,
         });
         return fail(
@@ -87,6 +90,20 @@ export const requestContext = new Elysia({ name: 'request-context' })
       }
     }
   });
+
+/** `code`/`errno` + message of every nested `cause`, joined — null when there is none. */
+export function describeCause(error: unknown): string | null {
+  const parts: string[] = [];
+  let cur = error instanceof Error ? error.cause : undefined;
+  for (let depth = 0; cur && depth < 5; depth++) {
+    const e = cur as { code?: unknown; errno?: unknown; message?: unknown; cause?: unknown };
+    const tag = [e.code, e.errno].filter((x) => x !== undefined && x !== null).join('/');
+    const msg = typeof e.message === 'string' ? e.message : String(cur);
+    parts.push(tag ? `${tag}: ${msg}` : msg);
+    cur = e.cause;
+  }
+  return parts.length ? parts.join(' ← ') : null;
+}
 
 /** Elysia's validation error carries the offending path/message; expose only that. */
 function safeValidation(error: unknown): unknown {
