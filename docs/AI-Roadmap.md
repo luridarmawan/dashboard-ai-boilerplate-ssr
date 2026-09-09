@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **F0 selesai** 2026-09-09 (`modules/AI/api/probe.ts`, `POST /providers/:id/test`, mock `/responses`); F1 menunggu keputusan §5.1 |
+| **Status** | **F0 selesai** 2026-09-09 (`modules/AI/api/probe.ts`, `POST /providers/:id/test`, mock `/responses`); bentuk Responses API **terverifikasi ke provider nyata** 2026-09-10 (§12); F1 menunggu keputusan §5.1 |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -165,7 +165,7 @@ const body = p.endpoint === 'responses'
   - system → `instructions`; user/assistant teks → `input[]`
   - **Tool round-trip (I-3):** Responses API tidak punya role `tool`. Loop sekarang mendorong `{ role: 'tool', tool_call_id, content }` (`routes.ts:792`) dan giliran assistant membawa `tool_calls` (`ProviderMessage`, `routes.ts:69`) — tiap round harus jadi item `function_call` / `function_call_output` berkunci `call_id`
   - **Lampiran (H-11):** `{ type: 'image_url', image_url: { url } }` (`ContentPart`, `routes.ts:66`; dirakit di `routes.ts:680`) menjadi `input_image`
-- Normalisasi SSE di satu tempat `parseResponsesChunk` (`response.output_text.delta` → frame yang sudah ada). **Sisi web tidak perlu berubah:** API tidak mem-proxy frame upstream, ia menyusun frame `choices[0].delta` sendiri (`routes.ts:874`, `981`–`1009`) dan kedua klien membaca bentuk itu (`web/routes/chat/+page.svelte`, `web/widgets/FloatingChat.svelte:152`) — cukup alirkan hasil parse ke penyusun frame yang sama, keluarannya tetap `text/event-stream`
+- Normalisasi SSE di satu tempat `parseResponsesChunk` (`response.output_text.delta` → frame yang sudah ada). **Wajib menyaring, bukan meneruskan semua delta:** provider nyata mengirim `response.reasoning_summary_text.delta` **sebelum** teks jawaban (§12), jadi meneruskan setiap `*.delta` akan menuangkan ringkasan reasoning ke dalam balon jawaban. **Sisi web tidak perlu berubah:** API tidak mem-proxy frame upstream, ia menyusun frame `choices[0].delta` sendiri (`routes.ts:874`, `981`–`1009`) dan kedua klien membaca bentuk itu (`web/routes/chat/+page.svelte`, `web/widgets/FloatingChat.svelte:152`) — cukup alirkan hasil parse ke penyusun frame yang sama, keluarannya tetap `text/event-stream`
 
 ### 5.3 Mock provider — `scripts/ai-mock-provider.ts:23`
 
@@ -233,7 +233,7 @@ Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; parale
 2. `POST /v1/m/ai/providers/:id/test` mengembalikan `capabilities` + `preferred_endpoint`; `GET /v1/m/ai/providers` menyertakannya
 3. Chat ke provider `responses-only` berhasil stream & non-stream; chat ke `chat-only` tetap berhasil (fallback)
 4. Bila `capabilities` provider `false`: switch `ai.tools_enable` di **Pengaturan → AI** diberi keterangan "tidak didukung penyedia terpilih", dan pemilih provider di chat menampilkan badge kemampuan. Toggle reasoning/tools **per-chat** tidak dijanjikan di sini — UI-nya belum ada (§1)
-5. Biaya & token reasoning tercatat benar di `ai_calls` dan `Analitik AI`
+5. Biaya & token tercatat benar di `ai_calls` dan `Analitik AI`. **Perlu keputusan sebelum F3** (§12 no. 4): `usage` Responses memakai `input_tokens`/`output_tokens` (bukan `prompt_tokens`/`completion_tokens`) dan melaporkan `output_tokens_details.reasoning_tokens` secara terpisah — pada provider yang diuji angkanya **tidak konsisten** (`output_tokens` = `text_tokens`, sementara `reasoning_tokens` di luar keduanya). Pilih: `tokensOut = output_tokens` (mungkin menagih kurang) atau `output_tokens + reasoning_tokens` (mungkin menagih dobel di provider lain), dan tambahkan kolom `reasoning_tokens` di `ai_calls` kalau §7.5 mau bisa dibuktikan
 6. Tanpa `capabilities` (provider lama) → perilaku lama utuh (chat via `/chat/completions`), dan penyedia baku tenant tidak bergeser: urutan `enabledProviders` tetap `is_default` → `code` (§3 no. 2)
 7. Penyedia legacy *Pengaturan → AI* berperilaku sesuai opsi yang dipilih di §5.1 (baku: `ai.preferred_endpoint = auto`)
 
@@ -346,4 +346,41 @@ AI test — 3 sumber, 2 tenant
 - `modules/AI/api/routes.ts:325` `ProviderView`, `:341` `ProviderOption`, `:349` `providerView`, `:1707` skema respons `/test` (inline)
 - `modules/AI/test/integration/providers.test.ts:55` & `ai.test.ts:77` fake upstream in-process (`Bun.serve`) — yang dipakai CI
 - `scripts/ci/m5-gate4.sh` gate "modul AI dicabut" — tidak berhubungan dengan provider
+
+## 12. Bentuk Responses API — terverifikasi ke provider nyata (2026-09-10)
+
+Diuji langsung ke `AI_API_BASE_URL` dari `.env` (`ai-router.carik.id/v1`, model `sumo/qwen3.8-flash`), bukan dari dokumentasi atau ingatan. Semua asumsi §4.1/§5.2 **benar**, dengan tiga tambahan yang mengubah pekerjaan F2/F3.
+
+**1. Non-stream `POST /responses`** — top-level: `id, object, created_at, model, status, background, error, output, output_text, usage`. Ada field ringkas **`output_text`** (isi teks jawaban), jadi jalur non-stream tidak perlu merangkai `output[]` sendiri. `output[].type` = `reasoning`, `message`; `message.content[].type` = `output_text`.
+
+**2. Urutan event stream** (persis, satu turn):
+
+```
+response.created → response.in_progress → response.output_item.added
+→ response.reasoning_summary_part.added → response.reasoning_summary_text.delta
+→ response.reasoning_summary_text.done → response.reasoning_summary_part.done
+→ response.output_item.done → response.output_item.added → response.content_part.added
+→ response.output_text.delta → response.output_text.done → response.content_part.done
+→ response.output_item.done → response.completed
+```
+
+`response.output_text.delta` berisi `{ type, item_id, output_index, content_index, delta, logprobs, sequence_number }`. **Ringkasan reasoning datang lebih dulu dan juga berupa `*.delta`** — inilah alasan `parseResponsesChunk` harus menyaring per `type`, bukan meneruskan semua delta (§5.2).
+
+**3. Tool round-trip — terbukti utuh, dua arah.** Item `function_call` punya kunci `id, type, call_id, name, arguments` (`arguments` = string JSON, mis. `{"city": "Jakarta"}`). Mengirim hasilnya kembali sebagai `{ type: 'function_call_output', call_id, output }` di dalam `input[]` — bersama item `function_call` aslinya — menghasilkan jawaban akhir yang benar (200, `output[]` = `reasoning, message`). Jadi pemetaan §5.2 sudah tepat: `call_id`, bukan `tool_call_id`, dan tanpa role `tool`.
+
+`input[]` juga menerima bentuk sederhana `{ type: 'message', role, content: '<string>' }` — tidak wajib memakai array content part.
+
+**4. `usage` beda bentuk DAN meragukan.** Responses melaporkan:
+
+```json
+{"input_tokens":67,"output_tokens":56,
+ "input_tokens_details":{"cached_tokens":0,"text_tokens":67},
+ "output_tokens_details":{"reasoning_tokens":53,"text_tokens":56}}
+```
+
+Perhatikan: `output_tokens` (56) **sama dengan** `text_tokens` (56) sementara `reasoning_tokens` (53) berada di luar keduanya — padahal 53 + 56 > 56. Artinya di provider ini token reasoning **tidak** termasuk `output_tokens`; menagih hanya `output_tokens` berarti menagih kurang, dan asumsi sebaliknya di provider lain berarti menagih dobel. Ini keputusan §7.5 yang harus diambil sebelum F3, bukan detail implementasi.
+
+**5. Batas probe yang perlu diketahui:** model ini **selalu** mengeluarkan item `reasoning` walau parameter `reasoning` tidak dikirim. Jadi langkah 5 §4.1 sesungguhnya menjawab "apakah model ini melakukan reasoning", bukan "apakah parameter `reasoning` dihormati" — dua hal itu tidak bisa dibedakan dari satu panggilan, dan untuk keputusan badge memang tidak perlu dibedakan.
+
+**Hasil probe provider tersebut:** `preferred=responses`, responses ✓ chat ✓ stream ✓ reasoning ✓ (`reasoning`) tools ✓, 3 model, **Direkomendasikan ★**, 6,1 dtk (langkah terlama: `/responses` 2,5 dtk).
 - `packages/db/migrations/mysql/0021_flat_impossible_man.sql` migrasi terakhir; `packages/db/src/descriptor.ts:152` `col.json()`

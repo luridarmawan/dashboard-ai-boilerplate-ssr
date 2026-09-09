@@ -11,7 +11,7 @@ import { isRecommended, probeCapabilities } from '../api/probe.ts';
  *   - the stream probe hangs up after the first frame instead of draining the completion
  */
 
-type Handler = (req: Request, url: URL) => Response | Promise<Response> | null;
+type Handler = (req: Request, url: URL) => Response | null | Promise<Response | null>;
 
 /** A provider that only serves what the case gives it; anything else is 404, like a real proxy. */
 function provider(handler: Handler) {
@@ -234,6 +234,47 @@ describe('AI capability probe (§4.1)', () => {
       expect(r.ok).toBe(true);
       expect(r.stream.supported).toBe(true);
       expect(r.tools).toEqual({ supported: false, functionCalling: false, via: null });
+    } finally {
+      p.server.stop(true);
+    }
+  });
+
+  test('a `response.created` frame carrying "error": null is a working stream, not a failure', async () => {
+    // Exactly what a live Responses proxy sends first. Reading `error` as "any mention = broken"
+    // reported a perfectly good streaming provider as non-streaming.
+    const created =
+      'event: response.created\ndata: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","error":null,"output":[]}}\n\n';
+    const p = provider((req, url) => {
+      if (url.pathname.endsWith('/models')) return models(['model-x']);
+      if (!url.pathname.endsWith('/responses')) return null;
+      return req.headers.get('accept') === 'text/event-stream'
+        ? new Response(created, { headers: { 'content-type': 'text/event-stream' } })
+        : responsesOk();
+    });
+    try {
+      const r = await probe(p.url);
+      expect(r.stream.supported).toBe(true);
+      expect(r.stream.responsesStream).toBe(true);
+      expect(r.steps.find((s) => s.step === 'stream')?.status).toBe('ok');
+    } finally {
+      p.server.stop(true);
+    }
+  });
+
+  test('a real error frame is still reported as no stream', async () => {
+    const p = provider((req, url) => {
+      if (url.pathname.endsWith('/models')) return models(['model-x']);
+      if (!url.pathname.endsWith('/responses')) return null;
+      return req.headers.get('accept') === 'text/event-stream'
+        ? new Response('data: {"error":{"message":"streaming not enabled for this key"}}\n\n', {
+            headers: { 'content-type': 'text/event-stream' },
+          })
+        : responsesOk();
+    });
+    try {
+      const r = await probe(p.url);
+      expect(r.stream.supported).toBe(false);
+      expect(r.steps.find((s) => s.step === 'stream')?.note).toContain('streaming not enabled');
     } finally {
       p.server.stop(true);
     }

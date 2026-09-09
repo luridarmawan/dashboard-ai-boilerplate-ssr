@@ -93,6 +93,37 @@ function presenceOf(a: Attempt, signatureField: string): Presence {
   return 'present';
 }
 
+/**
+ * First complete `data:` payload in an SSE buffer, or null while none has arrived yet. A frame is
+ * only complete once its blank-line terminator is in the buffer — returning early would truncate
+ * the JSON and make it unparseable.
+ */
+function firstDataPayload(buf: string): string | null {
+  for (const frame of buf.split(/\n\n|\r\n\r\n/).slice(0, -1)) {
+    for (const line of frame.split(/\r?\n/)) {
+      if (line.startsWith('data:')) return line.slice(5).trim();
+    }
+  }
+  return null;
+}
+
+/**
+ * Is this first frame an actual failure? Beware `"error": null` — a real Responses
+ * `response.created` frame carries it, and treating any mention of `error` as a failure reports
+ * a perfectly good streaming provider as non-streaming (seen on a live proxy, 2026-09-10).
+ */
+function frameFailure(payload: string): boolean {
+  if (payload === '[DONE]') return false;
+  try {
+    const j = JSON.parse(payload) as { error?: unknown; type?: unknown };
+    if (j.type === 'error') return true;
+    return 'error' in j && j.error !== null && j.error !== undefined;
+  } catch {
+    // Not JSON: fall back to text, but still ignore an explicitly null error.
+    return /"error"\s*:\s*(?!null)/.test(payload);
+  }
+}
+
 export class ProbeAborted extends Error {}
 
 /** Sequential probe runner: shared deadline, per-step timeout, every step recorded. */
@@ -207,13 +238,14 @@ class Runner {
           const { value, done } = await reader.read();
           if (done) break;
           buf += dec.decode(value, { stream: true });
-          if (/(^|\n)data:/.test(buf)) {
-            const errored = /"error"\s*:/.test(buf);
+          const payload = firstDataPayload(buf);
+          if (payload !== null) {
+            const failure = frameFailure(payload);
             return {
-              ok: !errored,
+              ok: !failure,
               sse: true,
               status: res.status,
-              note: errored ? clip(buf) : null,
+              note: failure ? clip(payload) : null,
               ms: ms(),
             };
           }
