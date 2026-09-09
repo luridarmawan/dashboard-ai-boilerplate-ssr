@@ -16,6 +16,8 @@ const fields: FieldDef[] = [
   { name: 'name', type: 'string', label: t('tenants.name'), required: true, maxlength: 191 },
   { name: 'active', type: 'boolean', label: t('tenants.detail.active') },
 ];
+/** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
+const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -30,13 +32,13 @@ const fieldErrors = $derived(
   </Card>
   {#if can('client.manage') && c.code !== 'default'}
     <Card title={t('tenants.detail.delete')} description={t('tenants.detail.delete_hint')}>
-      {#if data.confirmDelete}
+      {#if confirming}
         <!-- Two-step confirmation (no JavaScript required): the code has to be typed, and the action checks it again. -->
         <div class="grid gap-4" id="delete">
           <Alert variant="error" title={t('tenants.detail.delete_confirm')}>
             <p>{t('tenants.detail.delete_confirm_lead', { name: c.name })}</p>
           </Alert>
-          <form method="POST" action="?/delete" class="grid gap-4">
+          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4">
             <Csrf token={data.csrf} />
             <Field label={t('tenants.detail.delete_confirm_code', { code: c.code })} for="confirm-code" error={form?.code === 'confirm_failed' ? form.error : null} required>
               <Input id="confirm-code" name="code" autocomplete="off" autocapitalize="none" spellcheck={false} required />

@@ -1,7 +1,14 @@
 import { formToObject, UserUpdateBody, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, forwardSetCookies, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  forwardSetCookies,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -20,6 +27,12 @@ export const load: PageServerLoad = async (event) => {
     viewer: { id: me?.id ?? '', isSuperadmin: me?.isSuperadmin ?? false },
     groups: groups.data?.success ? groups.data.data : [],
     created: event.url.searchParams.has('created'),
+    /**
+     * Removing a user is destructive (the account itself is soft-deleted with its last tenant), so
+     * it takes two steps: `?confirm=delete` opens the confirmation — a plain link, no JavaScript
+     * needed (L-22) — and the action below still refuses a POST whose typed e-mail does not match.
+     */
+    confirmDelete: event.url.searchParams.get('confirm') === 'delete',
   };
 };
 
@@ -85,6 +98,17 @@ export const actions: Actions = {
         message: t('common.form_expired'),
       });
     }
+    // The confirmation is enforced HERE, not only in the markup: the caller must type the user's own
+    // e-mail, read back from the API rather than from a hidden field a client could edit.
+    const current = await apiFor(event).v1.users({ id: event.params.id }).get();
+    if (!current.data?.success)
+      error(current.status === 404 ? 404 : current.status, t('users.detail.not_found'));
+    if (str(form, 'email').trim().toLowerCase() !== current.data.data.email.toLowerCase())
+      return actionFailure({
+        status: 422,
+        code: 'confirm_failed',
+        message: t('users.detail.delete_confirm_mismatch'),
+      });
     const r = unwrap(await apiFor(event).v1.users({ id: event.params.id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/users');

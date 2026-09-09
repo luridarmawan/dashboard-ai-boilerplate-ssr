@@ -20,6 +20,8 @@ const extras = $derived([...granted].filter((p) => !matrixKeys.has(p)));
 const memberIds = $derived(new Set(g.members.map((m) => m.userId)));
 const candidates = $derived(data.tenantUsers.filter((u) => !memberIds.has(u.id)));
 const editable = $derived(can('group.edit'));
+/** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
+const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
 </script>
 
 <svelte:head><title>{t('groups.detail.title', { name: g.name })}</title></svelte:head>
@@ -27,7 +29,7 @@ const editable = $derived(can('group.edit'));
 <div class="page">
   <h1>{g.name} <code>{g.code}</code>{#if g.isSystem} <span class="muted">{t('groups.detail.system')}</span>{/if}</h1>
   {#if form?.saved}<p class="notice">{t('groups.detail.saved')}</p>{/if}
-  {#if form?.error}
+  {#if form?.error && form.code !== 'confirm_failed'}
     <p class="error">{form.error}{#if form.details && typeof form.details === 'object' && 'unknown' in form.details} — {(form.details as { unknown: string[] }).unknown.join(', ')}{/if}</p>
   {/if}
 
@@ -95,12 +97,27 @@ const editable = $derived(can('group.edit'));
   {/if}
 
   {#if can('group.manage') && !g.isSystem}
-    <h2>{t('groups.detail.delete')}</h2>
-    <form method="POST" action="?/delete" class="row">
-      <Csrf token={data.csrf} />
-      <button type="submit" class="danger">{t('groups.detail.delete')}</button>
-      <span class="muted">{t('groups.detail.delete_hint')}</span>
-    </form>
+    <h2 id="delete">{t('groups.detail.delete')}</h2>
+    {#if confirming}
+      <!-- Two-step confirmation (no JavaScript required): the code has to be typed, and the action checks it again. -->
+      <p class="error" role="alert">{t('groups.detail.delete_confirm_lead', { name: g.name, n: g.members.length })}</p>
+      <form method="POST" action="?/delete&confirm=delete" class="stack">
+        <Csrf token={data.csrf} />
+        <label>{t('groups.detail.delete_confirm_code', { code: g.code })}
+          <input name="code" autocomplete="off" autocapitalize="none" spellcheck="false" required />
+        </label>
+        {#if form?.code === 'confirm_failed'}<p class="error" role="alert">{form.error}</p>{/if}
+        <div class="row">
+          <button type="submit" class="danger">{t('groups.detail.delete_confirm_submit')}</button>
+          <a class="btn secondary" href={`/groups/${g.id}`}>{t('common.cancel')}</a>
+        </div>
+      </form>
+    {:else}
+      <div class="row">
+        <a class="btn danger" href={`/groups/${g.id}?confirm=delete#delete`}>{t('groups.detail.delete')}</a>
+        <span class="muted">{t('groups.detail.delete_hint')}</span>
+      </div>
+    {/if}
   {/if}
   <p><a href="/groups">← {t('groups.detail.all_groups')}</a></p>
 </div>

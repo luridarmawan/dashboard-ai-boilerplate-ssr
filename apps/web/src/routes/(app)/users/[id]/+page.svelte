@@ -2,7 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card } from '$lib/components/ui';
+import { Alert, Badge, Button, Card, Field, Input } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../../$types';
@@ -50,6 +50,8 @@ const values = $derived({
   isSuperadmin: u.isSuperadmin,
   groupIds: u.groups.map((g) => g.id),
 });
+/** Open on `?confirm=delete`, and stay open when the action bounced the typed e-mail back. */
+const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -94,10 +96,26 @@ const fieldErrors = $derived(
 
   {#if can('user.manage')}
     <Card title={t('users.detail.remove_title')} description={t('users.detail.remove_desc')}>
-      <form method="POST" action="?/delete">
-        <Csrf token={data.csrf} />
-        <Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('users.detail.remove_button')}</Button>
-      </form>
+      {#if confirming}
+        <!-- Two-step confirmation (no JavaScript required): the e-mail has to be typed, and the action checks it again. -->
+        <div class="grid gap-4" id="delete">
+          <Alert variant="error" title={t('users.detail.delete_confirm')}>
+            <p>{t('users.detail.delete_confirm_lead', { name: u.name, email: u.email })}</p>
+          </Alert>
+          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4">
+            <Csrf token={data.csrf} />
+            <Field label={t('users.detail.delete_confirm_email', { email: u.email })} for="confirm-email" error={form?.code === 'confirm_failed' ? form.error : null} required>
+              <Input id="confirm-email" name="email" autocomplete="off" autocapitalize="none" spellcheck={false} required />
+            </Field>
+            <div class="flex flex-wrap gap-2">
+              <Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('users.detail.delete_confirm_submit')}</Button>
+              <Button href="/users/{u.id}" variant="secondary">{t('common.cancel')}</Button>
+            </div>
+          </form>
+        </div>
+      {:else}
+        <Button href="/users/{u.id}?confirm=delete#delete" variant="destructive"><Icon name="trash" size={16} />{t('users.detail.remove_button')}</Button>
+      {/if}
     </Card>
   {/if}
 </div>

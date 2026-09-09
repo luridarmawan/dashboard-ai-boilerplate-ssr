@@ -98,6 +98,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
       {#if state.sort}<input type="hidden" name="sort" value={state.sort} />{/if}
       <input type="hidden" name="order" value={state.order} />
       {#if state.cols.length}<input type="hidden" name="cols" value={state.cols.join(',')} />{/if}
+      <input type="hidden" name="limit" value={state.limit} />
       <label class="sr-only" for={`${formId}-q`}>{L.search}</label>
       <input id={`${formId}-q`} name="q" value={state.q} placeholder={searchPlaceholder ?? L.search} class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
       <Button type="submit" variant="outline" size="sm"><Icon name="search" size={16} />{L.search}</Button>
@@ -108,6 +109,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
         {#if state.q}<input type="hidden" name="q" value={state.q} />{/if}
         <input type="hidden" name="sort" value={state.sort} />
         <input type="hidden" name="order" value={state.order} />
+        <input type="hidden" name="limit" value={state.limit} />
         {#each columns as c (c.key)}
           <label class="flex items-center gap-2"><input type="checkbox" name="cols" value={c.key} checked={visible.some((v) => v.key === c.key)} class="h-4 w-4 accent-primary" />{c.label}</label>
         {/each}

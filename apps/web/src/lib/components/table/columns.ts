@@ -44,7 +44,7 @@ export interface TableState {
   q: string;
   sort: string;
   order: 'asc' | 'desc';
-  /** Visible column keys, from `?cols=a,b`; empty = defaults. */
+  /** Visible column keys, from `?cols=a,b` or a repeated `?cols=a&cols=b`; empty = defaults. */
   cols: string[];
 }
 
@@ -64,7 +64,20 @@ export function tableStateFrom(
     q: url.searchParams.get('q') ?? '',
     sort: url.searchParams.get('sort') ?? defaults.sort,
     order: order === 'desc' ? 'desc' : order === 'asc' ? 'asc' : (defaults.order ?? 'asc'),
-    cols: (url.searchParams.get('cols') ?? '').split(',').filter(Boolean),
+    /**
+     * Two shapes reach us: the table's own links carry one compact `?cols=a,b`, while the column
+     * picker is a set of checkboxes and posts a repeated `?cols=a&cols=b`. Reading only the first
+     * value left the picker showing a single column, so accept both.
+     */
+    cols: [
+      ...new Set(
+        url.searchParams
+          .getAll('cols')
+          .flatMap((v) => v.split(','))
+          .map((v) => v.trim())
+          .filter(Boolean),
+      ),
+    ],
   };
 }
 
