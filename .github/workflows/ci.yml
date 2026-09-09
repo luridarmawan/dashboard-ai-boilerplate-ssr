@@ -406,12 +406,34 @@ jobs:
         run: |
           npx --yes lighthouse@12 http://127.0.0.1:5173/ --preset=desktop --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=/tmp/lh.json
           node -e '
-            const r = require("/tmp/lh.json").categories;
-            const s = Object.fromEntries(Object.entries(r).map(([k,v]) => [k, Math.round(v.score*100)]));
-            console.log(JSON.stringify(s));
+            const lh = require("/tmp/lh.json");
+            const s = Object.fromEntries(Object.entries(lh.categories).map(([k,v]) => [k, Math.round(v.score*100)]));
+            console.log("scores", JSON.stringify(s));
+            // Always print the metrics behind the performance score, so a drop can be read from the log
+            // instead of being guessed at: which metric moved, and which audits Lighthouse blames.
+            const a = lh.audits;
+            const ms = (id) => (a[id] ? `${Math.round(a[id].numericValue)}ms` : "-");
+            console.log("metrics", JSON.stringify({
+              FCP: ms("first-contentful-paint"), LCP: ms("largest-contentful-paint"), TBT: ms("total-blocking-time"),
+              SI: ms("speed-index"), TTI: ms("interactive"), TTFB: ms("server-response-time"),
+              CLS: a["cumulative-layout-shift"]?.numericValue?.toFixed(3) ?? "-",
+              lcpElement: a["largest-contentful-paint-element"]?.details?.items?.[0]?.items?.[0]?.node?.snippet ?? "-",
+            }));
+            const perfIds = new Set(lh.categories.performance.auditRefs.map((r) => r.id));
+            const weak = Object.values(a).filter((x) => perfIds.has(x.id) && typeof x.score === "number" && x.score < 0.9)
+              .sort((x, y) => x.score - y.score).slice(0, 8)
+              .map((x) => `${x.id}=${Math.round(x.score*100)} ${x.displayValue ?? ""}`.trim());
+            console.log("weak audits", JSON.stringify(weak));
             const bad = Object.entries(s).filter(([,v]) => v < 90);
             if (bad.length) { console.error("Lighthouse < 90:", bad); process.exit(1); }
           '
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-landing
+          path: /tmp/lh.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: indexable without JavaScript (R-4)
         run: |
           curl -s http://127.0.0.1:5173/ | grep -q 'data-testid="products"'
