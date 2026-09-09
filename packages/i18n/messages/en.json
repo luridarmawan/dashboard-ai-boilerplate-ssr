@@ -442,6 +442,8 @@
   "profile.mfa.setup": "Set up 2FA",
   "profile.mfa.title": "Two-factor authentication (2FA)",
   "profile.name": "Name",
+  "profile.phone": "Phone number (optional)",
+  "profile.phone_hint": "Optional. Free format: +62 812-3456-7890; spaces and dashes are stripped on save.",
   "profile.password.changed": "Password changed. Sessions on other devices have been signed out.",
   "profile.password.confirm": "Repeat new password",
   "profile.password.current": "Current password",

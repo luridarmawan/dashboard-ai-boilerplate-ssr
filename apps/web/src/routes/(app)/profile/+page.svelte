@@ -13,6 +13,13 @@ const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const profileFields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('profile.name'), required: true, maxlength: 191 },
   {
+    name: 'phone',
+    type: 'string',
+    label: t('profile.phone'),
+    maxlength: 32,
+    hint: t('profile.phone_hint'),
+  },
+  {
     name: 'locale',
     type: 'select',
     label: t('nav.language'),

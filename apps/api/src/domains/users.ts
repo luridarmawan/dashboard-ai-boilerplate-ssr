@@ -89,6 +89,7 @@ const PublicUser = t.Object({
   id: t.String(),
   email: t.String(),
   name: t.String(),
+  phone: t.Nullable(t.String()),
   avatarUrl: t.Nullable(t.String()),
   locale: t.String(),
   theme: t.Nullable(t.String()),
@@ -261,6 +262,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const db = unsafeAcrossTenants(); // users is a global table
       const patch: Partial<typeof schema.users.$inferInsert> = {};
       if (body.name !== undefined) patch.name = body.name.trim();
+      if (body.phone !== undefined) patch.phone = body.phone === null ? null : body.phone.replace(/[ \-]/g, '');
       if (body.locale !== undefined) patch.locale = body.locale;
       if (body.theme !== undefined) patch.theme = body.theme;
       if (body.avatarUrl !== undefined) patch.avatar_url = body.avatarUrl;

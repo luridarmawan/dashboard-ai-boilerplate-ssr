@@ -174,6 +174,7 @@ export function publicUser(u: UserRow) {
     id: u.id,
     email: u.email,
     name: u.name,
+    phone: u.phone,
     avatarUrl: u.avatar_url,
     locale: u.locale,
     theme: u.theme,

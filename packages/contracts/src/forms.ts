@@ -26,8 +26,11 @@ export const LoginBody = t.Object({ email: Email, password: Password });
 export const RegisterBody = t.Object({ email: Email, password: Password, name: Name });
 
 // ---- profile (D-4) ----
+/** Optional, free-form E.164-ish contact number: digits with optional +, spaces, dashes. */
+export const Phone = t.Optional(t.Nullable(t.String({ pattern: '^\\+?[0-9][0-9 \\-]{0,30}$', maxLength: 32 })));
 export const ProfileBody = t.Object({
   name: t.Optional(Name),
+  phone: Phone,
   locale: t.Optional(LocaleCode),
   theme: t.Optional(t.Nullable(t.String({ maxLength: 64 }))),
   avatarUrl: t.Optional(t.Nullable(t.String({ maxLength: 512 }))),

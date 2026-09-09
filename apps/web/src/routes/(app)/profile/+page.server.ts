@@ -69,7 +69,7 @@ export const actions: Actions = {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
-    const input = formToObject(form, { nullable: ['theme', 'avatarUrl'] });
+    const input = formToObject(form, { nullable: ['theme', 'avatarUrl', 'phone'] });
     const v = validateForm(ProfileBody, input);
     if (!v.ok)
       return actionFailure(

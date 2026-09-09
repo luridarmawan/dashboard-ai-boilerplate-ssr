@@ -148,6 +148,13 @@
       "when": 1788912268715,
       "tag": "0020_worthless_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788949297060,
+      "tag": "0021_fast_gwen_stacy",
+      "breakpoints": true
     }
   ]
 }

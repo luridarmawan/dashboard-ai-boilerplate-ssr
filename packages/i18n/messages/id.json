@@ -442,6 +442,8 @@
   "profile.mfa.setup": "Siapkan 2FA",
   "profile.mfa.title": "Autentikasi dua faktor (2FA)",
   "profile.name": "Nama",
+  "profile.phone": "Nomor telepon (opsional)",
+  "profile.phone_hint": "Boleh kosong. Format bebas: +62 812-3456-7890; spasi dan tanda hubung dibuang saat disimpan.",
   "profile.password.changed": "Kata sandi diganti. Sesi di perangkat lain telah diakhiri.",
   "profile.password.confirm": "Ulangi kata sandi baru",
   "profile.password.current": "Kata sandi saat ini",

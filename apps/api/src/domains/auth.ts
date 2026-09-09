@@ -53,6 +53,7 @@ export const PublicUser = t.Object({
   id: t.String(),
   email: t.String(),
   name: t.String(),
+  phone: t.Nullable(t.String()),
   avatarUrl: t.Nullable(t.String()),
   locale: t.String(),
   theme: t.Nullable(t.String()),
