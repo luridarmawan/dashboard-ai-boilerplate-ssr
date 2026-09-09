@@ -209,7 +209,7 @@ export const invitationsDomain = new Elysia({
             name: existing.name,
             inviter: a.user.name,
             tenant: tenantLabel,
-            link: publicLink('/auth/login'),
+            link: publicLink('/auth/login', request),
           },
         });
         await writeAudit(db, {
@@ -255,7 +255,7 @@ export const invitationsDomain = new Elysia({
         .where(eq(schema.invitations.id, id))
         .limit(1)) as InvitationRow[];
       if (!row) throw new Error('invitation row vanished after insert');
-      const link = publicLink(`/join/${code}`);
+      const link = publicLink(`/join/${code}`, request);
       await sendTemplate(db, {
         to: email,
         template: 'invite',

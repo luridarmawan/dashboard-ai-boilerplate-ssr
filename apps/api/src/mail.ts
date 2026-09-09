@@ -101,7 +101,33 @@ export async function runOutboxOnce() {
   });
 }
 
-/** Absolute link for an email, from the public origin. */
-export function publicLink(path: string): string {
-  return `${env().APP_ORIGIN_PRIMARY ?? 'http://127.0.0.1:5173'}${path}`;
+/**
+ * The browser-facing origin a link in an e-mail should use. The web app forwards the origin the
+ * user is actually on (`x-forwarded-proto`/`x-forwarded-host`, else `origin`) with every API call;
+ * when APP_ORIGIN lists the allowed origins, that forwarded origin is used only if it is one of
+ * them (else the primary), and without APP_ORIGIN it is used as is — so a dev server on another
+ * port, or a second domain of the same installation, gets links that point back to itself.
+ */
+export function publicOrigin(request?: Request | null): string {
+  const e = env();
+  let forwarded: string | null = null;
+  if (request) {
+    const proto = request.headers.get('x-forwarded-proto');
+    const host = request.headers.get('x-forwarded-host');
+    if (proto && host) forwarded = `${proto}://${host}`.toLowerCase();
+    else {
+      const origin = request.headers.get('origin');
+      if (origin && /^https?:\/\//.test(origin)) forwarded = origin.toLowerCase();
+    }
+  }
+  if (e.APP_ORIGINS.length) {
+    if (forwarded && e.APP_ORIGINS.includes(forwarded)) return forwarded;
+    return e.APP_ORIGIN_PRIMARY ?? forwarded ?? 'http://127.0.0.1:5173';
+  }
+  return forwarded ?? 'http://127.0.0.1:5173';
+}
+
+/** Absolute link for an e-mail, from the public origin of THIS request when one is given. */
+export function publicLink(path: string, request?: Request | null): string {
+  return `${publicOrigin(request)}${path}`;
 }

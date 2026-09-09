@@ -252,7 +252,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         template: 'verify-email',
         locale: 'id',
         clientId: tenant?.id ?? null,
-        data: { name: body.name.trim(), link: publicLink(`/auth/verify?token=${verify}`) },
+        data: { name: body.name.trim(), link: publicLink(`/auth/verify?token=${verify}`, request) },
       });
 
       const session = await createSession(db, {
@@ -536,7 +536,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
           template: 'reset-password',
           locale: 'id',
           clientId: null,
-          data: { name: '', link: publicLink(`/auth/reset?token=${token}`) },
+          data: { name: '', link: publicLink(`/auth/reset?token=${token}`, request) },
         });
       }
       // Always the same answer: whether the email exists is not for the caller to learn.

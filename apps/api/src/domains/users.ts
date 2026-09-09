@@ -916,7 +916,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
             template: 'set-password',
             locale: body.locale ?? 'id',
             clientId: ts.clientId,
-            data: { name: body.name.trim(), link: publicLink(`/auth/reset?token=${raw}`) },
+            data: { name: body.name.trim(), link: publicLink(`/auth/reset?token=${raw}`, request) },
           });
         }
       }
