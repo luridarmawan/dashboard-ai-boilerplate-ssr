@@ -137,7 +137,7 @@ type ProviderView = {
  * A provider that speaks the MODERN endpoint only: `/models` + `/responses`, no
  * `/chat/completions`. Used to prove the recommendation badge and the display ordering.
  */
-function responsesProvider(key: string) {
+function responsesProvider(key: string, alsoChat = false) {
   const server = Bun.serve({
     port: 0,
     async fetch(req) {
@@ -146,6 +146,11 @@ function responsesProvider(key: string) {
       const url = new URL(req.url);
       if (url.pathname.endsWith('/models'))
         return Response.json({ object: 'list', data: [{ id: 'g-1', object: 'model' }] });
+      if (alsoChat && url.pathname.endsWith('/chat/completions'))
+        return Response.json({
+          choices: [{ message: { role: 'assistant', content: 'pong' } }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        });
       if (!url.pathname.endsWith('/responses'))
         return new Response('{"error":{"message":"not found"}}', {
           status: 404,
@@ -642,6 +647,53 @@ describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
       await call(`/v1/m/ai/providers/${gammaId}`, { method: 'DELETE' }, [admin]);
     } finally {
       gamma.server.stop(true);
+    }
+  });
+
+  test('three provider shapes are classified apart: chat-only, responses-only, both (F4)', async () => {
+    const both = responsesProvider('both-key', true);
+    const D = `both-${run % 100000}`;
+    try {
+      const created = await call(
+        '/v1/m/ai/providers',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Dual',
+            code: D,
+            baseUrl: both.url,
+            apiKey: 'both-key',
+            defaultModel: 'g-1',
+            models: [{ model: 'g-1', priceIn: 1, priceOut: 2 }],
+          }),
+        },
+        [admin],
+      );
+      expect(created.status).toBe(201);
+      const id = ((await json(created)).data as ProviderView).id;
+      const probed = (
+        await json(await call(`/v1/m/ai/providers/${id}/test`, { method: 'POST' }, [admin]))
+      ).data as { capabilities: Caps; preferredEndpoint: string; recommended: boolean };
+      // Both present → /responses still wins (§3 no. 1), and that is what chat will use.
+      expect(probed.capabilities.endpoints).toEqual({ responses: true, chatCompletions: true });
+      expect(probed.preferredEndpoint).toBe('responses');
+      expect(probed.recommended).toBe(true);
+
+      // The three shapes now coexist: alpha chat-only, this one both. (responses-only was proven
+      // in the case above, which deletes its profile again.)
+      const list = (await json(await call('/v1/m/ai/providers', {}, [admin])))
+        .data as ProviderView[];
+      expect(list.find((x) => x.code === D)?.capabilities?.endpoints).toEqual({
+        responses: true,
+        chatCompletions: true,
+      });
+      expect(list.find((x) => x.code === A)?.capabilities?.endpoints).toEqual({
+        responses: false,
+        chatCompletions: true,
+      });
+      await call(`/v1/m/ai/providers/${id}`, { method: 'DELETE' }, [admin]);
+    } finally {
+      both.server.stop(true);
     }
   });
 

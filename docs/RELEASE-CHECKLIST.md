@@ -51,3 +51,15 @@ docker stats --no-stream --format 'table {{.Name}}\t{{.MemUsage}}' && free -m
 ```
 
 Uninstall modul dengan migrasi turun (G-15) — dulu ditunda — kini ada: `bun modules:remove <Nama>` ([`MODULES.md`](./MODULES.md) §5). **Keputusan tetap** (bukan penundaan): transport MCP hanya HTTP / Streamable HTTP — `stdio`/`websocket` tidak akan dibangun (`docs/MCP.md`).
+
+## Perubahan perilaku yang perlu diumumkan
+
+**Rilis dengan AI-Roadmap F2 (2026-09-10): chat mencoba `/responses` lebih dulu.** Setting baru `ai.preferred_endpoint` baku `auto`, jadi instalasi yang memakai *Pengaturan → AI* (bukan profil Penyedia AI) akan mengarah ke endpoint modern pada chat berikutnya. Penyedia yang tidak punya endpoint itu menjawab 404/405 dan otomatis turun ke `/chat/completions`, lalu hasilnya diingat 10 menit per base URL — satu round-trip terbuang, bukan kegagalan. Yang perlu diperiksa operator sebelum rollout:
+
+```bash
+dc run --rm api bun run ai:test            # matriks per sumber; --strict untuk gagal bila ada yang error
+```
+
+Bila sebuah penyedia ternyata dilaporkan chat-only padahal seharusnya tidak, periksa `--verbose`: langkah yang **timeout** dulu terbaca sebagai "endpoint tidak ada". Batas waktunya kini 8 detik per langkah (CLI 10 detik), tetapi tautan yang sangat lambat tetap bisa memvonis salah — uji ulang lewat tombol **Uji koneksi** setelah jaringan tenang, atau paku `ai.preferred_endpoint` secara manual.
+
+Dua hal lain yang berubah di rilis yang sama: `ai_calls` bertambah kolom `upstream_endpoint` dan `reasoning_tokens` (migrasi `0022`, aditif — aman untuk rollout side-by-side), dan Analitik AI kini menampilkan porsi token reasoning, yang pada model bernalar bisa jauh lebih besar daripada dugaan.

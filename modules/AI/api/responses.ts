@@ -124,8 +124,11 @@ export function toResponsesInput(messages: readonly ProviderMessage[]): {
       input.push({ type: 'message', role: 'user', content: m.content ?? '' });
       continue;
     }
-    // H-11 attachments. NOT verified against a live provider: the tested proxy was given plain
-    // text only. `input_image` is the documented counterpart of chat's `image_url`.
+    // H-11 attachments. Half verified (2026-09-10, §12.3): the content-parts form with
+    // `input_text` is accepted by a live provider, but `input_image` is rejected with a 400 by
+    // that gateway before the API ever sees it — for a data URI and an https URL alike. So the
+    // shape below is still the documented one, not a proven one, and an attachment sent to such
+    // a gateway surfaces as an upstream 400.
     const parts: ResponsesContentPart[] = m.content.map((c) =>
       c.type === 'text'
         ? { type: 'input_text', text: c.text }

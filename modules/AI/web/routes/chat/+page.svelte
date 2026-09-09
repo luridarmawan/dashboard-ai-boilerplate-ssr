@@ -4,6 +4,7 @@ import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
+import Capabilities from '../../lib/Capabilities.svelte';
 import { renderMarkdown } from '../../lib/markdown.ts';
 
 /**
@@ -68,6 +69,16 @@ const currentPick = $derived.by(() => {
   if (!c?.providerId) return 'default';
   const p = data.providers.find((x: { id: string }) => x.id === c.providerId);
   return p ? `${p.code}::${c.model ?? p.defaultModel}` : 'default';
+});
+/**
+ * The profile behind the current pick, so the header can show what it can actually do (§7.4).
+ * A `<select>` cannot carry badges, so the matrix sits beside it and the ★ rides in the group
+ * label — the ordering already puts recommended providers first (§3 no. 2).
+ */
+const pickedProvider = $derived.by(() => {
+  const c = data.conversation;
+  if (!c?.providerId) return null;
+  return data.providers.find((x: { id: string }) => x.id === c.providerId) ?? null;
 });
 const errorText = $derived(
   data.error === 'no_api_key'
@@ -266,13 +277,16 @@ function copy(text: string) {
               <select id="pm" name="pm" value={currentPick} class="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-xs" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
                 <option value="default">{t('ai.chat.model_default')}</option>
                 {#each data.providers as p (p.id)}
-                  <optgroup label={p.name}>
+                  <optgroup label={p.recommended ? `${p.name} ★` : p.name}>
                     {#each p.models as m (m.model)}<option value={`${p.code}::${m.model}`}>{m.label ?? m.model}</option>{/each}
                   </optgroup>
                 {/each}
               </select>
               <noscript><Button type="submit" variant="ghost" size="sm">{t('ai.chat.model_change')}</Button></noscript>
             </form>
+            {#if pickedProvider?.capabilities}
+              <Capabilities capabilities={pickedProvider.capabilities} recommended={pickedProvider.recommended} preferredEndpoint={pickedProvider.preferredEndpoint} compact />
+            {/if}
           {/if}
           <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button type="submit" variant="ghost" size="sm"><Icon name="folder" size={14} />{t('ai.chat.archive')}</Button></form>
           <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('ai.chat.delete')}</Button></form>

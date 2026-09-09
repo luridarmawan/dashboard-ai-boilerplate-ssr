@@ -151,8 +151,8 @@ export default defineConfig('AI', [
           en: 'Let the assistant call module tools',
         },
         note: {
-          id: 'Tool dari api/tools.ts modul (titik perluasan 8) ditawarkan ke model; tetap tunduk izin user dan tenant.',
-          en: 'Tools from module api/tools.ts (extension point 8) are offered to the model; still bound by user permission and tenant.',
+          id: 'Tool dari api/tools.ts modul (titik perluasan 8) ditawarkan ke model; tetap tunduk izin user dan tenant. Hanya berlaku bila penyedianya mendukung tools — halaman Penyedia AI menandainya per penyedia setelah Uji koneksi.',
+          en: 'Tools from module api/tools.ts (extension point 8) are offered to the model; still bound by user permission and tenant. Only has an effect when the provider supports tools — the AI providers page marks this per provider after a connection test.',
         },
         default: true,
         order: 11,
