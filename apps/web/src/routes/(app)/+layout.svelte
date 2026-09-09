@@ -131,9 +131,8 @@ const shellContext = $derived({
     <Icon name="bell" size={18} />
     {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
   </a>
-  <LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact />
   <!-- Account menu: the avatar + name open a <details> dropdown (no JavaScript needed; `use:dropdown`
-       adds outside-click/Escape/after-navigation closing) with the profile, the theme picker and sign-out. -->
+       adds outside-click/Escape/after-navigation closing) with the profile, the theme picker, the language picker, and sign-out. -->
   <details class="group relative" data-testid="account-menu" use:dropdown>
     <summary class="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm hover:bg-accent" aria-label={t('shell.account_menu')}>
       {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}
@@ -148,6 +147,9 @@ const shellContext = $derived({
       <ul class="grid gap-0.5 border-t pt-1">
         <li><a href="/profile" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="user" size={16} class="text-muted-foreground" />{t('nav.profile')}</a></li>
         <li><a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="palette" size={16} class="text-muted-foreground" />{t('shell.theme_link')}</a></li>
+        <li>
+          <LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} variant="submenu" />
+        </li>
         {#if data.tenants.length > 1}
           <!-- Tenant switcher (B-4) as a sub-menu: each tenant is a POST + full server-side navigation. Hidden for one tenant (B-5). -->
           <li>
