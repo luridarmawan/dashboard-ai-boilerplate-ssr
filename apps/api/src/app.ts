@@ -1,3 +1,4 @@
+import { rawEnv } from '@core/config';
 import { openapi } from '@elysiajs/openapi';
 import { Elysia } from 'elysia';
 import { auth } from './domains/auth.ts';
@@ -47,7 +48,9 @@ export const app = new Elysia()
       specPath: '/openapi.json',
       documentation: {
         info: {
-          title: 'Dashboard AI Boilerplate API',
+          // Self-hosters brand the deployment once in .env: APP_LANDING_TITLE names the landing
+          // page, the footers, and this document (§4.7 branding).
+          title: rawEnv('APP_LANDING_TITLE') ?? 'Dashboard AI Boilerplate API',
           version: '0.0.0',
           description:
             'API-first: this document is generated from the route schemas at runtime (PRD N-1, N-2). ' +

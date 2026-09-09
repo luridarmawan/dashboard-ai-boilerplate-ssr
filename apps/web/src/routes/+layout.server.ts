@@ -1,5 +1,6 @@
 import { ANONYMOUS_NAMESPACES, messagesFor } from '@core/i18n';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
+import { brandedMessages } from '$lib/server/branding';
 import { cfgString } from '$lib/server/config';
 import type { LayoutServerLoad } from './$types';
 
@@ -40,7 +41,9 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
    * this correct under client-side navigation: signing in and out are full document loads, while
    * a client navigation can never change the session, so the catalogue can never be stale.
    */
-  messages: locals.session
-    ? messagesFor(locals.locale.locale)
-    : messagesFor(locals.locale.locale, [...ANONYMOUS_NAMESPACES, ...PUBLIC_MODULE_NS]),
+  messages: brandedMessages(
+    locals.session
+      ? messagesFor(locals.locale.locale)
+      : messagesFor(locals.locale.locale, [...ANONYMOUS_NAMESPACES, ...PUBLIC_MODULE_NS]),
+  ),
 });

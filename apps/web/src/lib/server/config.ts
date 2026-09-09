@@ -1,6 +1,7 @@
 import { modules } from '@core/module-kit/registry';
 import type { ThemeManifest } from '@core/ui-theme';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { api } from '$lib/api/client';
 import { sessionCookieHeader } from './session.ts';
 
@@ -19,14 +20,26 @@ export interface PublicConfig {
   readonly ok: boolean;
 }
 
-const DEFAULTS: Record<string, unknown> = {
-  'app.name': 'Dashboard',
-  'app.landing_route': '/example',
-  'app.home_route': '/dashboard',
-  'app.default_theme': 'base',
-  'app.allowed_themes': [],
-  'app.default_locale': 'id',
-};
+/**
+ * `LANDING_ROUTE` in `.env` is the bootstrap fallback for `app.landing_route` (§4.7) — what `/`
+ * serves while `configurations` holds no value, including when the API cannot be reached at all
+ * (F-6). The same fallback backs the API's registry default, so both processes agree.
+ */
+export function landingFallback(): string {
+  const v = env.LANDING_ROUTE?.trim();
+  return v?.startsWith('/') && !v.startsWith('//') ? v : '/example';
+}
+
+function defaults(): Record<string, unknown> {
+  return {
+    'app.name': 'Dashboard',
+    'app.landing_route': landingFallback(),
+    'app.home_route': '/dashboard',
+    'app.default_theme': 'base',
+    'app.allowed_themes': [],
+    'app.default_locale': 'id',
+  };
+}
 
 /** Without an answer from the API we cannot know module state; installed modules stay reachable (F-6). */
 const ALL_MODULES = () => new Set(modules.map((m) => m.ns));
@@ -48,7 +61,7 @@ export async function loadPublicConfig(
       client.v1.module.enabled.get(),
       client.v1.themes.custom.get(),
     ]);
-    const values = cfg.data?.success ? { ...DEFAULTS, ...cfg.data.data } : DEFAULTS;
+    const values = cfg.data?.success ? { ...defaults(), ...cfg.data.data } : defaults();
     const enabled = mods.data?.success ? new Set(mods.data.data.map((m) => m.ns)) : null;
     const customThemes = custom.data?.success
       ? custom.data.data.map((c) => ({
@@ -80,7 +93,7 @@ export async function loadPublicConfig(
       ok: !!cfg.data?.success,
     };
   } catch {
-    return { values: DEFAULTS, enabledModules: ALL_MODULES(), customThemes: [], ok: false };
+    return { values: defaults(), enabledModules: ALL_MODULES(), customThemes: [], ok: false };
   }
 }
 

@@ -2,7 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card } from '$lib/components/ui';
+import { Alert, Badge, Button, Card, Field, Input } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../../$types';
@@ -30,7 +30,26 @@ const fieldErrors = $derived(
   </Card>
   {#if can('client.manage') && c.code !== 'default'}
     <Card title={t('tenants.detail.delete')} description={t('tenants.detail.delete_hint')}>
-      <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('tenants.detail.delete')}</Button></form>
+      {#if data.confirmDelete}
+        <!-- Two-step confirmation (no JavaScript required): the code has to be typed, and the action checks it again. -->
+        <div class="grid gap-4" id="delete">
+          <Alert variant="error" title={t('tenants.detail.delete_confirm')}>
+            <p>{t('tenants.detail.delete_confirm_lead', { name: c.name })}</p>
+          </Alert>
+          <form method="POST" action="?/delete" class="grid gap-4">
+            <Csrf token={data.csrf} />
+            <Field label={t('tenants.detail.delete_confirm_code', { code: c.code })} for="confirm-code" error={form?.code === 'confirm_failed' ? form.error : null} required>
+              <Input id="confirm-code" name="code" autocomplete="off" autocapitalize="none" spellcheck={false} required />
+            </Field>
+            <div class="flex flex-wrap gap-2">
+              <Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('tenants.detail.delete_confirm_submit')}</Button>
+              <Button href="/tenants/{c.id}" variant="secondary">{t('common.cancel')}</Button>
+            </div>
+          </form>
+        </div>
+      {:else}
+        <Button href="/tenants/{c.id}?confirm=delete#delete" variant="destructive"><Icon name="trash" size={16} />{t('tenants.detail.delete')}</Button>
+      {/if}
     </Card>
   {/if}
 </div>

@@ -1,7 +1,7 @@
 import type { Handle } from '@sveltejs/kit';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
-import { cfgString, loadPublicConfig } from '$lib/server/config';
+import { cfgString, landingFallback, loadPublicConfig } from '$lib/server/config';
 import { resolveRequestDirection, resolveRequestLocale } from '$lib/server/locale';
 import { loadSession } from '$lib/server/session';
 import { resolveRequestTheme } from '$lib/server/theme';
@@ -31,7 +31,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   // content). A landing route that no longer exists, or belongs to a disabled module, falls back
   // to the built-in landing page with a warning instead of a 404 on the front door.
   if (event.url.pathname === '/' && event.request.method === 'GET' && !event.locals.session) {
-    const landing = cfgString(event.locals.config, 'app.landing_route', '/example');
+    const landing = cfgString(event.locals.config, 'app.landing_route', landingFallback());
     const target = landingTarget(landing, event.locals.config.enabledModules);
     if (target) {
       const forwarded = await event.fetch(new URL(target + event.url.search, event.url.origin), {
@@ -43,6 +43,18 @@ export const handle: Handle = async ({ event, resolve }) => {
         headers.set('x-landing-route', target);
         return new Response(await forwarded.text(), { status: 200, headers });
       }
+      // The route exists but would not render (its module disabled for this tenant → 404, its
+      // loader failing → 500). Say so: the front door quietly showing the built-in page instead
+      // of the configured landing is otherwise impossible to explain from the outside.
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          msg: 'landing route tidak bisa dirender — memakai halaman depan bawaan (F-6)',
+          landing: target,
+          status: forwarded.status,
+          requestId: event.locals.requestId,
+        }),
+      );
     }
   }
 

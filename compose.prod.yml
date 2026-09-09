@@ -36,6 +36,11 @@ x-app-env: &app-env
   RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
   REDIS_URL: ${REDIS_URL:-}
   LANDING_ROUTE: ${LANDING_ROUTE:-/example}
+  # Branding (§4.7): the landing headline, its lead, and the footer line of every page. The
+  # first also titles the OpenAPI document. Empty = the translated defaults.
+  APP_LANDING_TITLE: ${APP_LANDING_TITLE:-}
+  APP_LANDING_LEAD: ${APP_LANDING_LEAD:-}
+  APP_FOOTER_TITLE: ${APP_FOOTER_TITLE:-}
   # Email bootstrap (J-1): used when the matching mail.* setting is empty; admins can override in Settings
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-}
@@ -112,6 +117,11 @@ services:
       XFF_DEPTH: ${XFF_DEPTH:-1}
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
+      # Branding and the landing fallback are rendered by web, so it needs them too (§4.7)
+      LANDING_ROUTE: ${LANDING_ROUTE:-/example}
+      APP_LANDING_TITLE: ${APP_LANDING_TITLE:-}
+      APP_LANDING_LEAD: ${APP_LANDING_LEAD:-}
+      APP_FOOTER_TITLE: ${APP_FOOTER_TITLE:-}
     depends_on:
       api:
         condition: service_healthy

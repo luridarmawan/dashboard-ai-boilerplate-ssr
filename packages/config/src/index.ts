@@ -147,6 +147,17 @@ const envSchema = z
 
     /** Bootstrap fallback only — the real value lives in database configuration (§4.7). */
     LANDING_ROUTE: z.string().startsWith('/').default('/example'),
+
+    /**
+     * Fixed copy of a self-hosted deployment: the headline and lead of the built-in landing page
+     * and the line in every footer. These are BRANDING, not runtime settings — they must be right
+     * in the very first HTML a visitor sees, before any database exists, so they live here and not
+     * in `configurations`. Unset = the translated defaults (`landing.title`, `landing.lead`,
+     * `shell.footer`). `APP_LANDING_TITLE` also titles the OpenAPI document (N-2).
+     */
+    APP_LANDING_TITLE: z.string().max(200).optional(),
+    APP_LANDING_LEAD: z.string().max(500).optional(),
+    APP_FOOTER_TITLE: z.string().max(200).optional(),
   })
   .transform((env) => ({
     ...env,
@@ -250,6 +261,21 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>> = p
   if (result.success) return result.data;
   const problems = result.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
   throw new EnvError(problems);
+}
+
+/**
+ * One env value, read WITHOUT validating the whole environment. Both the OpenAPI document and
+ * the `app.landing_route` default are built while modules are still being imported, and importing
+ * must never require a complete environment (see apps/api/src/services.ts) — while `env()` would
+ * throw on the first missing variable. The keys are still declared in the schema above, so
+ * `preflight` validates them like every other one. Empty or blank = "not set".
+ */
+export function rawEnv(
+  key: keyof Env,
+  source: Readonly<Record<string, string | undefined>> = process.env,
+): string | undefined {
+  const v = source[key];
+  return typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined;
 }
 
 let cached: Env | undefined;

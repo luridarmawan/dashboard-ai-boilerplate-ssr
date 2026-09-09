@@ -1,5 +1,16 @@
+import { rawEnv } from '@core/config';
 import type { ConfigFieldDef, ConfigSectionDef } from '@core/module-kit';
 import { moduleConfig } from '@core/module-kit/registry';
+
+/**
+ * `LANDING_ROUTE` in `.env` is the documented bootstrap fallback for `app.landing_route` (§4.7):
+ * with no row in `configurations`, THIS is what `/` serves. Read without validating the whole
+ * environment — this registry is built while modules are still being imported.
+ */
+function landingFallback(): string {
+  const v = rawEnv('LANDING_ROUTE');
+  return v?.startsWith('/') && !v.startsWith('//') ? v : '/example';
+}
 
 /**
  * Built-in configuration sections (PRD E-8). Everything an admin may change at runtime lives
@@ -47,10 +58,10 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'route',
         title: { id: 'Halaman depan (anonim)', en: 'Landing page (anonymous)' },
         note: {
-          id: 'Isi / untuk pengunjung yang belum masuk. Divalidasi terhadap registry route.',
-          en: 'What / serves to anonymous visitors. Validated against the route registry.',
+          id: 'Halaman yang disajikan di / untuk pengunjung yang belum masuk. Kosongkan untuk memakai LANDING_ROUTE dari .env. Divalidasi terhadap registry route.',
+          en: 'The page / serves to anonymous visitors. Leave empty to fall back to LANDING_ROUTE from .env. Validated against the route registry.',
         },
-        default: '/example',
+        default: landingFallback(),
         public: true,
         order: 2,
       },
