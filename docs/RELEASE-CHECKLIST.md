@@ -4,7 +4,7 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 
 | # | Kriteria (ringkas) | Bukti otomatis | Manual |
 |---|---|---|---|
-| 1 | Repo bersih → dashboard berfungsi < 5 menit lewat migrasi ter-versi | job `integration` (install → migrate → seed → proof) | ☐ ukur waktu di mesin baru |
+| 1 | Repo bersih → dashboard berfungsi < 5 menit lewat migrasi ter-versi | job `integration` (install → migrate → seed → proof) | ☑ 2026-09-10 (dikonfirmasi pemilik) — diukur di mesin baru, di bawah 5 menit |
 | 2 | Suite sama lulus di MySQL 8, MariaDB 11, PostgreSQL 16 | job `db-matrix` | — |
 | 3 | `--scale api=3` tanpa sticky session | job `scale-proof` (`proof:m1:scale`) | — |
 | 4 | `/openapi.json` cocok dengan perilaku; klien typed terkompilasi | `proof:m5:gate4` + typecheck Eden | — |
@@ -20,15 +20,17 @@ Titik rilis MVP (ROADMAP M7) adalah **seluruh kriteria §8 hijau**. Sebagian dib
 | 14 | Hapus folder modul + sync → aplikasi tetap benar | `ci:modgen-guard` langkah 4 | — |
 | 15 | Landing `Example` di `/`: SSR, data DB, form kontak tanpa JS → outbox | `scripts/m4-gate-proof.ts` | — |
 | 16 | `app.landing_route` dari UI langsung berlaku; route salah ditolak | `scripts/m3-gate-proof.ts` | — |
-| 17 | 4 tema, 2 berbeda layout & ikon; tema baku admin; pilihan user bertahan; tanpa kedipan | `scripts/m2-gate-proof.ts`, `theme:validate` | ☐ cek visual kedipan di browser |
+| 17 | 4 tema, 2 berbeda layout & ikon; tema baku admin; pilihan user bertahan; tanpa kedipan | `scripts/m2-gate-proof.ts`, `theme:validate` | ☑ 2026-09-10 (dikonfirmasi pemilik) — tidak ada kedipan saat ganti tema di browser |
 | 18 | Layout kustom dari modul (termasuk repo lain) tanpa ubah halaman/core | proof M2 #5 (`dummy.two-column`), `ci:cross-repo` | — |
 | 19 | `_layoutVariant = 'wide'` per halaman; ganti tema mengubah layout konkret | proof M2 #3, `layout-contract.ts` | — |
 | 20 | Allowlist tema; tema dicabut → user pindah ke baku tanpa galat | `scripts/m3-gate-proof.ts` | — |
 | 21 | Set ikon bertukar; CI gagal bila ada nama ikon tak tertutup | `icon-coverage.ts`, proof M2 | — |
 | 22 | Menonaktifkan modul pemilik tema/layout tidak merusak halaman | proof M3 (L-14) | — |
 | 23 | VPS bersih → HTTPS < 15 menit mengikuti [`DEPLOY.md`](./DEPLOY.md) tanpa langkah tak tertulis | `docker-build`, `scale-proof` (stack yang sama, tanpa domain publik) | ☑ 2026-09-08: VPS Ubuntu LTS + Docker, 13 menit (setup 10.44 → build image 6 menit → stack hidup 10.57), `migrate` + `seed` + `/v1/ready` hijau; rollout `deploy/upgrade.sh` tanpa request gagal |
-| 24 | Backup → hapus database → restore → aplikasi utuh | job `backup-restore` (`scripts/ci/backup-restore-proof.sh`) | ☐ ulangi sekali di VPS dengan `run --rm restore` |
+| 24 | Backup → hapus database → restore → aplikasi utuh | job `backup-restore` (`scripts/ci/backup-restore-proof.sh`) | ☑ 2026-09-10 (dikonfirmasi pemilik) — backup → drop → `run --rm restore` di VPS, aplikasi utuh |
 | 25 | Stabil di 2 vCPU / 4 GB, RAM idle < 1,5 GB | `scripts/ci/idle-memory.sh` di job `scale-proof` (3 replika api) | ☑ 2026-09-08 (sudah migrate + seed, 10 menit idle): caddy 10 MB, web 68 MB, api 87/40/38 MB, backup 4 MB, mysql 467 MB — total container ≈ 713 MB, pagu 2,9 GB tidak tersentuh |
+
+**Seluruh 25 kriteria hijau 2026-09-10** — tiga pembuktian manual terakhir (#1, #17, #24) dijalankan dan dikonfirmasi pemilik. Yang masih terbuka di luar tabel ini: ROADMAP M6 gate 5 (seseorang di luar tim inti mengikuti [`MODULES.md`](./MODULES.md) sampai modulnya jalan, tanpa bertanya).
 
 ## Cara menjalankan bagian manual
 

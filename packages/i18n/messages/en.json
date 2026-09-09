@@ -50,6 +50,8 @@
   "notifications.open": "Open",
   "notifications.only_unread": "Unread only",
   "notifications.all": "All",
+  "notifications.view_all": "View all",
+  "notifications.no_unread": "No new notifications.",
   "landing.title": "Dashboard AI Boilerplate",
   "landing.lead": "API-first, multi-tenant, themeable. The Example module's landing page arrives in M4.",
   "landing.api_unreachable": "API unreachable",

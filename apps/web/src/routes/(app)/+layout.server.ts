@@ -6,6 +6,15 @@ import { buildBreadcrumb, buildMenu } from '$lib/server/menu';
 import { apiFetchData, apiFor, csrfToken } from '$lib/server/session';
 import type { LayoutServerLoad } from './$types';
 
+/** What the bell dropdown shows per row — the shell never needs more than this. */
+type BellItem = {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  createdAt: string;
+};
+
 /**
  * Everything under (app) needs a session; menu, breadcrumb and permissions ride along for SSR
  * (C-6b, C-7, F-2). The dashboard LAYOUT is resolved here too (§4.8): the page's declared
@@ -18,11 +27,28 @@ export const load: LayoutServerLoad = async (event) => {
     redirect(303, `/auth/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   const locale = event.locals.locale.locale;
   const menu = buildMenu(s, event.url.pathname, locale, event.locals.config.enabledModules);
-  // Bell (J-4): one cheap count per page; a failure must never break the shell.
-  const unread = await apiFor(event)
-    .v1.notifications.count.get()
-    .then((r) => (r.data?.success ? r.data.data.unread : 0))
-    .catch(() => 0);
+  // Bell (J-4): ONE call feeds both the badge and the dropdown preview — asking for the unread
+  // rows returns the unread total alongside them, so this costs no more than the old count call.
+  // A failure must never break the shell.
+  const empty = { unread: 0, items: [] as BellItem[] };
+  const bell = await apiFor(event)
+    .v1.notifications.get({ query: { unread: '1', limit: '5' } })
+    .then((r) =>
+      r.data?.success
+        ? {
+            unread: r.data.data.unread,
+            items: r.data.data.items.map((n) => ({
+              id: n.id,
+              title: n.title,
+              body: n.body,
+              link: n.link,
+              // Eden revives date-like strings into Date objects; the shell renders a string.
+              createdAt: new Date(n.createdAt).toISOString(),
+            })),
+          }
+        : empty,
+    )
+    .catch(() => empty);
   // Shell widgets (H-13): module-contributed, on every page, filtered here like the dashboard's —
   // a widget the user may not see (or whose module is off for the tenant) never reaches the HTML.
   const shellWidgets = await Promise.all(
@@ -57,7 +83,8 @@ export const load: LayoutServerLoad = async (event) => {
     breadcrumb: buildBreadcrumb(event.url.pathname, menu, locale),
     layoutId: layout.layout.id,
     layoutVariant: variant,
-    unreadNotifications: unread,
+    unreadNotifications: bell.unread,
+    recentNotifications: bell.items,
     shellWidgets,
   };
 };

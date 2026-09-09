@@ -50,6 +50,8 @@
   "notifications.open": "Buka",
   "notifications.only_unread": "Hanya yang belum dibaca",
   "notifications.all": "Semua",
+  "notifications.view_all": "Lihat semua",
+  "notifications.no_unread": "Tidak ada notifikasi baru.",
   "landing.title": "Dashboard AI Boilerplate",
   "landing.lead": "API-first, multi-tenant, bertema. Halaman landing dari modul Example hadir di M4.",
   "landing.api_unreachable": "API tidak terjangkau",

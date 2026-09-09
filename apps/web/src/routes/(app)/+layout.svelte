@@ -27,6 +27,12 @@ const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
 // Client-side navigation keeps the DOM: a top-nav group or the language dropdown left open would
 // stay open over the new page. Without JavaScript every navigation is a full load and this never runs.
 afterNavigate(() => closeAllDropdowns());
+/** Bell rows carry an ISO timestamp; the shell shows it in the reader's own locale. */
+const whenText = (iso: string) =>
+  new Date(iso).toLocaleString(data.locale === 'en' ? 'en-US' : 'id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
 /** What a shell widget (H-13) learns about the page it floats over — nothing it could not see itself. */
 const shellContext = $derived({
   locale: data.locale,
@@ -126,11 +132,49 @@ const shellContext = $derived({
       <Button type="submit" variant="destructive" size="sm">{t('shell.impersonate_stop')}</Button>
     </form>
   {/if}
-  <!-- Bell (J-4): a plain link, badge rendered server-side; the page marks items read via forms. -->
-  <a href="/notifications" class="relative flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={data.unreadNotifications ? `${t('shell.notifications')} (${data.unreadNotifications})` : t('shell.notifications')} data-testid="bell">
-    <Icon name="bell" size={18} />
-    {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
-  </a>
+  <!-- Bell (J-4): the badge is still rendered server-side; the newest unread open in a <details>
+       dropdown, the same no-JS pattern as the account menu (`use:dropdown` only adds outside-click
+       and Escape closing). Every control inside is a form posting to the /notifications actions —
+       opening a row marks it read and lands on its link — so the shell needs no JavaScript (L-22). -->
+  <details class="group relative" data-testid="bell-menu" use:dropdown>
+    <summary class="relative flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label={data.unreadNotifications ? `${t('shell.notifications')} (${data.unreadNotifications})` : t('shell.notifications')} data-testid="bell">
+      <Icon name="bell" size={18} />
+      {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
+    </summary>
+    <div id="bell-dropdown" class="absolute end-0 z-40 mt-1 w-72 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg sm:w-80">
+      <div class="flex items-center justify-between gap-2 px-2 py-1.5">
+        <p class="text-sm font-medium">{t('notifications.title')}</p>
+        {#if data.unreadNotifications}
+          <form method="POST" action="/notifications?/readAll">
+            <Csrf token={data.csrf} />
+            <button type="submit" class="text-xs text-muted-foreground hover:text-foreground">{t('notifications.mark_all')}</button>
+          </form>
+        {/if}
+      </div>
+      <ul class="grid gap-0.5 border-t pt-1" data-testid="bell-items">
+        {#each data.recentNotifications as n (n.id)}
+          <li>
+            <!-- The action redirects to `link` when it is a local path, else back to the list. -->
+            <form method="POST" action="/notifications?/read">
+              <Csrf token={data.csrf} />
+              <input type="hidden" name="id" value={n.id} />
+              <input type="hidden" name="link" value={n.link ?? ''} />
+              <button type="submit" class="grid w-full gap-0.5 rounded-md px-2 py-1.5 text-start hover:bg-accent">
+                <span class="min-w-0 truncate text-sm font-medium">{n.title}</span>
+                {#if n.body}<span class="min-w-0 truncate text-xs text-muted-foreground">{n.body}</span>{/if}
+                <span class="text-xs text-muted-foreground">{whenText(n.createdAt)}</span>
+              </button>
+            </form>
+          </li>
+        {:else}
+          <li class="px-2 py-6 text-center text-sm text-muted-foreground">{t('notifications.no_unread')}</li>
+        {/each}
+      </ul>
+      <div class="mt-1 border-t pt-1">
+        <a href="/notifications" class="flex items-center justify-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline">{t('notifications.view_all')}<Icon name="arrow-right" size={14} class="rtl:rotate-180" /></a>
+      </div>
+    </div>
+  </details>
   <!-- Account menu: the avatar + name open a <details> dropdown (no JavaScript needed; `use:dropdown`
        adds outside-click/Escape/after-navigation closing) with the profile, the theme picker, the language picker, and sign-out. -->
   <details class="group relative" data-testid="account-menu" use:dropdown>

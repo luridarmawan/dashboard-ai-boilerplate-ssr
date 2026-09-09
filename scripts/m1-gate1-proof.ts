@@ -2,7 +2,8 @@
 /**
  * M1 gate #1 proof, through the WEB app with plain HTTP (no browser, no JavaScript):
  *   login → create a user → set a group's permissions → the user sees exactly them →
- *   create a tenant → switch → the user list is per tenant → logout.
+ *   create a tenant → switch → the user list is per tenant → the bell dropdown marks a
+ *   notification read → logout.
  * It also checks gate #2 at the web layer: a cross-origin form post is refused.
  *
  *   WEB_URL=http://127.0.0.1:5173 ADMIN_EMAIL=… ADMIN_PASSWORD=… bun run scripts/m1-gate1-proof.ts
@@ -88,6 +89,11 @@ const csrfOf = (html: string) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1] 
 const errorOf = (html: string) =>
   /class="error">([^<]*)/.exec(html)?.[1]?.trim() ?? `(no error banner; ${html.length} bytes)`;
 const location = (res: Response) => res.headers.get('location') ?? '';
+/** The bell dropdown's row list, so a match cannot come from the page behind the shell. */
+function bellPanel(html: string): string {
+  const i = html.indexOf('data-testid="bell-items"');
+  return i < 0 ? '' : html.slice(i, html.indexOf('</ul>', i));
+}
 
 async function login(jar: Jar, email: string, password: string) {
   const page = await get(jar, '/auth/login');
@@ -254,7 +260,48 @@ const member = new Jar();
   check('wrong CSRF field → 403', bad.res.status === 403, `${bad.res.status}`);
 }
 
-// 7. logout invalidates server-side
+// 7. bell (J-4): the shell's notification dropdown works with plain forms
+{
+  // Minting an API token notifies its owner — the one producer whose recipient is the actor.
+  const profile = await get(admin, '/profile');
+  const tokenName = `bell-${run}`;
+  const made = await post(admin, '/profile?/createToken', {
+    _csrf: csrfOf(profile.html),
+    name: tokenName,
+  });
+  check(
+    'create API token → 200 (notifies the owner)',
+    made.res.status === 200,
+    `${made.res.status}`,
+  );
+  const dash = await get(admin, '/dashboard');
+  const panel = bellPanel(dash.html);
+  check('bell badge counts it server-side', dash.html.includes('data-testid="bell-count"'));
+  check(
+    'bell dropdown lists it without JavaScript',
+    panel.includes(tokenName),
+    `panel ${panel.length} bytes`,
+  );
+  const id = /name="id" value="([0-9a-f-]{36})"/.exec(panel)?.[1] ?? '';
+  const read = await post(admin, '/notifications?/read', {
+    _csrf: csrfOf(dash.html),
+    id,
+    link: '',
+  });
+  check(
+    'marking read from the bell → 303 /notifications',
+    read.res.status === 303 && location(read.res) === '/notifications',
+    `${read.res.status} ${location(read.res)}`,
+  );
+  const after = await get(admin, '/dashboard');
+  check(
+    'badge and the row are gone afterwards',
+    !after.html.includes('data-testid="bell-count"') &&
+      !bellPanel(after.html).includes('name="id" value='),
+  );
+}
+
+// 8. logout invalidates server-side
 {
   const dash = await get(admin, '/dashboard');
   const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });
