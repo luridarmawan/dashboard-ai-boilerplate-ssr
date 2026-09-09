@@ -558,6 +558,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | A-10 | **[P0]** **Proteksi CSRF berlaku untuk seluruh endpoint yang mengubah state, tanpa pengecualian.** Mekanismenya: `SameSite=Lax` + validasi header `Origin`/`Referer` + token double-submit untuk form. Endpoint publik ditandai eksplisit lewat daftar putih, bukan dengan mematikan middleware (D6). |
 | A-11 | **[P2]** 2FA TOTP + recovery codes. |
 | A-12 | **[P0]** Rekam `last_seen`, `ip`, dan `device` per sesi. |
+| A-13 | **[P1]** Registrasi lewat **tautan undangan** per tenant (`/join/<kode>`): admin dengan `user.create` mengundang alamat email; tautan berlaku `security.invitation_hours` (baku 72 jam) dan **tetap bisa dipakai saat `SIGNUP_ENABLED=false`** (flag itu hanya mengatur pendaftaran mandiri). Email yang sudah terdaftar tidak diundang: akunnya ditambahkan ke tenant dan dikirimi informasi untuk masuk. Undangan bisa dicabut; mengundang ulang alamat yang sama mencabut yang lama. |
 
 ### FR-B · Multi-Tenancy
 
@@ -954,7 +955,8 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 | Grup | Endpoint |
 |---|---|
-| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `GET /google/start` · `POST /google-login` |
+| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `GET /google/start` · `POST /google-login` · `GET /join/:code` · `POST /join` |
+| `invitations` | `GET /` · `POST /` · `DELETE /:id` (undangan ke tenant aktif, A-13) |
 | `auth-public` | `POST /reset-password/request` · `POST /reset-password/validate-token` · `POST /reset-password/confirm` |
 | `tokens` | `GET /` · `POST /` · `DELETE /:id` (API token untuk klien non-browser, A-4) |
 | `user` | `GET /` · `GET /:id` · `POST /` · `PUT /:id` · `DELETE /:id` · `GET /permission` · `GET /scope` · `GET /profile/me` · `PUT /profile/me` (termasuk preferensi tema & bahasa) |
@@ -973,7 +975,7 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 Tabel yang dimiliki core. Modul menambah tabelnya sendiri dengan prefix nama modul (G-9).
 
-`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `email_verification_tokens` · `rate_limits` · `outbox_email` · `audit_log` · `oauth_accounts` (A-8 — identitas eksternal per user, kunci tautan `provider` + `provider_user_id`, bukan email)
+`users` · `sessions` · `api_tokens` · `clients` · `client_user_maps` · `groups` · `group_permissions` · `group_user_maps` · `categories` · `configurations` · `modules` · `themes` · `password_reset_tokens` · `email_verification_tokens` · `rate_limits` · `outbox_email` · `audit_log` · `oauth_accounts` (A-8 — identitas eksternal per user, kunci tautan `provider` + `provider_user_id`, bukan email) · `invitations` (A-13 — global dengan `client_id` eksplisit seperti `sessions`, karena kodenya dicari tanpa konteks tenant)
 
 Dua di antaranya dituntut kebutuhan P0 dan sebelumnya belum tercatat di sini: `email_verification_tokens` (A-6 — token verifikasi email; alurnya sejajar `password_reset_tokens`, jadi tidak boleh menumpang tabel yang sama) dan `rate_limits` (penghitung ber-window untuk adapter `database`, yang merupakan driver **baku** rate limit — Keputusan M).
 

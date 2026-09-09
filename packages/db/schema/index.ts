@@ -10,6 +10,7 @@ import { files } from './files.def.ts';
 import { groupPermissions } from './group_permissions.def.ts';
 import { groupUserMaps } from './group_user_maps.def.ts';
 import { groups } from './groups.def.ts';
+import { invitations } from './invitations.def.ts';
 import { modules } from './modules.def.ts';
 import { notifications } from './notifications.def.ts';
 import { oauthAccounts } from './oauth_accounts.def.ts';
@@ -56,6 +57,7 @@ export const tables: readonly TableDef[] = [
   userMfa,
   mfaChallenges,
   oauthAccounts,
+  invitations,
   outboxEmail,
   queueJobs,
 ];

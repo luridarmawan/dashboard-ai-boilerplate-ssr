@@ -147,15 +147,30 @@ const shellContext = $derived({
     <Icon name="bell" size={18} />
     {#if data.unreadNotifications}<span class="absolute -top-0.5 -end-0.5 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] leading-4 text-primary-foreground" data-testid="bell-count">{data.unreadNotifications > 99 ? '99+' : data.unreadNotifications}</span>{/if}
   </a>
-  <a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={t('shell.theme_link')}><Icon name="palette" size={18} /></a>
   <LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact />
-  <a href="/profile" class="hidden items-center gap-2 rounded-md px-2 py-1 text-sm no-underline hover:bg-accent hover:no-underline sm:flex">
-    {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}<span>{data.user.name}</span>
-  </a>
-  <form method="POST" action="/auth/logout">
-    <Csrf token={data.csrf} />
-    <Button type="submit" variant="ghost" size="sm" aria-label={t('nav.logout')}><Icon name="logout" size={18} /><span class="hidden sm:inline">{t('nav.logout')}</span></Button>
-  </form>
+  <!-- Account menu: the avatar + name open a <details> dropdown (no JavaScript needed; `use:dropdown`
+       adds outside-click/Escape/after-navigation closing) with the profile, the theme picker and sign-out. -->
+  <details class="group relative" data-testid="account-menu" use:dropdown>
+    <summary class="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm hover:bg-accent" aria-label={t('shell.account_menu')}>
+      {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}
+      <span class="hidden max-w-40 truncate sm:inline">{data.user.name}</span>
+      <Icon name="chevron-down" size={14} class="transition-transform group-open:rotate-180" />
+    </summary>
+    <div class="absolute end-0 z-40 mt-1 w-64 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
+      <div class="flex items-center gap-3 px-2 py-2">
+        {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-10 w-10 rounded-full object-cover" />{:else}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name="user" size={20} /></span>{/if}
+        <div class="min-w-0"><p class="truncate text-sm font-medium">{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p></div>
+      </div>
+      <ul class="grid gap-0.5 border-t pt-1">
+        <li><a href="/profile" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="user" size={16} class="text-muted-foreground" />{t('nav.profile')}</a></li>
+        <li><a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="palette" size={16} class="text-muted-foreground" />{t('shell.theme_link')}</a></li>
+      </ul>
+      <form method="POST" action="/auth/logout" class="mt-1 border-t pt-1">
+        <Csrf token={data.csrf} />
+        <button type="submit" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-destructive hover:bg-accent"><Icon name="logout" size={16} />{t('nav.logout')}</button>
+      </form>
+    </div>
+  </details>
 {/snippet}
 
 {#snippet breadcrumb()}

@@ -141,6 +141,13 @@
       "when": 1788900145795,
       "tag": "0019_fluffy_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788912268715,
+      "tag": "0020_worthless_shaman",
+      "breakpoints": true
     }
   ]
 }

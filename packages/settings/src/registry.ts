@@ -135,6 +135,19 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         max: 20,
         order: 2,
       },
+      {
+        key: 'security.invitation_hours',
+        type: 'number',
+        title: { id: 'Masa berlaku tautan undangan (jam)', en: 'Invitation link validity (hours)' },
+        note: {
+          id: 'Undangan ke tenant ini (Pengguna → Undang) berlaku selama ini sejak dibuat; baku 72 jam.',
+          en: 'Invitations into this tenant (Users → Invite) stay valid this long after creation; default 72 hours.',
+        },
+        default: 72,
+        min: 1,
+        max: 720,
+        order: 8,
+      },
       // ---- Google sign-in (A-8). Client id + secret come from Google Cloud Console → Credentials →
       // OAuth client (Web application); the authorised redirect URI is <origin>/auth/google/callback.
       // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env are the bootstrap when these are empty (E-6).

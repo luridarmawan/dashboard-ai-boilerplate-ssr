@@ -1,14 +1,15 @@
 <script lang="ts">
 import { page } from '$app/state';
+import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { type ColumnDef, DataTable } from '$lib/components/table';
-import { Badge, Button } from '$lib/components/ui';
+import { Badge, Button, Card } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
-import type { PageData } from './$types';
+import type { ActionData, PageData } from './$types';
 
-let { data }: { data: PageData & LayoutData } = $props();
+let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
@@ -74,4 +75,42 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
       {/if}
     {/snippet}
   </DataTable>
+
+  {#if can('user.create') && data.invitations}
+    <!-- A-13: invite by e-mail. The invitee registers through /join/<code> even with self-service sign-up off. -->
+    <Card class="mt-6" title={t('users.invite.title')} description={t('users.invite.lead')} id="invitations">
+      {#if form?.invited?.existing}
+        <p class="notice" data-testid="invite-existing">{t('users.invite.existing', { email: form.invited.email })}</p>
+      {:else if form?.invited}
+        <div class="notice grid gap-1" data-testid="invite-sent">
+          <p>{t('users.invite.sent', { email: form.invited.email })}</p>
+          <p class="text-xs">{t('users.invite.link_hint')} <code class="select-all break-all">{form.invited.link}</code></p>
+        </div>
+      {/if}
+      {#if form?.error && !form?.invited}<p class="error" role="alert">{form.error}</p>{/if}
+      <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form">
+        <Csrf token={data.csrf} />
+        <label class="grid gap-1 text-sm">{t('users.invite.email')} <input name="email" type="email" required autocomplete="off" class="h-9 w-72 rounded-md border border-input bg-background px-2 text-sm" value={form?.values?.email ?? ''} /></label>
+        <Button type="submit" size="sm"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
+      </form>
+      {#if data.invitations.length}
+        <table class="mt-4 w-full text-sm" data-testid="invitations">
+          <thead class="text-start text-xs text-muted-foreground"><tr><th class="py-1 text-start">{t('users.invite.col_email')}</th><th class="py-1 text-start">{t('users.invite.col_status')}</th><th class="py-1 text-start">{t('users.invite.col_expires')}</th><th class="py-1 text-start">{t('users.invite.col_by')}</th><th class="py-1"></th></tr></thead>
+          <tbody>
+            {#each data.invitations as inv (inv.id)}
+              <tr class="border-t">
+                <td class="py-1.5">{inv.email}</td>
+                <td class="py-1.5"><Badge variant={inv.status === 'pending' ? 'secondary' : 'destructive'}>{inv.status === 'pending' ? t('users.invite.status_pending') : t('users.invite.status_expired')}</Badge></td>
+                <td class="py-1.5 text-muted-foreground">{new Date(inv.expiresAt).toLocaleString(dateLocale)}</td>
+                <td class="py-1.5 text-muted-foreground">{inv.invitedBy ?? '—'}</td>
+                <td class="py-1.5 text-end"><form method="POST" action="?/revoke"><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm">{t('users.invite.revoke')}</Button></form></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else}
+        <p class="mt-3 text-sm text-muted-foreground">{t('users.invite.empty')}</p>
+      {/if}
+    </Card>
+  {/if}
 </div>

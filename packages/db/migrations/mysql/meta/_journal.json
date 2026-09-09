@@ -141,6 +141,13 @@
       "when": 1788900145237,
       "tag": "0019_many_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1788912268150,
+      "tag": "0020_salty_kronos",
+      "breakpoints": true
     }
   ]
 }

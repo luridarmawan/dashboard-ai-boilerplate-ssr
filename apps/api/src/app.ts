@@ -6,6 +6,7 @@ import { clients } from './domains/clients.ts';
 import { configuration } from './domains/configuration.ts';
 import { filesDomain } from './domains/files.ts';
 import { groups } from './domains/groups.ts';
+import { invitationsDomain, joinDomain } from './domains/invitations.ts';
 import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
@@ -76,6 +77,10 @@ export const app = new Elysia()
             description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
           },
           {
+            name: 'invitations',
+            description: 'Invitation links into the active tenant (A-13)',
+          },
+          {
             name: 'webhooks',
             description: 'Outgoing webhooks: signed core events per tenant (J-5)',
           },
@@ -88,6 +93,8 @@ export const app = new Elysia()
       .use(system)
       .use(auth)
       .use(authGoogle)
+      .use(joinDomain)
+      .use(invitationsDomain)
       .use(users)
       .use(groups)
       .use(clients)

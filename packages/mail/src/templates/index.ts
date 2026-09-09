@@ -17,7 +17,13 @@ export interface Rendered {
   readonly text: string;
 }
 
-export type TemplateId = 'verify-email' | 'reset-password' | 'set-password' | 'invite' | 'contact';
+export type TemplateId =
+  | 'verify-email'
+  | 'reset-password'
+  | 'set-password'
+  | 'invite'
+  | 'invite-existing'
+  | 'contact';
 
 type Dict = Record<string, string>;
 const T: Record<'id' | 'en', Dict> = {
@@ -38,6 +44,11 @@ const T: Record<'id' | 'en', Dict> = {
     'invite.subject': 'Undangan bergabung ke {tenant} — {app}',
     'invite.body': '{inviter} mengundang Anda bergabung ke {tenant}.',
     'invite.cta': 'Terima undangan',
+    'invite.expires': 'Tautan ini berlaku {hours} jam.',
+    'invite_existing.subject': 'Anda sudah punya akun di {app}',
+    'invite_existing.body':
+      '{inviter} mengundang Anda bergabung ke {tenant}. Alamat email ini sudah terdaftar, jadi cukup masuk dengan akun Anda — tenant tersebut sudah ditambahkan. Lupa kata sandi? Gunakan "Lupa kata sandi" di halaman masuk.',
+    'invite_existing.cta': 'Masuk',
     'contact.subject': 'Pesan baru dari {name} — {app}',
     'contact.body': 'Pesan masuk lewat formulir kontak:',
     'contact.reply': 'Balas ke',
@@ -61,6 +72,11 @@ const T: Record<'id' | 'en', Dict> = {
     'invite.subject': 'You are invited to {tenant} — {app}',
     'invite.body': '{inviter} invited you to join {tenant}.',
     'invite.cta': 'Accept invitation',
+    'invite.expires': 'This link is valid for {hours} hours.',
+    'invite_existing.subject': 'You already have an account at {app}',
+    'invite_existing.body':
+      '{inviter} invited you to join {tenant}. This e-mail address is already registered, so simply sign in with your account — that tenant has been added for you. Forgot your password? Use "Forgot password" on the sign-in page.',
+    'invite_existing.cta': 'Sign in',
     'contact.subject': 'New message from {name} — {app}',
     'contact.body': 'A message arrived through the contact form:',
     'contact.reply': 'Reply to',
@@ -140,11 +156,25 @@ export function renderTemplate(
     }
     case 'invite': {
       const subject = tr(locale, 'invite.subject', { app, tenant: String(data.tenant ?? '') });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${button(link, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
+      const hours =
+        data.hours === undefined
+          ? ''
+          : `<p>${tr(locale, 'invite.expires', { hours: String(data.hours) })}</p>`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${hours}${button(link, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
         html: shell(brand, locale, subject, body),
         text: `${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}\n\n${link}`,
+      };
+    }
+    case 'invite-existing': {
+      const vars = { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') };
+      const subject = tr(locale, 'invite_existing.subject', { app });
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite_existing.body', vars)}</p>${button(link, tr(locale, 'invite_existing.cta'), brand.primary)}${fallback(locale, link)}`;
+      return {
+        subject,
+        html: shell(brand, locale, subject, body),
+        text: `${tr(locale, 'invite_existing.body', vars)}\n\n${link}`,
       };
     }
     case 'contact': {
