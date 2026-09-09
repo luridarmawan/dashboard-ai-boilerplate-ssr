@@ -50,11 +50,14 @@ export const app = new Elysia()
         info: {
           // Self-hosters brand the deployment once in .env: APP_LANDING_TITLE names the landing
           // page, the footers, and this document (§4.7 branding).
-          title: rawEnv('APP_LANDING_TITLE') ?? 'Dashboard AI Boilerplate API',
+          // original response:
+          // 'API-first: this document is generated from the route schemas at runtime (PRD N-1, N-2). ' +
+          // 'Every response uses the envelope `{ success, data | error, requestId }` (N-4).',
+          title: `${rawEnv('APP_LANDING_TITLE') ?? 'Dashboard AI Boilerplate'} API`,
           version: '0.0.0',
           description:
-            'API-first: this document is generated from the route schemas at runtime (PRD N-1, N-2). ' +
-            'Every response uses the envelope `{ success, data | error, requestId }` (N-4).',
+            'API-first: this document is generated from the route schemas at runtime. ' +
+            'Every response uses the envelope `{ success, data | error, requestId }`.',
         },
         tags: [
           { name: 'system', description: 'Liveness, readiness, build identity' },
