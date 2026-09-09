@@ -404,7 +404,19 @@ jobs:
           curl -sI http://127.0.0.1:5173/ | head -1
       - name: lighthouse (Performance, Accessibility, Best Practices, SEO)
         run: |
-          npx --yes lighthouse@12 http://127.0.0.1:5173/ --preset=desktop --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=/tmp/lh.json
+          # Three runs, the median by performance counts: a shared runner's momentary load has swung the
+          # same commit between 81 and 100 — Lighthouse's own guidance for variance is to aggregate runs.
+          for i in 1 2 3; do
+            npx --yes lighthouse@12 http://127.0.0.1:5173/ --preset=desktop --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=/tmp/lh-$i.json
+          done
+          node -e '
+            const fs = require("fs");
+            const runs = [1, 2, 3].map((i) => require(`/tmp/lh-${i}.json`));
+            const perf = (r) => r.categories.performance.score;
+            runs.sort((a, b) => perf(a) - perf(b));
+            console.log("performance per run", JSON.stringify(runs.map((r) => Math.round(perf(r) * 100))), "→ median");
+            fs.writeFileSync("/tmp/lh.json", JSON.stringify(runs[1]));
+          '
           node -e '
             const lh = require("/tmp/lh.json");
             const s = Object.fromEntries(Object.entries(lh.categories).map(([k,v]) => [k, Math.round(v.score*100)]));

@@ -6,7 +6,9 @@ export default {
   preprocess: vitePreprocess(),
   kit: {
     // adapter-node run under Bun: the safe fallback the PRD names (§10) — no community adapter.
-    adapter: adapter({ out: 'build' }),
+    // precompress: immutable client assets are also emitted as .gz/.br and served as such when the
+    // browser accepts it — Caddy compresses in the compose stack, this covers systemd mode and CI.
+    adapter: adapter({ out: 'build', precompress: true }),
     alias: {
       '@core/ui-theme': '../../packages/ui-theme',
       // Extension point 10: modules import core components as `@core/ui` (see src/lib/components/index.ts).
