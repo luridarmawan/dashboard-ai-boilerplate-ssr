@@ -140,7 +140,7 @@ const shellContext = $derived({
       <span class="hidden max-w-40 truncate sm:inline">{data.user.name}</span>
       <Icon name="chevron-down" size={14} class="transition-transform group-open:rotate-180" />
     </summary>
-    <div class="absolute end-0 z-40 mt-1 w-64 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
+    <div id="user-menu-dropdown" class="absolute end-0 z-40 mt-1 w-64 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
       <div class="flex items-center gap-3 px-2 py-2">
         {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-10 w-10 rounded-full object-cover" />{:else}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name="user" size={20} /></span>{/if}
         <div class="min-w-0"><p class="truncate text-sm font-medium">{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p>{#if activeTenant}<p class="truncate text-xs text-muted-foreground"><Icon name="building" size={12} class="me-1 inline align-[-1px]" />{activeTenant.name}</p>{/if}</div>
