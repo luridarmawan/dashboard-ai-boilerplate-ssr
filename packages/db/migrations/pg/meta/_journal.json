@@ -155,6 +155,13 @@
       "when": 1788949297060,
       "tag": "0021_fast_gwen_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788987646477,
+      "tag": "0022_quiet_shadow_king",
+      "breakpoints": true
     }
   ]
 }

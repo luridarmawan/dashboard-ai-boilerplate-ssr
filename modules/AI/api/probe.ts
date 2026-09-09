@@ -545,6 +545,70 @@ export async function probeCapabilities(
 }
 
 /**
+ * Read a stored `ai_providers.capabilities` value back into the type. The column is JSON, but a
+ * stored matrix is only ever as trustworthy as the version that wrote it — an older release, or
+ * MariaDB handing back the raw longtext — so every field is checked and anything unrecognised
+ * degrades to null (which callers treat as "never probed", i.e. the pre-F1 behaviour).
+ */
+export function capabilitiesOf(raw: unknown): Capabilities | null {
+  let v = raw;
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v);
+    } catch {
+      return null;
+    }
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const obj = (k: string) =>
+    o[k] && typeof o[k] === 'object' ? (o[k] as Record<string, unknown>) : {};
+  const bool = (src: Record<string, unknown>, k: string) => src[k] === true;
+  const endpoints = obj('endpoints');
+  const stream = obj('stream');
+  const reasoning = obj('reasoning');
+  const tools = obj('tools');
+  const param = reasoning.param;
+  const endpoint = (x: unknown): Endpoint | null =>
+    x === 'responses' || x === 'chat_completions' ? x : null;
+  return {
+    endpoints: {
+      responses: bool(endpoints, 'responses'),
+      chatCompletions: bool(endpoints, 'chatCompletions'),
+    },
+    stream: {
+      supported: bool(stream, 'supported'),
+      sse: bool(stream, 'sse'),
+      responsesStream: bool(stream, 'responsesStream'),
+    },
+    reasoning: {
+      supported: bool(reasoning, 'supported'),
+      param: param === 'reasoning' || param === 'reasoning_effort' ? param : null,
+      via: endpoint(reasoning.via),
+    },
+    tools: {
+      supported: bool(tools, 'supported'),
+      functionCalling: bool(tools, 'functionCalling'),
+      via: endpoint(tools.via),
+    },
+    modelsTested: Array.isArray(o.modelsTested)
+      ? o.modelsTested.filter((m): m is string => typeof m === 'string' && MODEL_ID.test(m))
+      : [],
+    preferredEndpoint: endpoint(o.preferredEndpoint),
+  };
+}
+
+/** The matrix as it is stored and exposed — the probe's own bookkeeping stays out of the column. */
+export const toStored = (r: ProbeResult): Capabilities => ({
+  endpoints: r.endpoints,
+  stream: r.stream,
+  reasoning: r.reasoning,
+  tools: r.tools,
+  modelsTested: r.modelsTested,
+  preferredEndpoint: r.preferredEndpoint,
+});
+
+/**
  * §3 rule 2: modern endpoint plus something to use it for. Presentation only — never let this
  * reorder `enabledProviders`, or the tenant's default provider would drift (§3, §7.6).
  */

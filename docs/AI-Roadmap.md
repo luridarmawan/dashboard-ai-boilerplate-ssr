@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **F0 selesai** 2026-09-09 (`modules/AI/api/probe.ts`, `POST /providers/:id/test`, mock `/responses`); bentuk Responses API **terverifikasi ke provider nyata** 2026-09-10 (§12); F1 menunggu keputusan §5.1 |
+| **Status** | **F0 + F1 selesai** (2026-09-09, 2026-09-10) — probe, migrasi `0022`, persistensi, badge & urutan, setting `ai.preferred_endpoint`. Bentuk Responses API **terverifikasi ke provider nyata** (§12). Berikutnya: F2 |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -124,17 +124,43 @@ Indeks tidak perlu; pembacaan via `providerView`. (`col.json()` memang tersedia 
 **`ai_calls` — kolom baru, JANGAN pakai `endpoint` yang sudah ada.** `ai_calls.endpoint` (`col.identifier(64)`) sudah dipakai sebagai label rute API **lokal**: nilainya `'chat.completions'` (`modules/AI/api/routes.ts:726`), dibaca halaman Log (`routes.ts:1379`), dan termasuk kontrak filter log (`routes.ts:1403`). Menulis `responses` ke sana mendefinisikan ulang kolom yang sudah dibaca dua konsumen. Tambah kolom terpisah di migrasi yang sama:
 
 ```ts
-// ai_calls
+// ai_calls — keduanya dibuat sekarang meski `reasoning_tokens` baru diisi di F3:
+// migrasi harus aditif untuk rollout side-by-side, dan dua migrasi berarti dua
+// siklus rollout untuk satu fitur.
 upstream_endpoint: col.identifier(16).nullable(), // 'responses' | 'chat_completions'
+reasoning_tokens: col.int().nullable(), // §5.1a
 ```
 
-**Lubang yang harus diputuskan sebelum F1: penyedia legacy tidak punya baris untuk ditulisi.** Bila tenant belum punya profil, `resolveProvider` jatuh ke `ai.baseurl`/`ai.key`/`ai.model` (`providers.ts:96`–`118`) — penyedia implisit `docs/AI.md:15`, yaitu justru kasus single-tenant yang paling umum. Kolom di atas semuanya milik `ai_providers`, dan §9 menolak probe per request, jadi apa adanya jalur itu **tidak akan pernah memakai `/responses`**. Halaman *Pengaturan → AI* juga tidak punya tombol Uji koneksi — halaman itu digenerate dari `modules/AI/config.ts` (12 key `ai.*`, tak satu pun soal endpoint). Pilih satu:
+**Penyedia legacy tidak punya baris untuk ditulisi — KEPUTUSAN (2026-09-10): setting `ai.preferred_endpoint`.** Bila tenant belum punya profil, `resolveProvider` jatuh ke `ai.baseurl`/`ai.key`/`ai.model` (`providers.ts:96`–`118`) — penyedia implisit `docs/AI.md:15`, yaitu kasus single-tenant yang paling umum. Kolom di atas semuanya milik `ai_providers`, dan §9 menolak probe per request, jadi apa adanya jalur itu tidak akan pernah memakai `/responses`.
 
-1. **Tambah setting `ai.preferred_endpoint`** (`auto` | `responses` | `chat_completions`, baku `auto`) di `config.ts`; `auto` mencoba `/responses` sekali lalu fallback pada 404/405 dan mengingatnya per-proses — *disarankan*
-2. `bun run ai:test` yang menulis `ai.preferred_endpoint` — bertentangan dengan §10.5 ("tidak menulis ke DB"), perlu pengecualian eksplisit
-3. Nyatakan jalur legacy **chat-only selamanya** dan tulis itu di kriteria §7.6
+Yang menentukan pilihan: **provider di `.env` repo ini sendiri adalah jalur legacy itu, dan ia mendukung `/responses`** (§12). Menyatakan legacy chat-only selamanya berarti instalasi single-tenant tidak pernah memakai endpoint modern — membuang sebagian besar nilai roadmap ini. Menyerahkannya ke `bun run ai:test` membuat kemampuan bergantung pada seseorang menjalankan perintah, yang tidak layak untuk boilerplate yang dipasang orang lain.
 
-Opsi 1 dan 2 menambah key di `config.ts`, artinya `bun run modules:sync` menulis ulang `modules.json` — hasilnya wajib round-trip byte-identik.
+Maka: key baru di `modules/AI/config.ts`
+
+```
+ai.preferred_endpoint : auto | responses | chat_completions   (baku: auto)
+```
+
+- `auto` **tidak menulis balik ke DB dari jalur chat.** Diselesaikan malas saat pemakaian pertama, di-cache di proses per `(baseUrl, model)` dengan TTL ~10 menit; fallback hanya pada `404`/`405` (aturan `presenceOf` di `probe.ts`). Biaya cache-miss = satu round-trip 404, dan hasilnya tetap benar di banyak worker tanpa koordinasi
+- `bun run ai:test` cukup **menampilkan** hasil resolusi `auto` — §10.5 ("tidak menulis ke DB") tetap utuh
+- **Key-nya sudah ada sejak F1, tetapi belum ada yang membacanya:** chat baru bercabang endpoint di F2, jadi catatan field-nya menyatakan terus-terang "belum berpengaruh" agar tidak tampak seperti tombol rusak. Hapus kalimat itu saat F2 mendarat
+- Admin yang sudah tahu providernya bisa memaku nilainya dan melewati deteksi
+
+Konsekuensi yang ikut dikerjakan: key baru di `config.ts` membuat `bun run modules:sync` menulis ulang `modules.json` (wajib round-trip byte-identik) dan menambah key i18n `id`/`en`.
+
+### 5.1a Akuntansi token reasoning — KEPUTUSAN (2026-09-10)
+
+`usage` Responses berbeda bentuk dari chat (`input_tokens`/`output_tokens`, bukan `prompt_tokens`/`completion_tokens`) dan angkanya tidak seragam antar provider (§12 no. 4). **Jangan memilih satu rumus buta** — provider mengirim cukup data untuk menyimpulkan konvensinya sendiri:
+
+| Kondisi | Konvensi | `tokensOut` |
+|---|---|---|
+| `reasoning_tokens + text_tokens == output_tokens` | inklusif | `output_tokens` |
+| `text_tokens == output_tokens` dan `reasoning_tokens > 0` | eksklusif | `output_tokens + reasoning_tokens` |
+| tanpa `output_tokens_details` | — | `output_tokens` |
+
+`reasoning_tokens` selalu ikut disimpan apa adanya (null bila tidak dilaporkan). Aturan ini benar di kedua konvensi tanpa konfigurasi per provider. Tanpa itu, provider yang diuji tertagih kurang hampir separuh output-nya (53 dari 109 token hilang).
+
+Perhitungannya milik F3; **kolomnya dibuat sekarang** di migrasi `0022` (§5.1) supaya F3 tidak menuntut migrasi kedua.
 
 ### 5.2 API — `modules/AI/api/providers.ts` + `modules/AI/api/routes.ts`
 
@@ -212,12 +238,20 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 | Fase | Isi | Gate |
 |---|---|---|
 | ~~**F0 — Probe tanpa DB**~~ **SELESAI 2026-09-09** | `modules/AI/api/probe.ts` (murni, tanpa `@app/api/services`/`@core/db`) + `POST /providers/:id/test` kembalikan matriks tanpa menyimpannya; mock dapat `GET /v1/models`, `POST /v1/responses`, `MOCK_ENDPOINTS` | Terbukti: `modules/AI/test/probe.test.ts` (11 kasus, unit) + matriks di `providers.test.ts`; mock tiga mode diklasifikasi benar. **Proxy nyata belum diuji** — butuh key |
-| **F1 — Persist & UI (2–3 hari)** | Migrasi `capabilities` + `preferred_endpoint`, `providerView`, halaman Providers tampilkan badge & sorting | Halaman `/m/ai/providers` urutkan direkomendasikan di atas; badge hijau/abu sesuai hasil |
+| ~~**F1 — Persist & UI**~~ **SELESAI 2026-09-10** | Migrasi `0022` (aditif, mysql+pg: 5 kolom `ai_providers` + `upstream_endpoint`/`reasoning_tokens` di `ai_calls`), persistensi di `POST /test`, `providerView` + `ProviderOption` membawa matriks, `web/lib/Capabilities.svelte`, kolom **Kemampuan** + urutan rekomendasi, setting `ai.preferred_endpoint`, i18n id/en | Terbukti: `providers.test.ts` — matriks tersimpan & terbaca kembali, penyedia `/responses`-only ber-badge ★ dan berada di urutan pertama meski namanya terurut terakhir, **chat tanpa menyebut penyedia tetap ke penyedia baku**, probe gagal tidak menghapus matriks yang sudah diketahui |
 | **F2 — Chat runtime dual-endpoint (5–8 hari)** | `resolveProvider` + `callProvider` bercabang `/responses` vs `/chat/completions`, `parseResponsesChunk`, `toResponsesInput/Tools` **termasuk `function_call`/`function_call_output` (I-3) dan `input_image` (H-11)**, log `ai_calls.upstream_endpoint` | Chat streaming & non-stream lulus di kedua endpoint (mock + provider nyata); `ai_calls.provider` + `upstream_endpoint` tercatat; sisi web tidak disentuh |
-| **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), `reasoning_tokens` → `tokensOut` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
+| **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), aturan inklusif/eksklusif §5.1a mengisi `tokensOut` + `reasoning_tokens` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
 | **F4 — Polish & gate CI (1–2 hari)** | Perluas fake `Bun.serve` in-process: `providers.test.ts:55` (3 mode — chat-only, responses-only, keduanya; badge & preferred) dan `ai.test.ts:77` (cabang `/responses` + stream + tool round-trip, dengan cek `url.pathname`). `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut, aplikasi tetap ter-build tanpa jejak AI" (`scripts/ci/m5-gate4.sh`) dan tidak menyentuh provider; `proof:m5:gate1`–`gate3` tidak ada |
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
+
+### 6.2 Catatan pelaksanaan F1 (2026-09-10)
+
+- **Migrasi `0022` seluruhnya `ALTER TABLE … ADD`** di kedua dialek — aman untuk rollout side-by-side. Dibuat dengan `TABLE_PREFIX= bun run db:generate`: tanpa mengosongkan prefiks, drizzle-kit melihat setiap tabel berganti nama dan berhenti menunggu jawaban interaktif. `modules.json` round-trip bersih meski ada key config baru.
+- **Urutan rekomendasi murni di handler view.** `byRecommended()` menyortir salinan; `enabledProviders` tidak disentuh. Ada tesnya: penyedia `/responses`-only bernama "Zeta responses" muncul pertama di daftar dan di pemilih, tetapi chat yang tidak menyebut penyedia tetap dilayani penyedia baku — inilah kriteria §7.6 yang dijaga.
+- **Probe gagal tidak menimpa `capabilities`.** Key kedaluwarsa tidak boleh menghapus kemampuan yang sudah terbukti; `last_probe_error`/`last_probe_ms` merekam kegagalannya di sebelahnya.
+- `capabilitiesOf()` memvalidasi kolom JSON field demi field (termasuk fallback `JSON.parse` bila MariaDB mengembalikan longtext); bentuk yang tak dikenal turun jadi `null` = "belum pernah diprobe", yakni perilaku pra-F1.
+- `Badge` tidak menerima prop `title`; tooltip dibungkus `<span title>` seperti pola yang sudah ada. Ini hanya ketahuan dari `svelte-check`, bukan dari `tsc`.
 
 ### 6.1 Catatan pelaksanaan F0 (2026-09-09)
 
@@ -233,7 +267,7 @@ Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; parale
 2. `POST /v1/m/ai/providers/:id/test` mengembalikan `capabilities` + `preferred_endpoint`; `GET /v1/m/ai/providers` menyertakannya
 3. Chat ke provider `responses-only` berhasil stream & non-stream; chat ke `chat-only` tetap berhasil (fallback)
 4. Bila `capabilities` provider `false`: switch `ai.tools_enable` di **Pengaturan → AI** diberi keterangan "tidak didukung penyedia terpilih", dan pemilih provider di chat menampilkan badge kemampuan. Toggle reasoning/tools **per-chat** tidak dijanjikan di sini — UI-nya belum ada (§1)
-5. Biaya & token tercatat benar di `ai_calls` dan `Analitik AI`. **Perlu keputusan sebelum F3** (§12 no. 4): `usage` Responses memakai `input_tokens`/`output_tokens` (bukan `prompt_tokens`/`completion_tokens`) dan melaporkan `output_tokens_details.reasoning_tokens` secara terpisah — pada provider yang diuji angkanya **tidak konsisten** (`output_tokens` = `text_tokens`, sementara `reasoning_tokens` di luar keduanya). Pilih: `tokensOut = output_tokens` (mungkin menagih kurang) atau `output_tokens + reasoning_tokens` (mungkin menagih dobel di provider lain), dan tambahkan kolom `reasoning_tokens` di `ai_calls` kalau §7.5 mau bisa dibuktikan
+5. Biaya & token tercatat benar di `ai_calls` dan `Analitik AI`, dengan token reasoning tersimpan terpisah di `ai_calls.reasoning_tokens` sehingga Analitik bisa memisahkannya (aturan hitung: §5.1a)
 6. Tanpa `capabilities` (provider lama) → perilaku lama utuh (chat via `/chat/completions`), dan penyedia baku tenant tidak bergeser: urutan `enabledProviders` tetap `is_default` → `code` (§3 no. 2)
 7. Penyedia legacy *Pengaturan → AI* berperilaku sesuai opsi yang dipilih di §5.1 (baku: `ai.preferred_endpoint = auto`)
 

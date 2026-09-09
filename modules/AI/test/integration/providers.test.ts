@@ -112,14 +112,64 @@ function mockProvider(
   });
   return { server, seen, url: `http://127.0.0.1:${server.port}/v1` };
 }
+type Caps = {
+  endpoints: { responses: boolean; chatCompletions: boolean };
+  reasoning: { supported: boolean };
+  tools: { supported: boolean };
+};
 type ProviderView = {
   id: string;
   code: string;
+  name: string;
   apiKeySet: boolean;
   isDefault: boolean;
   enabled: boolean;
+  lastStatus: string | null;
+  capabilities: Caps | null;
+  capabilitiesAt: string | null;
+  preferredEndpoint: string | null;
+  lastProbeError: string | null;
+  recommended: boolean;
   models: { model: string; priceIn: number; priceOut: number }[];
 };
+
+/**
+ * A provider that speaks the MODERN endpoint only: `/models` + `/responses`, no
+ * `/chat/completions`. Used to prove the recommendation badge and the display ordering.
+ */
+function responsesProvider(key: string) {
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      if (req.headers.get('authorization') !== `Bearer ${key}`)
+        return new Response('{"error":{"message":"bad key"}}', { status: 401 });
+      const url = new URL(req.url);
+      if (url.pathname.endsWith('/models'))
+        return Response.json({ object: 'list', data: [{ id: 'g-1', object: 'model' }] });
+      if (!url.pathname.endsWith('/responses'))
+        return new Response('{"error":{"message":"not found"}}', {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      if (req.headers.get('accept') === 'text/event-stream')
+        return new Response(
+          'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","error":null}}\n\n',
+          { headers: { 'content-type': 'text/event-stream' } },
+        );
+      return Response.json({
+        id: 'r1',
+        object: 'response',
+        status: 'completed',
+        output: [
+          { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'pong' }] },
+        ],
+        output_text: 'pong',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      });
+    },
+  });
+  return { server, url: `http://127.0.0.1:${server.port}/v1` };
+}
 
 describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
   let db: Db;
@@ -498,6 +548,101 @@ describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
     const foreign = await call('/v1/m/ai/providers/options', { headers }, [admin]);
     // The superadmin may enter any tenant; there the profile list is empty.
     if (foreign.status === 200) expect(((await json(foreign)).data as unknown[]).length).toBe(0);
+  });
+
+  test('a recommended provider is listed first, yet the tenant default for chat does not move (§3 no. 2, §7.6)', async () => {
+    const gamma = responsesProvider('gamma-key');
+    const C = `gamma-${run % 100000}`;
+    try {
+      const created = await call(
+        '/v1/m/ai/providers',
+        {
+          method: 'POST',
+          // Named to sort LAST alphabetically: if it still comes first, the order is by
+          // recommendation and not by name.
+          body: JSON.stringify({
+            name: 'Zeta responses',
+            code: C,
+            baseUrl: gamma.url,
+            apiKey: 'gamma-key',
+            defaultModel: 'g-1',
+            models: [{ model: 'g-1', priceIn: 1, priceOut: 2 }],
+          }),
+        },
+        [admin],
+      );
+      expect(created.status).toBe(201);
+      const gammaId = ((await json(created)).data as ProviderView).id;
+
+      const probed = (
+        await json(await call(`/v1/m/ai/providers/${gammaId}/test`, { method: 'POST' }, [admin]))
+      ).data as { ok: boolean; recommended: boolean; capabilities: Caps };
+      expect(probed.ok).toBe(true);
+      expect(probed.capabilities.endpoints).toEqual({ responses: true, chatCompletions: false });
+      expect(probed.recommended).toBe(true);
+
+      // F1: the matrix is persisted and comes back on the view, not recomputed per request.
+      const view = (await json(await call(`/v1/m/ai/providers/${gammaId}`, {}, [admin])))
+        .data as ProviderView;
+      expect(view.preferredEndpoint).toBe('responses');
+      expect(view.capabilities?.endpoints.responses).toBe(true);
+      expect(view.capabilitiesAt).not.toBeNull();
+      expect(view.recommended).toBe(true);
+
+      const list = (await json(await call('/v1/m/ai/providers', {}, [admin])))
+        .data as ProviderView[];
+      expect(list[0]?.code).toBe(C);
+      expect(list.find((x) => x.code === A)?.recommended).toBe(false);
+
+      const opts = (await json(await call('/v1/m/ai/providers/options', {}, [admin]))).data as {
+        code: string;
+        isDefault: boolean;
+        recommended: boolean;
+      }[];
+      expect(opts[0]?.code).toBe(C);
+      // The DISPLAY moved; the default did not.
+      expect(opts.find((o) => o.isDefault)?.code).toBe(A);
+
+      // The proof that matters: a chat naming no provider still resolves to the tenant default.
+      const before = alpha.seen.length;
+      const chat = await call(
+        '/v1/m/ai/chat/completions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'penyedia baku?' }] }),
+        },
+        [admin],
+      );
+      expect(chat.status).toBe(200);
+      expect(alpha.seen.length).toBe(before + 1);
+      expect(alpha.seen.at(-1)?.model).toBe('a-small');
+
+      // A failed probe records the failure but keeps the matrix: an expired key must not erase
+      // what the provider was already proven to support.
+      await call(
+        `/v1/m/ai/providers/${gammaId}`,
+        { method: 'PUT', body: JSON.stringify({ apiKey: 'wrong' }) },
+        [admin],
+      );
+      expect(
+        (
+          (
+            await json(
+              await call(`/v1/m/ai/providers/${gammaId}/test`, { method: 'POST' }, [admin]),
+            )
+          ).data as { ok: boolean }
+        ).ok,
+      ).toBe(false);
+      const after = (await json(await call(`/v1/m/ai/providers/${gammaId}`, {}, [admin])))
+        .data as ProviderView;
+      expect(after.capabilities?.endpoints.responses).toBe(true);
+      expect(after.lastStatus).toBe('error');
+      expect(after.lastProbeError).toContain('401');
+
+      await call(`/v1/m/ai/providers/${gammaId}`, { method: 'DELETE' }, [admin]);
+    } finally {
+      gamma.server.stop(true);
+    }
   });
 
   test('deleting a profile unpins its conversations and removes it from the picker', async () => {

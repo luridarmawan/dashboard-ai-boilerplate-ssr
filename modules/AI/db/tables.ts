@@ -26,6 +26,17 @@ export default defineTables('AI', [
       last_status: col.identifier(16).nullable(),
       last_error: col.text().nullable(),
       last_tested_at: col.datetime().nullable(),
+      /**
+       * Capability matrix from the last probe (AI-Roadmap §3, `Capabilities` in api/probe.ts).
+       * Never queried inside: MariaDB stores JSON as longtext, so filtering and ordering by
+       * capability happens in JS after the row is read.
+       */
+      capabilities: col.json().nullable(),
+      capabilities_at: col.datetime().nullable(),
+      /** 'responses' | 'chat_completions' — a scalar precisely so it CAN be queried. */
+      preferred_endpoint: col.identifier(16).nullable(),
+      last_probe_error: col.text().nullable(),
+      last_probe_ms: col.int().nullable(),
     },
     indexes: [{ columns: ['client_id', 'code'], unique: true }],
   }),
@@ -124,6 +135,18 @@ export default defineTables('AI', [
       /** Estimated cost in micro-units of the configured currency; null when no price is known. */
       cost_micro: col.int().nullable(),
       streamed: col.boolean().default(false),
+      /**
+       * Which UPSTREAM endpoint served the call: 'responses' | 'chat_completions'. Distinct from
+       * `endpoint` above, which names the LOCAL API route ('chat.completions') and is part of the
+       * log filter contract. Filled from F2 on; null for calls logged before that.
+       */
+      upstream_endpoint: col.identifier(16).nullable(),
+      /**
+       * Reasoning tokens the provider reported separately (AI-Roadmap §5.1a). Kept apart from
+       * `tokens_out` so analytics can show them, and because providers disagree on whether
+       * `output_tokens` already includes them. Filled from F3 on.
+       */
+      reasoning_tokens: col.int().nullable(),
     },
     indexes: [{ columns: ['client_id', 'created_at'] }, { columns: ['client_id', 'user_id'] }],
   }),

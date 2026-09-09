@@ -5,6 +5,7 @@ import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import Capabilities from '../../../lib/Capabilities.svelte';
 import { modelLines, providerFields } from '../_form.ts';
 
 let { data, form } = $props();
@@ -15,6 +16,7 @@ const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
 const money = (n: number) => (n ? n.toFixed(n < 0.01 ? 4 : 2) : '—');
+const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
 </script>
 
 <svelte:head><title>{p.name}</title></svelte:head>
@@ -59,12 +61,30 @@ const money = (n: number) => (n ? n.toFixed(n < 0.01 ? 4 : 2) : '—');
     {#if form?.tested}
       {#if form.tested.ok}
         <p class="notice" data-testid="provider-test-ok">{t('ai.providers.tested_ok')} {form.tested.models.length} · {form.tested.ms} ms</p>
+        <div class="mb-2">
+          <Capabilities capabilities={form.tested.capabilities} recommended={form.tested.recommended} preferredEndpoint={form.tested.preferredEndpoint} />
+        </div>
+        <ul class="mb-3 text-xs text-muted-foreground">
+          {#each form.tested.steps as s (s.step)}
+            <li>
+              <code>{s.step}</code>
+              <span class={s.status === 'ok' ? 'text-success' : s.status === 'error' ? 'text-destructive' : ''}>{s.status}</span>
+              · {s.ms} ms{#if s.note} — {s.note}{/if}
+            </li>
+          {/each}
+        </ul>
         {#if form.tested.models.length}
           <p class="text-xs text-muted-foreground">{t('ai.providers.tested_models_hint')}</p>
           <ul class="mt-1 flex flex-wrap gap-1">{#each form.tested.models as id (id)}<li><code class="rounded border px-1.5 py-0.5 text-xs">{id}</code></li>{/each}</ul>
         {/if}
       {:else}
         <p class="error" role="alert" data-testid="provider-test-fail">{t('ai.providers.tested_fail')}: {form.tested.error}</p>
+      {/if}
+    {:else if p.capabilities}
+      <div class="mb-2"><Capabilities capabilities={p.capabilities} recommended={p.recommended} preferredEndpoint={p.preferredEndpoint} /></div>
+      <p class="text-xs text-muted-foreground">{t('ai.providers.capabilities_at')} {fmt(p.capabilitiesAt)}{#if p.lastProbeMs} · {p.lastProbeMs} ms{/if}</p>
+      {#if p.lastStatus === 'error' && p.lastError}
+        <p class="error mt-2" role="alert">{t('ai.providers.tested_fail')}: {p.lastError}</p>
       {/if}
     {:else if p.lastStatus === 'error' && p.lastError}
       <p class="error" role="alert">{t('ai.providers.tested_fail')}: {p.lastError}</p>

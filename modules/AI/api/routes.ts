@@ -41,7 +41,7 @@ import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 import { discoverRemoteTools, wireSuffix } from './mcp-client.ts';
 import { maskedHeaders, mcpToolSource, mergeHeaders, toolNameFor } from './mcp-tools.ts';
-import { isRecommended, probeCapabilities } from './probe.ts';
+import { capabilitiesOf, isRecommended, probeCapabilities, toStored } from './probe.ts';
 import {
   costMicro,
   enabledProviders,
@@ -322,23 +322,7 @@ const ModelView = t.Object({
   priceOut: t.Number(),
   enabled: t.Boolean(),
 });
-const ProviderView = t.Object({
-  id: t.String(),
-  code: t.String(),
-  name: t.String(),
-  baseUrl: t.String(),
-  /** Whether a key is stored; the key itself never leaves the server. */
-  apiKeySet: t.Boolean(),
-  defaultModel: t.String(),
-  enabled: t.Boolean(),
-  isDefault: t.Boolean(),
-  lastStatus: t.Nullable(t.String()),
-  lastError: t.Nullable(t.String()),
-  lastTestedAt: t.Nullable(t.String()),
-  models: t.Array(ModelView),
-  createdAt: t.String(),
-});
-/** Capability matrix from the probe (AI-Roadmap §3). Stored per provider from F1 on. */
+/** Capability matrix from the probe (AI-Roadmap §3), as stored and exposed. */
 const CapabilitiesView = t.Object({
   endpoints: t.Object({ responses: t.Boolean(), chatCompletions: t.Boolean() }),
   stream: t.Object({ supported: t.Boolean(), sse: t.Boolean(), responsesStream: t.Boolean() }),
@@ -355,14 +339,55 @@ const CapabilitiesView = t.Object({
   modelsTested: t.Array(t.String()),
   preferredEndpoint: t.Nullable(t.String()),
 });
+const ProviderView = t.Object({
+  id: t.String(),
+  code: t.String(),
+  name: t.String(),
+  baseUrl: t.String(),
+  /** Whether a key is stored; the key itself never leaves the server. */
+  apiKeySet: t.Boolean(),
+  defaultModel: t.String(),
+  enabled: t.Boolean(),
+  isDefault: t.Boolean(),
+  lastStatus: t.Nullable(t.String()),
+  lastError: t.Nullable(t.String()),
+  lastTestedAt: t.Nullable(t.String()),
+  /** Null until the provider has been probed once (pre-F1 rows stay null and behave as before). */
+  capabilities: t.Nullable(CapabilitiesView),
+  capabilitiesAt: t.Nullable(t.String()),
+  preferredEndpoint: t.Nullable(t.String()),
+  lastProbeError: t.Nullable(t.String()),
+  lastProbeMs: t.Nullable(t.Integer()),
+  /** Derived, never stored: §3 no. 2. */
+  recommended: t.Boolean(),
+  models: t.Array(ModelView),
+  createdAt: t.String(),
+});
 const ProviderOption = t.Object({
   id: t.String(),
   code: t.String(),
   name: t.String(),
   isDefault: t.Boolean(),
   defaultModel: t.String(),
+  recommended: t.Boolean(),
+  preferredEndpoint: t.Nullable(t.String()),
+  capabilities: t.Nullable(CapabilitiesView),
   models: t.Array(t.Object({ model: t.String(), label: t.Nullable(t.String()) })),
 });
+/**
+ * §3 no. 2 for a stored row. PRESENTATION ONLY: this must never reach `enabledProviders`, whose
+ * order decides which profile serves a chat that names none (§7.6).
+ */
+function recommendedRow(r: ProviderRow): boolean {
+  const caps = capabilitiesOf(r.capabilities);
+  return !!caps && isRecommended(caps);
+}
+/** Recommended first, then the caller's own tie-breaker. View layer only, per §3 no. 2. */
+function byRecommended<T extends ProviderRow>(rows: T[], tie: (a: T, b: T) => number): T[] {
+  return [...rows].sort(
+    (a, b) => Number(recommendedRow(b)) - Number(recommendedRow(a)) || tie(a, b),
+  );
+}
 async function providerView(r: ProviderRow) {
   return {
     id: r.id,
@@ -376,6 +401,12 @@ async function providerView(r: ProviderRow) {
     lastStatus: r.last_status,
     lastError: r.last_error,
     lastTestedAt: r.last_tested_at?.toISOString() ?? null,
+    capabilities: capabilitiesOf(r.capabilities),
+    capabilitiesAt: r.capabilities_at?.toISOString() ?? null,
+    preferredEndpoint: r.preferred_endpoint,
+    lastProbeError: r.last_probe_error,
+    lastProbeMs: r.last_probe_ms,
+    recommended: recommendedRow(r),
     models: (await modelsOf(r.id)).map((m) => ({
       id: m.id,
       model: m.model,
@@ -1443,7 +1474,9 @@ export default defineApiRoutes(
       '/providers/options',
       async ({ tenantState }) => {
         if (!tenantState?.clientId) return ok([]);
-        const rows = await enabledProviders(tenantState.clientId);
+        // `enabledProviders` order (default → code) is the tenant's resolution order and must not
+        // change; this only reorders the COPY the picker displays, recommended first (§3 no. 2).
+        const rows = byRecommended(await enabledProviders(tenantState.clientId), () => 0);
         return ok(
           await Promise.all(
             rows.map(async (p) => ({
@@ -1452,6 +1485,9 @@ export default defineApiRoutes(
               name: p.name,
               isDefault: p.is_default,
               defaultModel: p.default_model,
+              recommended: recommendedRow(p),
+              preferredEndpoint: p.preferred_endpoint,
+              capabilities: capabilitiesOf(p.capabilities),
               models: (await modelsOf(p.id))
                 .filter((m) => m.enabled)
                 .map((m) => ({ model: m.model, label: m.label })),
@@ -1476,7 +1512,7 @@ export default defineApiRoutes(
         const rows = await tenant.select(schema.aiProviders, isNull(schema.aiProviders.deleted_at));
         return ok(
           await Promise.all(
-            rows.sort((a, b) => a.name.localeCompare(b.name)).map((r) => providerView(r)),
+            byRecommended(rows, (a, b) => a.name.localeCompare(b.name)).map((r) => providerView(r)),
           ),
         );
       },
@@ -1699,12 +1735,24 @@ export default defineApiRoutes(
         const r = await probeCapabilities(row.base_url, row.api_key, row.default_model, {
           signal: request.signal,
         });
+        const now = new Date();
         await tenant.update(
           schema.aiProviders,
           {
             last_status: r.ok ? 'ok' : 'error',
             last_error: r.error,
-            last_tested_at: new Date(),
+            last_tested_at: now,
+            // A failed probe keeps the last known matrix: an expired key should not erase what the
+            // provider was proven to support. The failure is recorded next to it instead.
+            ...(r.ok
+              ? {
+                  capabilities: toStored(r),
+                  capabilities_at: now,
+                  preferred_endpoint: r.preferredEndpoint,
+                }
+              : {}),
+            last_probe_error: r.error,
+            last_probe_ms: r.ms,
           },
           eq(schema.aiProviders.id, row.id),
         );

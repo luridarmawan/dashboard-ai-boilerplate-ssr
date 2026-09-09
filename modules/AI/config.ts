@@ -57,6 +57,25 @@ export default defineConfig('AI', [
         order: 3,
       },
       {
+        key: 'ai.preferred_endpoint',
+        type: 'select',
+        title: { id: 'Endpoint provider', en: 'Provider endpoint' },
+        note: {
+          id: 'Belum berpengaruh: chat masih selalu memakai /chat/completions sampai dukungan dua endpoint aktif. Setelah itu, Otomatis akan mencoba /responses lebih dulu dan turun ke /chat/completions bila provider menjawab 404/405. Berlaku untuk penyedia dari bagian ini; profil di Penyedia AI memakai hasil Uji koneksi masing-masing.',
+          en: 'No effect yet: chat always uses /chat/completions until dual-endpoint support lands. After that, Automatic tries /responses first and falls back to /chat/completions when the provider answers 404/405. Applies to the provider configured here; profiles under AI providers use their own connection test.',
+        },
+        default: 'auto',
+        options: [
+          { value: 'auto', label: { id: 'Otomatis (disarankan)', en: 'Automatic (recommended)' } },
+          { value: 'responses', label: { id: '/responses', en: '/responses' } },
+          {
+            value: 'chat_completions',
+            label: { id: '/chat/completions', en: '/chat/completions' },
+          },
+        ],
+        order: 4,
+      },
+      {
         key: 'ai.system_prompt',
         type: 'text',
         title: { id: 'System prompt', en: 'System prompt' },
@@ -66,7 +85,7 @@ export default defineConfig('AI', [
         },
         default: 'Anda adalah asisten yang membantu, ringkas, dan menjawab dalam bahasa pengguna.',
         max: 4000,
-        order: 4,
+        order: 5,
       },
       {
         key: 'ai.max_tokens',
@@ -75,7 +94,7 @@ export default defineConfig('AI', [
         default: 1024,
         min: 16,
         max: 128000,
-        order: 5,
+        order: 6,
       },
       {
         key: 'ai.log_retention_days',
@@ -84,7 +103,7 @@ export default defineConfig('AI', [
         default: 30,
         min: 1,
         max: 3650,
-        order: 6,
+        order: 7,
       },
       {
         key: 'ai.price_in_per_mtok',
@@ -96,7 +115,7 @@ export default defineConfig('AI', [
         },
         default: 0,
         min: 0,
-        order: 7,
+        order: 8,
       },
       {
         key: 'ai.price_out_per_mtok',
@@ -104,7 +123,7 @@ export default defineConfig('AI', [
         title: { id: 'Harga output / 1M token', en: 'Output price / 1M tokens' },
         default: 0,
         min: 0,
-        order: 8,
+        order: 9,
       },
       {
         key: 'ai.tools_enable',
@@ -118,7 +137,7 @@ export default defineConfig('AI', [
           en: 'Tools from module api/tools.ts (extension point 8) are offered to the model; still bound by user permission and tenant.',
         },
         default: true,
-        order: 9,
+        order: 10,
       },
       {
         key: 'ai.quota_tokens_month',
@@ -130,7 +149,7 @@ export default defineConfig('AI', [
         },
         default: 0,
         min: 0,
-        order: 10,
+        order: 11,
       },
       {
         key: 'ai.quota_tokens_user_month',
@@ -139,7 +158,7 @@ export default defineConfig('AI', [
         note: { id: '0 = tanpa batas.', en: '0 = unlimited.' },
         default: 0,
         min: 0,
-        order: 11,
+        order: 12,
       },
     ],
   },

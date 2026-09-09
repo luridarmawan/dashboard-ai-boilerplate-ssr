@@ -3,6 +3,7 @@ import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import Capabilities from '../../lib/Capabilities.svelte';
 
 let { data } = $props();
 const t = useT();
@@ -18,9 +19,10 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
     {#if can('ai.provider.manage')}<Button href="/m/ai/providers/new" size="sm"><Icon name="plus" size={16} />{t('ai.providers.new')}</Button>{/if}
   </div>
   <p class="text-sm text-muted-foreground">{t('ai.providers.intro')}</p>
+  <p class="text-xs text-muted-foreground">{t('ai.providers.sorted_hint')}</p>
   {#if data.saved === 'deleted'}<p class="notice">{t('ai.providers.deleted')}</p>{/if}
   <Table caption={t('ai.providers.title')}>
-    <thead><tr><th>Nama</th><th>Kode</th><th>Base URL</th><th>{t('ai.providers.models')}</th><th>{t('ai.providers.status')}</th><th></th></tr></thead>
+    <thead><tr><th>Nama</th><th>Kode</th><th>Base URL</th><th>{t('ai.providers.models')}</th><th>{t('ai.providers.capabilities')}</th><th>{t('ai.providers.status')}</th><th></th></tr></thead>
     <tbody>
       {#each data.providers as p (p.id)}
         <tr data-testid="provider-row">
@@ -32,6 +34,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
           <td><code>{p.code}</code></td>
           <td class="max-w-[22rem] truncate text-muted-foreground" title={p.baseUrl}>{p.baseUrl}{#if !p.apiKeySet} <Badge variant="destructive">{t('ai.providers.no_key')}</Badge>{/if}</td>
           <td>{p.models.length} <span class="text-xs text-muted-foreground">({p.defaultModel})</span></td>
+          <td><Capabilities capabilities={p.capabilities} recommended={p.recommended} preferredEndpoint={p.preferredEndpoint} compact /></td>
           <td>
             {#if p.lastStatus === 'ok'}<Badge variant="success">ok</Badge>
             {:else if p.lastStatus === 'error'}<span title={p.lastError ?? ''}><Badge variant="destructive">error</Badge></span>
@@ -41,7 +44,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
           <td class="text-end"><a href={`/m/ai/providers/${p.id}`}>{can('ai.provider.manage') ? t('common.edit') : t('common.view')}</a></td>
         </tr>
       {:else}
-        <tr><td colspan="6" class="py-8 text-center text-muted-foreground">{t('ai.providers.empty')}</td></tr>
+        <tr><td colspan="7" class="py-8 text-center text-muted-foreground">{t('ai.providers.empty')}</td></tr>
       {/each}
     </tbody>
   </Table>
