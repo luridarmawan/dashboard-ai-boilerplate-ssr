@@ -209,6 +209,11 @@ describe.skipIf(!enabled)('AI module as MCP client (I-4, I-5)', () => {
             'ai.key': 'test-key',
             'ai.enable': 'true',
             'ai.tools_enable': 'true',
+            // The fake below speaks the chat shape (`tools[].function.name`); the default `auto`
+            // would send it Responses-shaped tools (`tools[].name`) instead. What this file is
+            // about is EXTERNAL tools reaching the model, not which endpoint carries them — the
+            // tool round-trip over /responses has its own cases in ai.test.ts.
+            'ai.preferred_endpoint': 'chat_completions',
           },
         }),
       },
@@ -216,7 +221,20 @@ describe.skipIf(!enabled)('AI module as MCP client (I-4, I-5)', () => {
     );
     expect(cfg.status).toBe(200);
   });
-  afterAll(() => {
+  afterAll(async () => {
+    // Shared default tenant: hand the global setting back, or the next suite (or a manual run)
+    // silently gets the endpoint this file pinned.
+    await call(
+      '/v1/configuration',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          scope: 'global',
+          values: { 'ai.preferred_endpoint': '__clear__' },
+        }),
+      },
+      [admin],
+    );
     remote?.server.stop(true);
     provider?.stop(true);
   });

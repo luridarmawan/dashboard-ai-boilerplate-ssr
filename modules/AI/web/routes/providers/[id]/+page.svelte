@@ -17,6 +17,63 @@ const fieldErrors = $derived(
 );
 const money = (n: number) => (n ? n.toFixed(n < 0.01 ? 4 : 2) : '—');
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
+
+/**
+ * The probe over fetch: the card fills in without a page load. The form below is untouched, so
+ * with JavaScript off the `?/test` action still runs and still renders through `form.tested` —
+ * `tested` simply prefers whatever the fetch produced.
+ */
+type Tested = {
+  ok: boolean;
+  error: string | null;
+  models: string[];
+  ms: number;
+  capabilities: Parameters<typeof Capabilities>[1]['capabilities'];
+  preferredEndpoint: string | null;
+  recommended: boolean;
+  steps: { step: string; status: string; ms: number; note: string | null }[];
+};
+let testing = $state(false);
+let live = $state<Tested | null>(null);
+const tested = $derived(live ?? (form?.tested as Tested | undefined) ?? null);
+
+async function runTest(e: SubmitEvent) {
+  e.preventDefault();
+  const el = e.currentTarget as HTMLFormElement;
+  testing = true;
+  try {
+    const res = await fetch(`/m/ai/providers/${p.id}/test`, {
+      method: 'POST',
+      body: new FormData(el),
+    });
+    const body = (await res.json()) as Tested & { error?: string };
+    live = res.ok
+      ? body
+      : ({
+          ok: false,
+          error: body.error ?? `HTTP ${res.status}`,
+          models: [],
+          ms: 0,
+          capabilities: null,
+          preferredEndpoint: null,
+          recommended: false,
+          steps: [],
+        } as Tested);
+  } catch (err) {
+    live = {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      models: [],
+      ms: 0,
+      capabilities: null,
+      preferredEndpoint: null,
+      recommended: false,
+      steps: [],
+    } as Tested;
+  } finally {
+    testing = false;
+  }
+}
 </script>
 
 <svelte:head><title>{p.name}</title></svelte:head>
@@ -56,21 +113,21 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
   </Card>
   <Card title={t('ai.providers.test')}>
     {#if can('ai.provider.manage')}
-      <form method="POST" action="?/test" class="mb-3"><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm"><Icon name="refresh" size={16} />{t('ai.providers.test')}</Button></form>
+      <form method="POST" action="?/test" class="mb-3" onsubmit={runTest}><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm" disabled={testing}><Icon name="refresh" size={16} />{testing ? t('common.running') : t('ai.providers.test')}</Button></form>
     {/if}
-    {#if form?.tested}
-      {#if form.tested.ok}
-        <p class="notice" data-testid="provider-test-ok">{t('ai.providers.tested_ok')} {form.tested.models.length} · {form.tested.ms} ms</p>
+    {#if tested}
+      {#if tested.ok}
+        <p class="notice" data-testid="provider-test-ok">{t('ai.providers.tested_ok')} {tested.models.length} · {tested.ms} ms</p>
         <div class="mb-2">
-          <Capabilities capabilities={form.tested.capabilities} recommended={form.tested.recommended} preferredEndpoint={form.tested.preferredEndpoint} />
+          <Capabilities capabilities={tested.capabilities} recommended={tested.recommended} preferredEndpoint={tested.preferredEndpoint} />
         </div>
-        {#if form.tested.steps.some((s: { status: string }) => s.status === 'error')}
+        {#if tested.steps.some((s: { status: string }) => s.status === 'error')}
           <!-- A step that timed out is not proof the endpoint is missing; say so rather than let
                the matrix read as a confident negative. -->
           <p class="text-xs text-warning">{t('ai.providers.probe_partial')}</p>
         {/if}
         <ul class="mb-3 text-xs text-muted-foreground">
-          {#each form.tested.steps as s (s.step)}
+          {#each tested.steps as s (s.step)}
             <li>
               <code>{s.step}</code>
               <span class={s.status === 'ok' ? 'text-success' : s.status === 'error' ? 'text-destructive' : ''}>{s.status}</span>
@@ -78,12 +135,12 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
             </li>
           {/each}
         </ul>
-        {#if form.tested.models.length}
+        {#if tested.models.length}
           <p class="text-xs text-muted-foreground">{t('ai.providers.tested_models_hint')}</p>
-          <ul class="mt-1 flex flex-wrap gap-1">{#each form.tested.models as id (id)}<li><code class="rounded border px-1.5 py-0.5 text-xs">{id}</code></li>{/each}</ul>
+          <ul class="mt-1 flex flex-wrap gap-1">{#each tested.models as id (id)}<li><code class="rounded border px-1.5 py-0.5 text-xs">{id}</code></li>{/each}</ul>
         {/if}
       {:else}
-        <p class="error" role="alert" data-testid="provider-test-fail">{t('ai.providers.tested_fail')}: {form.tested.error}</p>
+        <p class="error" role="alert" data-testid="provider-test-fail">{t('ai.providers.tested_fail')}: {tested.error}</p>
       {/if}
     {:else if p.capabilities}
       <div class="mb-2"><Capabilities capabilities={p.capabilities} recommended={p.recommended} preferredEndpoint={p.preferredEndpoint} /></div>

@@ -100,4 +100,14 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
   // H-6: after the first exchange the page lands on the persisted conversation
   await expect(page).toHaveURL(/\/m\/ai\/chat\?c=[0-9a-f-]{36}/, { timeout: 15_000 });
   await expect(page.getByTestId('messages')).toContainText(`Halo dari E2E ${run}`);
+
+  // Settings section action (extension point 6): the AI connection test runs in place. The point
+  // of the assertion is the URL — a page load here would mean the button fell back to a form post.
+  await page.goto('/settings');
+  const aiCard = page.locator('#ai');
+  await aiCard.getByRole('button', { name: /Uji koneksi|Test connection/ }).click();
+  await expect(page.getByTestId('action-result-ai-test')).toContainText(/Terhubung|Connected/, {
+    timeout: 20_000,
+  });
+  await expect(page).toHaveURL(/\/settings$/);
 });

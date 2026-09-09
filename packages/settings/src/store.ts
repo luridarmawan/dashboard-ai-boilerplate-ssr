@@ -99,6 +99,15 @@ export class SettingsStore {
       title: s.title,
       note: s.note ?? null,
       order: s.order ?? 100,
+      // Extension point 6: buttons the section offers beside "Save" (e.g. "test connection").
+      // The page renders them generically; it never learns what a module's action does.
+      actions: (s.actions ?? []).map((a) => ({
+        key: a.key,
+        label: a.label,
+        endpoint: a.endpoint,
+        permission: a.permission ?? null,
+        note: a.note ?? null,
+      })),
       fields: [...s.fields]
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
         .map((f) => {

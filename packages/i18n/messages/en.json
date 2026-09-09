@@ -19,6 +19,7 @@
   "common.detail": "Detail",
   "common.new": "New",
   "common.saved": "Saved.",
+  "common.running": "Running…",
   "common.active": "active",
   "common.inactive": "inactive",
   "common.form_expired": "The form session expired — reload the page",

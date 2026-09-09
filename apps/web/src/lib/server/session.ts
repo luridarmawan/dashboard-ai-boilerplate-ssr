@@ -121,6 +121,68 @@ export function apiFor(event: RequestEvent, clientId?: string | null) {
   });
 }
 
+/** Identity headers shared by the runtime-path helpers below. */
+function forwardHeaders(event: RequestEvent, clientId?: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    'x-request-id': event.locals.requestId,
+    accept: 'application/json',
+  };
+  const cookie = cookieHeader(event.cookies);
+  if (cookie) headers.cookie = cookie;
+  const csrf = event.cookies.get(CSRF_COOKIE);
+  if (csrf) headers['x-csrf-token'] = csrf;
+  headers.origin = event.url.origin;
+  headers['x-forwarded-proto'] = event.url.protocol.replace(':', '');
+  headers['x-forwarded-host'] = event.url.host;
+  if (clientId) headers['x-client-id'] = clientId;
+  try {
+    headers['x-forwarded-for'] = event.getClientAddress();
+  } catch {
+    /* not available (prerender) */
+  }
+  return headers;
+}
+
+/**
+ * POST to an API path known only at runtime — a config section's action endpoint (extension
+ * point 6). Unlike `apiFetchData` the caller needs the failure too, so the envelope is returned
+ * as-is rather than reduced to `data`.
+ */
+export async function apiPostData<T = unknown>(
+  event: RequestEvent,
+  path: string,
+  body: unknown = {},
+  clientId?: string | null,
+): Promise<{ status: number; data: T | null; error: string | null }> {
+  if (!path.startsWith('/v1/')) return { status: 400, data: null, error: 'path tidak valid' };
+  try {
+    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, {
+      method: 'POST',
+      headers: { ...forwardHeaders(event, clientId), 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const envelope = (await res.json().catch(() => null)) as {
+      success?: boolean;
+      data?: T;
+      error?: { message?: string };
+    } | null;
+    if (res.ok && envelope?.success) {
+      return { status: res.status, data: envelope.data ?? null, error: null };
+    }
+    return {
+      status: res.status,
+      data: null,
+      error: envelope?.error?.message ?? `HTTP ${res.status}`,
+    };
+  } catch (err) {
+    return {
+      status: 502,
+      data: null,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /**
  * Plain fetch to an API path (`/v1/...`) with the same identity headers as `apiFor` — for paths
  * only known at runtime (widget `data` hooks). Returns the envelope's `data`, or null on any failure.

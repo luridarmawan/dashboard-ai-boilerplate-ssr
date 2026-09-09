@@ -31,12 +31,21 @@ const Field = t.Object({
   value: t.Unknown(),
   secretSet: t.Nullable(t.Boolean()),
 });
+/** Extension point 6: a button the section offers beside "Save", rendered generically. */
+const SectionAction = t.Object({
+  key: t.String(),
+  label: Localized,
+  endpoint: t.String(),
+  permission: t.Nullable(t.String()),
+  note: t.Nullable(Localized),
+});
 const Section = t.Object({
   section: t.String(),
   module: t.String(),
   title: Localized,
   note: t.Nullable(Localized),
   order: t.Integer(),
+  actions: t.Array(SectionAction),
   fields: t.Array(Field),
 });
 
@@ -99,6 +108,13 @@ export const configuration = new Elysia({
           title: { ...s.title },
           note: s.note ? { ...s.note } : null,
           order: s.order,
+          actions: s.actions.map((a) => ({
+            key: a.key,
+            label: { ...a.label },
+            endpoint: a.endpoint,
+            permission: a.permission,
+            note: a.note ? { ...a.note } : null,
+          })),
           fields: s.fields.map((f) => {
             const options: Opt[] | null =
               f.key === 'app.allowed_themes' || f.type === 'theme'

@@ -325,6 +325,31 @@ export interface ConfigFieldDef {
   readonly max?: number;
 }
 
+/**
+ * An action button the settings form offers beside "Save" for this section — "test connection"
+ * and friends. The core page renders it and POSTs to `endpoint` without leaving the page; it
+ * knows nothing about what the action means. The endpoint answers `ConfigActionResult`.
+ *
+ * This exists so a module never has to be special-cased inside the core settings page.
+ */
+export interface ConfigSectionActionDef {
+  /** Stable id, unique per section. */
+  readonly key: string;
+  readonly label: LocalizedText;
+  /** API path under `/v1/`, e.g. `/v1/m/ai/settings/test`. POSTed with an empty JSON body. */
+  readonly endpoint: string;
+  /** Permission the caller needs; the endpoint MUST enforce it too — this only hides the button. */
+  readonly permission?: string;
+  readonly note?: LocalizedText;
+}
+
+/** What a section action answers. Rendered generically: one verdict, optional detail lines. */
+export interface ConfigActionResult {
+  readonly ok: boolean;
+  readonly message: string;
+  readonly details?: readonly string[];
+}
+
 export interface ConfigSectionDef {
   /** Section id: the module namespace (`billing`) or `<ns>.<sub>`. */
   readonly section: string;
@@ -332,6 +357,8 @@ export interface ConfigSectionDef {
   readonly note?: LocalizedText;
   readonly order?: number;
   readonly fields: readonly ConfigFieldDef[];
+  /** Buttons beside "Save" for this section (extension point 6). */
+  readonly actions?: readonly ConfigSectionActionDef[];
 }
 
 const CONFIG_KEY_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
@@ -360,6 +387,22 @@ export function defineConfig(
       }
       if ((f.type === 'select' || f.type === 'list') && !f.options?.length) {
         throw new ModuleContractError(`kunci "${f.key}": tipe ${f.type} butuh options`);
+      }
+    }
+    const actionKeys = new Set<string>();
+    for (const a of s.actions ?? []) {
+      // A plain slug: the key is scoped by its section already, so it needs no namespace.
+      if (!/^[a-z][a-z0-9_-]*$/.test(a.key))
+        throw new ModuleContractError(`aksi section "${a.key}" tidak valid`);
+      if (actionKeys.has(a.key))
+        throw new ModuleContractError(`aksi section "${a.key}" duplikat di "${s.section}"`);
+      actionKeys.add(a.key);
+      // The core settings page POSTs this path as-is; keep it inside the module's own API tree so
+      // a section can never point the button at an unrelated part of the API.
+      if (!a.endpoint.startsWith(`/v1/m/${ns}/`) || a.endpoint.includes('..')) {
+        throw new ModuleContractError(
+          `aksi "${a.key}": endpoint harus di bawah "/v1/m/${ns}/", bukan "${a.endpoint}"`,
+        );
       }
     }
   }

@@ -13,6 +13,20 @@ export default defineConfig('AI', [
       en: 'OpenAI-compatible provider. The key never reaches the browser.',
     },
     order: 30,
+    // Extension point 6: the settings form renders this beside "Save" and POSTs it without a
+    // page load. Same probe as the provider page's button, aimed at the settings-based provider.
+    actions: [
+      {
+        key: 'test',
+        label: { id: 'Uji koneksi', en: 'Test connection' },
+        endpoint: '/v1/m/ai/settings/test',
+        permission: 'ai.provider.manage',
+        note: {
+          id: 'Menguji base URL + key yang tersimpan di bagian ini (bukan profil di Penyedia AI).',
+          en: 'Tests the base URL + key stored in this section (not the AI providers profiles).',
+        },
+      },
+    ],
     fields: [
       {
         key: 'ai.enable',

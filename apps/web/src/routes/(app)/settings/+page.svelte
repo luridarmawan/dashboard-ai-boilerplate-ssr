@@ -3,6 +3,7 @@ import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
+import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
 
@@ -23,6 +24,38 @@ const locales = [
   { value: 'id', label: t('lang.id') },
   { value: 'en', label: t('lang.en') },
 ];
+
+/**
+ * Section actions (extension point 6): a module declares a button, this page runs it over fetch
+ * and shows the verdict in place. Nothing here knows what any particular action does — the
+ * result is always one message plus optional detail lines.
+ */
+type ActionResult = { ok: boolean; message: string; details?: string[] };
+let running = $state<string | null>(null);
+let results = $state<Record<string, ActionResult>>({});
+const can = (p: string | null) =>
+  !p || data.user.isSuperadmin || hasPermission(data.permissions, p);
+
+async function runAction(section: string, key: string) {
+  const id = `${section}:${key}`;
+  running = id;
+  try {
+    const body = new FormData();
+    body.set('_csrf', data.csrf);
+    body.set('section', section);
+    body.set('action', key);
+    body.set('scope', data.scope);
+    const res = await fetch('/settings/action', { method: 'POST', body });
+    results = { ...results, [id]: (await res.json()) as ActionResult };
+  } catch (err) {
+    results = {
+      ...results,
+      [id]: { ok: false, message: err instanceof Error ? err.message : String(err) },
+    };
+  } finally {
+    running = null;
+  }
+}
 </script>
 
 <svelte:head><title>{t('nav.settings')}</title></svelte:head>
@@ -100,7 +133,28 @@ const locales = [
             {/if}
           </Field>
         {/each}
-        <div class="sm:col-span-2"><Button type="submit"><Icon name="save" size={16} />{t('settings.save_section', { section: L(s.title) })}</Button></div>
+        <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+          <Button type="submit"><Icon name="save" size={16} />{t('settings.save_section', { section: L(s.title) })}</Button>
+          {#each s.actions.filter((a) => can(a.permission)) as a (a.key)}
+            {@const id = `${s.section}:${a.key}`}
+            <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key)}>
+              <Icon name="refresh" size={16} />{running === id ? t('common.running') : L(a.label)}
+            </Button>
+          {/each}
+        </div>
+        {#each s.actions as a (a.key)}
+          {@const r = results[`${s.section}:${a.key}`]}
+          {#if r}
+            <div class="sm:col-span-2" data-testid={`action-result-${s.section}-${a.key}`}>
+              <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{r.message}</p>
+              {#if r.details?.length}
+                <ul class="mt-1 text-xs text-muted-foreground">
+                  {#each r.details as d, i (i)}<li>{d}</li>{/each}
+                </ul>
+              {/if}
+            </div>
+          {/if}
+        {/each}
       </form>
     </Card>
   {/each}

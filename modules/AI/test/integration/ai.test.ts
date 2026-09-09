@@ -90,18 +90,24 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
       const body = (await req.json()) as {
         stream?: boolean;
         instructions?: string;
-        input?: {
-          type?: string;
-          role?: string;
-          content?: unknown;
-          call_id?: string;
-          output?: string;
-        }[];
+        input?:
+          | string
+          | {
+              type?: string;
+              role?: string;
+              content?: unknown;
+              call_id?: string;
+              output?: string;
+            }[];
         tools?: { type: string; name: string }[];
         reasoning?: unknown;
         reasoning_effort?: unknown;
       };
-      const input = body.input ?? [];
+      // `input` is either the item array or a bare string — the probe sends the string form, and
+      // a handler that assumes an array crashes the mock and fails the case for the wrong reason.
+      const raw = body.input ?? [];
+      const input =
+        typeof raw === 'string' ? [{ type: 'message', role: 'user', content: raw }] : raw;
       mockLastInput = input;
       mockLastReasoning = body.reasoning ?? body.reasoning_effort ?? null;
       mockToolsSeen = body.tools ? body.tools.map((t) => t.name) : null;
@@ -738,6 +744,24 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
       { method: 'PUT', body: JSON.stringify({ scope: 'global', values: { 'ai.enable': 'true' } }) },
       [admin],
     );
+  });
+
+  test('settings section action: the probe runs for the settings-based provider (ext. point 6)', async () => {
+    // The metadata the core settings page renders its button from — it never hardcodes AI.
+    const cfg = (await json(await call('/v1/configuration', {}, [admin]))).data as {
+      sections: { section: string; actions: { key: string; endpoint: string }[] }[];
+    };
+    const ai = cfg.sections.find((x) => x.section === 'ai');
+    expect(ai?.actions.map((a) => a.key)).toEqual(['test']);
+    expect(ai?.actions[0]?.endpoint).toBe('/v1/m/ai/settings/test');
+
+    const r = await call('/v1/m/ai/settings/test', { method: 'POST' }, [admin]);
+    expect(r.status).toBe(200);
+    const d = (await json(r)).data as { ok: boolean; message: string; details: string[] };
+    expect(d.ok).toBe(true);
+    // The generic shape the page renders: one verdict plus detail lines.
+    expect(d.message).toContain('Terhubung');
+    expect(d.details.join(' ')).toContain('/chat/completions');
   });
 
   // ---- F2: the same chat over the modern endpoint (AI-Roadmap §5.2, §12) ----

@@ -1857,6 +1857,85 @@ export default defineApiRoutes(
         },
       },
     )
+    // ---- settings-based provider: the same probe, for the section that has no profile row ----
+    .post(
+      '/settings/test',
+      async ({ auth, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const clientId = tenantState?.clientId ?? null;
+        if (!clientId) {
+          set.status = 409;
+          return fail('conflict', 'Tidak ada tenant aktif', requestId);
+        }
+        // Resolve exactly what a chat would use when no profile is picked, so the button tests
+        // the configuration the operator is looking at — env → global → tenant (§10.1).
+        const p = await resolveProvider(clientId, {});
+        if (p.id) {
+          // A profile exists and wins; testing the settings here would mislead.
+          set.status = 409;
+          return fail(
+            'conflict',
+            `Tenant ini memakai profil "${p.code}" di Penyedia AI — uji koneksinya di halaman itu`,
+            requestId,
+          );
+        }
+        const r = await probeCapabilities(p.baseurl, p.key, p.model, { signal: request.signal });
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId,
+          actorId: a.user.id,
+          action: 'ai.settings.test',
+          resource: 'ai.settings',
+          resourceId: null,
+          ip: clientIp(request, server),
+          requestId,
+          after: {
+            ok: r.ok,
+            ms: r.ms,
+            preferredEndpoint: r.preferredEndpoint,
+            recommended: isRecommended(r),
+          },
+        });
+        // The generic `ConfigActionResult` the settings page knows how to render.
+        const flag = (on: boolean, name: string) => `${on ? '✓' : '—'} ${name}`;
+        return ok({
+          ok: r.ok,
+          message: r.ok
+            ? `Terhubung lewat ${r.preferredEndpoint === 'responses' ? '/responses' : '/chat/completions'} — ${p.model} · ${r.ms} ms${isRecommended(r) ? ' · direkomendasikan' : ''}`
+            : `Gagal terhubung: ${r.error ?? 'penyedia tidak menjawab'}`,
+          details: [
+            `${p.baseurl} · ${p.key ? 'key tersimpan' : 'tanpa key'}`,
+            [
+              flag(r.endpoints.responses, '/responses'),
+              flag(r.endpoints.chatCompletions, '/chat/completions'),
+              flag(r.stream.supported, 'stream'),
+              flag(r.reasoning.supported, 'reasoning'),
+              flag(r.tools.supported, 'tools'),
+            ].join(' · '),
+            ...r.steps
+              .filter((x) => x.status === 'error')
+              .map((x) => `${x.step}: ${x.note ?? 'gagal'}`),
+            ...(r.modelsTested.length ? [`model: ${r.modelsTested.slice(0, 8).join(', ')}`] : []),
+          ],
+        });
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        response: {
+          200: OkSchema(
+            t.Object({
+              ok: t.Boolean(),
+              message: t.String(),
+              details: t.Array(t.String()),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'Capability probe for the settings-based provider (Pengaturan → AI); answers the generic config-action shape',
+        },
+      },
+    )
     .post(
       '/providers/:id/test',
       async ({ auth, params, set, request, server, requestId, tenantState }) => {

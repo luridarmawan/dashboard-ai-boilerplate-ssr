@@ -299,6 +299,27 @@ export default defineConfig('Billing', [
 
 Tipe: `string · text · number · boolean · select · secret · markdown · route · theme · locale · list`. `route` divalidasi terhadap registry route saat disimpan; `theme` terhadap registry tema; `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
 
+**Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
+
+```ts
+{ section: 'billing', title: …, fields: [ … ],
+  actions: [{
+    key: 'test',                                   // slug, unik per section
+    label: { id: 'Uji koneksi', en: 'Test connection' },
+    endpoint: '/v1/m/billing/settings/test',       // WAJIB di bawah /v1/m/<ns>/
+    permission: 'billing.manage',                  // menyembunyikan tombol; endpoint tetap wajib menjaganya sendiri
+    note: { id: 'Menguji kredensial yang tersimpan.', en: 'Tests the stored credentials.' },
+  }] }
+```
+
+Halaman menjalankannya lewat `fetch` — tanpa memuat ulang — dan merender hasilnya secara generik, jadi endpoint harus menjawab bentuk `ConfigActionResult`:
+
+```ts
+{ ok: boolean; message: string; details?: string[] }
+```
+
+Tiga hal yang dijaga kontraknya: `endpoint` wajib berada di bawah `/v1/m/<ns>/` sehingga sebuah section tidak bisa mengarahkan tombolnya ke bagian API lain; browser hanya mengirim **section + key**, sedangkan endpoint yang dipanggil dicari dari metadata section (bukan dari permintaan) sehingga proxy-nya tidak bisa dipakai sembarangan; dan `permission` hanya menyembunyikan tombol — penjagaan sesungguhnya tetap di endpoint. Tanpa JavaScript tombolnya tidak melakukan apa-apa, jadi jangan menaruh sesuatu yang wajib di sana. Contoh nyata: `modules/AI/config.ts` (`/v1/m/ai/settings/test`).
+
 ### `widgets.ts` — widget dasbor (titik perluasan 11)
 
 Kartu di halaman utama dasbor. Difilter izin dan dirender **di server** seperti menu (F-1, F-2): widget yang izinnya tidak dipenuhi tidak ikut terkirim ke browser, dan komponennya tidak diunduh. Penempatan lewat metadata (`order`, `size`), bukan lewat perubahan halaman core (G-19).
