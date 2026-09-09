@@ -49,15 +49,19 @@ const layoutIds = new Set(
 );
 
 for (const file of walk(routes)) {
+  // `join` yields `\` separators on Windows; match on a POSIX-normalised copy, otherwise both
+  // generated maps come out empty there — and an empty route registry makes every `route` setting
+  // (app.landing_route above all) fail validation, so `/` silently falls back to the built-in page.
+  const posix = file.split('\\').join('/');
   // Route registry (§4.7): every page, as a concrete path — groups stripped, param routes skipped.
-  if (/\/\+page\.svelte$/.test(file)) {
+  if (/\/\+page\.svelte$/.test(posix)) {
     const id = routeId(file);
     if (!/\[/.test(id)) {
       const path = id.replace(/\/\([^)]+\)/g, '') || '/';
       concretePaths.add(path === '' ? '/' : path);
     }
   }
-  if (!/\/\+page(\.server)?\.ts$/.test(file)) continue;
+  if (!/\/\+page(\.server)?\.ts$/.test(posix)) continue;
   let src = readFileSync(file, 'utf8');
   const shim = SHIM_RE.exec(src);
   if (shim?.[1]?.startsWith('.')) {
