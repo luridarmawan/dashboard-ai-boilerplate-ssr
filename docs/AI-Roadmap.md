@@ -44,7 +44,9 @@ Satu hasil `capabilities` per provider (disimpan, bukan dihitung tiap request):
 **Aturan prioritas (sesuai permintaan):**
 
 1. `preferred_endpoint = "responses"` bila `endpoints.responses == true` — selalu diutamakan
-2. Provider dengan `endpoints.responses && (reasoning.supported || tools.supported)` diberi badge **Direkomendasikan** dan diurutkan paling atas di `GET /v1/m/ai/providers/options` dan halaman `/m/ai/providers`
+2. Provider dengan `endpoints.responses && (reasoning.supported || tools.supported)` diberi badge **Direkomendasikan** dan diurutkan paling atas di `GET /v1/m/ai/providers/options` dan halaman `/m/ai/providers`.
+
+   **Sorting itu HANYA di lapisan view — jangan sentuh `enabledProviders`.** Fungsi itu (`modules/AI/api/providers.ts:31`) mengurutkan `is_default` lalu `code`, dan `resolveProvider` memakai `profiles[0]` sebagai penyedia baku tenant (`providers.ts:79`). Kalau urutan rekomendasi dimasukkan ke sana, penyedia yang melayani chat **berubah sendiri** ketika pemanggil tidak menyebut `code`/`providerId` — melanggar kriteria §7.6. Ikuti pola yang sudah ada: `GET /providers` menyortir salinannya sendiri di handler (`routes.ts:1462`); `/providers/options` (`routes.ts:1428`) harus menyortir salinannya sendiri juga.
 3. Chat runtime: `resolveProvider` (`modules/AI/api/providers.ts:67`) mengembalikan `endpoint` yang dipakai; `callProvider` memilih URL & payload sesuai endpoint
 
 ## 4. Strategi probing — minimal, aman, deterministik
@@ -111,12 +113,22 @@ last_probe_ms: col.int().nullable(),
 
 Indeks tidak perlu; pembacaan via `providerView`. (`col.json()` memang tersedia — `packages/db/src/descriptor.ts:152`.)
 
+**`capabilities` tidak boleh difilter atau disortir di SQL.** Kontrak kolom menyatakannya eksplisit: "Never query inside JSON in portable code — MariaDB stores it as longtext" (`packages/db/src/descriptor.ts:151`). Karena itu `preferred_endpoint` sengaja kolom skalar terpisah — semua penyaringan/pengurutan berbasis kemampuan dilakukan di JS setelah baris dibaca, bukan lewat `WHERE capabilities->…`.
+
 **`ai_calls` — kolom baru, JANGAN pakai `endpoint` yang sudah ada.** `ai_calls.endpoint` (`col.identifier(64)`) sudah dipakai sebagai label rute API **lokal**: nilainya `'chat.completions'` (`modules/AI/api/routes.ts:726`), dibaca halaman Log (`routes.ts:1379`), dan termasuk kontrak filter log (`routes.ts:1403`). Menulis `responses` ke sana mendefinisikan ulang kolom yang sudah dibaca dua konsumen. Tambah kolom terpisah di migrasi yang sama:
 
 ```ts
 // ai_calls
 upstream_endpoint: col.identifier(16).nullable(), // 'responses' | 'chat_completions'
 ```
+
+**Lubang yang harus diputuskan sebelum F1: penyedia legacy tidak punya baris untuk ditulisi.** Bila tenant belum punya profil, `resolveProvider` jatuh ke `ai.baseurl`/`ai.key`/`ai.model` (`providers.ts:96`–`118`) — penyedia implisit `docs/AI.md:15`, yaitu justru kasus single-tenant yang paling umum. Kolom di atas semuanya milik `ai_providers`, dan §9 menolak probe per request, jadi apa adanya jalur itu **tidak akan pernah memakai `/responses`**. Halaman *Pengaturan → AI* juga tidak punya tombol Uji koneksi — halaman itu digenerate dari `modules/AI/config.ts` (12 key `ai.*`, tak satu pun soal endpoint). Pilih satu:
+
+1. **Tambah setting `ai.preferred_endpoint`** (`auto` | `responses` | `chat_completions`, baku `auto`) di `config.ts`; `auto` mencoba `/responses` sekali lalu fallback pada 404/405 dan mengingatnya per-proses — *disarankan*
+2. `bun run ai:test` yang menulis `ai.preferred_endpoint` — bertentangan dengan §10.5 ("tidak menulis ke DB"), perlu pengecualian eksplisit
+3. Nyatakan jalur legacy **chat-only selamanya** dan tulis itu di kriteria §7.6
+
+Opsi 1 dan 2 menambah key di `config.ts`, artinya `bun run modules:sync` menulis ulang `modules.json` — hasilnya wajib round-trip byte-identik.
 
 ### 5.2 API — `modules/AI/api/providers.ts` + `modules/AI/api/routes.ts`
 
@@ -129,7 +141,9 @@ upstream_endpoint: col.identifier(16).nullable(), // 'responses' | 'chat_complet
 **`routes.ts`**
 
 - `POST /providers/:id/test` (`routes.ts:1670`) — panggil `probeCapabilities` (bukan hanya `GET /models`), simpan `capabilities`/`preferred_endpoint`/`capabilities_at`, audit `ai.provider.test` dengan ringkasan capability
-- `GET /providers/:id` & `GET /providers` & `providerView` — sertakan `capabilities`, `preferredEndpoint`
+- `GET /providers/:id` & `GET /providers` & `providerView` (`routes.ts:349`) — sertakan `capabilities`, `preferredEndpoint`, `capabilitiesAt`
+- **Skema respons ikut tumbuh, dan Elysia memvalidasi keluaran:** `ProviderView` (`routes.ts:325`) dan skema `/test` yang ditulis inline (`routes.ts:1707`) harus ditambah field baru — field yang lupa ditambah jadi **500**, bukan lolos diam-diam
+- **`capabilitiesAt` adalah tanggal baru:** Eden Treaty mengubah string date-like menjadi `Date` di sisi web, jadi loader butuh normalisasi seperti `lastTestedAt` hari ini (`web/routes/providers/+page.svelte:39`). Uji integrasi memakai raw `fetch` sehingga **tidak** menangkap ini
 - `POST /chat/completions` (`routes.ts:460`) — `callProvider(endpoint, stream, withTools)`:
 
 ```ts
@@ -154,14 +168,21 @@ Mock hari ini mengembalikan `404` untuk **segala** hal yang bukan `POST /v1/chat
 - `GET /v1/models` — daftar id model tiruan (dipakai langkah 1 §4.1)
 - `POST /v1/responses` — echo + SSE (`response.output_text.delta`) + `tools`/`reasoning` dummy, agar `bun run ai:mock` membuktikan kedua endpoint di CI. `GET /responses` tetap tidak ada — hanya `POST`.
 
-Gate F4 butuh tiga mode di mock yang sama (chat-only / responses-only / keduanya), mis. lewat `MOCK_ENDPOINTS=chat|responses|both`.
+Tiga mode di mock yang sama (chat-only / responses-only / keduanya), mis. lewat `MOCK_ENDPOINTS=chat|responses|both`, berguna untuk membuktikan §7.1–§7.3 dengan tangan.
+
+**Posisi mock ini: dev manual + `bun run ai:test` — BUKAN CI.** Uji integrasi memalsukan upstream *in-process* dengan `Bun.serve`-nya sendiri, dan itu yang harus diperluas di F4:
+
+- `modules/AI/test/integration/providers.test.ts:55` `mockProvider()` — sudah melayani `/models` + `/chat/completions`, persis bentuk yang dibutuhkan
+- `modules/AI/test/integration/ai.test.ts:77` — fake stream + tool round-trip
+
+**Jebakan:** fake di `ai.test.ts` mengabaikan pathname — apa pun yang bukan `/models` dijawab sebagai chat (`ai.test.ts:77`–`95`). Menambah `/responses` tanpa cabang `url.pathname` eksplisit membuat request bentuk Responses dijawab bentuk chat, dan **tesnya lolos padahal salah**.
 
 ### 5.4 Web — `modules/AI/web/routes/providers/`
 
 - `+page.svelte` — tabel tambah kolom **Kemampuan**: badge `responses`, `stream`, `reasoning`, `tools` (hijau/abu) + badge **Direkomendasikan** bila `preferred_endpoint === 'responses' && (reasoning || tools)`
 - `[id]/+page.svelte:55` — card Uji koneksi tampilkan matriks, latensi per langkah, dan rekomendasi; tombol tetap `POST ?/test`
 - `+page.server.ts` & `[id]/+page.server.ts` — teruskan `capabilities` ke UI. `[id]/+page.server.ts:60` mengetik payload uji secara kaku sebagai `{ ok, error, models, ms }` dan harus diperlebar ke matriks §3
-- `new/+page.svelte:17` hint perbarui: "Utamakan provider yang mendukung `/responses` + reasoning/tools"
+- `new/+page.svelte` — tidak ada teks yang diubah di berkas ini; baris 17 adalah `FormBuilder`. Hint-nya ada di `ai.providers.new_hint` (i18n) → lihat §5.5
 
 ### 5.5 i18n — `modules/AI/i18n/*.json`
 
@@ -176,6 +197,7 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 
 - `ai.providers.test_hint` (`i18n/id.json:71`) — berbunyi persis "Memanggil GET /models di penyedia…"
 - `ai.providers.tested_ok` (`:72`) dan `ai.providers.tested_models_hint` (`:73`)
+- `ai.providers.new_hint` (`:54`) — tambahkan "Utamakan penyedia yang mendukung `/responses` + reasoning/tools" (ini butir §5.4 yang lama, teksnya memang di sini)
 
 ## 6. Fase & estimasi
 
@@ -185,7 +207,7 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 | **F1 — Persist & UI (2–3 hari)** | Migrasi `capabilities` + `preferred_endpoint`, `providerView`, halaman Providers tampilkan badge & sorting | Halaman `/m/ai/providers` urutkan direkomendasikan di atas; badge hijau/abu sesuai hasil |
 | **F2 — Chat runtime dual-endpoint (5–8 hari)** | `resolveProvider` + `callProvider` bercabang `/responses` vs `/chat/completions`, `parseResponsesChunk`, `toResponsesInput/Tools` **termasuk `function_call`/`function_call_output` (I-3) dan `input_image` (H-11)**, log `ai_calls.upstream_endpoint` | Chat streaming & non-stream lulus di kedua endpoint (mock + provider nyata); `ai_calls.provider` + `upstream_endpoint` tercatat; sisi web tidak disentuh |
 | **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), `reasoning_tokens` → `tokensOut` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
-| **F4 — Polish & gate CI (1–2 hari)** | `proof:m5:gate4` pakai mock `/responses`; perluas `modules/AI/test/integration/providers.test.ts` (berkasnya sudah ada): 3 mode mock (chat-only, responses-only, keduanya), badge & preferred | `bun run proof:m5:gate4` + `bun test modules/AI/test/integration/providers.test.ts` hijau tanpa key nyata — `proof:m5:gate1`–`gate3` **tidak ada**, hanya `gate4` (`package.json:53`) |
+| **F4 — Polish & gate CI (1–2 hari)** | Perluas fake `Bun.serve` in-process: `providers.test.ts:55` (3 mode — chat-only, responses-only, keduanya; badge & preferred) dan `ai.test.ts:77` (cabang `/responses` + stream + tool round-trip, dengan cek `url.pathname`). `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut, aplikasi tetap ter-build tanpa jejak AI" (`scripts/ci/m5-gate4.sh`) dan tidak menyentuh provider; `proof:m5:gate1`–`gate3` tidak ada |
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
 
@@ -196,7 +218,8 @@ Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; parale
 3. Chat ke provider `responses-only` berhasil stream & non-stream; chat ke `chat-only` tetap berhasil (fallback)
 4. Bila `capabilities` provider `false`: switch `ai.tools_enable` di **Pengaturan → AI** diberi keterangan "tidak didukung penyedia terpilih", dan pemilih provider di chat menampilkan badge kemampuan. Toggle reasoning/tools **per-chat** tidak dijanjikan di sini — UI-nya belum ada (§1)
 5. Biaya & token reasoning tercatat benar di `ai_calls` dan `Analitik AI`
-6. Tanpa `capabilities` (provider lama) → perilaku lama utuh (chat via `/chat/completions`)
+6. Tanpa `capabilities` (provider lama) → perilaku lama utuh (chat via `/chat/completions`), dan penyedia baku tenant tidak bergeser: urutan `enabledProviders` tetap `is_default` → `code` (§3 no. 2)
+7. Penyedia legacy *Pengaturan → AI* berperilaku sesuai opsi yang dipilih di §5.1 (baku: `ai.preferred_endpoint = auto`)
 
 ## 8. Risiko & mitigasi
 
@@ -204,6 +227,8 @@ Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; parale
 |---|---|
 | Provider mengembalikan 400 untuk `max_output_tokens` kecil | Coba `max_tokens` / `max_completion_tokens`; toleransi 400 → anggap endpoint ada |
 | Model reasoning menolak `temperature` selain nilai baku (o1/o3) | Kirim `temperature: 0` hanya di langkah 3 (chat); langkah 2 dan 5 tanpa `temperature` (§4.1) |
+| Sorting rekomendasi menggeser penyedia baku tenant | Sorting hanya di handler view; `enabledProviders` tidak diubah (§3 no. 2) — dijaga tes `providers.test.ts` |
+| Probe stream terus ditagih setelah chunk pertama | Setelah 1 chunk terbaca, `reader.cancel()` + abort `AbortController`-nya, jangan hanya `break` dari loop |
 | Probe berbayar walau 8 token | Timeout & `max_output_tokens` minimal; tampilkan heuristik bila ditolak 402/429 |
 | SSE Responses format beda vendor (Anthropic compat, Azure) | Normalisasi di satu tempat `parseResponsesChunk`; fallback ke `chat` bila parse gagal |
 | Breaking chat saat dual-endpoint | Lebih kecil dari dugaan: frame SSE keluar disusun API sendiri, jadi sisi web tidak berubah (§5.2). Tetap pakai feature flag `preferred_endpoint` per provider + fallback otomatis ke `chat_completions` bila Responses 404/405 |
@@ -300,5 +325,9 @@ AI test — 3 sumber, 2 tenant
 - `apps/api/src/services.ts` `settings.get(clientId, key)` — sumber Settings per tenant/global
 - `modules/AI/api/routes.ts:726` `ai_calls.endpoint = 'chat.completions'` (label rute lokal — bukan endpoint upstream); dibaca `routes.ts:1379`, kontrak filter `routes.ts:1403`
 - `modules/AI/api/routes.ts:792` giliran `role: 'tool'`; `routes.ts:66` `ContentPart` (`image_url`); `routes.ts:874`/`981`–`1009` penyusun frame SSE keluar
-- `modules/AI/config.ts:110` switch `ai.tools_enable` (satu-satunya kendali tools di UI)
+- `modules/AI/config.ts:110` switch `ai.tools_enable` (satu-satunya kendali tools di UI); `config.ts:18`–`136` 12 key `ai.*` yang menghasilkan halaman Pengaturan → AI
+- `modules/AI/api/providers.ts:31` `enabledProviders` (urutan `is_default` → `code`; `resolveProvider` memakai `profiles[0]`); `providers.ts:96`–`118` jalur legacy `ai.*`
+- `modules/AI/api/routes.ts:325` `ProviderView`, `:341` `ProviderOption`, `:349` `providerView`, `:1707` skema respons `/test` (inline)
+- `modules/AI/test/integration/providers.test.ts:55` & `ai.test.ts:77` fake upstream in-process (`Bun.serve`) — yang dipakai CI
+- `scripts/ci/m5-gate4.sh` gate "modul AI dicabut" — tidak berhubungan dengan provider
 - `packages/db/migrations/mysql/0021_flat_impossible_man.sql` migrasi terakhir; `packages/db/src/descriptor.ts:152` `col.json()`
