@@ -175,13 +175,22 @@ export const invitationsDomain = new Elysia({
       const ip = clientIp(request, server);
       const tenantLabel = await tenantName(clientId);
 
-      // Already registered: add to this tenant (as POST /users does for a known address) and say so by e-mail.
+      // Already registered (including soft-deleted): add to this tenant and say so by e-mail.
+      // Soft-deleted accounts are revived so the invite can be fulfilled (otherwise the
+      // invitation would be created for a taken e-mail and the subsequent /join would 409).
       const [existing] = await db
         .select()
         .from(schema.users)
-        .where(and(eq(schema.users.email, email), isNull(schema.users.deleted_at)))
+        .where(eq(schema.users.email, email))
         .limit(1);
       if (existing) {
+        if (existing.deleted_at) {
+          await db
+            .update(schema.users)
+            .set({ deleted_at: null })
+            .where(eq(schema.users.id, existing.id));
+          existing.deleted_at = null;
+        }
         const membership = await tenant.selectOne(
           schema.clientUserMaps,
           eq(schema.clientUserMaps.user_id, existing.id),
@@ -402,30 +411,72 @@ export const joinDomain = new Elysia({ name: 'join', prefix: '/auth', tags: ['au
         return fail('weak_password', 'Kata sandi terlalu lemah', requestId, problems);
       }
       const [taken] = await db
-        .select({ id: schema.users.id })
+        .select({ id: schema.users.id, deleted_at: schema.users.deleted_at })
         .from(schema.users)
         .where(eq(schema.users.email, row.email))
         .limit(1);
-      if (taken) {
+      if (taken && !taken.deleted_at) {
         set.status = 409;
         return fail('email_taken', 'Email ini sudah terdaftar — masuk dengan akun Anda', requestId);
       }
-      const userId = newId();
       const now = new Date();
-      await db.insert(schema.users).values({
-        id: userId,
-        email: row.email,
-        name: body.name.trim(),
-        password_hash: await hashPassword(body.password),
-        // The link reached this very mailbox: the address is verified (A-6).
-        email_verified_at: now,
-      });
-      await db.insert(schema.clientUserMaps).values({
-        id: newId(),
-        client_id: row.client_id,
-        user_id: userId,
-        is_default: true,
-      });
+      let userId: string;
+      if (taken?.deleted_at) {
+        // Soft-deleted account: revive it with the new credentials (otherwise the UNIQUE on
+        // email would block the insert and the invitation would be stuck).
+        userId = taken.id;
+        await db
+          .update(schema.users)
+          .set({
+            deleted_at: null,
+            name: body.name.trim(),
+            password_hash: await hashPassword(body.password),
+            email_verified_at: now,
+          })
+          .where(eq(schema.users.id, userId));
+        // Restore or create the tenant membership for the inviting tenant.
+        const [existingMap] = await db
+          .select({ id: schema.clientUserMaps.id, deleted_at: schema.clientUserMaps.deleted_at })
+          .from(schema.clientUserMaps)
+          .where(
+            and(
+              eq(schema.clientUserMaps.client_id, row.client_id),
+              eq(schema.clientUserMaps.user_id, userId),
+            ),
+          )
+          .limit(1);
+        if (existingMap) {
+          if (existingMap.deleted_at) {
+            await db
+              .update(schema.clientUserMaps)
+              .set({ deleted_at: null })
+              .where(eq(schema.clientUserMaps.id, existingMap.id));
+          }
+        } else {
+          await db.insert(schema.clientUserMaps).values({
+            id: newId(),
+            client_id: row.client_id,
+            user_id: userId,
+            is_default: true,
+          });
+        }
+      } else {
+        userId = newId();
+        await db.insert(schema.users).values({
+          id: userId,
+          email: row.email,
+          name: body.name.trim(),
+          password_hash: await hashPassword(body.password),
+          // The link reached this very mailbox: the address is verified (A-6).
+          email_verified_at: now,
+        });
+        await db.insert(schema.clientUserMaps).values({
+          id: newId(),
+          client_id: row.client_id,
+          user_id: userId,
+          is_default: true,
+        });
+      }
       await db
         .update(schema.invitations)
         .set({ accepted_at: now, accepted_user_id: userId })
