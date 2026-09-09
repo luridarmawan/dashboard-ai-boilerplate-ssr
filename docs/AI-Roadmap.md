@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Selesai seluruhnya** F0–F4 + CLI §10 (2026-09-09 … 2026-09-10), terbukti terhadap provider nyata (§12). Satu sisa jujur: pemetaan `input_image` (H-11) belum bisa dibuktikan karena gerbang provider uji memblokirnya (§12.3) |
+| **Status** | **Selesai seluruhnya** F0–F4 + CLI §10 (2026-09-09 … 2026-09-10). Terbukti terhadap provider nyata (§12) dan lewat UI sungguhan — gate M5 + Playwright lolos dengan chat dilayani `/responses` (§6.3). Satu sisa jujur: pemetaan `input_image` (H-11) tidak bisa dibuktikan karena gerbang provider uji memblokir gambar di **kedua** endpoint, jadi bukan regresi F2 (§12.3) |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -247,6 +247,20 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
 
+### 6.3 Bukti lewat UI sungguhan (2026-09-10)
+
+`bun run proof:e2e:docker` — gate M5 (jalur tanpa-JS, jembatan streaming, halaman Log, pembatalan) plus Playwright — **LOLOS dengan chat dilayani `/responses`**, dibuktikan dari `ai_calls`:
+
+```
+responses  non-stream ok  6
+responses  streamed   ok  3
+responses  streamed   cancelled 2
+```
+
+Baris `cancelled` itu berarti jalur abort di cabang stream Responses ikut teruji, bukan hanya jalur bahagia.
+
+**Percobaan pertama justru berjalan lewat `/chat/completions` tanpa disadari.** Sebabnya `ai.test.ts` memaku `ai.preferred_endpoint = chat_completions` secara global dan tidak pernah mengembalikannya — dan tenant di berkas itu adalah tenant baku yang **dipakai bersama**, jadi setelan yang ditinggalkan mengubah perilaku apa pun yang jalan sesudahnya di basis data yang sama. Ini pelajaran yang sama bentuknya dengan fake yang tidak sadar-pathname: suite hijau, tetapi yang diuji bukan yang dikira. `afterAll` kini mengembalikan setelan itu (dan `ai.reasoning_effort`) ke keadaan semula.
+
 ### 6.2 Catatan pelaksanaan F1 (2026-09-10)
 
 - **Migrasi `0022` seluruhnya `ALTER TABLE … ADD`** di kedua dialek — aman untuk rollout side-by-side. Dibuat dengan `TABLE_PREFIX= bun run db:generate`: tanpa mengosongkan prefiks, drizzle-kit melihat setiap tabel berganti nama dan berhenti menunggu jawaban interaktif. `modules.json` round-trip bersih meski ada key config baru.
@@ -473,7 +487,9 @@ Empat permintaan ke provider yang sama, hanya bentuk `input` yang berbeda:
 
 **Belum terbukti:** `input_image` itu sendiri. Balasannya HTML bergaya Apache ("Your browser sent a request that this server could not understand"), artinya **gateway menolaknya sebelum API melihatnya** — bukan API yang bilang bentuknya salah. Kemungkinan besar router ini memang memblokir muatan gambar, dan modelnya (`qwen3.8-flash`) juga bukan model vision.
 
-**Konsekuensi operasional:** mengirim lampiran gambar ke penyedia `/responses` yang gerbangnya berlaku begini akan muncul sebagai `502 — Penyedia AI menjawab 400`, dengan potongan HTML-nya di `details.upstream`. Itu cukup untuk didiagnosis, tetapi pemetaan `input_image` tetap harus diuji ke provider vision sungguhan sebelum diklaim jalan.
+**Bukan regresi F2.** Diperiksa juga jalur LAMA di provider yang sama — `POST /chat/completions` dengan `content: [{ type:'image_url' }]`, persis yang dikirim H-11 sebelum F2 — dan hasilnya **sama: `400` HTML dari proxy**, sementara varian teks dan varian content-parts-tanpa-gambar tetap `200`. Ketiga model yang ditawarkan provider (`sumo/qwen3.8-flash`, `combo-otto`, `combo-otto-mini`) berperilaku identik. Jadi gerbang ini tidak pernah menerima gambar di endpoint mana pun; F2 tidak mengubah apa pun soal itu.
+
+**Konsekuensi operasional:** mengirim lampiran gambar ke penyedia yang gerbangnya berlaku begini muncul sebagai `502 — Penyedia AI menjawab 400`, dengan potongan HTML-nya di `details.upstream` — cukup untuk didiagnosis. Pemetaan `input_image` tetap **belum bisa dibuktikan di sini**; butuh provider vision yang gerbangnya meneruskan gambar.
 
 **Hasil probe provider tersebut:** `preferred=responses`, responses ✓ chat ✓ stream ✓ reasoning ✓ (`reasoning`) tools ✓, 3 model, **Direkomendasikan ★**, 6,1 dtk (langkah terlama: `/responses` 2,5 dtk).
 - `packages/db/migrations/mysql/0021_flat_impossible_man.sql` migrasi terakhir; `packages/db/src/descriptor.ts:152` `col.json()`

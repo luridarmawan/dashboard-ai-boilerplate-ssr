@@ -355,7 +355,23 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
       ).status,
     ).toBe(200);
   });
-  afterAll(() => mock?.stop(true));
+  afterAll(async () => {
+    mock?.stop(true);
+    // The tenant here is the SHARED default one: a global setting left behind changes behaviour
+    // for whatever runs next in the same database — the M5/E2E proof silently ran the chat path
+    // instead of /responses because this file had pinned it. Hand the installation back as found.
+    await call(
+      '/v1/configuration',
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          scope: 'global',
+          values: { 'ai.preferred_endpoint': '__clear__', 'ai.reasoning_effort': '__clear__' },
+        }),
+      },
+      [admin],
+    );
+  });
 
   test('H-4: without an API key the answer is actionable, not generic', async () => {
     await call(
