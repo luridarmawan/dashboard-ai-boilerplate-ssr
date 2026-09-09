@@ -1,4 +1,5 @@
 import { settings } from '@app/api/services';
+import { env } from '@core/config';
 import { and, eq, isNull, schema, unsafeAcrossTenants } from '@core/db';
 
 /**
@@ -94,15 +95,19 @@ export async function resolveProvider(
     };
   }
   const toMicro = (n: number | null) => Math.round((n ?? 0) * 1_000_000);
+  const e = env();
   return {
     id: null,
     code: null,
     baseurl: (
-      (await settings.get<string | null>(clientId, 'ai.baseurl')) ?? 'https://api.openai.com/v1'
+      (await settings.get<string | null>(clientId, 'ai.baseurl')) ??
+      e.AI_API_BASE_URL ??
+      'https://api.openai.com/v1'
     ).replace(/\/$/, ''),
-    key: (await settings.get<string | null>(clientId, 'ai.key')) || null,
+    key: (await settings.get<string | null>(clientId, 'ai.key')) || e.AI_API_KEY || null,
     model:
-      wanted.model || ((await settings.get<string | null>(clientId, 'ai.model')) ?? 'gpt-4o-mini'),
+      wanted.model ||
+      ((await settings.get<string | null>(clientId, 'ai.model')) ?? e.AI_MODEL ?? 'gpt-4o-mini'),
     systemPrompt,
     maxTokens,
     priceInMicro: toMicro(await settings.get<number | null>(clientId, 'ai.price_in_per_mtok')),

@@ -141,6 +141,16 @@ const envSchema = z
       .string()
       .regex(/^\d+\s*\/\s*\d+$/)
       .default('10/900'),
+    /**
+     * AI bootstrap (H-2): used when `ai.baseurl` / `ai.key` / `ai.model` are EMPTY
+     * in the database, same rule as SMTP_* / GOOGLE_* (E-6). Lets an operator
+     * wire a default provider from .env at deploy time; an admin can still
+     * override it per tenant from Pengaturan → AI without a restart.
+     */
+    AI_API_BASE_URL: z.url().optional(),
+    AI_API_KEY: z.string().min(1).max(4000).optional(),
+    AI_MODEL: z.string().min(1).max(120).optional(),
+
     /** Bootstrap the first superadmin on seed (C-5). Only read by `bun db:seed`. */
     BOOTSTRAP_ADMIN_EMAIL: z.email().optional(),
     BOOTSTRAP_ADMIN_PASSWORD: z.string().min(10).optional(),

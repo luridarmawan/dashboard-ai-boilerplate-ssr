@@ -53,6 +53,10 @@ x-app-env: &app-env
   # `https://apps.example.com,https://other.example.id,localhost` (bare host = http and https).
   # The first https entry is used for absolute links in emails. Defaults to https://DOMAIN.
   APP_ORIGIN: ${APP_ORIGIN:-https://${DOMAIN:-localhost}}
+  # AI bootstrap (H-2): used when ai.baseurl / ai.key / ai.model are empty in Settings (E-6)
+  AI_API_BASE_URL: ${AI_API_BASE_URL:-}
+  AI_API_KEY: ${AI_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-}
   UPLOADS_DIR: /data/uploads
   # Uploads (Q-16): the `uploads` volume by default, or any S3-compatible bucket
   STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
