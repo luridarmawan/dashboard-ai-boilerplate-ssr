@@ -42,8 +42,8 @@
       "kind": "public",
       "name": { "id": "Marketing lebar", "en": "Wide marketing" },
       "description": {
-        "id": "Header transparan, bagian selebar layar, footer tebal.",
-        "en": "Transparent header, full-bleed sections, thick footer."
+        "id": "Header lengket semi-transparan, bagian selebar layar, footer tebal.",
+        "en": "Sticky translucent header, full-bleed sections, thick footer."
       }
     },
     {

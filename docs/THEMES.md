@@ -94,7 +94,7 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 | `sidebar-classic` | dashboard | Sidebar kiri yang bisa diciutkan + header |
 | `topnav-compact` | dashboard | Navigasi horizontal, tanpa sidebar, konten selebar layar |
 | `centered-narrow` | dashboard | Kolom sempit di tengah untuk wizard & form panjang |
-| `marketing-wide` | public | Header transparan, bagian selebar layar, footer tebal |
+| `marketing-wide` | public | Header lengket semi-transparan, bagian selebar layar, footer tebal |
 | `centered-card` | auth | Kartu tunggal di tengah |
 | `split-hero` | auth | Form di kiri, panel merek di kanan; menumpuk di layar sempit |
 

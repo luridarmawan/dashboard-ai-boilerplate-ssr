@@ -8,7 +8,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
 </script>
 
 <div class="flex min-h-dvh flex-col">
-  <header class="flex h-14 items-center gap-3 border-b px-4">
+  <header class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur">
     <details class="relative" use:dropdown>
       <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
         <Icon name="menu" />

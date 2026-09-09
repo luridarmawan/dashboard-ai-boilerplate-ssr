@@ -8,7 +8,7 @@ let { brand, nav, content, footer }: PublicRegions = $props();
 </script>
 
 <div class="flex min-h-dvh flex-col">
-  <header class="absolute inset-x-0 top-0 z-30">
+  <header class="sticky top-0 z-30 bg-background/80 backdrop-blur">
     <div class="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
       {@render brand()}
       <nav class="ms-auto hidden md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
@@ -22,7 +22,7 @@ let { brand, nav, content, footer }: PublicRegions = $props();
       </details>
     </div>
   </header>
-  <main id="content" class="flex-1 pt-16">{@render content()}</main>
+  <main id="content" class="flex-1">{@render content()}</main>
   <footer class="border-t bg-card">
     <div class="mx-auto max-w-6xl px-4 py-10 text-sm text-muted-foreground">{@render footer()}</div>
   </footer>

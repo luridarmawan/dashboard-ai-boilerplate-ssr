@@ -9,18 +9,19 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
 
 <div class="flex min-h-dvh flex-col">
   <header class="sticky top-0 z-30 border-b bg-card">
-    <div class="flex h-12 items-center gap-4 px-4">
-      {@render brand()}
-      <nav class="hidden md:block" aria-label="Navigasi utama">{@render nav({ orientation: 'horizontal' })}</nav>
-      <div class="ms-auto flex items-center gap-2">{@render header()}</div>
+    <div class="flex h-12 items-center gap-3 px-4">
+      <!-- Under md the top nav collapses into a menu button; it sits BEFORE the brand (start side). -->
       <details class="relative md:hidden" use:dropdown>
         <summary class="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label="Buka menu">
           <Icon name="menu" />
         </summary>
-        <nav class="absolute end-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
+        <nav class="absolute start-0 top-11 z-40 w-64 rounded-md border bg-popover p-3 shadow-lg" aria-label="Navigasi utama">
           {@render nav({ orientation: 'vertical' })}
         </nav>
       </details>
+      {@render brand()}
+      <nav class="hidden md:ms-1 md:block" aria-label="Navigasi utama">{@render nav({ orientation: 'horizontal' })}</nav>
+      <div class="ms-auto flex items-center gap-2">{@render header()}</div>
     </div>
   </header>
 
