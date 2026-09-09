@@ -10,7 +10,7 @@
   "layouts": {
     "dashboard": {
       "default": "sidebar-classic",
-      "wide": "topnav-compact",
+      "wide": "sidebar-classic",
       "focused": "centered-narrow"
     },
     "public": { "default": "marketing-wide" },

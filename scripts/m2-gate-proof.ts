@@ -4,7 +4,8 @@
  *   #1 four themes selectable; switching changes colours (html attribute → tokens), icons
  *      (icon set) AND layout (auth/dashboard shells differ per theme)
  *   #2 the first HTML already carries the resolved theme, for anonymous visitors too
- *   #3 one page declares `_layoutVariant = 'wide'` and renders differently; others do not change
+ *   #3 one page declares `_layoutVariant = 'wide'`; the THEME decides which layout answers it, so
+ *      the same page renders in a different shell per theme while its code never changes
  *   #6 the theme picker works with JavaScript disabled (form + cookie)
  *
  *   WEB_URL=… ADMIN_EMAIL=… ADMIN_PASSWORD=… bun run scripts/m2-gate-proof.ts
@@ -194,8 +195,8 @@ const admin = new Jar();
   );
   const users = await get(admin, '/users');
   check(
-    '#3 /users declares variant `wide` → base maps it to topnav-compact; page code unchanged',
-    footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'topnav-compact',
+    '#3 /users declares variant `wide`; base answers it with sidebar-classic — one shell per theme',
+    footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'sidebar-classic',
     `${footerLayout(users.html)}/${footerVariant(users.html)}`,
   );
   const groups = await get(admin, '/groups');
@@ -218,7 +219,7 @@ const admin = new Jar();
   );
   const corpUsers = await get(admin, '/users');
   check(
-    '#3 corporate answers `wide` with its own mapping (topnav-compact) — variant, not layout id',
+    '#3 the SAME page answers `wide` with topnav-compact under corporate — variant, not layout id',
     footerVariant(corpUsers.html) === 'wide' && footerLayout(corpUsers.html) === 'topnav-compact',
   );
   const profile = await get(admin, '/profile');
