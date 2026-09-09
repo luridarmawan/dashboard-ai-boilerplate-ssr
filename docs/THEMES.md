@@ -100,7 +100,7 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 
 **Varian** (Keputusan K): halaman menyebut kebutuhannya (`layoutVariant = 'wide'`), tema yang memetakannya ke layout konkret. Halaman yang sama, dua susunan berbeda, nol perubahan kode: `/users` mendeklarasikan `wide` dan dijawab `sidebar-classic` oleh `base`, `topnav-compact` oleh `corporate`, `dummy.two-column`… oleh tema modul.
 
-Keempat tema bawaan sengaja menjawab `wide` dengan layout `default` mereka sendiri, sehingga **satu tema = satu shell untuk seluruh aplikasi**: berpindah ke halaman lebar tidak pernah menukar sidebar jadi navigasi atas di tengah jalan. Tema turunan bebas memilih sebaliknya — petakan `wide` ke layout lain kalau memang menginginkan shell berbeda untuk halaman padat tabel.
+Semua tema yang dikapalkan — keempat tema bawaan maupun tema modul `dummy.ocean` — sengaja menjawab `wide` dengan layout `default` mereka sendiri, sehingga **satu tema = satu shell untuk seluruh aplikasi**: berpindah ke halaman lebar tidak pernah menukar sidebar jadi navigasi atas di tengah jalan. Tema turunan bebas memilih sebaliknya — petakan `wide` ke layout lain kalau memang menginginkan shell berbeda untuk halaman padat tabel.
 
 Tema yang tidak memetakan sebuah varian jatuh ke `default` miliknya dengan peringatan di dev, bukan galat. Ini yang membuat tema pihak ketiga tidak wajib mengenal setiap varian yang pernah dibuat orang lain.
 

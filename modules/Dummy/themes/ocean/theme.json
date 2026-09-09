@@ -10,7 +10,7 @@
   "layouts": {
     "dashboard": {
       "default": "dummy.two-column",
-      "wide": "topnav-compact",
+      "wide": "dummy.two-column",
       "focused": "centered-narrow"
     },
     "public": { "default": "marketing-wide" },

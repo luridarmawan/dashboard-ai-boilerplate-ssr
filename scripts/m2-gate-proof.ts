@@ -395,8 +395,17 @@ const admin = new Jar();
   );
   const users = await get(admin, '/users');
   check(
-    '#5 module theme maps `wide` to a core layout (topnav-compact) — mixing is free',
-    footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'topnav-compact',
+    '#5 /users (variant `wide`) stays on the module layout — one shell per theme, module themes too',
+    footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'dummy.two-column',
+    `${footerLayout(users.html)}/${footerVariant(users.html)}`,
+  );
+  // Mixing is free in the other direction too: the module theme's dashboard is a MODULE layout
+  // while its auth shell is a CORE one. Checked anonymously — /auth/login redirects when logged in.
+  await post(anon, '/theme', { _csrf: pickerCsrf, theme: 'dummy.ocean', mode: 'light', back: '/' });
+  const oceanLogin = await get(anon, '/auth/login');
+  check(
+    '#5 module theme mixes registries: module layout for dashboard, core centered-card for auth',
+    oceanLogin.html.includes(AUTH_MARK['centered-card']),
   );
   check(
     '#5 icons come from the module icon set dummy.rounded-24 (Lucide, stroke 2.25)',
