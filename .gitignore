@@ -24,5 +24,8 @@ backups/
 test-results/
 playwright-report/
 
-# Unggahan lokal saat pengembangan (UPLOADS_DIR bawaan, Q-9/Q-16)
+# Unggahan lokal saat pengembangan (UPLOADS_DIR bawaan, Q-9/Q-16).
+# CWD proses API adalah apps/api (scripts/dev.ts), jadi default ./data/uploads
+# mendarat di apps/api/data/. Baris /data/ dipakai saat API dijalankan dari root.
 /data/
+/apps/api/data/
