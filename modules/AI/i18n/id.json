@@ -91,6 +91,8 @@
   "ai.analytics.cancelled": "dibatalkan",
   "ai.analytics.tokens_in": "Token masuk",
   "ai.analytics.tokens_out": "Token keluar",
+  "ai.analytics.tokens_reasoning": "token reasoning",
+  "ai.analytics.tokens_reasoning_hint": "Bagian dari token output yang dipakai model untuk bernalar. Ditagih seperti output biasa.",
   "ai.analytics.cost": "Biaya",
   "ai.analytics.cost_hint": "Estimasi dari daftar harga model; — bila belum ada harga.",
   "ai.analytics.per_day": "Token per hari",

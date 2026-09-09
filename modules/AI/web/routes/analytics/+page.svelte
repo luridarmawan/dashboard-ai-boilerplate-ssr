@@ -43,7 +43,18 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
   <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="ai-analytics-totals">
     <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.calls')}</p><p class="text-2xl font-semibold">{num(s.totals.calls)}</p><p class="text-xs text-muted-foreground">{num(s.totals.ok)} ok · {num(s.totals.errors)} {t('ai.analytics.errors')} · {num(s.totals.cancelled)} {t('ai.analytics.cancelled')}</p></Card>
     <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.tokens_in')}</p><p class="text-2xl font-semibold">{num(s.totals.tokensIn)}</p></Card>
-    <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.tokens_out')}</p><p class="text-2xl font-semibold">{num(s.totals.tokensOut)}</p></Card>
+    <Card>
+      <p class="text-xs text-muted-foreground">{t('ai.analytics.tokens_out')}</p>
+      <p class="text-2xl font-semibold">{num(s.totals.tokensOut)}</p>
+      {#if s.totals.tokensReasoning > 0}
+        <!-- Reasoning is a subset of output and is billed like it: a turn can spend most of its
+             output on thinking, which is invisible unless it is named. -->
+        <p class="text-xs text-muted-foreground" title={t('ai.analytics.tokens_reasoning_hint')}>
+          {num(s.totals.tokensReasoning)} {t('ai.analytics.tokens_reasoning')}
+          ({Math.round((s.totals.tokensReasoning / Math.max(1, s.totals.tokensOut)) * 100)}%)
+        </p>
+      {/if}
+    </Card>
     <Card><p class="text-xs text-muted-foreground">{t('ai.analytics.cost')}</p><p class="text-2xl font-semibold">{money(s.totals.costMicro)}</p><p class="text-xs text-muted-foreground">{t('ai.analytics.cost_hint')}</p></Card>
   </div>
 
@@ -88,12 +99,12 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
   <div class="grid gap-4 xl:grid-cols-2">
     <Card title={t('ai.analytics.per_model')}>
       <Table caption={t('ai.analytics.per_model')}>
-        <thead><tr><th>{t('ai.analytics.provider')}</th><th>Model</th><th class="text-end">{t('ai.analytics.calls')}</th><th class="text-end">Token</th><th class="text-end">{t('ai.analytics.cost')}</th></tr></thead>
+        <thead><tr><th>{t('ai.analytics.provider')}</th><th>Model</th><th class="text-end">{t('ai.analytics.calls')}</th><th class="text-end">Token</th><th class="text-end">{t('ai.analytics.tokens_reasoning')}</th><th class="text-end">{t('ai.analytics.cost')}</th></tr></thead>
         <tbody>
           {#each s.byModel as m (`${m.provider}|${m.model}`)}
-            <tr><td>{#if m.provider}<code>{m.provider}</code>{:else}<Badge variant="secondary">{t('ai.analytics.legacy')}</Badge>{/if}</td><td><code>{m.model ?? '—'}</code></td><td class="text-end">{num(m.calls)}</td><td class="text-end">{num(m.tokensIn + m.tokensOut)}</td><td class="text-end">{money(m.costMicro)}</td></tr>
+            <tr><td>{#if m.provider}<code>{m.provider}</code>{:else}<Badge variant="secondary">{t('ai.analytics.legacy')}</Badge>{/if}</td><td><code>{m.model ?? '—'}</code></td><td class="text-end">{num(m.calls)}</td><td class="text-end">{num(m.tokensIn + m.tokensOut)}</td><td class="text-end">{m.tokensReasoning ? num(m.tokensReasoning) : '—'}</td><td class="text-end">{money(m.costMicro)}</td></tr>
           {:else}
-            <tr><td colspan="5" class="py-6 text-center text-muted-foreground">{t('common.none')}</td></tr>
+            <tr><td colspan="6" class="py-6 text-center text-muted-foreground">{t('common.none')}</td></tr>
           {/each}
         </tbody>
       </Table>

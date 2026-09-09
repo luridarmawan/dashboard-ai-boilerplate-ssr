@@ -1,7 +1,7 @@
 import { settings } from '@app/api/services';
 import { env } from '@core/config';
 import { and, eq, isNull, schema, unsafeAcrossTenants } from '@core/db';
-import type { Endpoint } from './probe.ts';
+import { capabilitiesOf, type Endpoint, type ReasoningParam } from './probe.ts';
 
 /**
  * Provider resolution (H-10). A tenant may hold several provider PROFILES (`ai_providers`), each
@@ -25,6 +25,10 @@ export interface ResolvedProvider {
   maxTokens: number;
   /** Which upstream endpoint to call (AI-Roadmap F2). */
   endpoint: Endpoint;
+  /** Reasoning effort to ask for, or null to send nothing and take the provider's default (F3). */
+  reasoningEffort: string | null;
+  /** Which spelling this provider understood at probe time; null = the modern nested one. */
+  reasoningParam: ReasoningParam | null;
   /** Price per 1M tokens, micro-units of the currency. */
   priceInMicro: number;
   priceOutMicro: number;
@@ -98,6 +102,11 @@ export function resetEndpointCache(): void {
 const asEndpoint = (v: unknown): Endpoint | null =>
   v === 'responses' || v === 'chat_completions' ? v : null;
 
+const EFFORTS = new Set(['minimal', 'low', 'medium', 'high']);
+/** `provider` (the default) and anything unknown mean: send no reasoning parameter at all. */
+const asEffort = (v: unknown): string | null =>
+  typeof v === 'string' && EFFORTS.has(v) ? v : null;
+
 /**
  * Pick the provider for a call. Precedence: `wanted.code` (request) → `wanted.providerId`
  * (conversation) → the tenant's default profile → the legacy settings. The model: `wanted.model`
@@ -110,6 +119,9 @@ export async function resolveProvider(
 ): Promise<ResolvedProvider> {
   const systemPrompt = (await settings.get<string | null>(clientId, 'ai.system_prompt')) || null;
   const maxTokens = (await settings.get<number | null>(clientId, 'ai.max_tokens')) ?? 1024;
+  const reasoningEffort = asEffort(
+    await settings.get<string | null>(clientId, 'ai.reasoning_effort'),
+  );
   const profiles = await enabledProviders(clientId);
   let profile: ProviderRow | undefined;
   if (wanted.code) {
@@ -132,6 +144,10 @@ export async function resolveProvider(
       maxTokens,
       // A profile that has never been probed keeps the pre-F2 behaviour exactly (§7.6).
       endpoint: asEndpoint(profile.preferred_endpoint) ?? 'chat_completions',
+      reasoningEffort,
+      // The probe recorded which spelling this provider accepted; without one, use the modern
+      // nested `reasoning: { effort }` — the shape verified against a live provider (§12).
+      reasoningParam: capabilitiesOf(profile.capabilities)?.reasoning.param ?? null,
       priceInMicro: Number(priced?.price_in_micro ?? 0),
       priceOutMicro: Number(priced?.price_out_micro ?? 0),
     };
@@ -150,6 +166,8 @@ export async function resolveProvider(
     endpoint:
       asEndpoint(await settings.get<string | null>(clientId, 'ai.preferred_endpoint')) ??
       autoEndpoint(baseurl),
+    reasoningEffort,
+    reasoningParam: null,
     key: (await settings.get<string | null>(clientId, 'ai.key')) || e.AI_API_KEY || null,
     model:
       wanted.model ||

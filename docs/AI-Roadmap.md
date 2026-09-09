@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **F0 + F1 + F2 selesai** (2026-09-09, 2026-09-10) — probe, persistensi & UI, dan chat dua-endpoint yang **terbukti terhadap provider nyata** (§12). Berikutnya: F3 (pemetaan param reasoning, `tool_choice`) dan §10 CLI |
+| **Status** | **F0–F3 selesai** (2026-09-09 … 2026-09-10) — probe, persistensi & UI, chat dua-endpoint, dan kendali upaya reasoning; semuanya **terbukti terhadap provider nyata** (§12). Berikutnya: §10 CLI `ai:test`, badge di pemilih chat (§7.4), sisa F4 |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -240,7 +240,7 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 | ~~**F0 — Probe tanpa DB**~~ **SELESAI 2026-09-09** | `modules/AI/api/probe.ts` (murni, tanpa `@app/api/services`/`@core/db`) + `POST /providers/:id/test` kembalikan matriks tanpa menyimpannya; mock dapat `GET /v1/models`, `POST /v1/responses`, `MOCK_ENDPOINTS` | Terbukti: `modules/AI/test/probe.test.ts` (11 kasus, unit) + matriks di `providers.test.ts`; mock tiga mode diklasifikasi benar. **Proxy nyata belum diuji** — butuh key |
 | ~~**F1 — Persist & UI**~~ **SELESAI 2026-09-10** | Migrasi `0022` (aditif, mysql+pg: 5 kolom `ai_providers` + `upstream_endpoint`/`reasoning_tokens` di `ai_calls`), persistensi di `POST /test`, `providerView` + `ProviderOption` membawa matriks, `web/lib/Capabilities.svelte`, kolom **Kemampuan** + urutan rekomendasi, setting `ai.preferred_endpoint`, i18n id/en | Terbukti: `providers.test.ts` — matriks tersimpan & terbaca kembali, penyedia `/responses`-only ber-badge ★ dan berada di urutan pertama meski namanya terurut terakhir, **chat tanpa menyebut penyedia tetap ke penyedia baku**, probe gagal tidak menghapus matriks yang sudah diketahui |
 | ~~**F2 — Chat runtime dual-endpoint**~~ **SELESAI 2026-09-10** | `modules/AI/api/responses.ts` (`toResponsesInput`/`toResponsesTools`/`parseResponsesEvent`/`readResponsesReply`/`normalizeUsage`), `callProvider` bercabang + fallback runtime 404/405, `ai_calls.upstream_endpoint` & `reasoning_tokens` terisi | Terbukti: 18 kasus unit (`responses.test.ts`) + 4 kasus integrasi (non-stream, stream dengan ringkasan reasoning disaring, tool round-trip `function_call`/`function_call_output`, fallback) + **uji langsung ke provider nyata** (§12.1). Sisi web tidak disentuh sama sekali |
-| **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), aturan inklusif/eksklusif §5.1a mengisi `tokensOut` + `reasoning_tokens` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
+| ~~**F3 — Reasoning/tools**~~ **SELESAI 2026-09-10** | Setting `ai.reasoning_effort` (`provider` baku = tidak mengirim apa pun), ejaan param diambil dari hasil probe (`reasoning` nested vs `reasoning_effort` flat), Analitik memisahkan token reasoning. Aturan §5.1a sudah mendarat lebih awal di F2 | Terbukti: kasus integrasi — tanpa setelan tidak ada param terkirim, dengan `low` terkirim `reasoning: { effort: 'low' }`; Analitik menampilkan porsi reasoning. **`tool_choice` sengaja tidak dikerjakan** (§9) |
 | **F4 — Polish & gate CI (1–2 hari)** | Perluas fake `Bun.serve` in-process: `providers.test.ts:55` (3 mode — chat-only, responses-only, keduanya; badge & preferred) dan `ai.test.ts:77` (cabang `/responses` + stream + tool round-trip, dengan cek `url.pathname`). `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut, aplikasi tetap ter-build tanpa jejak AI" (`scripts/ci/m5-gate4.sh`) dan tidak menyentuh provider; `proof:m5:gate1`–`gate3` tidak ada |
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
@@ -288,6 +288,7 @@ Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; parale
 - **Dua field `baseUrl` terpisah** — menambah kompleksitas form; satu `baseUrl` + deteksi cukup (prefiks `/v1` sama)
 - **Probe tiap request chat** — menambah latensi & biaya; probe hanya di setup
 - **Hapus `/chat/completions` sekaligus** — banyak proxy kompatibel belum implement `/responses`; dual support wajib
+- **Mengirim `tool_choice`** (rencana awal F3) — tidak ada bukti dibutuhkan: probe membuktikan tools diterima tanpa itu, dan mengirim field yang tidak diminta justru berisiko `400` pada provider yang tidak mengenalnya. Ronde terakhir sudah dipaksa menjawab dengan cara yang lebih aman — tools-nya tidak dikirim sama sekali
 
 ## 10. CLI `bun run ai:test` — uji koneksi tanpa browser
 
@@ -433,6 +434,20 @@ Dua hal yang dibuktikannya:
 
 1. **74 frame ringkasan reasoning datang, nol yang bocor** ke jawaban. Tanpa penyaringan per `type`, seluruh isi pikiran model akan muncul di balon jawaban pengguna.
 2. **Aturan §5.1a bukan teori.** Provider melaporkan `output_tokens` 10 dengan `reasoning_tokens` 261; tanpa aturan eksklusif, giliran ini tertagih 10 token alih-alih 271 — meleset 27 kali lipat pada satu percakapan.
+
+### 12.2 Upaya reasoning diuji ke provider nyata — dan apa yang TIDAK terbukti (2026-09-10)
+
+Prompt sepele yang sama ("Sebutkan tiga warna"), tiga varian, tiga kali ulang:
+
+| Varian | reasoning_tokens (3 kali jalan) |
+|---|---|
+| tanpa param | 223 · 223 · 223 |
+| `reasoning: { effort: 'low' }` | 58 · 308 · 58 |
+| `reasoning: { effort: 'minimal' }` | 352 · 119 · 119 |
+
+**Yang terbukti:** parameter diterima (200, bukan 400) dan jawabannya tetap benar; besaran token reasoning untuk pertanyaan sesepele ini berayun 58–352, yang dengan sendirinya menunjukkan kenapa kendali dan pelaporannya layak ada.
+
+**Yang TIDAK terbukti: penghematan.** Angka "tanpa param" identik persis tiga kali dan varian lain mengulang nilai yang sama — pola respons yang di-cache per body, bukan pengukuran bersih. Urutannya pun tidak konsisten (`minimal` pernah lebih mahal daripada tanpa param). Jangan mengklaim "effort rendah = lebih murah" dari data ini; yang bisa dikatakan adalah kendalinya berfungsi dan biayanya kini terlihat di Analitik.
 
 **Hasil probe provider tersebut:** `preferred=responses`, responses ✓ chat ✓ stream ✓ reasoning ✓ (`reasoning`) tools ✓, 3 model, **Direkomendasikan ★**, 6,1 dtk (langkah terlama: `/responses` 2,5 dtk).
 - `packages/db/migrations/mysql/0021_flat_impossible_man.sql` migrasi terakhir; `packages/db/src/descriptor.ts:152` `col.json()`

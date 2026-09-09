@@ -91,6 +91,8 @@
   "ai.analytics.cancelled": "cancelled",
   "ai.analytics.tokens_in": "Tokens in",
   "ai.analytics.tokens_out": "Tokens out",
+  "ai.analytics.tokens_reasoning": "reasoning tokens",
+  "ai.analytics.tokens_reasoning_hint": "The share of output tokens the model spent thinking. Billed like any other output.",
   "ai.analytics.cost": "Cost",
   "ai.analytics.cost_hint": "Estimated from the model price list; — when unpriced.",
   "ai.analytics.per_day": "Tokens per day",

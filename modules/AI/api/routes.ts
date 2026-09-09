@@ -453,6 +453,12 @@ interface Stat {
   calls: number;
   tokensIn: number;
   tokensOut: number;
+  /**
+   * Reasoning tokens, as a SUBSET of `tokensOut` (§5.1a normalises them into it). Reported apart
+   * because a reasoning model can spend most of a turn's output on thinking — a 10-token answer
+   * costing 261 reasoning tokens is invisible otherwise, and it is billed.
+   */
+  tokensReasoning: number;
   costMicro: number;
 }
 interface DayStat extends Stat {
@@ -749,6 +755,14 @@ export default defineApiRoutes(
               // other than the default — so it only goes out when the caller asked for one.
               max_output_tokens: maxTokens,
               ...(body.temperature === undefined ? {} : { temperature: body.temperature }),
+              // F3: only when an effort was chosen — the default sends nothing, so a provider
+              // that has never heard of the parameter keeps working untouched. The spelling is
+              // the one the probe saw this provider accept.
+              ...(p.reasoningEffort
+                ? p.reasoningParam === 'reasoning_effort'
+                  ? { reasoning_effort: p.reasoningEffort }
+                  : { reasoning: { effort: p.reasoningEffort } }
+                : {}),
               ...(withTools && openAiTools ? { tools: toResponsesTools(openAiTools) } : {}),
             };
           } else {
@@ -1969,6 +1983,7 @@ export default defineApiRoutes(
             cancelled: 0,
             tokensIn: 0,
             tokensOut: 0,
+            tokensReasoning: 0,
             costMicro: 0,
           },
           byDay: [] as DayStat[],
@@ -1987,6 +2002,7 @@ export default defineApiRoutes(
             user_id: schema.aiCalls.user_id,
             tokens_in: schema.aiCalls.tokens_in,
             tokens_out: schema.aiCalls.tokens_out,
+            reasoning_tokens: schema.aiCalls.reasoning_tokens,
             cost_micro: schema.aiCalls.cost_micro,
             status: schema.aiCalls.status,
           })
@@ -2009,6 +2025,7 @@ export default defineApiRoutes(
           s.calls++;
           s.tokensIn += r.tokens_in ?? 0;
           s.tokensOut += r.tokens_out ?? 0;
+          s.tokensReasoning += r.reasoning_tokens ?? 0;
           s.costMicro += r.cost_micro ?? 0;
         };
         for (const r of rows) {
@@ -2017,7 +2034,14 @@ export default defineApiRoutes(
           else if (r.status === 'cancelled') totals.cancelled++;
           else totals.errors++;
           const day = r.created_at.toISOString().slice(0, 10);
-          const d = byDay.get(day) ?? { day, calls: 0, tokensIn: 0, tokensOut: 0, costMicro: 0 };
+          const d = byDay.get(day) ?? {
+            day,
+            calls: 0,
+            tokensIn: 0,
+            tokensOut: 0,
+            tokensReasoning: 0,
+            costMicro: 0,
+          };
           bump(d, r);
           byDay.set(day, d);
           const mk = `${r.provider ?? ''}|${r.model ?? ''}`;
@@ -2027,6 +2051,7 @@ export default defineApiRoutes(
             calls: 0,
             tokensIn: 0,
             tokensOut: 0,
+            tokensReasoning: 0,
             costMicro: 0,
           };
           bump(m, r);
@@ -2039,6 +2064,7 @@ export default defineApiRoutes(
             calls: 0,
             tokensIn: 0,
             tokensOut: 0,
+            tokensReasoning: 0,
             costMicro: 0,
           };
           bump(u, r);
@@ -2048,7 +2074,14 @@ export default defineApiRoutes(
         for (let i = 0; i < days; i++) {
           const day = new Date(from.getTime() + i * 86_400_000).toISOString().slice(0, 10);
           if (!byDay.has(day))
-            byDay.set(day, { day, calls: 0, tokensIn: 0, tokensOut: 0, costMicro: 0 });
+            byDay.set(day, {
+              day,
+              calls: 0,
+              tokensIn: 0,
+              tokensOut: 0,
+              tokensReasoning: 0,
+              costMicro: 0,
+            });
         }
         const userIds = [...byUser.keys()].filter(Boolean);
         if (userIds.length) {
@@ -2093,6 +2126,7 @@ export default defineApiRoutes(
                 cancelled: t.Integer(),
                 tokensIn: t.Integer(),
                 tokensOut: t.Integer(),
+                tokensReasoning: t.Integer(),
                 costMicro: t.Integer(),
               }),
               byDay: t.Array(
@@ -2101,6 +2135,7 @@ export default defineApiRoutes(
                   calls: t.Integer(),
                   tokensIn: t.Integer(),
                   tokensOut: t.Integer(),
+                  tokensReasoning: t.Integer(),
                   costMicro: t.Integer(),
                 }),
               ),
@@ -2111,6 +2146,7 @@ export default defineApiRoutes(
                   calls: t.Integer(),
                   tokensIn: t.Integer(),
                   tokensOut: t.Integer(),
+                  tokensReasoning: t.Integer(),
                   costMicro: t.Integer(),
                 }),
               ),
@@ -2122,6 +2158,7 @@ export default defineApiRoutes(
                   calls: t.Integer(),
                   tokensIn: t.Integer(),
                   tokensOut: t.Integer(),
+                  tokensReasoning: t.Integer(),
                   costMicro: t.Integer(),
                 }),
               ),

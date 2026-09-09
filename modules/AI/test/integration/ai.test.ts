@@ -66,6 +66,8 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
   let mockHasResponses = true;
   /** F2: the `input[]` of the last /responses call, so tests can inspect the translation. */
   let mockLastInput: { type?: string; role?: string; content?: unknown; call_id?: string }[] = [];
+  /** F3: the reasoning parameter of the last /responses call, or null when none was sent. */
+  let mockLastReasoning: unknown = null;
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -96,9 +98,12 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
           output?: string;
         }[];
         tools?: { type: string; name: string }[];
+        reasoning?: unknown;
+        reasoning_effort?: unknown;
       };
       const input = body.input ?? [];
       mockLastInput = input;
+      mockLastReasoning = body.reasoning ?? body.reasoning_effort ?? null;
       mockToolsSeen = body.tools ? body.tools.map((t) => t.name) : null;
       const plain = (c: unknown): string =>
         typeof c === 'string'
@@ -864,6 +869,49 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
       const out = mockLastInput.find((i) => i.type === 'function_call_output');
       expect(out?.call_id).toBe('call_1');
       expect(mockLastInput.some((i) => i.role === 'tool')).toBe(false);
+    });
+
+    test('reasoning effort: nothing is sent by default, the chosen effort is sent when set (F3)', async () => {
+      mockLastReasoning = null;
+      await call(
+        '/v1/m/ai/chat/completions',
+        { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'x' }] }) },
+        [admin],
+      );
+      // The default is "provider": a provider that never heard of the parameter is untouched.
+      expect(mockLastReasoning).toBeNull();
+
+      await call(
+        '/v1/configuration',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ scope: 'global', values: { 'ai.reasoning_effort': 'low' } }),
+        },
+        [admin],
+      );
+      try {
+        mockLastReasoning = null;
+        const res = await call(
+          '/v1/m/ai/chat/completions',
+          { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'y' }] }) },
+          [admin],
+        );
+        expect(res.status).toBe(200);
+        // The modern nested spelling; the flat one is used only where the probe saw it accepted.
+        expect(mockLastReasoning).toEqual({ effort: 'low' });
+      } finally {
+        await call(
+          '/v1/configuration',
+          {
+            method: 'PUT',
+            body: JSON.stringify({
+              scope: 'global',
+              values: { 'ai.reasoning_effort': 'provider' },
+            }),
+          },
+          [admin],
+        );
+      }
     });
 
     test('a provider without /responses falls back to /chat/completions instead of failing', async () => {
