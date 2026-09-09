@@ -52,13 +52,27 @@ async function waitFor<T>(
     await sleep(50);
   }
 }
-/** A tiny OpenAI-compatible provider: /models lists ids, /chat/completions echoes with fixed usage. */
+/**
+ * A tiny OpenAI-compatible provider: /models lists ids, /chat/completions echoes with fixed usage.
+ * It is a CHAT-ONLY provider on purpose — `/responses` answers 404 — which is what makes it a
+ * useful subject for the capability probe (AI-Roadmap §4.1).
+ *
+ * The pathname check is not decoration: the probe posts a Responses-shaped body (`input`, no
+ * `messages`) to `/responses`, so a handler that treats every POST as a chat completion would
+ * throw on `body.messages`, kill the connection, and fail every later request to this server.
+ */
 function mockProvider(
   key: string,
   models: string[],
   usage: { prompt: number; completion: number },
 ) {
+  /** Chat completions only — the probe's own calls are not part of what a test asserts about. */
   const seen: { model: string | undefined }[] = [];
+  const notFound = () =>
+    new Response('{"error":{"message":"not found"}}', {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+    });
   const server = Bun.serve({
     port: 0,
     async fetch(req) {
@@ -70,12 +84,23 @@ function mockProvider(
           object: 'list',
           data: models.map((id) => ({ id, object: 'model' })),
         });
-      const body = (await req.json()) as { model?: string; messages: { content: string }[] };
-      seen.push({ model: body.model });
+      if (!url.pathname.endsWith('/chat/completions')) return notFound();
+      const body = (await req.json()) as {
+        model?: string;
+        messages?: { content: string }[];
+        max_tokens?: number;
+      };
+      // The probe's own traffic must stay out of `seen`: it is a single 8-token "ping" turn, not
+      // a chat a test asked for. (`tools` is no marker — real chat turns carry tools too.)
+      const isProbe =
+        body.max_tokens === 8 &&
+        body.messages?.length === 1 &&
+        body.messages[0]?.content === 'ping';
+      if (!isProbe) seen.push({ model: body.model });
       return Response.json({
         model: body.model,
         choices: [
-          { message: { role: 'assistant', content: `echo ${body.messages.at(-1)?.content}` } },
+          { message: { role: 'assistant', content: `echo ${body.messages?.at(-1)?.content}` } },
         ],
         usage: {
           prompt_tokens: usage.prompt,
@@ -201,15 +226,29 @@ describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
     expect(opts[0]?.models.map((m) => m.model)).toEqual(['a-large', 'a-small']);
   });
 
-  test('test endpoint: GET /models with the stored key proves URL + key and lists ids; a wrong key fails clearly', async () => {
+  test('test endpoint: the capability probe proves URL + key, lists ids and reports the matrix; a wrong key fails clearly', async () => {
     const ok = (
       await json(await call(`/v1/m/ai/providers/${alphaId}/test`, { method: 'POST' }, [admin]))
     ).data as {
       ok: boolean;
       models: string[];
+      preferredEndpoint: string | null;
+      recommended: boolean;
+      capabilities: {
+        endpoints: { responses: boolean; chatCompletions: boolean };
+        tools: { supported: boolean };
+      };
+      steps: { step: string; status: string }[];
     };
     expect(ok.ok).toBe(true);
     expect(ok.models).toEqual(['a-large', 'a-small']);
+    // This mock is chat-only, so the probe must say so — and must not recommend it (§3 no. 2).
+    expect(ok.capabilities.endpoints).toEqual({ responses: false, chatCompletions: true });
+    expect(ok.preferredEndpoint).toBe('chat_completions');
+    expect(ok.recommended).toBe(false);
+    expect(ok.capabilities.tools.supported).toBe(true);
+    expect(ok.steps.find((s) => s.step === 'responses')?.status).toBe('unsupported');
+    expect(ok.steps.find((s) => s.step === 'reasoning')?.status).toBe('skipped');
     await call(
       `/v1/m/ai/providers/${betaId}`,
       { method: 'PUT', body: JSON.stringify({ apiKey: 'wrong' }) },

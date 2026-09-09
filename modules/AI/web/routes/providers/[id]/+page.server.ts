@@ -2,6 +2,7 @@ import { formToObject, validateForm } from '@core/contracts';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import type { ProbeResult } from '../../../../api/probe.ts';
 import { ProviderUpdateBody } from '../../../../api/schemas.ts';
 import { parseModelLines } from '../_form.ts';
 
@@ -50,14 +51,23 @@ export const actions: Actions = {
     if (!r.ok) return actionFailure(r.failure, values);
     return { saved: true };
   },
-  /** GET /models at the provider with the stored key: proves URL + key, lists model ids. */
+  /** Capability probe with the stored key (AI-Roadmap §4.1): endpoints, stream, reasoning, tools. */
   test: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     if (!checkCsrf(event, form)) return csrfFail();
     const r = unwrap<{
       success: true;
-      data: { ok: boolean; error: string | null; models: string[]; ms: number };
+      data: {
+        ok: boolean;
+        error: string | null;
+        models: string[];
+        ms: number;
+        capabilities: Omit<ProbeResult, 'ok' | 'error' | 'ms' | 'steps'>;
+        preferredEndpoint: string | null;
+        recommended: boolean;
+        steps: ProbeResult['steps'];
+      };
     }>(await apiFor(event).v1.m.ai.providers({ id }).test.post());
     if (!r.ok) return actionFailure(r.failure);
     return { tested: r.data.data };

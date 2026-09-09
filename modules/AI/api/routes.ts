@@ -41,13 +41,13 @@ import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 import { discoverRemoteTools, wireSuffix } from './mcp-client.ts';
 import { maskedHeaders, mcpToolSource, mergeHeaders, toolNameFor } from './mcp-tools.ts';
+import { isRecommended, probeCapabilities } from './probe.ts';
 import {
   costMicro,
   enabledProviders,
   modelsOf,
   ProviderNotFound,
   type ProviderRow,
-  probeProvider,
   resolveProvider,
   toPriceMicro,
 } from './providers.ts';
@@ -337,6 +337,23 @@ const ProviderView = t.Object({
   lastTestedAt: t.Nullable(t.String()),
   models: t.Array(ModelView),
   createdAt: t.String(),
+});
+/** Capability matrix from the probe (AI-Roadmap §3). Stored per provider from F1 on. */
+const CapabilitiesView = t.Object({
+  endpoints: t.Object({ responses: t.Boolean(), chatCompletions: t.Boolean() }),
+  stream: t.Object({ supported: t.Boolean(), sse: t.Boolean(), responsesStream: t.Boolean() }),
+  reasoning: t.Object({
+    supported: t.Boolean(),
+    param: t.Nullable(t.String()),
+    via: t.Nullable(t.String()),
+  }),
+  tools: t.Object({
+    supported: t.Boolean(),
+    functionCalling: t.Boolean(),
+    via: t.Nullable(t.String()),
+  }),
+  modelsTested: t.Array(t.String()),
+  preferredEndpoint: t.Nullable(t.String()),
 });
 const ProviderOption = t.Object({
   id: t.String(),
@@ -1677,7 +1694,11 @@ export default defineApiRoutes(
           set.status = 404;
           return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
         }
-        const r = await probeProvider(row.base_url, row.api_key);
+        // F0: the probe answers the whole §4.1 matrix; nothing of it is persisted yet — only the
+        // existing last_status/last_error/last_tested_at columns are written, as before.
+        const r = await probeCapabilities(row.base_url, row.api_key, row.default_model, {
+          signal: request.signal,
+        });
         await tenant.update(
           schema.aiProviders,
           {
@@ -1695,9 +1716,37 @@ export default defineApiRoutes(
           resourceId: row.id,
           ip: clientIp(request, server),
           requestId,
-          after: { ok: r.ok, models: r.models.length, ms: r.ms },
+          after: {
+            ok: r.ok,
+            models: r.modelsTested.length,
+            ms: r.ms,
+            preferredEndpoint: r.preferredEndpoint,
+            responses: r.endpoints.responses,
+            stream: r.stream.supported,
+            reasoning: r.reasoning.supported,
+            tools: r.tools.supported,
+            recommended: isRecommended(r),
+          },
         });
-        return ok(r);
+        // `models` stays in the payload under its old name so the existing admin card keeps
+        // rendering while F1 grows the UI into the full matrix.
+        return ok({
+          ok: r.ok,
+          error: r.error,
+          models: r.modelsTested,
+          ms: r.ms,
+          capabilities: {
+            endpoints: r.endpoints,
+            stream: r.stream,
+            reasoning: r.reasoning,
+            tools: r.tools,
+            modelsTested: r.modelsTested,
+            preferredEndpoint: r.preferredEndpoint,
+          },
+          preferredEndpoint: r.preferredEndpoint,
+          recommended: isRecommended(r),
+          steps: r.steps,
+        });
       },
       {
         beforeHandle: permission('ai.provider.manage'),
@@ -1709,13 +1758,24 @@ export default defineApiRoutes(
               error: t.Nullable(t.String()),
               models: t.Array(t.String()),
               ms: t.Integer(),
+              capabilities: CapabilitiesView,
+              preferredEndpoint: t.Nullable(t.String()),
+              recommended: t.Boolean(),
+              steps: t.Array(
+                t.Object({
+                  step: t.String(),
+                  status: t.String(),
+                  ms: t.Integer(),
+                  note: t.Nullable(t.String()),
+                }),
+              ),
             }),
           ),
           ...errorResponses,
         },
         detail: {
           summary:
-            'Call the provider’s GET /models with the stored key: proves URL + key, lists model ids to price (H-10)',
+            'Capability probe with the stored key (AI-Roadmap §4.1): endpoints, stream, reasoning, tools + model ids to price (H-10)',
         },
       },
     )

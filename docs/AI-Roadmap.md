@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft — diusulkan 2026-09-09; direview terhadap kode 2026-09-09 |
+| **Status** | **F0 selesai** 2026-09-09 (`modules/AI/api/probe.ts`, `POST /providers/:id/test`, mock `/responses`); F1 menunggu keputusan §5.1 |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -30,16 +30,22 @@ Prinsip: **deteksi sekali di setup, pakai selamanya di chat** — jalur panas ti
 
 Satu hasil `capabilities` per provider (disimpan, bukan dihitung tiap request):
 
+Bentuk ini **camelCase**, sama seperti seluruh kontrak API repo ini (`providerView` memetakan
+snake_case DB → camelCase kontrak), dan itu pula yang disimpan di kolom JSON:
+
 ```json
 {
-  "endpoints": { "responses": true, "chat_completions": true },
-  "stream": { "supported": true, "sse": true, "responses_stream": true },
+  "endpoints": { "responses": true, "chatCompletions": true },
+  "stream": { "supported": true, "sse": true, "responsesStream": true },
   "reasoning": { "supported": true, "param": "reasoning|reasoning_effort", "via": "responses" },
-  "tools": { "supported": true, "function_calling": true, "via": "responses|chat" },
-  "models_tested": ["gpt-4o-mini", "o3-mini"],
-  "preferred_endpoint": "responses"
+  "tools": { "supported": true, "functionCalling": true, "via": "responses|chat_completions" },
+  "modelsTested": ["gpt-4o-mini", "o3-mini"],
+  "preferredEndpoint": "responses"
 }
 ```
+
+Tipe otoritatifnya `Capabilities` di `modules/AI/api/probe.ts`; kolom DB tetap snake_case
+(`capabilities`, `preferred_endpoint`).
 
 **Aturan prioritas (sesuai permintaan):**
 
@@ -170,6 +176,8 @@ Mock hari ini mengembalikan `404` untuk **segala** hal yang bukan `POST /v1/chat
 
 Tiga mode di mock yang sama (chat-only / responses-only / keduanya), mis. lewat `MOCK_ENDPOINTS=chat|responses|both`, berguna untuk membuktikan §7.1–§7.3 dengan tangan.
 
+**Sudah diimplementasikan** (F0): `GET /v1/models`, `POST /v1/responses` (non-stream + SSE `response.output_text.delta` + `reasoning`/`function_call` dummy), dan `MOCK_ENDPOINTS=chat|responses|both`.
+
 **Posisi mock ini: dev manual + `bun run ai:test` — BUKAN CI.** Uji integrasi memalsukan upstream *in-process* dengan `Bun.serve`-nya sendiri, dan itu yang harus diperluas di F4:
 
 - `modules/AI/test/integration/providers.test.ts:55` `mockProvider()` — sudah melayani `/models` + `/chat/completions`, persis bentuk yang dibutuhkan
@@ -203,13 +211,21 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 
 | Fase | Isi | Gate |
 |---|---|---|
-| **F0 — Probe tanpa DB (1–2 hari)** | `probeCapabilities()` murni + `POST /test` kembalikan matriks tanpa simpan | `curl` ke mock + proxy nyata (OpenAI & Groq) menampilkan matriks benar |
+| ~~**F0 — Probe tanpa DB**~~ **SELESAI 2026-09-09** | `modules/AI/api/probe.ts` (murni, tanpa `@app/api/services`/`@core/db`) + `POST /providers/:id/test` kembalikan matriks tanpa menyimpannya; mock dapat `GET /v1/models`, `POST /v1/responses`, `MOCK_ENDPOINTS` | Terbukti: `modules/AI/test/probe.test.ts` (11 kasus, unit) + matriks di `providers.test.ts`; mock tiga mode diklasifikasi benar. **Proxy nyata belum diuji** — butuh key |
 | **F1 — Persist & UI (2–3 hari)** | Migrasi `capabilities` + `preferred_endpoint`, `providerView`, halaman Providers tampilkan badge & sorting | Halaman `/m/ai/providers` urutkan direkomendasikan di atas; badge hijau/abu sesuai hasil |
 | **F2 — Chat runtime dual-endpoint (5–8 hari)** | `resolveProvider` + `callProvider` bercabang `/responses` vs `/chat/completions`, `parseResponsesChunk`, `toResponsesInput/Tools` **termasuk `function_call`/`function_call_output` (I-3) dan `input_image` (H-11)**, log `ai_calls.upstream_endpoint` | Chat streaming & non-stream lulus di kedua endpoint (mock + provider nyata); `ai_calls.provider` + `upstream_endpoint` tercatat; sisi web tidak disentuh |
 | **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), `reasoning_tokens` → `tokensOut` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
 | **F4 — Polish & gate CI (1–2 hari)** | Perluas fake `Bun.serve` in-process: `providers.test.ts:55` (3 mode — chat-only, responses-only, keduanya; badge & preferred) dan `ai.test.ts:77` (cabang `/responses` + stream + tool round-trip, dengan cek `url.pathname`). `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut, aplikasi tetap ter-build tanpa jejak AI" (`scripts/ci/m5-gate4.sh`) dan tidak menyentuh provider; `proof:m5:gate1`–`gate3` tidak ada |
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
+
+### 6.1 Catatan pelaksanaan F0 (2026-09-09)
+
+- **Sebagian F4 terpaksa maju.** Begitu `POST /test` memanggil probe, ia mem-POST bentuk Responses (`input`, tanpa `messages`) ke `/responses`; fake in-process di `providers.test.ts` yang tadinya menganggap **setiap** POST sebagai chat langsung melempar di `body.messages.at`, memutus koneksi, dan menggagalkan 4 dari 6 tes. Fake itu kini sadar-pathname dan chat-only secara sengaja. **`ai.test.ts` belum disentuh** — ia tidak memanggil `/test`, jadi belum kena; F4 tetap harus memperbaikinya sebelum menambah `/responses` di sana.
+- Lalu-lintas probe dijaga keluar dari `seen` di fake (penanda: `max_tokens === 8` + satu pesan `"ping"`). `tools` **bukan** penanda — chat sungguhan pun mengirim `tools`.
+- Probe membatalkan reader SSE setelah frame pertama (ada tesnya: 200 frame tidak pernah habis terbaca).
+- Anggaran waktu: timeout 3 dtk per langkah **plus** `budgetMs` 15 dtk untuk seluruh rangkaian. Klaim §4.1 "total < 4 detik" hanya berlaku pada provider sehat; provider mati/lambat memakai ~9 dtk (3 langkah × 3 dtk) sebelum menyerah.
+- Probe yang dibatalkan mengembalikan hasil biasa (`error: 'probe dibatalkan'`), bukan exception — supaya route dan CLI tidak perlu masing-masing menangkapnya.
 
 ## 7. Kriteria terima
 
