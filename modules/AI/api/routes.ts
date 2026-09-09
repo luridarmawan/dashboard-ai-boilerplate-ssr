@@ -46,12 +46,22 @@ import {
   costMicro,
   enabledProviders,
   modelsOf,
+  noteResponsesMissing,
   ProviderNotFound,
   type ProviderRow,
   resolveProvider,
   toPriceMicro,
 } from './providers.ts';
 import { adjustCredit, chargeCredit, checkQuota, creditLedger, creditOf } from './quota.ts';
+import {
+  type ProviderMessage,
+  parseResponsesEvent,
+  readResponsesReply,
+  type ToolCall,
+  toResponsesInput,
+  toResponsesTools,
+  type Usage,
+} from './responses.ts';
 import {
   ChatCompletionBody,
   ConversationCreate,
@@ -62,26 +72,6 @@ import {
   ProviderUpdateBody,
 } from './schemas.ts';
 
-/** OpenAI content parts: text plus images (H-11 attachments reach vision models this way). */
-type ContentPart =
-  | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
-/** Provider-side message: OpenAI shape, including the tool round-trip (I-3). */
-interface ProviderMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | null | ContentPart[];
-  tool_calls?: ToolCall[];
-  tool_call_id?: string;
-}
-interface ToolCall {
-  id: string;
-  type: 'function';
-  function: { name: string; arguments: string };
-}
-interface Usage {
-  prompt_tokens?: number;
-  completion_tokens?: number;
-}
 /** What the UI is told about each tool call (`dab.tool` frames in the stream, `x_tools` in JSON). */
 interface ToolTrace {
   name: string;
@@ -197,6 +187,9 @@ interface CallLog {
   streamed: boolean;
   priceInMicro: number;
   priceOutMicro: number;
+  /** Which UPSTREAM endpoint served it (F2) — not the local route named by `endpoint`. */
+  upstreamEndpoint?: string | null;
+  reasoningTokens?: number | null;
 }
 // Operational counters (M-6) beside the per-call log rows (H-9): provider/model/status only —
 // never a user or tenant label.
@@ -250,6 +243,8 @@ function logCall(c: CallLog): void {
         error: c.error ?? null,
         cost_micro: cost,
         streamed: c.streamed,
+        upstream_endpoint: c.upstreamEndpoint ?? null,
+        reasoning_tokens: c.reasoningTokens ?? null,
       })
       .catch((err) =>
         logger.warn('ai: call log failed', {
@@ -734,25 +729,72 @@ export default defineApiRoutes(
         // H-3: when the browser goes away, the upstream request goes away.
         request.signal.addEventListener('abort', () => upstream.abort(), { once: true });
 
-        const callProvider = (stream: boolean, withTools: boolean) =>
-          fetch(`${p.baseurl}/chat/completions`, {
+        // F2: which upstream endpoint serves this turn. Starts from the resolved provider and
+        // can drop to chat mid-turn when `/responses` turns out not to exist (see `callProvider`).
+        let endpoint = p.endpoint;
+        const maxTokens = body.max_tokens ?? p.maxTokens;
+
+        const send = (stream: boolean, withTools: boolean) => {
+          const responses = endpoint === 'responses';
+          const url = responses ? `${p.baseurl}/responses` : `${p.baseurl}/chat/completions`;
+          let payload: Record<string, unknown>;
+          if (responses) {
+            const { instructions, input } = toResponsesInput(convo);
+            payload = {
+              model,
+              input,
+              stream,
+              ...(instructions ? { instructions } : {}),
+              // Responses names the cap differently, and reasoning models reject a temperature
+              // other than the default — so it only goes out when the caller asked for one.
+              max_output_tokens: maxTokens,
+              ...(body.temperature === undefined ? {} : { temperature: body.temperature }),
+              ...(withTools && openAiTools ? { tools: toResponsesTools(openAiTools) } : {}),
+            };
+          } else {
+            payload = {
+              model,
+              messages: convo,
+              stream,
+              temperature: body.temperature,
+              max_tokens: maxTokens,
+              ...(withTools && openAiTools ? { tools: openAiTools } : {}),
+              ...(stream ? { stream_options: { include_usage: true } } : {}),
+            };
+          }
+          return fetch(url, {
             method: 'POST',
             headers: {
               'content-type': 'application/json',
               authorization: `Bearer ${p.key}`,
               accept: stream ? 'text/event-stream' : 'application/json',
             },
-            body: JSON.stringify({
-              model,
-              messages: convo,
-              stream,
-              temperature: body.temperature,
-              max_tokens: body.max_tokens ?? p.maxTokens,
-              ...(withTools && openAiTools ? { tools: openAiTools } : {}),
-              ...(stream ? { stream_options: { include_usage: true } } : {}),
-            }),
+            body: JSON.stringify(payload),
             signal: upstream.signal,
           });
+        };
+
+        /**
+         * One upstream call, with the §8 safety net: a provider whose `preferred_endpoint` says
+         * `responses` but answers 404/405 is not broken, it simply does not have that route — so
+         * drop to `/chat/completions` for the rest of this turn and remember it for the next
+         * requests, instead of failing a chat the user is waiting on.
+         */
+        const callProvider = async (stream: boolean, withTools: boolean) => {
+          const res = await send(stream, withTools);
+          if (endpoint === 'responses' && (res.status === 404 || res.status === 405)) {
+            await res.body?.cancel().catch(() => {});
+            logger.info('ai: /responses missing, falling back to /chat/completions', {
+              baseurl: p.baseurl,
+              provider: p.code,
+              requestId,
+            });
+            noteResponsesMissing(p.baseurl);
+            endpoint = 'chat_completions';
+            return send(stream, withTools);
+          }
+          return res;
+        };
 
         const log = (
           roundStart: number,
@@ -761,6 +803,7 @@ export default defineApiRoutes(
           status: 'ok' | 'error' | 'cancelled',
           firstTokenMs: number | null,
           error?: string,
+          reasoningTokens?: number | null,
         ) => {
           const tokensIn =
             usage?.prompt_tokens ??
@@ -783,6 +826,8 @@ export default defineApiRoutes(
             streamed: !!body.stream,
             priceInMicro: p.priceInMicro,
             priceOutMicro: p.priceOutMicro,
+            upstreamEndpoint: endpoint,
+            reasoningTokens: reasoningTokens ?? null,
           });
         };
 
@@ -882,21 +927,60 @@ export default defineApiRoutes(
               choices?: { message?: { content?: string | null; tool_calls?: ToolCall[] } }[];
               usage?: Usage;
             };
-            const msg = json.choices?.[0]?.message;
-            const content = msg?.content ?? '';
-            log(roundStart, json.usage ?? null, content, 'ok', null);
-            const calls = (msg?.tool_calls ?? []).filter((c) => c?.type === 'function' && c.id);
+            // Both shapes reduce to the same three things; the client only ever sees the chat one.
+            const reply =
+              endpoint === 'responses'
+                ? readResponsesReply(json)
+                : {
+                    content: json.choices?.[0]?.message?.content ?? '',
+                    toolCalls: (json.choices?.[0]?.message?.tool_calls ?? []).filter(
+                      (c) => c?.type === 'function' && c.id,
+                    ),
+                    usage: json.usage ?? null,
+                    reasoningTokens: null as number | null,
+                  };
+            const content = reply.content;
+            log(roundStart, reply.usage, content, 'ok', null, undefined, reply.reasoningTokens);
+            const calls = reply.toolCalls;
             if (calls.length && round < MAX_TOOL_ROUNDS) {
               if (content) transcript += `${content}\n\n`;
-              convo.push({ role: 'assistant', content: msg?.content ?? null, tool_calls: calls });
+              convo.push({ role: 'assistant', content: content || null, tool_calls: calls });
               convo.push(...(await runToolCalls(calls)));
               continue;
             }
             transcript += content;
             // Awaited on purpose: the no-JS page reloads the conversation right after this reply.
-            await persist(transcript, json.usage?.completion_tokens ?? estimateTokens(transcript));
+            await persist(transcript, reply.usage?.completion_tokens ?? estimateTokens(transcript));
+            // A Responses body is not what the client's contract promises, so it is rendered as a
+            // chat completion; a chat body passes through as before.
+            const envelope =
+              endpoint === 'responses'
+                ? {
+                    id: (json as { id?: string }).id ?? assistantMsgId,
+                    object: 'chat.completion',
+                    model,
+                    choices: [
+                      {
+                        index: 0,
+                        message: { role: 'assistant', content },
+                        finish_reason: calls.length ? 'tool_calls' : 'stop',
+                      },
+                    ],
+                    ...(reply.usage
+                      ? {
+                          usage: {
+                            prompt_tokens: reply.usage.prompt_tokens ?? 0,
+                            completion_tokens: reply.usage.completion_tokens ?? 0,
+                            total_tokens:
+                              (reply.usage.prompt_tokens ?? 0) +
+                              (reply.usage.completion_tokens ?? 0),
+                          },
+                        }
+                      : {}),
+                  }
+                : json;
             return {
-              ...json,
+              ...envelope,
               x_tools: traces,
               // H-12: the stored ids, so a client can regenerate / branch from them.
               ...(conversationId
@@ -947,6 +1031,7 @@ export default defineApiRoutes(
                 }
                 let assistant = '';
                 let usage: Usage | null = null;
+                let reasoningTokens: number | null = null;
                 let firstTokenMs: number | null = null;
                 const calls = new Map<number, ToolCall>();
                 const decoder = new TextDecoder();
@@ -964,6 +1049,36 @@ export default defineApiRoutes(
                       if (!line.startsWith('data:')) continue;
                       const data = line.slice(5).trim();
                       if (!data || data === '[DONE]') continue; // ours to send, once, at the end
+
+                      // ---- Responses (F2): translate, never forward. Its frames are a different
+                      // wire format, and one of them — `response.reasoning_summary_text.delta` —
+                      // arrives BEFORE the answer, so forwarding blindly would pour the model's
+                      // reasoning summary into the answer bubble (§12 no. 2).
+                      if (endpoint === 'responses') {
+                        const ev = parseResponsesEvent(data);
+                        if (ev.error) {
+                          log(roundStart, usage, assistant, 'error', firstTokenMs, ev.error);
+                          frame({
+                            error: {
+                              code: 'service_unavailable',
+                              message: `Penyedia AI: ${ev.error}`,
+                            },
+                          });
+                          return;
+                        }
+                        if (ev.text) {
+                          if (firstTokenMs === null)
+                            firstTokenMs = Math.round(performance.now() - started);
+                          assistant += ev.text;
+                          frame({ choices: [{ index: 0, delta: { content: ev.text } }] });
+                        }
+                        if (ev.toolCall) calls.set(calls.size, ev.toolCall);
+                        if (ev.usage) usage = ev.usage;
+                        if (ev.reasoningTokens !== undefined && ev.reasoningTokens !== null)
+                          reasoningTokens = ev.reasoningTokens;
+                        continue;
+                      }
+
                       let j: {
                         choices?: {
                           finish_reason?: string | null;
@@ -1014,12 +1129,20 @@ export default defineApiRoutes(
                 } catch (err) {
                   if (upstream.signal.aborted) {
                     transcript += assistant;
-                    log(roundStart, usage, assistant, 'cancelled', firstTokenMs);
+                    log(
+                      roundStart,
+                      usage,
+                      assistant,
+                      'cancelled',
+                      firstTokenMs,
+                      undefined,
+                      reasoningTokens,
+                    );
                     return;
                   }
                   throw err;
                 }
-                log(roundStart, usage, assistant, 'ok', firstTokenMs);
+                log(roundStart, usage, assistant, 'ok', firstTokenMs, undefined, reasoningTokens);
                 transcript += assistant;
                 transcriptTokens = usage?.completion_tokens ?? null;
                 const list = [...calls.values()].filter((c) => c.id && c.function.name);

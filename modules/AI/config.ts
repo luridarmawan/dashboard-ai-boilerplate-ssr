@@ -61,8 +61,8 @@ export default defineConfig('AI', [
         type: 'select',
         title: { id: 'Endpoint provider', en: 'Provider endpoint' },
         note: {
-          id: 'Belum berpengaruh: chat masih selalu memakai /chat/completions sampai dukungan dua endpoint aktif. Setelah itu, Otomatis akan mencoba /responses lebih dulu dan turun ke /chat/completions bila provider menjawab 404/405. Berlaku untuk penyedia dari bagian ini; profil di Penyedia AI memakai hasil Uji koneksi masing-masing.',
-          en: 'No effect yet: chat always uses /chat/completions until dual-endpoint support lands. After that, Automatic tries /responses first and falls back to /chat/completions when the provider answers 404/405. Applies to the provider configured here; profiles under AI providers use their own connection test.',
+          id: 'Otomatis: coba /responses lebih dulu, turun ke /chat/completions bila provider menjawab 404/405 (hasilnya diingat sebentar, jadi tidak diulang tiap chat). Pilih manual bila Anda sudah tahu kemampuan provider. Berlaku untuk penyedia dari bagian ini; profil di Penyedia AI memakai hasil Uji koneksi masing-masing.',
+          en: 'Automatic: try /responses first and fall back to /chat/completions when the provider answers 404/405 (the answer is remembered briefly, so it is not retried on every chat). Pin it when you already know what the provider supports. Applies to the provider configured here; profiles under AI providers use their own connection test.',
         },
         default: 'auto',
         options: [

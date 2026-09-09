@@ -1,6 +1,7 @@
 import { settings } from '@app/api/services';
 import { env } from '@core/config';
 import { and, eq, isNull, schema, unsafeAcrossTenants } from '@core/db';
+import type { Endpoint } from './probe.ts';
 
 /**
  * Provider resolution (H-10). A tenant may hold several provider PROFILES (`ai_providers`), each
@@ -22,6 +23,8 @@ export interface ResolvedProvider {
   model: string;
   systemPrompt: string | null;
   maxTokens: number;
+  /** Which upstream endpoint to call (AI-Roadmap F2). */
+  endpoint: Endpoint;
   /** Price per 1M tokens, micro-units of the currency. */
   priceInMicro: number;
   priceOutMicro: number;
@@ -59,6 +62,43 @@ export class ProviderNotFound extends Error {
 }
 
 /**
+ * `ai.preferred_endpoint = auto` (the default for the settings-based provider) is resolved
+ * optimistically: try `/responses`, and let the runtime fallback record the answer when a
+ * provider turns out not to have it. That costs one wasted 404 per base URL per TTL instead of a
+ * probe on every chat — §9 rules out probing per request, and §5.1 rules out writing to the DB
+ * from the chat path.
+ *
+ * Keyed by base URL because endpoint availability is a property of the API, not of the model.
+ * In-process on purpose: a stale entry costs one extra round-trip, never a wrong answer, so
+ * workers do not need to agree.
+ */
+const AUTO_TTL_MS = 600_000;
+const autoEndpoints = new Map<string, { endpoint: Endpoint; at: number }>();
+
+const autoKey = (baseUrl: string) => baseUrl.replace(/\/$/, '');
+
+function autoEndpoint(baseUrl: string): Endpoint {
+  const key = autoKey(baseUrl);
+  const hit = autoEndpoints.get(key);
+  if (hit && Date.now() - hit.at < AUTO_TTL_MS) return hit.endpoint;
+  if (hit) autoEndpoints.delete(key);
+  return 'responses';
+}
+
+/** Called when a live `/responses` call answered 404/405: remember it for the next requests. */
+export function noteResponsesMissing(baseUrl: string): void {
+  autoEndpoints.set(autoKey(baseUrl), { endpoint: 'chat_completions', at: Date.now() });
+}
+
+/** Test seam: the cache is process-wide and would otherwise leak between cases. */
+export function resetEndpointCache(): void {
+  autoEndpoints.clear();
+}
+
+const asEndpoint = (v: unknown): Endpoint | null =>
+  v === 'responses' || v === 'chat_completions' ? v : null;
+
+/**
  * Pick the provider for a call. Precedence: `wanted.code` (request) → `wanted.providerId`
  * (conversation) → the tenant's default profile → the legacy settings. The model: `wanted.model`
  * → the profile's default model (→ `ai.model` for the legacy path). Prices come from the
@@ -90,20 +130,26 @@ export async function resolveProvider(
       model,
       systemPrompt,
       maxTokens,
+      // A profile that has never been probed keeps the pre-F2 behaviour exactly (§7.6).
+      endpoint: asEndpoint(profile.preferred_endpoint) ?? 'chat_completions',
       priceInMicro: Number(priced?.price_in_micro ?? 0),
       priceOutMicro: Number(priced?.price_out_micro ?? 0),
     };
   }
   const toMicro = (n: number | null) => Math.round((n ?? 0) * 1_000_000);
   const e = env();
+  const baseurl = (
+    (await settings.get<string | null>(clientId, 'ai.baseurl')) ??
+    e.AI_API_BASE_URL ??
+    'https://api.openai.com/v1'
+  ).replace(/\/$/, '');
   return {
     id: null,
     code: null,
-    baseurl: (
-      (await settings.get<string | null>(clientId, 'ai.baseurl')) ??
-      e.AI_API_BASE_URL ??
-      'https://api.openai.com/v1'
-    ).replace(/\/$/, ''),
+    baseurl,
+    endpoint:
+      asEndpoint(await settings.get<string | null>(clientId, 'ai.preferred_endpoint')) ??
+      autoEndpoint(baseurl),
     key: (await settings.get<string | null>(clientId, 'ai.key')) || e.AI_API_KEY || null,
     model:
       wanted.model ||

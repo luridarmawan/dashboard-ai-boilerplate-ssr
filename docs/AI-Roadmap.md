@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **F0 + F1 selesai** (2026-09-09, 2026-09-10) — probe, migrasi `0022`, persistensi, badge & urutan, setting `ai.preferred_endpoint`. Bentuk Responses API **terverifikasi ke provider nyata** (§12). Berikutnya: F2 |
+| **Status** | **F0 + F1 + F2 selesai** (2026-09-09, 2026-09-10) — probe, persistensi & UI, dan chat dua-endpoint yang **terbukti terhadap provider nyata** (§12). Berikutnya: F3 (pemetaan param reasoning, `tool_choice`) dan §10 CLI |
 | **Pemilik** | Modul `AI` (`modules/AI/`) |
 | **Bergantung pada** | `docs/PRD.md` §4.5 titik perluasan 1–12, `docs/AI.md` §Ganti provider & Multi-provider (H-10), `docs/ROADMAP.md` §8.6 |
 | **Isu pemicu** | Provider saat ini hardcode `POST /chat/completions` (`modules/AI/api/routes.ts:690`), uji koneksi hanya `GET /models` (`modules/AI/api/providers.ts:136`). Belum ada deteksi `/responses`, stream, reasoning, dan tools — admin tidak tahu kemampuan API sebelum chat pertama gagal |
@@ -143,7 +143,7 @@ ai.preferred_endpoint : auto | responses | chat_completions   (baku: auto)
 
 - `auto` **tidak menulis balik ke DB dari jalur chat.** Diselesaikan malas saat pemakaian pertama, di-cache di proses per `(baseUrl, model)` dengan TTL ~10 menit; fallback hanya pada `404`/`405` (aturan `presenceOf` di `probe.ts`). Biaya cache-miss = satu round-trip 404, dan hasilnya tetap benar di banyak worker tanpa koordinasi
 - `bun run ai:test` cukup **menampilkan** hasil resolusi `auto` — §10.5 ("tidak menulis ke DB") tetap utuh
-- **Key-nya sudah ada sejak F1, tetapi belum ada yang membacanya:** chat baru bercabang endpoint di F2, jadi catatan field-nya menyatakan terus-terang "belum berpengaruh" agar tidak tampak seperti tombol rusak. Hapus kalimat itu saat F2 mendarat
+- Key-nya lahir di F1 tanpa pembaca dan catatannya menyatakan "belum berpengaruh"; sejak F2 mendarat (2026-09-10) kalimat itu dicabut dan setting-nya benar-benar mengendalikan endpoint
 - Admin yang sudah tahu providernya bisa memaku nilainya dan melewati deteksi
 
 Konsekuensi yang ikut dikerjakan: key baru di `config.ts` membuat `bun run modules:sync` menulis ulang `modules.json` (wajib round-trip byte-identik) dan menambah key i18n `id`/`en`.
@@ -239,7 +239,7 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 |---|---|---|
 | ~~**F0 — Probe tanpa DB**~~ **SELESAI 2026-09-09** | `modules/AI/api/probe.ts` (murni, tanpa `@app/api/services`/`@core/db`) + `POST /providers/:id/test` kembalikan matriks tanpa menyimpannya; mock dapat `GET /v1/models`, `POST /v1/responses`, `MOCK_ENDPOINTS` | Terbukti: `modules/AI/test/probe.test.ts` (11 kasus, unit) + matriks di `providers.test.ts`; mock tiga mode diklasifikasi benar. **Proxy nyata belum diuji** — butuh key |
 | ~~**F1 — Persist & UI**~~ **SELESAI 2026-09-10** | Migrasi `0022` (aditif, mysql+pg: 5 kolom `ai_providers` + `upstream_endpoint`/`reasoning_tokens` di `ai_calls`), persistensi di `POST /test`, `providerView` + `ProviderOption` membawa matriks, `web/lib/Capabilities.svelte`, kolom **Kemampuan** + urutan rekomendasi, setting `ai.preferred_endpoint`, i18n id/en | Terbukti: `providers.test.ts` — matriks tersimpan & terbaca kembali, penyedia `/responses`-only ber-badge ★ dan berada di urutan pertama meski namanya terurut terakhir, **chat tanpa menyebut penyedia tetap ke penyedia baku**, probe gagal tidak menghapus matriks yang sudah diketahui |
-| **F2 — Chat runtime dual-endpoint (5–8 hari)** | `resolveProvider` + `callProvider` bercabang `/responses` vs `/chat/completions`, `parseResponsesChunk`, `toResponsesInput/Tools` **termasuk `function_call`/`function_call_output` (I-3) dan `input_image` (H-11)**, log `ai_calls.upstream_endpoint` | Chat streaming & non-stream lulus di kedua endpoint (mock + provider nyata); `ai_calls.provider` + `upstream_endpoint` tercatat; sisi web tidak disentuh |
+| ~~**F2 — Chat runtime dual-endpoint**~~ **SELESAI 2026-09-10** | `modules/AI/api/responses.ts` (`toResponsesInput`/`toResponsesTools`/`parseResponsesEvent`/`readResponsesReply`/`normalizeUsage`), `callProvider` bercabang + fallback runtime 404/405, `ai_calls.upstream_endpoint` & `reasoning_tokens` terisi | Terbukti: 18 kasus unit (`responses.test.ts`) + 4 kasus integrasi (non-stream, stream dengan ringkasan reasoning disaring, tool round-trip `function_call`/`function_call_output`, fallback) + **uji langsung ke provider nyata** (§12.1). Sisi web tidak disentuh sama sekali |
 | **F3 — Reasoning/tools deep (2–3 hari)** | Reasoning param mapping (`reasoning_effort` vs `reasoning`), aturan inklusif/eksklusif §5.1a mengisi `tokensOut` + `reasoning_tokens` + biaya, `tool_choice` mapping | Test integrasi: model reasoning mengembalikan `reasoning_tokens`; tools 5 round tetap jalan di `/responses` |
 | **F4 — Polish & gate CI (1–2 hari)** | Perluas fake `Bun.serve` in-process: `providers.test.ts:55` (3 mode — chat-only, responses-only, keduanya; badge & preferred) dan `ai.test.ts:77` (cabang `/responses` + stream + tool round-trip, dengan cek `url.pathname`). `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut, aplikasi tetap ter-build tanpa jejak AI" (`scripts/ci/m5-gate4.sh`) dan tidak menyentuh provider; `proof:m5:gate1`–`gate3` tidak ada |
 
@@ -415,6 +415,24 @@ response.created → response.in_progress → response.output_item.added
 Perhatikan: `output_tokens` (56) **sama dengan** `text_tokens` (56) sementara `reasoning_tokens` (53) berada di luar keduanya — padahal 53 + 56 > 56. Artinya di provider ini token reasoning **tidak** termasuk `output_tokens`; menagih hanya `output_tokens` berarti menagih kurang, dan asumsi sebaliknya di provider lain berarti menagih dobel. Ini keputusan §7.5 yang harus diambil sebelum F3, bukan detail implementasi.
 
 **5. Batas probe yang perlu diketahui:** model ini **selalu** mengeluarkan item `reasoning` walau parameter `reasoning` tidak dikirim. Jadi langkah 5 §4.1 sesungguhnya menjawab "apakah model ini melakukan reasoning", bukan "apakah parameter `reasoning` dihormati" — dua hal itu tidak bisa dibedakan dari satu panggilan, dan untuk keputusan badge memang tidak perlu dibedakan.
+
+### 12.1 Terjemahan stream diuji ke provider nyata (2026-09-10)
+
+`parseResponsesEvent` dijalankan atas aliran sungguhan dari provider yang sama, dengan `input`/`instructions` yang dibangun `toResponsesInput`:
+
+```
+event asli : response.created → response.in_progress → response.output_item.added
+→ response.reasoning_summary_part.added → response.reasoning_summary_text.delta
+→ … → response.output_text.delta → … → response.completed
+frame response.reasoning_summary_text.delta yang datang : 74
+teks yang dirakit parser                                : "Merah, biru, hijau."
+usage ternormalisasi : {"prompt_tokens":65,"completion_tokens":271}, reasoningTokens 261
+```
+
+Dua hal yang dibuktikannya:
+
+1. **74 frame ringkasan reasoning datang, nol yang bocor** ke jawaban. Tanpa penyaringan per `type`, seluruh isi pikiran model akan muncul di balon jawaban pengguna.
+2. **Aturan §5.1a bukan teori.** Provider melaporkan `output_tokens` 10 dengan `reasoning_tokens` 261; tanpa aturan eksklusif, giliran ini tertagih 10 token alih-alih 271 — meleset 27 kali lipat pada satu percakapan.
 
 **Hasil probe provider tersebut:** `preferred=responses`, responses ✓ chat ✓ stream ✓ reasoning ✓ (`reasoning`) tools ✓, 3 model, **Direkomendasikan ★**, 6,1 dtk (langkah terlama: `/responses` 2,5 dtk).
 - `packages/db/migrations/mysql/0021_flat_impossible_man.sql` migrasi terakhir; `packages/db/src/descriptor.ts:152` `col.json()`

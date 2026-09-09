@@ -61,6 +61,11 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
   /** Wire names of the tools the last request offered to the "model" (null = no `tools` field). */
   let mockToolsSeen: string[] | null = null;
   let mockLastMessages: { role: string; content: string | null }[] = [];
+  /** F2: which upstream endpoint the last call went to, and whether /responses exists at all. */
+  let mockLastPath = '';
+  let mockHasResponses = true;
+  /** F2: the `input[]` of the last /responses call, so tests can inspect the translation. */
+  let mockLastInput: { type?: string; role?: string; content?: unknown; call_id?: string }[] = [];
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -73,12 +78,123 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
         body: JSON.stringify({ email: adminEmail, password: adminPassword }),
       }),
     );
+    /**
+     * The same mock, speaking the MODERN endpoint (F2). It mirrors the chat behaviour — echo,
+     * system prompt marker, PING tool round-trip — through Responses shapes, and its stream
+     * deliberately emits `response.reasoning_summary_text.delta` BEFORE the answer: a real
+     * provider does (§12 no. 2), and forwarding it would pour reasoning into the answer bubble.
+     */
+    const respondResponses = async (req: Request): Promise<Response> => {
+      const body = (await req.json()) as {
+        stream?: boolean;
+        instructions?: string;
+        input?: {
+          type?: string;
+          role?: string;
+          content?: unknown;
+          call_id?: string;
+          output?: string;
+        }[];
+        tools?: { type: string; name: string }[];
+      };
+      const input = body.input ?? [];
+      mockLastInput = input;
+      mockToolsSeen = body.tools ? body.tools.map((t) => t.name) : null;
+      const plain = (c: unknown): string =>
+        typeof c === 'string'
+          ? c
+          : Array.isArray(c)
+            ? c.map((x) => (x as { text?: string }).text ?? '').join('')
+            : '';
+      const lastUser = [...input].reverse().find((i) => i.type === 'message' && i.role === 'user');
+      const fnOut = input.find((i) => i.type === 'function_call_output');
+      const usage = {
+        input_tokens: 11,
+        output_tokens: 7,
+        output_tokens_details: { reasoning_tokens: 3, text_tokens: 7 },
+      };
+      if (body.tools && plain(lastUser?.content).includes('PING') && !fnOut) {
+        const call = {
+          type: 'function_call',
+          id: 'fc_1',
+          call_id: 'call_1',
+          name: 'dummy_ping',
+          arguments: JSON.stringify({ message: 'from-model' }),
+        };
+        if (!body.stream)
+          return Response.json({ id: 'resp_1', output: [call], output_text: '', usage });
+        return new Response(
+          `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: 'resp_1', error: null } })}\n\n` +
+            `data: ${JSON.stringify({ type: 'response.output_item.done', item: call })}\n\n` +
+            `data: ${JSON.stringify({ type: 'response.completed', response: { usage } })}\n\n`,
+          { headers: { 'content-type': 'text/event-stream' } },
+        );
+      }
+      const text = fnOut
+        ? `TOOL SAID ${fnOut.output}`
+        : `${body.instructions ? 'SYS ' : ''}echo: ${plain(lastUser?.content)} with **md** and \`code\``;
+      if (!body.stream)
+        return Response.json({
+          id: 'resp_1',
+          output: [
+            { type: 'reasoning', id: 'rs_1', summary: [] },
+            {
+              type: 'message',
+              role: 'assistant',
+              content: [{ type: 'output_text', text }],
+            },
+          ],
+          output_text: text,
+          usage,
+        });
+      const enc = new TextEncoder();
+      return new Response(
+        new ReadableStream({
+          async start(c) {
+            const f = (o: unknown) => c.enqueue(enc.encode(`data: ${JSON.stringify(o)}\n\n`));
+            f({ type: 'response.created', response: { id: 'resp_1', error: null } });
+            // The poison: if this reaches the client, the assembled answer is wrong.
+            f({ type: 'response.reasoning_summary_text.delta', delta: 'JANGAN-TAMPIL ' });
+            for (const word of text.split(' ')) {
+              if (req.signal.aborted) {
+                mockAborted++;
+                c.close();
+                return;
+              }
+              f({ type: 'response.output_text.delta', item_id: 'm1', delta: `${word} ` });
+              await sleep(25);
+            }
+            f({ type: 'response.output_text.done', item_id: 'm1', text });
+            f({ type: 'response.completed', response: { usage } });
+            c.close();
+          },
+        }),
+        { headers: { 'content-type': 'text/event-stream' } },
+      );
+    };
     // In-process mock provider: streams 20 chunks, 25 ms apart; counts aborted requests.
     mock = Bun.serve({
       port: 0,
       async fetch(req) {
         if (!req.headers.get('authorization')?.includes('test-key'))
           return new Response('{"error":{"message":"bad key"}}', { status: 401 });
+        // The pathname check matters: the probe and the F2 chat path post a Responses-shaped body
+        // (`input`, no `messages`). A handler that treats every POST as a chat completion throws
+        // on `body.messages`, kills the connection, and fails everything after it.
+        const path = new URL(req.url).pathname;
+        mockLastPath = path;
+        const notFound = () =>
+          new Response('{"error":{"message":"not found"}}', {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          });
+        if (path.endsWith('/models'))
+          return Response.json({ object: 'list', data: [{ id: 'mock-1', object: 'model' }] });
+        if (path.endsWith('/responses')) {
+          if (!mockHasResponses) return notFound();
+          return respondResponses(req);
+        }
+        if (!path.endsWith('/chat/completions')) return notFound();
         const body = (await req.json()) as {
           stream?: boolean;
           messages: { role: string; content: string | null; tool_call_id?: string }[];
@@ -226,6 +342,10 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
           'ai.key': 'test-key',
           'ai.enable': 'true',
           'ai.system_prompt': 'Be brief.',
+          // Pin the classic endpoint: everything below this line was written against
+          // /chat/completions and must keep proving THAT path. The Responses path has its own
+          // cases at the end of the file, which flip this setting.
+          'ai.preferred_endpoint': 'chat_completions',
         })
       ).status,
     ).toBe(200);
@@ -597,5 +717,176 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
       { method: 'PUT', body: JSON.stringify({ scope: 'global', values: { 'ai.enable': 'true' } }) },
       [admin],
     );
+  });
+
+  // ---- F2: the same chat over the modern endpoint (AI-Roadmap §5.2, §12) ----
+  describe('dual endpoint (F2)', () => {
+    const setEndpoint = async (v: string) => {
+      const r = await call(
+        '/v1/configuration',
+        {
+          method: 'PUT',
+          body: JSON.stringify({ scope: 'global', values: { 'ai.preferred_endpoint': v } }),
+        },
+        [admin],
+      );
+      expect(r.status).toBe(200);
+      return r;
+    };
+    /**
+     * The newest ok call log. `logCall` inserts in a microtask, so waiting for "any ok row" would
+     * happily return the PREVIOUS test's row: the predicate has to name the endpoint expected.
+     */
+    const lastCall = (upstream: string) =>
+      waitFor(
+        async () =>
+          (
+            await db
+              .select()
+              .from(schema.aiCalls)
+              .where(eq(schema.aiCalls.client_id, tenantId))
+              .orderBy(desc(schema.aiCalls.created_at))
+              .limit(1)
+          )[0],
+        (l) => l.status === 'ok' && l.upstream_endpoint === upstream,
+      );
+
+    beforeAll(async () => {
+      mockHasResponses = true;
+      await setEndpoint('responses');
+    });
+    afterAll(async () => {
+      mockHasResponses = true;
+      await setEndpoint('chat_completions');
+    });
+
+    test('non-stream: the turn goes to /responses and comes back chat-shaped', async () => {
+      mockLastPath = '';
+      const res = await call(
+        '/v1/m/ai/chat/completions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'halo responses' }] }),
+        },
+        [admin],
+      );
+      expect(res.status).toBe(200);
+      expect(mockLastPath).toBe('/v1/responses');
+      const j = (await json(res)) as {
+        choices?: { message?: { content?: string } }[];
+        usage?: { completion_tokens?: number };
+      };
+      // The client contract does not change with the endpoint.
+      expect(j.choices?.[0]?.message?.content).toContain('echo: halo responses');
+      // The system prompt travelled as `instructions`, not as a message.
+      expect(j.choices?.[0]?.message?.content).toContain('SYS ');
+      expect(mockLastInput.some((i) => i.role === 'system')).toBe(false);
+      // §5.1a: the mock reports text_tokens == output_tokens, so reasoning is added on top.
+      expect(j.usage?.completion_tokens).toBe(10);
+      const log = await lastCall('responses');
+      expect(log?.upstream_endpoint).toBe('responses');
+      expect(log?.reasoning_tokens).toBe(3);
+      expect(log?.tokens_out).toBe(10);
+    });
+
+    test('stream: the answer assembles, and the reasoning summary never reaches the client', async () => {
+      mockLastPath = '';
+      const res = await call(
+        '/v1/m/ai/chat/completions',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: 'stream responses' }],
+            stream: true,
+          }),
+        },
+        [admin],
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toContain('text/event-stream');
+      const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+      const dec = new TextDecoder();
+      let raw = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        raw += dec.decode(value, { stream: true });
+      }
+      // Reassemble the way the browser does: chat-shaped deltas, whatever served them.
+      let assembled = '';
+      for (const line of raw.split('\n')) {
+        if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+        const frame = JSON.parse(line.slice(6)) as {
+          choices?: { delta?: { content?: string } }[];
+        };
+        assembled += frame.choices?.[0]?.delta?.content ?? '';
+      }
+      expect(assembled).toContain('echo: stream responses');
+      // The regression this exists for (§12 no. 2).
+      expect(assembled).not.toContain('JANGAN-TAMPIL');
+      expect(raw).not.toContain('reasoning_summary');
+      expect(raw).toContain('[DONE]');
+      const log = await waitFor(
+        async () =>
+          (
+            await db
+              .select()
+              .from(schema.aiCalls)
+              .where(eq(schema.aiCalls.client_id, tenantId))
+              .orderBy(desc(schema.aiCalls.created_at))
+              .limit(1)
+          )[0],
+        (l) => l.streamed && l.status === 'ok',
+      );
+      expect(log?.upstream_endpoint).toBe('responses');
+      expect(log?.reasoning_tokens).toBe(3);
+    });
+
+    test('tool round-trip over /responses: function_call out, function_call_output back', async () => {
+      mockLastPath = '';
+      const res = await call(
+        '/v1/m/ai/chat/completions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'PING lewat responses' }] }),
+        },
+        [admin],
+      );
+      expect(res.status).toBe(200);
+      const j = (await json(res)) as {
+        choices?: { message?: { content?: string } }[];
+        x_tools?: { name: string; ok: boolean }[];
+      };
+      expect(j.choices?.[0]?.message?.content).toContain('TOOL SAID');
+      expect(j.x_tools?.[0]?.ok).toBe(true);
+      // The second round carried the Responses tool items, not a `tool` role.
+      expect(mockLastInput.some((i) => i.type === 'function_call')).toBe(true);
+      const out = mockLastInput.find((i) => i.type === 'function_call_output');
+      expect(out?.call_id).toBe('call_1');
+      expect(mockLastInput.some((i) => i.role === 'tool')).toBe(false);
+    });
+
+    test('a provider without /responses falls back to /chat/completions instead of failing', async () => {
+      mockHasResponses = false;
+      mockLastPath = '';
+      try {
+        const res = await call(
+          '/v1/m/ai/chat/completions',
+          {
+            method: 'POST',
+            body: JSON.stringify({ messages: [{ role: 'user', content: 'tanpa responses' }] }),
+          },
+          [admin],
+        );
+        expect(res.status).toBe(200);
+        const j = (await json(res)) as { choices?: { message?: { content?: string } }[] };
+        expect(j.choices?.[0]?.message?.content).toContain('echo: tanpa responses');
+        expect(mockLastPath).toBe('/v1/chat/completions');
+        const log = await lastCall('chat_completions');
+        expect(log?.upstream_endpoint).toBe('chat_completions');
+      } finally {
+        mockHasResponses = true;
+      }
+    });
   });
 });
