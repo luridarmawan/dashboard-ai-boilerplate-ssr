@@ -21,7 +21,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
       </details>
       {@render brand()}
       <nav class="hidden md:ms-1 md:block" aria-label="Navigasi utama">{@render nav({ orientation: 'horizontal' })}</nav>
-      <div class="ms-auto flex items-center gap-2">{@render header()}</div>
+      <div id="nav-top-right-user-compact" class="ms-auto flex items-center gap-2">{@render header()}</div>
     </div>
   </header>
 

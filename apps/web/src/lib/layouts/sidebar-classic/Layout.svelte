@@ -24,7 +24,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
         </nav>
       </details>
       <div class="md:hidden">{@render brand()}</div>
-      <div class="ms-auto flex items-center gap-2">{@render header()}</div>
+      <div id="nav-top-right-user-classic" class="ms-auto flex items-center gap-2">{@render header()}</div>
     </header>
 
     <div class="px-4 pt-3 text-sm text-muted-foreground">{@render breadcrumb()}</div>
