@@ -36,7 +36,7 @@ const t = useT();
     <div class="row">
       <button type="submit">{t('auth.login.submit')}</button>
       <a href="/auth/forgot">{t('auth.login.forgot')}</a>
-      <a href="/auth/register">{t('auth.login.register')}</a>
+      {#if data.signupEnabled}<a href="/auth/register">{t('auth.login.register')}</a>{/if}
     </div>
   </form>
   {#if data.google}

@@ -109,3 +109,13 @@ export function cfgBool(c: PublicConfig, key: string): boolean | null {
   const v = c.values[key];
   return typeof v === 'boolean' ? v : null;
 }
+
+/** Effective self-service sign-up flag: runtime config wins, else .env SIGNUP_ENABLED, else !production. */
+export function isSignupEnabled(c: PublicConfig): boolean {
+  const v = cfgBool(c, 'security.signup_enabled');
+  if (typeof v === 'boolean') return v;
+  const raw = env.SIGNUP_ENABLED?.trim();
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  return env.NODE_ENV !== 'production';
+}

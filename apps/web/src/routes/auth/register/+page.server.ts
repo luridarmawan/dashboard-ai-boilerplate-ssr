@@ -1,5 +1,5 @@
-import { redirect } from '@sveltejs/kit';
-import { cfgBool } from '$lib/server/config';
+import { error, redirect } from '@sveltejs/kit';
+import { cfgBool, isSignupEnabled } from '$lib/server/config';
 import {
   actionFailure,
   apiFor,
@@ -11,9 +11,10 @@ import {
 } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
-/** Self-registration (A-1). The API decides whether it is open (SIGNUP_ENABLED). */
+/** Self-registration (A-1). Closed with 404 when SIGNUP_ENABLED=false (flag only for self-service; /join stays open). */
 export const load: PageServerLoad = async (event) => {
   if (event.locals.session) redirect(303, '/dashboard');
+  if (!isSignupEnabled(event.locals.config)) error(404, 'New registration disabled');
   return {
     csrf: csrfToken(event),
     signupEnabled: cfgBool(event.locals.config, 'security.signup_enabled'),
@@ -22,6 +23,12 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions: Actions = {
   default: async (event) => {
+    if (!isSignupEnabled(event.locals.config)) {
+      return actionFailure(
+        { status: 403, code: 'signup_disabled', message: 'New registration disabled' },
+        {},
+      );
+    }
     const form = await event.request.formData();
     const values = { email: str(form, 'email'), name: str(form, 'name') };
     if (!checkCsrf(event, form)) {
@@ -29,7 +36,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: 'Expired session — please refresh',
         },
         values,
       );

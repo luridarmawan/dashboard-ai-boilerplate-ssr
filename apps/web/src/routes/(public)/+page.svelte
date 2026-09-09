@@ -21,6 +21,6 @@ const t = useT();
   {:else}
     <p data-testid="api-status">{t('landing.api_unreachable')} ({data.apiError ?? 'tanpa respons'})</p>
   {/if}
-  <p><a href="/auth/login">{t('nav.login')}</a> · <a href="/auth/register">{t('nav.register')}</a></p>
+  <p><a href="/auth/login">{t('nav.login')}</a>{#if data.signupEnabled} · <a href="/auth/register">{t('nav.register')}</a>{/if}</p>
   <p><small>request {data.requestId}</small></p>
 </div>

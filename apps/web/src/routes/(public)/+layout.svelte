@@ -25,7 +25,9 @@ const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
       <li><a href="/dashboard" class="text-foreground no-underline hover:underline">{t('nav.dashboard')}</a></li>
     {:else}
       <li><a href="/auth/login" class="text-foreground no-underline hover:underline">{t('nav.login')}</a></li>
-      <li><a href="/auth/register" class="text-foreground no-underline hover:underline">{t('nav.register')}</a></li>
+      {#if data.signupEnabled}
+        <li><a href="/auth/register" class="text-foreground no-underline hover:underline">{t('nav.register')}</a></li>
+      {/if}
     {/if}
   </ul>
 {/snippet}

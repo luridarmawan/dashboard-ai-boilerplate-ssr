@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { cfgBool, cfgString } from '$lib/server/config';
+import { cfgBool, cfgString, isSignupEnabled } from '$lib/server/config';
 import {
   actionFailure,
   apiFor,
@@ -18,6 +18,7 @@ export const load: PageServerLoad = async (event) => {
   return {
     csrf: csrfToken(event),
     next: safeNext(event.url.searchParams.get('next'), home),
+    signupEnabled: isSignupEnabled(event.locals.config),
     // Sign in with Google (A-8) is a link to /auth/google; shown only when an admin switched it on.
     google: cfgBool(event.locals.config, 'security.google_enabled') === true,
     // /auth/google bounces here with ?error= when the provider is off or the API refused to start.
