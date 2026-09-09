@@ -126,22 +126,6 @@ const shellContext = $derived({
       <Button type="submit" variant="destructive" size="sm">{t('shell.impersonate_stop')}</Button>
     </form>
   {/if}
-  {#if data.tenants.length > 1}
-    <!-- Tenant switcher (B-4): a POST and a full server-side navigation; hidden for one tenant (B-5). -->
-    <form method="POST" action="/auth/switch-tenant" class="flex items-center gap-1">
-      <Csrf token={data.csrf} />
-      <input type="hidden" name="back" value={data.path} />
-      <label class="sr-only" for="tenant-switch">{t('shell.tenant')}</label>
-      <select id="tenant-switch" name="clientId" class="h-8 rounded-md border border-input bg-background px-2 text-sm">
-        {#each data.tenants as t (t.id)}
-          <option value={t.id} selected={t.id === data.clientId}>{t.name}</option>
-        {/each}
-      </select>
-      <Button type="submit" variant="outline" size="sm">{t('shell.switch_tenant')}</Button>
-    </form>
-  {:else if activeTenant}
-    <span class="hidden text-sm text-muted-foreground sm:inline">{activeTenant.name}</span>
-  {/if}
   <!-- Bell (J-4): a plain link, badge rendered server-side; the page marks items read via forms. -->
   <a href="/notifications" class="relative flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent" aria-label={data.unreadNotifications ? `${t('shell.notifications')} (${data.unreadNotifications})` : t('shell.notifications')} data-testid="bell">
     <Icon name="bell" size={18} />
@@ -159,11 +143,33 @@ const shellContext = $derived({
     <div class="absolute end-0 z-40 mt-1 w-64 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
       <div class="flex items-center gap-3 px-2 py-2">
         {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-10 w-10 rounded-full object-cover" />{:else}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name="user" size={20} /></span>{/if}
-        <div class="min-w-0"><p class="truncate text-sm font-medium">{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p></div>
+        <div class="min-w-0"><p class="truncate text-sm font-medium">{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p>{#if activeTenant}<p class="truncate text-xs text-muted-foreground"><Icon name="building" size={12} class="me-1 inline align-[-1px]" />{activeTenant.name}</p>{/if}</div>
       </div>
       <ul class="grid gap-0.5 border-t pt-1">
         <li><a href="/profile" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="user" size={16} class="text-muted-foreground" />{t('nav.profile')}</a></li>
         <li><a href={`/theme?back=${encodeURIComponent(data.path)}`} class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="palette" size={16} class="text-muted-foreground" />{t('shell.theme_link')}</a></li>
+        {#if data.tenants.length > 1}
+          <!-- Tenant switcher (B-4) as a sub-menu: each tenant is a POST + full server-side navigation. Hidden for one tenant (B-5). -->
+          <li>
+            <details class="group/tenant" data-testid="tenant-switch">
+              <summary class="flex cursor-pointer list-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-accent">
+                <Icon name="switch" size={16} class="text-muted-foreground" />
+                <span class="min-w-0 flex-1 truncate">{t('shell.switch_tenant_menu')}<span class="block truncate text-xs text-muted-foreground">{activeTenant?.name ?? '—'}</span></span>
+                <Icon name="chevron-down" size={14} class="transition-transform group-open/tenant:rotate-180" />
+              </summary>
+              <form method="POST" action="/auth/switch-tenant" class="ms-6 mt-0.5 grid gap-0.5 border-s ps-2">
+                <Csrf token={data.csrf} />
+                <input type="hidden" name="back" value={data.path} />
+                {#each data.tenants as tenant (tenant.id)}
+                  <button type="submit" name="clientId" value={tenant.id} aria-current={tenant.id === data.clientId ? 'true' : undefined} class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-foreground hover:bg-accent aria-[current=true]:bg-accent aria-[current=true]:font-medium">
+                    <Icon name="building" size={14} class="text-muted-foreground" /><span class="min-w-0 flex-1 truncate">{tenant.name}</span>
+                    {#if tenant.id === data.clientId}<Icon name="check" size={14} />{/if}
+                  </button>
+                {/each}
+              </form>
+            </details>
+          </li>
+        {/if}
       </ul>
       <form method="POST" action="/auth/logout" class="mt-1 border-t pt-1">
         <Csrf token={data.csrf} />

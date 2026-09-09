@@ -4,6 +4,7 @@
  */
 
 import ArrowLeftGlyph from '@lucide/svelte/icons/arrow-left';
+import SwitchGlyph from '@lucide/svelte/icons/arrow-left-right';
 import ArrowRightGlyph from '@lucide/svelte/icons/arrow-right';
 import SortGlyph from '@lucide/svelte/icons/arrow-up-down';
 import BellGlyph from '@lucide/svelte/icons/bell';
@@ -113,6 +114,7 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   filter: FilterGlyph as unknown as Component<Record<string, unknown>>,
   sort: SortGlyph as unknown as Component<Record<string, unknown>>,
   refresh: RefreshGlyph as unknown as Component<Record<string, unknown>>,
+  switch: SwitchGlyph as unknown as Component<Record<string, unknown>>,
   'more-horizontal': MoreHorizontalGlyph as unknown as Component<Record<string, unknown>>,
   'more-vertical': MoreVerticalGlyph as unknown as Component<Record<string, unknown>>,
   check: CheckGlyph as unknown as Component<Record<string, unknown>>,

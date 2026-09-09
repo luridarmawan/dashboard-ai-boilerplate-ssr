@@ -35,6 +35,7 @@
   "nav.main": "Main navigation",
   "shell.tenant": "Tenant",
   "shell.switch_tenant": "Switch",
+  "shell.switch_tenant_menu": "Switch tenant",
   "shell.tenant_error": "Could not switch tenant — you are not a member.",
   "shell.theme_link": "Theme & appearance",
   "shell.footer": "Dashboard AI Boilerplate",

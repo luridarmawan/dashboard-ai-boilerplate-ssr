@@ -29,6 +29,7 @@
     "filter",
     "sort",
     "refresh",
+    "switch",
     "more-horizontal",
     "more-vertical",
     "check",

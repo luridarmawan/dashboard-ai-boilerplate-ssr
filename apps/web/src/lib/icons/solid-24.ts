@@ -10,6 +10,7 @@ import ExternalLinkGlyph from 'phosphor-svelte/lib/ArrowSquareOutIcon';
 import RefreshGlyph from 'phosphor-svelte/lib/ArrowsClockwiseIcon';
 import SortGlyph from 'phosphor-svelte/lib/ArrowsDownUpIcon';
 import CollapseGlyph from 'phosphor-svelte/lib/ArrowsInIcon';
+import SwitchGlyph from 'phosphor-svelte/lib/ArrowsLeftRightIcon';
 import ExpandGlyph from 'phosphor-svelte/lib/ArrowsOutIcon';
 import BellGlyph from 'phosphor-svelte/lib/BellIcon';
 import BookmarkGlyph from 'phosphor-svelte/lib/BookmarkSimpleIcon';
@@ -114,6 +115,7 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   filter: FilterGlyph as unknown as Component<Record<string, unknown>>,
   sort: SortGlyph as unknown as Component<Record<string, unknown>>,
   refresh: RefreshGlyph as unknown as Component<Record<string, unknown>>,
+  switch: SwitchGlyph as unknown as Component<Record<string, unknown>>,
   'more-horizontal': MoreHorizontalGlyph as unknown as Component<Record<string, unknown>>,
   'more-vertical': MoreVerticalGlyph as unknown as Component<Record<string, unknown>>,
   check: CheckGlyph as unknown as Component<Record<string, unknown>>,
