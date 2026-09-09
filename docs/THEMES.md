@@ -140,7 +140,7 @@ Cara kerjanya: tabel `themes` (`scope`, `code`, `tokens` json, `icons`, `layouts
 
 **Tersedia sejak 2026-09-08:** editor tema dari UI admin (L-24, §5a) — tema kustom per tenant/global tersimpan di database, divalidasi kontras sebelum disimpan, berlaku tanpa deploy.
 
-**Belum:** aset merek untuk tema **berkas** (`logo.svg`, `favicon.svg`, `preview.png` di folder tema — pratinjau saat ini digenerate; tema kustom sudah bisa membawa logo lewat unggahan, §5a), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle).
+**Belum:** aset merek untuk tema **berkas** (`logo.svg`, `favicon.svg`, `preview.png` di folder tema — pratinjau saat ini digenerate; tema kustom sudah bisa membawa logo **dan favicon** lewat unggahan, §5a), allowlist `themes.enabled` saat build (L-15; sekarang semua tema terdaftar ikut ter-bundle).
 
 ## 7. Catatan lama
 
