@@ -255,8 +255,21 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
         [user] = await db
           .select()
           .from(schema.users)
-          .where(and(eq(schema.users.email, identity.email), isNull(schema.users.deleted_at)))
+          .where(eq(schema.users.email, identity.email))
           .limit(1);
+        if (user?.deleted_at) {
+          /**
+           * A deleted account owns this e-mail. Signing in must NOT bring it back — that would let
+           * anyone the admin removed walk in again — and the UNIQUE on `email` would refuse a second
+           * row anyway, so the insert below used to fail with a raw 500.
+           */
+          return refuse(
+            403,
+            'sso_not_allowed',
+            'Akun dengan email ini belum terdaftar — minta admin membuat akun Anda',
+            { reason: 'not_registered', email: identity.email },
+          );
+        }
         if (!user) {
           if (!cfg.autoCreate)
             return refuse(

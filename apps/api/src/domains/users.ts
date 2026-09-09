@@ -878,26 +878,44 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
           return fail('weak_password', 'Kata sandi terlalu lemah', requestId, problems);
         }
       }
+      /**
+       * Look past `deleted_at`: the UNIQUE on `email` covers soft-deleted rows too, so an account
+       * whose last tenant removed it has to be REVIVED here. Inserting a second row with the same
+       * e-mail fails in the database — an admin re-creating a user they had just removed used to
+       * get a raw 500. Same rule as accepting an invitation (A-13).
+       */
       let [user] = await db
         .select()
         .from(schema.users)
-        .where(and(eq(schema.users.email, email), isNull(schema.users.deleted_at)))
+        .where(eq(schema.users.email, email))
         .limit(1);
       let created = false;
-      if (user) {
+      let restored = false;
+      if (user && !user.deleted_at) {
         // An existing account: this is "add to my tenant", not a duplicate — unless already here.
         if (await isMemberOf(db, user.id, ts.clientId)) {
           return conflict(set, requestId, 'Pengguna sudah menjadi anggota tenant ini');
         }
       } else {
-        const id = newId();
-        await db.insert(schema.users).values({
-          id,
+        const id = user?.id ?? newId();
+        const values = {
           email,
           name: body.name.trim(),
           password_hash: body.password ? await hashPassword(body.password) : null,
           locale: body.locale ?? 'id',
-        });
+        };
+        if (user) {
+          // Nothing of the deleted account survives except its id and e-mail: it comes back with
+          // the details typed now, active, and never as a superadmin.
+          restored = true;
+          await db
+            .update(schema.users)
+            .set({ ...values, status_id: STATUS.ACTIVE, is_superadmin: false, deleted_at: null })
+            .where(eq(schema.users.id, id));
+          await invalidateUserSessions(id);
+        } else {
+          await db.insert(schema.users).values({ id, ...values });
+        }
         [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
         created = true;
         emit('user.created', { userId: id, clientId: ts.clientId }, { requestId });
@@ -952,7 +970,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         resourceId: u.id,
         ip: clientIp(request, server),
         requestId,
-        after: { email, groupIds: body.groupIds ?? [] },
+        after: { email, groupIds: body.groupIds ?? [], ...(restored ? { restored } : {}) },
       });
       set.status = 201;
       return ok({ ...(await tenantUser(ts.tenant, u)), created });

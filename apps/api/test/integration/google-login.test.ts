@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { pkceChallenge } from '@core/auth';
 import { resetEnvCache } from '@core/config';
-import { type Db, eq, STATUS, schema, unsafeAcrossTenants } from '@core/db';
+import { type Db, eq, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { settings } from '../../src/services.ts';
 
@@ -300,6 +300,37 @@ describe.skipIf(!enabled)('Sign in with Google (A-8)', () => {
     const admitted = await googleLogin('code-7');
     expect(admitted.status).toBe(200);
     await set({ 'security.google_allowed_domains': '' });
+  });
+
+  test('a deleted account is not resurrected by signing in with Google', async () => {
+    // The account an admin removed still owns its e-mail (the UNIQUE spans soft-deleted rows), so
+    // auto-create must refuse it instead of trying to insert a second row — that insert used to be
+    // a raw 500, and reviving the row here would let a removed user walk back in.
+    const email = `google-deleted-${run}@example.test`;
+    await db.insert(schema.users).values({
+      id: newId(),
+      email,
+      name: 'Gone',
+      password_hash: null,
+      deleted_at: new Date(),
+    });
+    await set({ 'security.google_auto_create': true });
+    profile = { sub: `sub-deleted-${run}`, email, email_verified: true, name: 'Gone' };
+    const r = await googleLogin('code-9');
+    expect(r.status).toBe(403);
+    expect((await json(r)).error?.code).toBe('sso_not_allowed');
+    // Still exactly one row, still deleted, and no link was made.
+    const rows = await db
+      .select({ deleted_at: schema.users.deleted_at })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.deleted_at).not.toBeNull();
+    const links = await db
+      .select({ id: schema.oauthAccounts.id })
+      .from(schema.oauthAccounts)
+      .where(eq(schema.oauthAccounts.provider_user_id, `sub-deleted-${run}`));
+    expect(links.length).toBe(0);
   });
 
   test('a deactivated user cannot get in through Google', async () => {

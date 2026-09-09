@@ -241,4 +241,28 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((await call('/v1/auth/me', {}, [bob])).status).toBe(401);
     expect((await call(`/v1/users/${bobId}`, {}, [admin])).status).toBe(404);
   });
+
+  test('re-creating a deleted user revives that row: the e-mail is UNIQUE across deleted rows too', async () => {
+    const res = await post(
+      '/v1/users',
+      { email: bobEmail, name: 'Bob Again', password: bobPassword, groupIds: [editorsId] },
+      [admin],
+    );
+    expect(res.status).toBe(201); // used to be 500: "Duplicate entry … for key 'users_email_uq'"
+    const u = (await json(res)).data as {
+      id: string;
+      created: boolean;
+      name: string;
+      statusId: number;
+      groups: unknown[];
+    };
+    expect(u.id).toBe(bobId); // the soft-deleted row came back — a second row cannot exist
+    expect(u.created).toBe(true);
+    expect(u.name).toBe('Bob Again');
+    expect(u.statusId).toBe(1);
+    expect(u.groups).toHaveLength(1);
+    // …and the account works again with the details typed now.
+    const back = await login(bobEmail, bobPassword);
+    expect((await call('/v1/auth/me', {}, [back])).status).toBe(200);
+  });
 });
