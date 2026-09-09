@@ -120,11 +120,13 @@ export function publicOrigin(request?: Request | null): string {
       if (origin && /^https?:\/\//.test(origin)) forwarded = origin.toLowerCase();
     }
   }
+  // Last resort (no request, no APP_ORIGIN): the dev web server from .env, else SvelteKit's default.
+  const dev = `http://${e.WEB_HOST ?? '127.0.0.1'}:${e.WEB_PORT ?? 5173}`;
   if (e.APP_ORIGINS.length) {
     if (forwarded && e.APP_ORIGINS.includes(forwarded)) return forwarded;
-    return e.APP_ORIGIN_PRIMARY ?? forwarded ?? 'http://127.0.0.1:5173';
+    return e.APP_ORIGIN_PRIMARY ?? forwarded ?? dev;
   }
-  return forwarded ?? 'http://127.0.0.1:5173';
+  return forwarded ?? dev;
 }
 
 /** Absolute link for an e-mail, from the public origin of THIS request when one is given. */

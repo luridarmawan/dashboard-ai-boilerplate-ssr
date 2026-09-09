@@ -130,6 +130,12 @@ const envSchema = z
     /** Test seams only: point the code exchange and identity lookup at a local stand-in for Google. */
     GOOGLE_OAUTH_TOKEN_URL: z.url().optional(),
     GOOGLE_OAUTH_USERINFO_URL: z.url().optional(),
+    /**
+     * Dev web server address (also read by apps/web/vite.config.ts). The api uses it only as the
+     * LAST fallback for links in e-mails when neither APP_ORIGIN nor a forwarding request is there.
+     */
+    WEB_HOST: z.string().min(1).optional(),
+    WEB_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     /** Login attempts per window, per IP and per email (A-2): `<limit>/<seconds>`. */
     LOGIN_RATE_LIMIT: z
       .string()
