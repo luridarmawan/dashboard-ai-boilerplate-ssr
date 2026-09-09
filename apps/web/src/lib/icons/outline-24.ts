@@ -5,7 +5,6 @@
  */
 
 import ArrowLeftGlyph from '@lucide/svelte/icons/arrow-left';
-import SwitchGlyph from '@lucide/svelte/icons/arrow-left-right';
 import ArrowRightGlyph from '@lucide/svelte/icons/arrow-right';
 import SortGlyph from '@lucide/svelte/icons/arrow-up-down';
 import BellGlyph from '@lucide/svelte/icons/bell';
@@ -65,6 +64,7 @@ import PlugGlyph from '@lucide/svelte/icons/plug';
 import PlusGlyph from '@lucide/svelte/icons/plus';
 import PuzzleGlyph from '@lucide/svelte/icons/puzzle';
 import RefreshGlyph from '@lucide/svelte/icons/refresh-cw';
+import SwitchGlyph from '@lucide/svelte/icons/repeat';
 import SaveGlyph from '@lucide/svelte/icons/save';
 import SearchGlyph from '@lucide/svelte/icons/search';
 import SendGlyph from '@lucide/svelte/icons/send';
