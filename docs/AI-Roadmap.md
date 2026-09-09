@@ -59,7 +59,7 @@ Tipe otoritatifnya `Capabilities` di `modules/AI/api/probe.ts`; kolom DB tetap s
 
 Deteksi harus **murah** (< 20 token), **idempoten**, dan **tidak menulis riwayat**.
 
-### 4.1 Urutan probe (total < 4 detik, timeout per langkah 3 dtk)
+### 4.1 Urutan probe (timeout 8 dtk per langkah, anggaran total 25 dtk)
 
 ```
 1. GET /models  (yang ada sekarang) → INFORMATIF saja: mengisi `models_tested`, TIDAK memveto probe.
@@ -91,6 +91,8 @@ Deteksi harus **murah** (< 20 token), **idempoten**, dan **tidak menulis riwayat
 Semua body memakai `max_output_tokens: 8 / max_tokens: 8` untuk meminimalkan biaya. Probe tidak memakai `conversation_id` / `attachments` / `context` sehingga tidak menyentuh tabel `ai_*`.
 
 **`temperature: 0` hanya di langkah 3 (chat).** Model reasoning (o1/o3) menolak `temperature` selain nilai baku, jadi langkah 2 dan 5 dikirim tanpa `temperature`.
+
+**Angka timeout direvisi 2026-09-10 setelah diukur.** Rencana awal 3 dtk per langkah ternyata terlalu ketat: pada provider nyata yang tidak bermasalah, langkah `/responses` saja makan 1,4–2,5 dtk, dan dari dalam kontainer lewat WAN 3 dtk kedaluwarsa. Akibatnya bukan sekadar lambat — langkah yang timeout terbaca sebagai **endpoint tidak ada**, sehingga provider yang punya `/responses` tersimpan sebagai chat-only sampai seseorang menguji ulang. Sekarang 8 dtk per langkah, anggaran total 25 dtk, dan kartu Uji koneksi memperingatkan bila ada langkah yang gagal. CLI §10 memakai 10 dtk karena dijalankan operator di VPS, bukan di jalur permintaan.
 
 **Langkah 5 satu-satunya yang tidak benar-benar gratis.** Token reasoning ditagih dan tidak dibatasi `max_output_tokens` seperti output biasa, jadi anggaran "< 20 token" tidak berlaku di sana: pakai `max_output_tokens: 16` dan perlakukan `400`/`422` sebagai "tidak didukung" **tanpa retry**.
 
@@ -357,12 +359,19 @@ AI test — 3 sumber, 2 tenant
   - `--require-responses` → gagal bila ada sumber tanpa `endpoints.responses`
 - `deploy/upgrade.sh` dan `api preflight` (Q-13) bisa memanggilnya sebagai pemeriksaan tambahan sebelum rollout.
 
-### 10.5 Implementasi (estimasi 1–2 hari, sebelum F2)
+### 10.5 Implementasi — SELESAI 2026-09-10
 
 - `scripts/ai-test.ts` impor `probeCapabilities` (ekstrak dari `providers.ts` ke `modules/AI/api/probe.ts` agar dipakai route + CLI). **`probe.ts` tidak boleh mengimpor `@app/api/services` maupun `@core/db`** — `providers.ts:1` menarik `settings` dari service yang dirangkai *lazy* oleh app API, dan itu justru yang tidak dimiliki skrip mandiri. Tanda tangannya `(baseUrl, key, model, signal)`, tidak lebih; pembacaan Settings/DB tinggal di `ai-test.ts`
 - CLI membaca `clients` + `ai_providers`, jadi kena jebakan `.env` membocorkan `TABLE_PREFIX` ke proses anak — bersihkan `childEnv` seperti skrip drizzle-kit
 - Tidak menulis `capabilities` ke DB — hanya baca + probe; tombol **Uji koneksi** di UI tetap yang menulis `ai_providers.capabilities`
-- `ai.mock` tetap terpisah; `ai:test` bisa menarget mock: `AI_API_BASE_URL=http://127.0.0.1:4010/v1 bun run ai:test`
+- `ai.mock` tetap terpisah; `ai:test` bisa menarget mock: `bun run ai:test -- --base-url http://127.0.0.1:4010/v1 --model mock-1`
+
+**Catatan pelaksanaan:**
+
+- `env()` memvalidasi SELURUH skema, jadi memanggilnya langsung membuat perintah ini mati dengan `DATABASE_URL wajib diisi` — persis skenario "DB belum ada" yang dijanjikan §10.1. Ada `safeEnv()` yang jatuh ke `process.env` untuk tiga nilai `AI_API_*` yang benar-benar dibutuhkan, dan bagian yang perlu DB dibungkus sehingga kegagalannya jadi satu baris pesan, bukan stack trace.
+- `--base-url` tidak menyentuh DB sama sekali (pulang lebih awal), sehingga bisa dipakai di mesin tanpa basis data.
+- Sumber tenant yang ditimpa profil tetap ditampilkan dengan penanda `↳ ditimpa profil <kode> — tidak dipakai chat`, supaya operator melihat konfigurasi yang ada tetapi tidak berlaku.
+- Timeout per langkah 10 dtk (lihat §4.1): CLI berjalan di VPS lewat WAN.
 
 ## 11. Rujukan implementasi
 

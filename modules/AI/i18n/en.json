@@ -66,6 +66,7 @@
   "ai.providers.probe_stream": "stream",
   "ai.providers.probe_reasoning": "reasoning",
   "ai.providers.probe_tools": "tools",
+  "ai.providers.probe_partial": "Some steps failed or timed out — a capability shown as unsupported may in fact be there. Test again if the network is slow.",
   "ai.providers.default": "default",
   "ai.providers.disabled": "disabled",
   "ai.providers.no_key": "no key",

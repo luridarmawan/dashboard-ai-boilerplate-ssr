@@ -66,6 +66,7 @@
   "ai.providers.probe_stream": "stream",
   "ai.providers.probe_reasoning": "reasoning",
   "ai.providers.probe_tools": "tools",
+  "ai.providers.probe_partial": "Sebagian langkah gagal atau kehabisan waktu — kemampuan yang ditandai tidak didukung bisa jadi sebenarnya ada. Ulangi uji bila jaringan sedang lambat.",
   "ai.providers.default": "baku",
   "ai.providers.disabled": "nonaktif",
   "ai.providers.no_key": "tanpa key",

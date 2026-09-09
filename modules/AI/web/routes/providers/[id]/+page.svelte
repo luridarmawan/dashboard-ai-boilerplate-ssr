@@ -64,6 +64,11 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
         <div class="mb-2">
           <Capabilities capabilities={form.tested.capabilities} recommended={form.tested.recommended} preferredEndpoint={form.tested.preferredEndpoint} />
         </div>
+        {#if form.tested.steps.some((s: { status: string }) => s.status === 'error')}
+          <!-- A step that timed out is not proof the endpoint is missing; say so rather than let
+               the matrix read as a confident negative. -->
+          <p class="text-xs text-warning">{t('ai.providers.probe_partial')}</p>
+        {/if}
         <ul class="mb-3 text-xs text-muted-foreground">
           {#each form.tested.steps as s (s.step)}
             <li>

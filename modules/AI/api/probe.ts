@@ -47,8 +47,15 @@ export interface ProbeOptions {
   signal?: AbortSignal;
 }
 
-const STEP_TIMEOUT_MS = 3_000;
-const BUDGET_MS = 15_000;
+/**
+ * §4.1 proposed 3s per step. Measured against a real provider that is not pathological, the
+ * `/responses` step alone takes 1.4–2.5s, and from a container over a WAN link 3s expires — at
+ * which point the step reads as an error and the matrix reports the endpoint as ABSENT. A
+ * provider with `/responses` then gets pinned to chat until someone tests it again. 8s leaves
+ * real headroom while still bounding an admin request.
+ */
+const STEP_TIMEOUT_MS = 8_000;
+const BUDGET_MS = 25_000;
 /** Probe bodies stay tiny: 8 output tokens is enough to prove an endpoint answers. */
 const PROBE_TOKENS = 8;
 /** Reasoning is the one genuinely billed step (reasoning tokens are not capped like output). */
