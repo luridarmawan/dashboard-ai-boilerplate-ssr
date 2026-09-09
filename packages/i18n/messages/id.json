@@ -460,6 +460,7 @@
   "profile.tokens.desc": "Untuk klien di luar browser — MCP (Claude Desktop, Claude Code), aplikasi mobile, skrip. Token bertindak sebagai Anda di tenant aktif; kirim sebagai header Authorization: Bearer.",
   "profile.tokens.empty": "Belum ada token.",
   "profile.tokens.example": "Contoh:",
+  "profile.tokens.forbidden": "Token API dipakai klien MCP; grup Anda tidak memberi izin \"use\" untuk server MCP eksternal (ai.mcp.use). Minta ke administrator.",
   "profile.tokens.expires": "Masa berlaku",
   "profile.tokens.expires_col": "Berlaku sampai",
   "profile.tokens.last_used": "Terakhir dipakai",

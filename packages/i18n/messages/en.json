@@ -460,6 +460,7 @@
   "profile.tokens.desc": "For clients outside the browser — MCP (Claude Desktop, Claude Code), mobile apps, scripts. A token acts as you in the active tenant; send it as the Authorization: Bearer header.",
   "profile.tokens.empty": "No tokens yet.",
   "profile.tokens.example": "Example:",
+  "profile.tokens.forbidden": "API tokens are for MCP clients; your groups do not grant \"use\" on external MCP servers (ai.mcp.use). Ask an administrator.",
   "profile.tokens.expires": "Validity",
   "profile.tokens.expires_col": "Valid until",
   "profile.tokens.last_used": "Last used",

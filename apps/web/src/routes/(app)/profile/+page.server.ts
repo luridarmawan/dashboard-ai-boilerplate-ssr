@@ -3,14 +3,26 @@ import { createTranslator, type Locale } from '@core/i18n';
 import { themes } from '@core/ui-theme';
 import QRCode from 'qrcode';
 import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
-/** Own profile (D-4): basics + preferences, a separate password form, and API tokens (A-4). */
+/**
+ * Own profile (D-4): basics + preferences, a separate password form, and API tokens (A-4).
+ *
+ * The token section is the MCP integration: a token exists to let an assistant call `/v1/mcp` on
+ * the owner's behalf, so only someone allowed to use MCP tools (`ai.mcp.use`, I-4) gets it. The
+ * check is repeated in both token actions below — hiding the card alone would leave the POSTs open.
+ */
+const TOKENS_PERMISSION = 'ai.mcp.use';
+
 export const load: PageServerLoad = async (event) => {
   const locale = event.locals.locale.locale;
   const allowed = event.locals.theme.allowed;
   const api = apiFor(event);
-  const [tokens, mfaRes] = await Promise.all([api.v1.tokens.get(), api.v1.users.profile.mfa.get()]);
+  const canTokens = event.locals.session?.can(TOKENS_PERMISSION) ?? false;
+  const [tokens, mfaRes] = await Promise.all([
+    canTokens ? api.v1.tokens.get() : null,
+    api.v1.users.profile.mfa.get(),
+  ]);
   const mfa = mfaRes.data?.success
     ? mfaRes.data.data
     : { enabled: false, pending: false, recoveryCodesLeft: 0, secret: null, otpauthUrl: null };
@@ -19,7 +31,8 @@ export const load: PageServerLoad = async (event) => {
     ? await QRCode.toString(mfa.otpauthUrl, { type: 'svg', margin: 1, width: 200 })
     : null;
   return {
-    tokens: tokens.data?.success ? tokens.data.data : [],
+    canTokens,
+    tokens: tokens?.data?.success ? tokens.data.data : [],
     mfa: { ...mfa, qr },
     appOrigin: event.url.origin,
     themes: [...themes(), ...event.locals.config.customThemes.map((c) => c.manifest)]
@@ -40,6 +53,16 @@ const csrfFail = (locale: Locale) =>
     code: 'csrf_failed',
     message: createTranslator(locale)('common.form_expired'),
   });
+
+/** Guard for the two token actions: the same permission the card is rendered behind. */
+const tokensDenied = (event: RequestEvent) =>
+  event.locals.session?.can(TOKENS_PERMISSION)
+    ? null
+    : actionFailure({
+        status: 403,
+        code: 'forbidden',
+        message: createTranslator(event.locals.locale.locale)('profile.tokens.forbidden'),
+      });
 
 export const actions: Actions = {
   profile: async (event) => {
@@ -150,6 +173,8 @@ export const actions: Actions = {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    const denied = tokensDenied(event);
+    if (denied) return denied;
     const name = str(form, 'name').trim();
     const days = Number(optStr(form, 'expiresInDays') ?? '0');
     const scopes = str(form, 'scopes')
@@ -182,6 +207,8 @@ export const actions: Actions = {
   revokeToken: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    const denied = tokensDenied(event);
+    if (denied) return denied;
     const r = unwrap(
       await apiFor(event)
         .v1.tokens({ id: str(form, 'id') })

@@ -195,6 +195,8 @@ const mfaError = $derived(
   <Card title={t('profile.password.title')} description={t('profile.password.desc')}>
     <FormBuilder fields={passwordFields} errors={form?.saved === undefined && form?.code ? {} : fieldErrors} csrf={data.csrf} action="?/password" submitLabel={t('profile.password.title')} notice={form?.saved === 'password' ? t('profile.password.changed') : null} error={null} />
   </Card>
+  {#if data.canTokens}
+  <!-- MCP integration (I-4): only for someone allowed to use MCP tools; the actions check it too. -->
   <Card title={t('profile.tokens.title')} description={t('profile.tokens.desc')}>
     {#if form?.saved === 'token' && form.token}
       <div class="notice mb-4" role="status" data-testid="new-token">
@@ -228,4 +230,5 @@ const mfaError = $derived(
       <FormBuilder fields={tokenFields} values={{ expiresInDays: '90' }} errors={form?.code === 'validation_failed' && form?.saved === undefined ? fieldErrors : {}} csrf={data.csrf} action="?/createToken" submitLabel={t('profile.tokens.create')} columns={2} notice={null} error={form?.saved === undefined && form?.values && 'name' in (form.values as object) ? apiError : null} />
     </div>
   </Card>
+  {/if}
 </div>

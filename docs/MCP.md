@@ -24,7 +24,7 @@ Bukti: `apps/api/test/integration/mcp.test.ts` — klien SDK resmi melakukan `in
 
 ## Menyambungkan klien
 
-1. Masuk ke dasbor → **Profil → Token API** → *Buat token*. Salin token; ia hanya ditampilkan sekali. Pilih masa berlaku, dan bila perlu batasi izin (mis. `example.product.read`).
+1. Masuk ke dasbor → **Profil → Token API** → *Buat token*. Salin token; ia hanya ditampilkan sekali. Pilih masa berlaku, dan bila perlu batasi izin (mis. `example.product.read`). Kartu ini hanya muncul untuk user yang punya izin **`ai.mcp.use`** ("use" pada *Server MCP eksternal*, atau `ai.mcp.manage`/wildcard yang mencakupnya; superadmin selalu); tanpa izin itu kedua aksinya dijawab 403 di server, bukan hanya disembunyikan.
 2. Daftarkan server di klien MCP Anda. URL-nya `https://<domain>/v1/mcp` (Caddy meneruskan `/v1/*` ke API, lihat [`DEPLOY.md`](./DEPLOY.md)):
 
 ```bash
@@ -51,7 +51,7 @@ Nama tool di kawat adalah `<ns>_<nama>` (mis. `example_list_products`), karena O
 | `POST /v1/tokens` `{ name, expiresInDays?, scopes?, clientId? }` | Buat token; **balasan satu-satunya yang memuat `token`** (201). Hanya dari sesi cookie — token tidak bisa membuat token |
 | `DELETE /v1/tokens/:id` | Cabut. Berlaku pada request berikutnya di semua instance |
 
-Yang disimpan hanya hash SHA-256 (seperti sesi). `scopes` harus izin yang terdaftar (`user.read`, `example.product.read`, …) dan hanya bisa **mempersempit** izin user; `clientId` harus tenant yang boleh dimasuki user. Aksi khusus sesi — logout, ganti tenant, membuat token — dijawab `403` dengan `reason: session_only` bila dipanggil dengan bearer. Request bearer tidak membawa cookie, jadi plugin CSRF mengecualikannya secara struktural (bukan per route).
+Endpointnya sendiri tetap milik setiap user yang punya sesi (token adalah miliknya sendiri, A-4); yang dibatasi izin `ai.mcp.use` adalah **kartu Token API di halaman Profil** beserta kedua aksinya — inti tidak bergantung pada izin milik modul. Yang disimpan hanya hash SHA-256 (seperti sesi). `scopes` harus izin yang terdaftar (`user.read`, `example.product.read`, …) dan hanya bisa **mempersempit** izin user; `clientId` harus tenant yang boleh dimasuki user. Aksi khusus sesi — logout, ganti tenant, membuat token — dijawab `403` dengan `reason: session_only` bila dipanggil dengan bearer. Request bearer tidak membawa cookie, jadi plugin CSRF mengecualikannya secara struktural (bukan per route).
 
 ## MCP client — server eksternal untuk asisten (I-4, I-5)
 
