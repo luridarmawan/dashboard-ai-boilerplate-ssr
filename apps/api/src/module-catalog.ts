@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { type Catalog, type CatalogView, catalogSchema, compareCatalog } from '@core/module-kit';
 import { modules } from '@core/module-kit/registry';
 
@@ -10,6 +12,22 @@ import { modules } from '@core/module-kit/registry';
  */
 const CACHE_MS = 10 * 60 * 1000;
 let cached: { url: string; at: number; catalog: Catalog } | null = null;
+
+/**
+ * The default catalogue file sits at the repo root (dev, where the api runs with cwd apps/api) or
+ * the image's working directory (prod). Walk up a few levels from cwd; null when nowhere.
+ */
+function defaultCatalogFile(): string | null {
+  let dir = process.cwd();
+  for (let i = 0; i < 4; i++) {
+    const candidate = join(dir, 'modules.catalog.json');
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
 
 /** Wire shape: optional fields become explicit nulls (exactOptionalPropertyTypes + TypeBox). */
 export interface CatalogEntryView extends Omit<CatalogView, 'description' | 'path' | 'homepage'> {
@@ -65,7 +83,10 @@ async function load(): Promise<{
       };
     }
   }
-  const file = process.env.MODULES_CATALOG_FILE?.trim() || 'modules.catalog.json';
+  const configured = process.env.MODULES_CATALOG_FILE?.trim();
+  const file = configured || defaultCatalogFile();
+  // No catalogue configured and none shipped: a plain "no source", not an error (the page says so).
+  if (!file) return { source: 'none', url: null, catalog: null, error: null };
   try {
     const f = Bun.file(file);
     if (!(await f.exists()))
