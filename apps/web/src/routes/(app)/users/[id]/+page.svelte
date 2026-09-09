@@ -17,6 +17,13 @@ const editable = $derived(can('user.edit'));
 const fields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('users.name'), required: true, maxlength: 191 },
   {
+    name: 'phone',
+    type: 'string',
+    label: t('users.phone'),
+    maxlength: 32,
+    hint: t('profile.phone_hint'),
+  },
+  {
     name: 'locale',
     type: 'select',
     label: t('nav.language'),
@@ -45,6 +52,7 @@ const fields: FieldDef[] = $derived([
 ]);
 const values = $derived({
   name: u.name,
+  phone: u.phone,
   locale: u.locale,
   active: u.statusId === 1,
   isSuperadmin: u.isSuperadmin,

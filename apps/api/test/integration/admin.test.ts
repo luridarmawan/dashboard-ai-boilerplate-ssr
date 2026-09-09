@@ -94,13 +94,26 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
   test('user: create in tenant with a group; the new user gets exactly those permissions', async () => {
     const res = await post(
       '/v1/users',
-      { email: bobEmail, name: 'Bob', password: bobPassword, groupIds: [editorsId] },
+      {
+        email: bobEmail,
+        name: 'Bob',
+        phone: '+62 812-3456-7890',
+        password: bobPassword,
+        groupIds: [editorsId],
+      },
       [admin],
     );
     expect(res.status).toBe(201);
-    const u = (await json(res)).data as { id: string; created: boolean; groups: unknown[] };
+    const u = (await json(res)).data as {
+      id: string;
+      created: boolean;
+      phone: string | null;
+      groups: unknown[];
+    };
     bobId = u.id;
     expect(u.created).toBe(true);
+    // Phone (D-4) is optional on create; spaces and dashes are stripped before it is stored.
+    expect(u.phone).toBe('+6281234567890');
     expect(u.groups).toHaveLength(1);
     bob = await login(bobEmail, bobPassword);
     const perms = await json(await call('/v1/auth/permissions', {}, [bob]));
@@ -124,9 +137,16 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
   test('user edit: deactivation ends the session on the next request; reactivation restores', async () => {
     expect((await put(`/v1/users/${bobId}`, { statusId: 0 }, [admin])).status).toBe(200);
     expect((await call('/v1/auth/me', {}, [bob])).status).toBe(401);
-    expect((await put(`/v1/users/${bobId}`, { statusId: 1, name: 'Robert' }, [admin])).status).toBe(
-      200,
+    const back = await put(
+      `/v1/users/${bobId}`,
+      { statusId: 1, name: 'Robert', phone: '0812 999' },
+      [admin],
     );
+    expect(back.status).toBe(200);
+    expect(((await json(back)).data as { phone: string | null }).phone).toBe('0812999');
+    // An empty phone clears the column instead of being rejected by the pattern.
+    const cleared = await json(await put(`/v1/users/${bobId}`, { phone: null }, [admin]));
+    expect((cleared.data as { phone: string | null }).phone).toBe(null);
     bob = await login(bobEmail, bobPassword);
     const me = await json(await call('/v1/auth/me', {}, [bob]));
     expect((me.data as { user: { name: string } }).user.name).toBe('Robert');

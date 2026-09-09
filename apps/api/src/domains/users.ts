@@ -66,6 +66,10 @@ import { emit, settings } from '../services.ts';
 /** Avatars are small by construction: 2 MB caps even a generous PNG. */
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
+/** Phone (D-4) is typed free-form; only the digits and a leading `+` are stored. */
+const normalizePhone = (v: string | null | undefined) =>
+  v === undefined || v === null || v.trim() === '' ? null : v.replace(/[ -]/g, '');
+
 /**
  * Users inside the ACTIVE tenant (PRD D-1) and the caller's own profile (D-4).
  *
@@ -262,7 +266,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const db = unsafeAcrossTenants(); // users is a global table
       const patch: Partial<typeof schema.users.$inferInsert> = {};
       if (body.name !== undefined) patch.name = body.name.trim();
-      if (body.phone !== undefined) patch.phone = body.phone === null ? null : body.phone.replace(/[ \-]/g, '');
+      if (body.phone !== undefined) patch.phone = normalizePhone(body.phone);
       if (body.locale !== undefined) patch.locale = body.locale;
       if (body.theme !== undefined) patch.theme = body.theme;
       if (body.avatarUrl !== undefined) patch.avatar_url = body.avatarUrl;
@@ -903,6 +907,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         const values = {
           email,
           name: body.name.trim(),
+          phone: normalizePhone(body.phone),
           password_hash: body.password ? await hashPassword(body.password) : null,
           locale: body.locale ?? 'id',
         };
@@ -1011,6 +1016,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const db = unsafeAcrossTenants(); // users is global (membership checked above)
       const patch: Partial<typeof schema.users.$inferInsert> = {};
       if (body.name !== undefined) patch.name = body.name.trim();
+      if (body.phone !== undefined) patch.phone = normalizePhone(body.phone);
       if (body.locale !== undefined) patch.locale = body.locale;
       if (body.statusId !== undefined) patch.status_id = body.statusId;
       if (body.isSuperadmin !== undefined) patch.is_superadmin = body.isSuperadmin;

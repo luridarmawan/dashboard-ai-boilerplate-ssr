@@ -15,7 +15,7 @@ export const actions: Actions = {
   default: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    const input = formToObject(form, { arrays: ['groupIds'] });
+    const input = formToObject(form, { arrays: ['groupIds'], nullable: ['phone'] });
     if (!checkCsrf(event, form)) {
       return actionFailure(
         {

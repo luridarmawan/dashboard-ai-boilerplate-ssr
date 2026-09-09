@@ -16,6 +16,13 @@ const fields: FieldDef[] = $derived([
     hint: t('users.new.email_hint'),
   },
   {
+    name: 'phone',
+    type: 'string',
+    label: t('users.phone'),
+    maxlength: 32,
+    hint: t('profile.phone_hint'),
+  },
+  {
     name: 'password',
     type: 'password',
     label: t('auth.login.password'),

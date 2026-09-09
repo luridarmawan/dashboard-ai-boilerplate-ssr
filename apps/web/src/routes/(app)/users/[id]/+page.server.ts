@@ -64,9 +64,10 @@ export const actions: Actions = {
       });
     }
     // Checkbox semantics → schema shape: `active` on/off becomes statusId 1/0.
-    const raw = formToObject(form, { arrays: ['groupIds'] });
+    const raw = formToObject(form, { arrays: ['groupIds'], nullable: ['phone'] });
     const input: Record<string, unknown> = {
       name: raw.name,
+      phone: raw.phone,
       locale: raw.locale,
       statusId: raw.active !== undefined ? 1 : 0,
       groupIds: raw.groupIds,

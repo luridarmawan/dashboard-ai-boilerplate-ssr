@@ -27,7 +27,9 @@ export const RegisterBody = t.Object({ email: Email, password: Password, name: N
 
 // ---- profile (D-4) ----
 /** Optional, free-form E.164-ish contact number: digits with optional +, spaces, dashes. */
-export const Phone = t.Optional(t.Nullable(t.String({ pattern: '^\\+?[0-9][0-9 \\-]{0,30}$', maxLength: 32 })));
+export const Phone = t.Optional(
+  t.Nullable(t.String({ pattern: '^\\+?[0-9][0-9 \\-]{0,30}$', maxLength: 32 })),
+);
 export const ProfileBody = t.Object({
   name: t.Optional(Name),
   phone: Phone,
@@ -44,12 +46,14 @@ export const PasswordChangeBody = t.Object({
 export const UserCreateBody = t.Object({
   email: Email,
   name: Name,
+  phone: Phone,
   password: t.Optional(Password),
   locale: t.Optional(LocaleCode),
   groupIds: t.Optional(t.Array(Id, { maxItems: 50 })),
 });
 export const UserUpdateBody = t.Object({
   name: t.Optional(Name),
+  phone: Phone,
   locale: t.Optional(LocaleCode),
   statusId: t.Optional(Status),
   isSuperadmin: t.Optional(t.Boolean()),
