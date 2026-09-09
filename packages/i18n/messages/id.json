@@ -508,7 +508,7 @@
   "users.name": "Nama",
   "users.new.email_hint": "Akun yang sudah ada dengan email ini akan ditambahkan ke tenant ini.",
   "users.new.password_hint": "Kosongkan agar pengguna mengatur sendiri lewat tautan set kata sandi.",
-  "users.phone": "Nomor telepon (opsional)",
+  "users.phone": "Telepon",
   "users.search_placeholder": "Cari nama / email",
   "users.status": "Status",
   "themes.editor.group.surface": "Permukaan",
