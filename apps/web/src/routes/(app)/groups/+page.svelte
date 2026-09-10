@@ -1,4 +1,7 @@
 <script lang="ts">
+import Icon from '$lib/components/Icon.svelte';
+import { type ColumnDef, DataTable } from '$lib/components/table';
+import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -7,27 +10,50 @@ import type { PageData } from './$types';
 let { data }: { data: PageData & LayoutData } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
+type Row = (typeof data.groups)[number];
+
+const columns: ColumnDef<Row>[] = [
+  {
+    key: 'name',
+    label: t('groups.group'),
+    sortKey: 'name',
+    value: (r) => r.name,
+  },
+  { key: 'code', label: t('groups.code'), value: (r) => r.code },
+  { key: 'permissions', label: t('groups.permissions'), value: (r) => r.permissionCount },
+  { key: 'members', label: t('groups.members'), value: (r) => r.memberCount },
+];
 </script>
 
 <svelte:head><title>{t('nav.groups')}</title></svelte:head>
 
 <div class="page">
-  <div class="row" style="justify-content: space-between">
+  <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('nav.groups')}</h1>
-    {#if can('group.create')}<a class="btn" href="/groups/new">{t('groups.add')}</a>{/if}
   </div>
-  <table>
-    <thead><tr><th>{t('groups.group')}</th><th>{t('groups.code')}</th><th>{t('groups.permissions')}</th><th>{t('groups.members')}</th><th></th></tr></thead>
-    <tbody>
-      {#each data.groups as g (g.id)}
-        <tr>
-          <td>{g.name}{#if g.isSystem} <code>{t('groups.system_tag')}</code>{/if}</td>
-          <td><code>{g.code}</code></td>
-          <td>{g.permissionCount}</td>
-          <td>{g.memberCount}</td>
-          <td><a href={`/groups/${g.id}`}>{can('group.edit') ? t('groups.manage') : t('common.view')}</a></td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+
+  <DataTable
+    rows={data.groups}
+    {columns}
+    state={data.state}
+    caption={t('groups.caption')}
+    searchPlaceholder={t('groups.search_placeholder')}
+    emptyTitle={t('groups.empty_title')}
+    emptyHint={data.state.q ? t('groups.empty_hint_search') : t('groups.empty_hint_add')}
+    rowActions={[{ label: can('group.edit') ? t('groups.manage') : t('common.view'), icon: can('group.edit') ? 'edit' : 'eye', href: (r) => `/groups/${r.id}` }]}
+  >
+    {#snippet toolbar()}
+      {#if can('group.create')}<Button href="/groups/new" size="sm"><Icon name="plus" size={16} />{t('groups.add')}</Button>{/if}
+    {/snippet}
+    {#snippet cell(row, col)}
+      {#if col.key === 'name'}
+        <a href={`/groups/${row.id}`} class="font-medium text-foreground">{row.name}</a>
+        {#if row.isSystem} <code>{t('groups.system_tag')}</code>{/if}
+      {:else if col.key === 'code'}
+        <code>{row.code}</code>
+      {:else}
+        {col.value ? (col.value(row) ?? '—') : '—'}
+      {/if}
+    {/snippet}
+  </DataTable>
 </div>
