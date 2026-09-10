@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, untrack } from 'svelte';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
@@ -45,6 +45,10 @@ let leafId = $state<string>(data.conversation?.leafId ?? '');
 $effect(() => {
   messages = data.conversation?.messages ?? [];
   leafId = data.conversation?.leafId ?? '';
+  // A freshly opened conversation starts at its latest message. `untrack` matters: scrollDown reads
+  // `follow`, and tracking it here would make every scroll away from the bottom re-run this effect
+  // and yank the reader straight back down.
+  untrack(() => scrollDown(true));
 });
 const versionOf = (id: string) => data.conversation?.siblings?.[id];
 const groups = $derived.by(() => {
@@ -97,8 +101,38 @@ const errorText = $derived(
           : null,
 );
 
-function scrollDown() {
+/**
+ * Follow the stream, but never fight the reader: any scroll that leaves the bottom turns following
+ * off, and coming back within a bubble's height turns it on again.
+ */
+let follow = $state(true);
+function onListScroll() {
+  const el = listEl;
+  if (!el) return;
+  follow = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+}
+function scrollDown(force = false) {
+  if (force) follow = true;
+  if (!follow) return;
+  // Instant, not smooth: a queued smooth animation keeps running after the reader scrolls away and
+  // drags the view back to the bottom, which reads as the page fighting them.
   queueMicrotask(() => listEl?.scrollTo({ top: listEl.scrollHeight }));
+}
+
+/**
+ * The panel fills what is left of the viewport instead of growing with the conversation list — a
+ * long sidebar used to push the composer below the fold. The shell layout is swappable (§4.8), so
+ * the space below is measured rather than guessed; the CSS height is the no-JS fallback.
+ */
+let rootEl: HTMLElement | undefined = $state();
+function fitHeight() {
+  const el = rootEl;
+  if (!el) return;
+  // Only what sits ABOVE us is subtracted — header, breadcrumb, page padding — so the panel ends at
+  // the bottom of the viewport. Whatever the shell puts below or beside it (a footer, a second
+  // column) is the shell's own scroll; measuring that too would squash the chat to fit it in.
+  const above = el.getBoundingClientRect().top + window.scrollY;
+  el.style.height = `${Math.max(320, window.innerHeight - above - 16)}px`;
 }
 
 /**
@@ -151,7 +185,7 @@ async function streamSend(e: SubmitEvent) {
   const picker = formEl.querySelector<HTMLInputElement>('input[type="file"]');
   if (picker) picker.value = '';
   fileNames = [];
-  scrollDown();
+  scrollDown(true); // the question, and the answer growing under it, stay in view
   streaming = true;
   controller = new AbortController();
   let createdId = '';
@@ -265,9 +299,15 @@ onMount(() => {
   // Warm the markdown renderer up front: its sanitiser is a dynamic import, and paying for that
   // load mid-stream is how a first reply gets lost (the dev server even re-optimises on discovery).
   void safeRender('');
+  fitHeight();
+  scrollDown(true); // open on the newest message, the way the conversation was left
   const onUnload = () => controller?.abort();
   window.addEventListener('beforeunload', onUnload);
-  return () => window.removeEventListener('beforeunload', onUnload);
+  window.addEventListener('resize', fitHeight);
+  return () => {
+    window.removeEventListener('beforeunload', onUnload);
+    window.removeEventListener('resize', fitHeight);
+  };
 });
 function copy(text: string) {
   navigator.clipboard?.writeText(text);
@@ -276,9 +316,35 @@ function copy(text: string) {
 
 <svelte:head><title>{t('ai.chat.title')}</title></svelte:head>
 
-<div id="ai-assistant-container" class="grid gap-4 lg:grid-cols-[18rem_1fr]" style="min-height: 70vh">
+<!--
+  One screenful, never more: the grid gets a definite height so both columns scroll inside
+  themselves. Before this, a long conversation list stretched the row and pushed the composer off
+  the bottom of the page. `fitHeight()` refines the CSS fallback below once JavaScript is up.
+-->
+<div bind:this={rootEl} id="ai-assistant-container" class="grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-4" style="height: calc(100dvh - 12rem); min-height: 24rem">
+  <!-- Narrow screens trade the whole sidebar for a combobox + a new-conversation button (H-7). -->
+  <div class="flex items-center gap-2 lg:hidden">
+    <form method="GET" action="/m/ai/chat" class="min-w-0 flex-1">
+      <label class="sr-only" for="conversation-picker">{t('ai.chat.pick')}</label>
+      <select id="conversation-picker" name="c" value={data.conversation?.id ?? ''} class="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
+        <option value="" disabled>{data.conversations.length ? t('ai.chat.pick') : t('ai.chat.empty')}</option>
+        {#each [['today', t('ai.chat.today')], ['yesterday', t('ai.chat.yesterday')], ['week', t('ai.chat.week')], ['older', t('ai.chat.older')]] as [key, label] (key)}
+          {@const items = groups[key as keyof typeof groups]}
+          {#if items.length}
+            <optgroup {label}>
+              {#each items as c (c.id)}<option value={c.id}>{c.title}</option>{/each}
+            </optgroup>
+          {/if}
+        {/each}
+      </select>
+      <!-- Without JavaScript the same select is a plain GET filter, one submit away. -->
+      <noscript><Button type="submit" variant="outline" size="sm" class="mt-2 w-full">{t('ai.chat.open')}</Button></noscript>
+    </form>
+    <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" size="icon" class="shrink-0" title={t('ai.chat.new')} aria-label={t('ai.chat.new')}><Icon name="plus" size={18} /></Button></form>
+  </div>
+
   <!-- sidebar (H-7) -->
-  <aside id="conversation-list-sidebar" class="flex flex-col gap-3 rounded-lg border bg-card p-3">
+  <aside id="conversation-list-sidebar" class="hidden min-h-0 flex-col gap-3 rounded-lg border bg-card p-3 lg:flex">
     <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" class="w-full" size="sm"><Icon name="plus" size={16} />{t('ai.chat.new')}</Button></form>
     <form method="GET" class="flex gap-1">
       <input name="q" value={data.q} placeholder={t('ai.chat.search')} class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" />
@@ -301,16 +367,16 @@ function copy(text: string) {
   </aside>
 
   <!-- conversation -->
-  <section id="message-container" class="flex min-h-0 flex-col rounded-lg border bg-card">
-    <header class="flex items-center justify-between gap-2 border-b px-4 py-2">
-      <h1 class="truncate text-base font-semibold">{data.conversation?.title ?? t('ai.chat.title')}</h1>
+  <section id="message-container" class="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-card">
+    <header class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-3 py-2 sm:px-4">
+      <h1 class="min-w-0 flex-1 truncate text-base font-semibold">{data.conversation?.title ?? t('ai.chat.title')}</h1>
       {#if data.conversation}
         <div class="flex flex-wrap items-center gap-1">
           {#if data.providers.length}
             <form method="POST" action="?/model" class="flex items-center gap-1" data-testid="model-picker">
               <Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} />
               <label class="sr-only" for="pm">{t('ai.chat.model')}</label>
-              <select id="pm" name="pm" value={currentPick} class="h-8 max-w-56 rounded-md border border-input bg-background px-2 text-xs" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
+              <select id="pm" name="pm" value={currentPick} class="h-8 max-w-36 rounded-md border border-input bg-background px-2 text-xs sm:max-w-56" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
                 <option value="default">{t('ai.chat.model_default')}</option>
                 {#each data.providers as p (p.id)}
                   <optgroup label={p.recommended ? `${p.name} ★` : p.name}>
@@ -324,8 +390,9 @@ function copy(text: string) {
               <Capabilities capabilities={pickedProvider.capabilities} recommended={pickedProvider.recommended} preferredEndpoint={pickedProvider.preferredEndpoint} compact />
             {/if}
           {/if}
-          <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button type="submit" variant="ghost" size="sm"><Icon name="folder" size={14} />{t('ai.chat.archive')}</Button></form>
-          <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('ai.chat.delete')}</Button></form>
+          <!-- The labels fold away on narrow screens; the title stays readable, the actions stay reachable. -->
+          <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button id="btn-chat-archive" type="submit" variant="ghost" size="sm" title={t('ai.chat.archive')} aria-label={t('ai.chat.archive')}><Icon name="folder" size={14} /><span class="hidden sm:inline">{t('ai.chat.archive')}</span></Button></form>
+          <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button id="btn-chat-delete" type="submit" variant="ghost" size="sm" class="text-destructive" title={t('ai.chat.delete')} aria-label={t('ai.chat.delete')}><Icon name="trash" size={14} /><!-- span class="hidden sm:inline">{t('ai.chat.delete')}</span> --></Button></form>
         </div>
       {/if}
     </header>
@@ -339,10 +406,10 @@ function copy(text: string) {
       </p>
     {/if}
     {#if errorText || streamError || form?.error}<p class="error m-4" role="alert">{streamError ?? errorText ?? form?.error}</p>{/if}
-    <div id="messages-list" bind:this={listEl} class="flex-1 space-y-4 overflow-y-auto p-4" data-testid="messages">
+    <div id="messages-list" bind:this={listEl} onscroll={onListScroll} class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4" data-testid="messages">
       {#each messages as m (m.id)}
         <article class={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} data-role={m.role}>
-          <div class={`max-w-[80%] rounded-lg px-4 py-2 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+          <div class={`max-w-[88%] rounded-lg px-3 py-2 sm:max-w-[80%] sm:px-4 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
             {#if m.role === 'assistant'}
               {#if m.tools?.length}
                 <ul class="mb-1 flex flex-wrap gap-1" aria-label={t('ai.chat.tools_used')}>
@@ -401,7 +468,7 @@ function copy(text: string) {
         <p class="py-12 text-center text-muted-foreground">{t('ai.chat.empty')}</p>
       {/each}
     </div>
-    <form method="POST" action="?/send" enctype="multipart/form-data" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="border-t p-3">
+    <form method="POST" action="?/send" enctype="multipart/form-data" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="shrink-0 border-t p-2 sm:p-3">
       <Csrf token={data.csrf} />
       <input type="hidden" name="c" value={data.conversation?.id ?? ''} />
       <input type="hidden" name="parent" value={leafId} />

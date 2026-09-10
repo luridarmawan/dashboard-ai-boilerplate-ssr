@@ -49,7 +49,7 @@ const flags = $derived(
 </script>
 
 {#if capabilities}
-  <span class="inline-flex flex-wrap items-center gap-1">
+  <span id="capabilities-list" class="inline-flex flex-wrap items-center gap-1">
     <Badge variant={endpoint === 'responses' ? 'success' : 'secondary'}>
       {endpoint === 'responses' ? '/responses' : '/chat'}
     </Badge>
