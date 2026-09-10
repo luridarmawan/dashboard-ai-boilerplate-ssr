@@ -44,9 +44,10 @@ git push (di repo host)              → §6   host meng-commit pemasangannya
 
 ```bash
 git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core
-# atau SSH: git clone git@github.com:luridarmawan/dashboard-ai-boilerplate-ssr.git core
 cd core && bun install
 ```
+
+Core ini publik dan URL-nya HTTPS, jadi clone di atas tidak meminta kredensial apa pun — tidak perlu kunci SSH, tidak perlu token. (SSH baru berguna kalau Anda memang punya akses tulis dan ingin mendorong ke core, atau kalau Anda memakai mirror privat — §7a.)
 
 Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkout core buatan tangan untuk setiap build. Clone itu dipakai untuk dua hal saja:
 
@@ -92,7 +93,7 @@ Repo modul butuh remote-nya sendiri — bukan remote core. Buat repo kosong di G
 
 ```bash
 cd ~/kerja/mod-billing
-git remote add origin git@github.com:<akun-anda>/mod-billing.git    # https juga boleh
+git remote add origin https://github.com/<akun-anda>/mod-billing.git   # SSH juga boleh: git@github.com:<akun-anda>/mod-billing.git
 git push -u origin main
 ```
 
@@ -181,7 +182,7 @@ Tag yang hanya ada di mesin Anda tidak bisa dipasang siapa pun: `modules:add` me
 ## 6. Memasang di host
 
 ```bash
-bun modules:add git@github.com:tim/mod-billing.git --ref v1.4.2
+bun modules:add https://github.com/tim/mod-billing.git --ref v1.4.2   # modul privat: pakai URL SSH, lihat §7b
 bun db:generate && bun run --cwd packages/db migrate
 git add modules.json .gitmodules biome.json bun.lock packages/db/migrations modules/Billing
 git commit -m "modul Billing v1.4.2"
