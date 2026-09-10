@@ -96,7 +96,9 @@ const hasFile = $derived(fields.some((f) => f.type === 'file'));
             {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={list(values[f.name]).includes(o.value)}>{o.label}</option>{/each}
           </Select>
         {:else if f.type === 'multiselect'}
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
+          <!-- A long option list scrolls inside its own box: with hundreds of groups the grid would
+               otherwise push the form's buttons far below the fold. -->
+          <div class="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 overflow-y-auto rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
             {#each f.options ?? [] as o (o.value)}
               <label class="flex items-center gap-2 text-sm">
                 <Checkbox name={f.name} value={o.value} checked={list(values[f.name]).includes(o.value)} disabled={readonly || f.disabled} />

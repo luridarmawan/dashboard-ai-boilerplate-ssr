@@ -1,14 +1,15 @@
 import { formToObject, UserCreateBody, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
+import { allGroups } from '$lib/server/groups';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
-  const groups = await apiFor(event).v1.groups.get({ query: { limit: 100 } });
-  if (!groups.data?.success) error(groups.status, t('groups.load_failed'));
-  return { groups: groups.data.data };
+  const groups = await allGroups(event);
+  if (!groups.ok) error(groups.status, t('groups.load_failed'));
+  return { groups: groups.rows };
 };
 
 export const actions: Actions = {

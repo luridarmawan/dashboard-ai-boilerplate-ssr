@@ -301,7 +301,37 @@ const member = new Jar();
   );
 }
 
-// 8. logout invalidates server-side
+// 8. group picker (D-2): a tenant with more groups than one API page still offers all of them
+{
+  const page = await get(admin, '/groups/new');
+  const token = csrfOf(page.html);
+  const made: { id: string; code: string }[] = [];
+  // One API page is MAX_LIMIT = 100 rows, so 101 extra groups puts the last ones out of reach of a
+  // single call. They must still reach the picker: the user form submits exactly the boxes it
+  // rendered and the API replaces a user's memberships with what arrives, so a group missing here
+  // cannot be granted AND would be stripped from whoever already had it.
+  for (let i = 0; i < 101; i++) {
+    const code = `pg-${run}-${String(i).padStart(3, '0')}`;
+    const r = await post(admin, '/groups/new', { _csrf: token, code, name: `Picker ${code}` });
+    const id = /\/groups\/([0-9a-f-]{36})/.exec(location(r.res))?.[1] ?? '';
+    if (id) made.push({ id, code });
+  }
+  check('101 extra groups created', made.length === 101, `${made.length}`);
+  const last = made.at(-1);
+  const form = await get(admin, '/users/new');
+  check(
+    'the user form offers a group past the first API page',
+    !!last && form.html.includes(`value="${last.id}"`),
+    last ? `${last.code} missing from ${form.html.length} bytes` : 'no group created',
+  );
+  // Leave the tenant as it was found: a proof that litters makes the next run harder to read.
+  for (const g of made)
+    await post(admin, `/groups/${g.id}?/delete`, { _csrf: token, code: g.code });
+  const after = await get(admin, '/users/new');
+  check('they are gone again afterwards', !!last && !after.html.includes(`value="${last.id}"`));
+}
+
+// 9. logout invalidates server-side
 {
   const dash = await get(admin, '/dashboard');
   const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });

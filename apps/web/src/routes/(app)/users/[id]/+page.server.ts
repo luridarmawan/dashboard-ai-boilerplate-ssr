@@ -1,6 +1,7 @@
 import { formToObject, UserUpdateBody, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
+import { allGroups } from '$lib/server/groups';
 import {
   actionFailure,
   apiFor,
@@ -16,7 +17,7 @@ export const load: PageServerLoad = async (event) => {
   const client = apiFor(event);
   const [user, groups] = await Promise.all([
     client.v1.users({ id: event.params.id }).get(),
-    client.v1.groups.get({ query: { limit: 100 } }),
+    allGroups(event),
   ]);
   if (!user.data?.success)
     error(user.status === 404 ? 404 : user.status, t('users.detail.not_found'));
@@ -25,7 +26,7 @@ export const load: PageServerLoad = async (event) => {
   return {
     user: user.data.data,
     viewer: { id: me?.id ?? '', isSuperadmin: me?.isSuperadmin ?? false },
-    groups: groups.data?.success ? groups.data.data : [],
+    groups: groups.ok ? groups.rows : [],
     created: event.url.searchParams.has('created'),
     /**
      * Removing a user is destructive (the account itself is soft-deleted with its last tenant), so
