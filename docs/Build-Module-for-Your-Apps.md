@@ -6,13 +6,14 @@ Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, paka
 
 ## Model mentalnya dulu — supaya tidak salah jalan
 
-Tiga hal yang sering ditebak salah:
+Empat hal yang sering ditebak salah:
 
+- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber templat modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri.
 - **Jangan fork core.** Yang di-fork akan berhenti bisa diperbarui, dan justru itu yang harus tetap mengalir. Kontraknya kebalikan dari fork: modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
 - **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core.
 - **Submodule adalah cara HOST memasang, bukan cara Anda bekerja.** Anda mengembangkan di repo biasa; saat dipasang, host menaruhnya sebagai submodule terkunci pada tag.
 
-Selama pengembangan, core dipakai sebagai "SDK": `harness.ts` meng-clone core ke `.core/`, menyalin modul Anda ke `<core>/modules/<Nama>`, lalu menjalankan install, sync, typecheck, lint, migrasi, dan tes **di sana**. Core-nya sekali pakai; modul Anda tetap satu-satunya yang Anda commit.
+Selama pengembangan, core dipakai sebagai "SDK": `harness.ts` menyalin modul Anda ke `<core>/modules/<Nama>`, lalu menjalankan install, sync, typecheck, lint, migrasi, dan tes **di sana** — memakai clone yang Anda tunjuk lewat `CORE_DIR`, atau clone sekali-pakai miliknya sendiri di `.core/`. Core-nya alat; modul Anda tetap satu-satunya yang Anda commit.
 
 ```
 repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
@@ -22,54 +23,98 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 └── harness.ts
 ```
 
-## 0. Prasyarat
+## 0. Prasyarat, dan pertanyaan pertama: apakah saya perlu clone core?
 
-Bun 1.4.x, akses baca ke repo core, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a.
+**Ya — clone dulu.** Sekali, di awal, seperti kebiasaan Anda:
 
-Lisensi modul Anda sendiri terserah Anda: templat modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
+```bash
+git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core
+# atau SSH: git clone git@github.com:luridarmawan/dashboard-ai-boilerplate-ssr.git core
+cd core && bun install
+```
+
+Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkout core buatan tangan untuk setiap build. Clone itu dipakai untuk dua hal saja:
+
+1. **Mengambil templat modul.** `bun create module` membaca templat dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
+2. **Menjalankan aplikasinya saat Anda mengembangkan** (`bun dev`), supaya modul Anda bisa dilihat di browser.
+
+Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda — dan bila suatu saat modul Anda menuntutnya, itu cacat kontrak yang perlu dilaporkan, bukan diizinkan.
+
+Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
+
+Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: templat modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
+Dari dalam checkout core tadi:
+
 ```bash
-# dari checkout core mana pun — templatnya ada di .bun-create/module
-bun create module ../mod-billing
+cd core
+bun create module ../mod-billing          # templatnya dari .bun-create/module di core ini
 cd ../mod-billing
-bun run rename Billing        # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
+bun run rename Billing                    # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
 git init && git add -A && git commit -m "modul Billing dari templat"
 ```
 
-Di luar checkout core: `BUN_CREATE_DIR=<core>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module` sekali dan pakai berulang.
+Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
+
+Peta direktorinya sekarang — dua repo bersebelahan, tidak bersarang:
+
+```
+~/kerja/
+├── core/            ← clone dashboard-ai-boilerplate-ssr (tidak Anda commit)
+└── mod-billing/     ← repo modul ANDA (git init sendiri, remote sendiri)
+```
+
+Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
 
 Templat ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
 
-## 2. Build, lint, test — tanpa menyiapkan core secara manual
+## 2. Build, lint, test — dua cara memberi core kepada harness
+
+`harness.ts` selalu membutuhkan sebuah core untuk bekerja; yang berbeda hanya dari mana core itu datang.
+
+**a. Pakai clone yang sudah ada** — ini yang Anda pakai sehari-hari, dan yang membuat `bun dev` bisa menyajikan modul Anda:
 
 ```bash
-bun run harness                                     # clone core ke .core/ pada ref di package.json
+CORE_DIR=../core bun run harness
+```
+
+**b. Biarkan harness meng-clone sendiri** — tidak ada `CORE_DIR`, jadi ia meng-clone core ke `.core/` di dalam repo modul, pada ref yang tertulis di `package.json`. Ini yang dipakai CI, dan yang berguna saat Anda ingin menguji modul terhadap versi core yang **tepat seperti yang akan dipakai host**:
+
+```bash
+bun run harness                                     # clone ke .core/ (sekali; berikutnya dipakai ulang)
 bun run harness --web                               # + svelte-check untuk halaman modul
 DATABASE_URL=mysql://app:app@127.0.0.1:3306/app bun run harness   # + migrasi & tes integrasi
 ```
 
+Apa pun caranya, yang dilakukan harness sama: menyalin folder modul ke `<core>/modules/<Nama>`, mendaftarkannya di `modules.json` core itu, `bun install`, `bootstrap`, `tsc`, `biome check`, `db:generate`, lalu tes modul. Core-nya sekali pakai — tidak ada yang perlu Anda commit dari sana.
+
 **`bun install` langsung di repo modul tidak berguna** — dependensinya `workspace:*` dan `tsconfig.json`-nya mengacu `../../tsconfig.base.json`; keduanya baru benar ketika modul berada di dalam core. Itulah alasan harness ada. Kalau Anda melihat galat resolusi paket, hampir pasti karena melewatkan harness.
 
-Core mana yang dipakai diatur di `package.json` repo modul:
+Core mana yang di-clone cara (b) diatur di `package.json` repo modul:
 
 ```jsonc
-"core": { "repo": "https://github.com/<owner>/<core>.git", "ref": "main" }
+"core": { "repo": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git", "ref": "main" }
 ```
 
-Bisa ditimpa lewat env: `CORE_REPO`, `CORE_REF`, atau `CORE_DIR`.
+Bisa ditimpa lewat env: `CORE_REPO`, `CORE_REF`, atau `CORE_DIR`. Saat merilis, ganti `ref` ke tag core yang Anda uji (§5).
 
 ## 3. Lingkaran kerja di browser
 
-Untuk melihat halaman modul sungguhan, arahkan harness ke checkout core yang sudah ada, lalu jalankan `bun dev` di core itu:
+Inilah alasan clone core di §0 berguna. Dua terminal:
 
 ```bash
-CORE_DIR=../dashboard-ai-boilerplate-ssr bun run harness
-cd ../dashboard-ai-boilerplate-ssr && bun dev        # modul tersaji di /m/billing/…
+# terminal 1 — di core, sekali saja, biarkan hidup
+cd ~/kerja/core && bun dev                  # modul tersaji di /m/billing/…
+
+# terminal 2 — di repo modul, setiap kali Anda mengubah kode modul
+cd ~/kerja/mod-billing && CORE_DIR=../core bun run harness
 ```
 
-Ulangi `harness` setiap kali Anda ingin menyalin perubahan modul ke core. Yang Anda commit tetap hanya repo modul.
+`harness` menyalin ulang modul Anda ke `core/modules/Billing` dan menjalankan sync; muat ulang browser. Untuk perubahan kecil pada halaman, Anda juga boleh menyunting langsung di `core/modules/Billing/…` selagi mencoba — **tetapi salin kembali ke repo modul sebelum commit**, karena `harness` berikutnya akan menimpanya.
+
+Yang Anda commit tetap hanya repo modul; `core/modules/Billing` dan `core/modules.json` di clone core itu adalah sisa kerja, bukan hasil kerja.
 
 ## 4. CI repo modul
 
@@ -175,6 +220,8 @@ Untuk membagi daftar modul internal ke beberapa instalasi, taruh `modules.catalo
 | Modul tidak muncul di menu | Izinnya belum diberikan ke grup, atau modul dimatikan untuk tenant itu di halaman **Modul** |
 | Nama constraint kepanjangan saat migrasi MySQL | Nama tabel modul terlalu panjang; ingat `TABLE_PREFIX` ikut dihitung dalam batas 64 karakter |
 | Lint host tiba-tiba mengeluh soal kode modul | Modul dipasang sebagai `local` (vendor), bukan submodule — host me-lint modul lokal |
+| Bingung modul ditaruh di mana setelah clone core | **Bersebelahan dengan core, bukan di dalamnya.** Yang masuk ke `core/modules/<Nama>` adalah salinan yang dibuat harness — sisa kerja, bukan tempat Anda menulis kode |
+| Perubahan di `core/modules/<Nama>` hilang | Itu salinan; harness berikutnya menimpanya. Sunting di repo modul, atau salin balik sebelum commit |
 
 ## 9. Daftar periksa rilis modul
 
