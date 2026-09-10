@@ -35,6 +35,9 @@ let streaming = $state(false);
 let streamError = $state<string | null>(null);
 let controller: AbortController | null = null;
 let listEl: HTMLElement | undefined = $state();
+let inputEl: HTMLTextAreaElement | undefined = $state();
+// The file input is icon-only now (ChatGPT-style), so the picked names are echoed under the box.
+let fileNames = $state<string[]>([]);
 // H-12: the parent of the next message = the last message on the shown path; updated after a stream.
 // svelte-ignore state_referenced_locally -- the $effect below re-syncs on navigation
 let leafId = $state<string>(data.conversation?.leafId ?? '');
@@ -98,6 +101,22 @@ function scrollDown() {
   queueMicrotask(() => listEl?.scrollTo({ top: listEl.scrollHeight }));
 }
 
+/**
+ * The composer starts one row tall and grows with the text up to the CSS `max-height`, after which
+ * it scrolls — `height: auto` first so shrinking on delete/clear works too.
+ */
+function autoGrow() {
+  const el = inputEl;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+// Re-measure on every draft change, so clearing it after a send collapses the box back to one row.
+$effect(() => {
+  draft;
+  autoGrow();
+});
+
 async function streamSend(e: SubmitEvent) {
   const formEl = e.currentTarget as HTMLFormElement;
   const content = draft.trim();
@@ -118,6 +137,7 @@ async function streamSend(e: SubmitEvent) {
   // The files went into `fd` already; clear the picker so they are not sent twice.
   const picker = formEl.querySelector<HTMLInputElement>('input[type="file"]');
   if (picker) picker.value = '';
+  fileNames = [];
   scrollDown();
   streaming = true;
   controller = new AbortController();
@@ -365,20 +385,29 @@ function copy(text: string) {
         <p class="py-12 text-center text-muted-foreground">{t('ai.chat.empty')}</p>
       {/each}
     </div>
-    <form method="POST" action="?/send" enctype="multipart/form-data" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="flex flex-wrap gap-2 border-t p-3">
+    <form method="POST" action="?/send" enctype="multipart/form-data" data-stream="/m/ai/chat/stream" onsubmit={streamSend} class="border-t p-3">
       <Csrf token={data.csrf} />
       <input type="hidden" name="c" value={data.conversation?.id ?? ''} />
       <input type="hidden" name="parent" value={leafId} />
-      <textarea id="chat-input" name="content" bind:value={draft} required rows="2" placeholder={t('ai.chat.placeholder')} class="min-h-10 flex-1 basis-64 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
-      <!-- H-11: attachments ride in the same form; without JavaScript the action uploads them first -->
-      <label id="files-upload-label" class="inline-flex h-10 cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground hover:bg-accent" title={t('ai.chat.attach_hint')}>
-        <Icon name="upload" size={14} /><span class="sr-only">{t('ai.chat.attach')}</span>
-        <input id="files-upload" type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="max-w-40 text-xs" data-testid="attach" />
-      </label>
-      {#if streaming}
-        <Button id="btn-send" type="button" variant="outline" onclick={stop}><Icon name="stop" size={16} />{t('ai.chat.stop')}</Button>
-      {:else}
-        <Button id="btn-send" type="submit" disabled={!data.aiEnabled}><Icon name="send" size={16} />{t('ai.chat.send')}</Button>
+      <!-- One pill carries the whole composer: attach on the left, the growing textarea, send on the right. -->
+      <div id="chat-composer" class="flex items-end gap-1 rounded-3xl border border-input bg-background px-2 py-1.5 focus-within:border-ring">
+        <!-- H-11: attachments ride in the same form; without JavaScript the action uploads them first -->
+        <label id="files-upload-label" class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground" title={t('ai.chat.attach_hint')}>
+          <Icon name="plus" size={18} /><span class="sr-only">{t('ai.chat.attach')}</span>
+          <!-- Hidden but real: clicking the label opens the picker natively, so no-JS keeps working. -->
+          <input id="files-upload" type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="sr-only" data-testid="attach" onchange={(e) => (fileNames = Array.from((e.currentTarget as HTMLInputElement).files ?? []).map((f) => f.name))} />
+        </label>
+        <textarea id="chat-input" name="content" bind:this={inputEl} bind:value={draft} required rows="1" placeholder={t('ai.chat.placeholder')} class="max-h-40 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-muted-foreground" oninput={autoGrow} onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
+        {#if streaming}
+          <Button id="btn-send" type="button" variant="outline" size="icon" class="shrink-0 rounded-full" onclick={stop} title={t('ai.chat.stop')} aria-label={t('ai.chat.stop')}><Icon name="stop" size={16} /></Button>
+        {:else}
+          <Button id="btn-send" type="submit" size="icon" class="shrink-0 rounded-full" disabled={!data.aiEnabled} title={t('ai.chat.send')} aria-label={t('ai.chat.send')}><Icon name="send" size={16} /></Button>
+        {/if}
+      </div>
+      {#if fileNames.length}
+        <ul class="mt-2 flex flex-wrap gap-1 px-2 text-xs text-muted-foreground" aria-label={t('ai.chat.attachments')} data-testid="attach-names">
+          {#each fileNames as n (n)}<li class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"><Icon name="file" size={12} />{n}</li>{/each}
+        </ul>
       {/if}
     </form>
   </section>
