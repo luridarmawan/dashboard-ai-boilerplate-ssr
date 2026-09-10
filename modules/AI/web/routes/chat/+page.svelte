@@ -276,9 +276,9 @@ function copy(text: string) {
 
 <svelte:head><title>{t('ai.chat.title')}</title></svelte:head>
 
-<div class="grid gap-4 lg:grid-cols-[18rem_1fr]" style="min-height: 70vh">
+<div id="ai-assistant-container" class="grid gap-4 lg:grid-cols-[18rem_1fr]" style="min-height: 70vh">
   <!-- sidebar (H-7) -->
-  <aside class="flex flex-col gap-3 rounded-lg border bg-card p-3">
+  <aside id="conversation-list-sidebar" class="flex flex-col gap-3 rounded-lg border bg-card p-3">
     <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" class="w-full" size="sm"><Icon name="plus" size={16} />{t('ai.chat.new')}</Button></form>
     <form method="GET" class="flex gap-1">
       <input name="q" value={data.q} placeholder={t('ai.chat.search')} class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" />
@@ -301,7 +301,7 @@ function copy(text: string) {
   </aside>
 
   <!-- conversation -->
-  <section class="flex min-h-0 flex-col rounded-lg border bg-card">
+  <section id="message-container" class="flex min-h-0 flex-col rounded-lg border bg-card">
     <header class="flex items-center justify-between gap-2 border-b px-4 py-2">
       <h1 class="truncate text-base font-semibold">{data.conversation?.title ?? t('ai.chat.title')}</h1>
       {#if data.conversation}
