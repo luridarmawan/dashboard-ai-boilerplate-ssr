@@ -303,7 +303,7 @@ function copy(text: string) {
       </p>
     {/if}
     {#if errorText || streamError || form?.error}<p class="error m-4" role="alert">{streamError ?? errorText ?? form?.error}</p>{/if}
-    <div bind:this={listEl} class="flex-1 space-y-4 overflow-y-auto p-4" data-testid="messages">
+    <div id="messages-list" bind:this={listEl} class="flex-1 space-y-4 overflow-y-auto p-4" data-testid="messages">
       {#each messages as m (m.id)}
         <article class={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} data-role={m.role}>
           <div class={`max-w-[80%] rounded-lg px-4 py-2 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
@@ -369,16 +369,16 @@ function copy(text: string) {
       <Csrf token={data.csrf} />
       <input type="hidden" name="c" value={data.conversation?.id ?? ''} />
       <input type="hidden" name="parent" value={leafId} />
-      <textarea name="content" bind:value={draft} required rows="2" placeholder={t('ai.chat.placeholder')} class="min-h-10 flex-1 basis-64 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
+      <textarea id="chat-input" name="content" bind:value={draft} required rows="2" placeholder={t('ai.chat.placeholder')} class="min-h-10 flex-1 basis-64 resize-y rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
       <!-- H-11: attachments ride in the same form; without JavaScript the action uploads them first -->
-      <label class="inline-flex h-10 cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground hover:bg-accent" title={t('ai.chat.attach_hint')}>
+      <label id="files-upload-label" class="inline-flex h-10 cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground hover:bg-accent" title={t('ai.chat.attach_hint')}>
         <Icon name="upload" size={14} /><span class="sr-only">{t('ai.chat.attach')}</span>
-        <input type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="max-w-40 text-xs" data-testid="attach" />
+        <input id="files-upload" type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="max-w-40 text-xs" data-testid="attach" />
       </label>
       {#if streaming}
-        <Button type="button" variant="outline" onclick={stop}><Icon name="stop" size={16} />{t('ai.chat.stop')}</Button>
+        <Button id="btn-send" type="button" variant="outline" onclick={stop}><Icon name="stop" size={16} />{t('ai.chat.stop')}</Button>
       {:else}
-        <Button type="submit" disabled={!data.aiEnabled}><Icon name="send" size={16} />{t('ai.chat.send')}</Button>
+        <Button id="btn-send" type="submit" disabled={!data.aiEnabled}><Icon name="send" size={16} />{t('ai.chat.send')}</Button>
       {/if}
     </form>
   </section>
