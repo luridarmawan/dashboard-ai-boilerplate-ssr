@@ -2,7 +2,7 @@
   "name": "@core/logger",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Structured JSON logging with request id and mandatory masking of sensitive data (PRD M-1, M-7)",
   "exports": {

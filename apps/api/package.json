@@ -2,7 +2,7 @@
   "name": "@app/api",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Elysia API \u2014 the product's source of truth; SvelteKit is its first consumer (Decision A)",
   "exports": {

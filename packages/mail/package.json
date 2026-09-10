@@ -2,7 +2,7 @@
   "name": "@core/mail",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Email outbox: enqueue rows, deliver with retries through SMTP, branded i18n templates (PRD FR-J)",
   "exports": {

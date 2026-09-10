@@ -2,7 +2,7 @@
   "name": "@core/auth",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Identity primitives shared by the API: permission matching (C-1, C-2), the resource registry (C-4), password & token helpers",
   "exports": {

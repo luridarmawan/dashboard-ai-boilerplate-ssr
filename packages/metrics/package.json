@@ -2,7 +2,7 @@
   "name": "@core/metrics",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Dependency-free Prometheus metrics: counters, gauges, histograms and the text exposition format (M-6)",
   "exports": {

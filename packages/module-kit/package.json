@@ -2,7 +2,7 @@
   "name": "@core/module-kit",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "Module contract: manifest & source schemas, definition helpers, and the modules:sync engine (PRD \u00a74.5, \u00a74.9, FR-G)",
   "exports": {

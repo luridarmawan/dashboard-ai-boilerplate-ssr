@@ -2,7 +2,7 @@
   "name": "@modules/ai",
   "version": "0.1.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "description": "AI module (Decision H): can be removed from modules.json, disabled per tenant, or switched off by configuration",
   "scripts": {

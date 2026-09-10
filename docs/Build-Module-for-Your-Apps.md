@@ -24,7 +24,9 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 
 ## 0. Prasyarat
 
-Bun 1.4.x, akses baca ke repo core (lihat §7 kalau core-nya privat), dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi.
+Bun 1.4.x, akses baca ke repo core, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a.
+
+Lisensi modul Anda sendiri terserah Anda: templat modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
