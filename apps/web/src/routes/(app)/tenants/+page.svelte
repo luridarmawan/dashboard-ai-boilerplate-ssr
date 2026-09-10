@@ -1,5 +1,7 @@
 <script lang="ts">
+import Icon from '$lib/components/Icon.svelte';
 import { type ColumnDef, DataTable } from '$lib/components/table';
+import { Button } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -47,6 +49,9 @@ const columns: ColumnDef<Row>[] = [
     emptyHint={data.state.q ? t('tenants.empty_hint_search') : t('tenants.empty_hint_add')}
     rowActions={[{ label: can('client.edit') ? t('common.edit') : t('common.view'), icon: can('client.edit') ? 'edit' : 'eye', href: (r) => `/tenants/${r.id}` }]}
   >
+    {#snippet toolbar()}
+      {#if can('client.create')}<Button href="/tenants/new" size="sm"><Icon name="plus" size={16} />{t('tenants.add')}</Button>{/if}
+    {/snippet}
     {#snippet cell(row, col)}
       {#if col.key === 'name'}
         <a href={`/tenants/${row.id}`} class="font-medium text-foreground">{row.name}</a>

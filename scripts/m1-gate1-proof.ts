@@ -205,6 +205,10 @@ const member = new Jar();
 
 // 5. tenant: create, switch, users are per tenant
 {
+  // The way IN to the form is part of the flow: a DataTable rewrite once dropped this button and
+  // left no way to add a tenant from the UI at all.
+  const list = await get(admin, '/tenants');
+  check('tenants list offers the create button', list.html.includes('href="/tenants/new"'));
   const page = await get(admin, '/tenants/new');
   const r = await post(admin, '/tenants/new', {
     _csrf: csrfOf(page.html),
