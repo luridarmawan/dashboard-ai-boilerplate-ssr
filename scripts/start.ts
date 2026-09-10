@@ -186,6 +186,12 @@ if (proxied) {
             redirect: 'manual', // 302 belongs to the browser, not to us
           } as RequestInit);
           const out = new Headers(res.headers);
+          // adapter-node serves static/ through sirv, whose MIME table (mrmime) has no entry for
+          // .ico: /favicon.ico comes back with an EMPTY Content-Type. Name it here, the way
+          // deploy/Caddyfile does for the compose stack.
+          if (!out.get('content-type') && url.pathname.endsWith('.ico')) {
+            out.set('content-type', 'image/x-icon');
+          }
           if (out.has('content-encoding')) {
             out.delete('content-encoding'); // body arrived decoded — see the note above
             out.delete('content-length');

@@ -40,6 +40,10 @@
 		lb_retries 3
 	}
 
+	# adapter-node serves static/ through sirv, whose MIME table (mrmime) has no entry for .ico, so
+	# /favicon.ico arrives here with an EMPTY Content-Type — and this site sends nosniff. Name the type.
+	header /favicon.ico Content-Type image/x-icon
+
 	header {
 		-Server
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
