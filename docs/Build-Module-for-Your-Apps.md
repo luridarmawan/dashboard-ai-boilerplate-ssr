@@ -6,11 +6,10 @@ Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, paka
 
 ## Model mentalnya dulu — supaya tidak salah jalan
 
-Empat hal yang sering ditebak salah:
+Tiga hal yang sering ditebak salah:
 
-- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber templat modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri.
-- **Jangan fork core.** Yang di-fork akan berhenti bisa diperbarui, dan justru itu yang harus tetap mengalir. Kontraknya kebalikan dari fork: modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
-- **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core.
+- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber templat modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Kontraknya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
+- **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core; ia punya remote, tag, dan CI-nya sendiri.
 - **Submodule adalah cara HOST memasang, bukan cara Anda bekerja.** Anda mengembangkan di repo biasa; saat dipasang, host menaruhnya sebagai submodule terkunci pada tag.
 
 Selama pengembangan, core dipakai sebagai "SDK": `harness.ts` menyalin modul Anda ke `<core>/modules/<Nama>`, lalu menjalankan install, sync, typecheck, lint, migrasi, dan tes **di sana** — memakai clone yang Anda tunjuk lewat `CORE_DIR`, atau clone sekali-pakai miliknya sendiri di `.core/`. Core-nya alat; modul Anda tetap satu-satunya yang Anda commit.
@@ -21,6 +20,22 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 ├── db/tables.ts     ──────▶ install → sync → tsc → biome → db:generate → test
 ├── api/  web/  test/
 └── harness.ts
+```
+
+## Peta perjalanannya
+
+Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
+
+```
+git clone <core>                     → §0   core, dipakai sebagai alat (tidak di-commit)
+bun create module ../mod-billing     → §1   repo modul Anda lahir
+git remote add origin … && git push  → §1a  ke repositori ANDA sendiri
+CORE_DIR=../core bun run harness     → §2   build, lint, typecheck, migrasi, tes
+bun dev di core                      → §3   lihat halamannya di browser
+CI repo modul                        → §4   harness yang sama, di setiap push
+git tag v1.4.2 && git push origin …  → §5   rilis
+bun modules:add <url> --ref v1.4.2   → §6   host memasang, terkunci di tag
+git push (di repo host)              → §6   host meng-commit pemasangannya
 ```
 
 ## 0. Prasyarat, dan pertanyaan pertama: apakah saya perlu clone core?
@@ -53,7 +68,8 @@ cd core
 bun create module ../mod-billing          # templatnya dari .bun-create/module di core ini
 cd ../mod-billing
 bun run rename Billing                    # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
-git init && git add -A && git commit -m "modul Billing dari templat"
+git init -b main
+git add -A && git commit -m "modul Billing dari templat"
 ```
 
 Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
@@ -69,6 +85,30 @@ Peta direktorinya sekarang — dua repo bersebelahan, tidak bersarang:
 Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
 
 Templat ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
+
+### 1a. Dorong ke repositori Anda sendiri
+
+Repo modul butuh remote-nya sendiri — bukan remote core. Buat repo kosong di GitHub (atau GitLab, atau git server Anda), lalu:
+
+```bash
+cd ~/kerja/mod-billing
+git remote add origin git@github.com:<akun-anda>/mod-billing.git    # https juga boleh
+git push -u origin main
+```
+
+Dengan GitHub CLI, keduanya jadi satu langkah — pilih `--public` atau `--private` sesuai kebutuhan:
+
+```bash
+gh repo create <akun-anda>/mod-billing --private --source=. --remote=origin --push
+```
+
+Periksa sekali bahwa remote-nya benar-benar milik Anda, bukan core:
+
+```bash
+git remote -v      # harus menunjuk mod-billing, BUKAN dashboard-ai-boilerplate-ssr
+```
+
+Kalau nanti repo ini privat, host yang memasangnya perlu kredensial baca — §7b.
 
 ## 2. Build, lint, test — dua cara memberi core kepada harness
 
@@ -126,9 +166,15 @@ Templat sudah membawa `.github/workflows/ci.yml`: MySQL sebagai service, lalu sa
 # 1. selaraskan versi core yang Anda dukung
 #    module.json  → "engines": { "core": ">=1.2.0" }
 #    package.json → "core": { "ref": "v1.2.0" }   (harness & CI ikut ref ini)
-# 2. tag
-git tag v1.4.2 && git push --tags
+# 2. commit dan dorong ke repo modul Anda
+git add -A && git commit -m "rilis v1.4.2"
+git push origin main
+# 3. tag — inilah yang dipasang host, jadi ia harus ada di remote
+git tag v1.4.2
+git push origin v1.4.2
 ```
+
+Tag yang hanya ada di mesin Anda tidak bisa dipasang siapa pun: `modules:add` mengambilnya dari remote. Kalau ragu, `git ls-remote --tags origin` harus menyebut tag itu.
 
 `engines.core` bukan hiasan: host memeriksanya (G-11), dan katalog menandai modul yang tidak cocok sebagai *tidak cocok* tanpa memberi perintah pasang.
 
@@ -139,6 +185,7 @@ bun modules:add git@github.com:tim/mod-billing.git --ref v1.4.2
 bun db:generate && bun run --cwd packages/db migrate
 git add modules.json .gitmodules biome.json bun.lock packages/db/migrations modules/Billing
 git commit -m "modul Billing v1.4.2"
+git push                     # repo HOST, bukan repo modul — inilah yang dipakai deploy
 ```
 
 Yang terjadi: `git submodule add` ke `modules/Billing`, checkout detach pada ref, entri `{ "source": "submodule", "repo", "ref", "path" }` di `modules.json`, path itu dikecualikan dari Biome host (modul eksternal di-lint di repo asalnya), `bun install`, lalu `modules:sync`.
@@ -228,6 +275,6 @@ Untuk membagi daftar modul internal ke beberapa instalasi, taruh `modules.catalo
 - [ ] `bun run harness --web` hijau, dan dengan `DATABASE_URL` tes integrasinya lewat
 - [ ] `module.json` → `engines.core` menyebut versi core yang benar-benar Anda uji
 - [ ] `package.json` → `core.ref` menunjuk tag core, bukan `main`
-- [ ] Tag dibuat dan di-push; catatan rilis menyebut migrasi bila ada
+- [ ] Tag dibuat dan **ada di remote** (`git ls-remote --tags origin` menyebutnya); catatan rilis menyebut migrasi bila ada
 - [ ] Dicoba sekali di host: `modules:add` → `db:generate` → `migrate` → halaman jalan
 - [ ] `bun modules:remove <Nama>` dicoba sekali — host kembali bersih

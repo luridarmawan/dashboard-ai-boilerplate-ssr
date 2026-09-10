@@ -9,6 +9,8 @@ Referensi kontraknya (setiap berkas modul, 16 titik perluasan, aturan yang dijag
 ## 0. Prasyarat
 
 ```bash
+git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git
+cd dashboard-ai-boilerplate-ssr
 bun install
 cp .env.example .env          # DATABASE_URL, DB_DIALECT
 bun run --cwd packages/db migrate
@@ -17,6 +19,8 @@ bun dev                       # api + web; port dicetak di terminal
 ```
 
 Kalau `bun dev` sudah menampilkan halaman masuk dan Anda bisa login, prasyaratnya beres.
+
+Modul yang Anda buat di sini **ikut repo ini** — commit dan push-nya ke remote repo ini (atau ke fork Anda, bila Anda memang memelihara turunan produk ini). Kalau modulnya justru harus punya repo dan siklus rilis sendiri, berhenti di sini dan pindah ke [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md).
 
 ## 1. Satu perintah: `bun modgen`
 
