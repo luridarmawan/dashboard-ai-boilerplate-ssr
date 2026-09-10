@@ -1,4 +1,7 @@
 <script lang="ts">
+import { onMount } from 'svelte';
+import { enhance } from '$app/forms';
+import { invalidateAll } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
@@ -56,6 +59,100 @@ async function runAction(section: string, key: string) {
     running = null;
   }
 }
+
+/**
+ * Tab ordering specification:
+ * 1. Application (section 'app')
+ * 2. Modules (non-core sections: e.g. AI, Dummy module, Example landing, etc.)
+ * 3. Security (section 'security')
+ * 4. Logs & retention (section 'logs')
+ * 5. Uploaded files (section 'files')
+ * 6. Email (section 'mail')
+ * 7. Any other fallback section
+ */
+const CORE_ORDER: Record<string, number> = {
+  app: 1,
+  security: 3,
+  logs: 4,
+  files: 5,
+  mail: 6,
+};
+
+function getSectionSortOrder(s: { section: string; module: string; order?: number }) {
+  if (s.section === 'app') return { group: 1, order: s.order ?? 0 };
+  if (s.section === 'security') return { group: 3, order: s.order ?? 0 };
+  if (s.section === 'logs') return { group: 4, order: s.order ?? 0 };
+  if (s.section === 'files') return { group: 5, order: s.order ?? 0 };
+  if (s.section === 'mail') return { group: 6, order: s.order ?? 0 };
+  if (s.module !== 'core' || !CORE_ORDER[s.section]) {
+    return { group: 2, order: s.order ?? 100 };
+  }
+  return { group: 7, order: s.order ?? 999 };
+}
+
+const sortedSections = $derived(
+  [...data.sections].sort((a, b) => {
+    const orderA = getSectionSortOrder(a);
+    const orderB = getSectionSortOrder(b);
+    if (orderA.group !== orderB.group) {
+      return orderA.group - orderB.group;
+    }
+    return orderA.order - orderB.order;
+  }),
+);
+
+let activeSection = $state<string>('');
+
+// Initialize active tab from URL searchParam (tab/saved), URL hash, or first tab
+$effect(() => {
+  if (!activeSection && sortedSections.length > 0) {
+    const hash = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
+    const urlParams =
+      typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const tabParam = urlParams?.get('tab');
+    const initial = data.saved || tabParam || hash;
+    if (initial && sortedSections.some((s) => s.section === initial)) {
+      activeSection = initial;
+    } else {
+      activeSection = sortedSections[0]?.section ?? '';
+    }
+  }
+});
+
+onMount(() => {
+  const onHashChange = () => {
+    const hash = window.location.hash.replace(/^#/, '');
+    if (hash && sortedSections.some((s) => s.section === hash)) {
+      activeSection = hash;
+    }
+  };
+  window.addEventListener('hashchange', onHashChange);
+  return () => window.removeEventListener('hashchange', onHashChange);
+});
+
+function selectTab(section: string) {
+  activeSection = section;
+}
+
+// Track AJAX save status per section
+let saving = $state<string | null>(null);
+let savedNotice = $state<string | null>(null);
+let clientError = $state<{ section: string; message: string } | null>(null);
+
+let savedTimer: ReturnType<typeof setTimeout> | null = null;
+function triggerSavedNotice(section: string) {
+  savedNotice = section;
+  if (savedTimer) clearTimeout(savedTimer);
+  savedTimer = setTimeout(() => {
+    if (savedNotice === section) savedNotice = null;
+  }, 4000);
+}
+
+$effect(() => {
+  if (data.saved) {
+    triggerSavedNotice(data.saved);
+  }
+});
 </script>
 
 <svelte:head><title>{t('nav.settings')}</title></svelte:head>
@@ -76,86 +173,155 @@ async function runAction(section: string, key: string) {
   </p>
   {#if form?.error && !failedSection}<p class="error">{form.error}</p>{/if}
 
-  {#each data.sections as s (s.section)}
-    <Card id={s.section} title={L(s.title)} description={L(s.note) || undefined}>
-      {#snippet actions()}<Badge variant="outline">{s.module}</Badge>{/snippet}
-      {#if data.saved === s.section}<p class="notice mb-4">{t('common.saved')}</p>{/if}
-      {#if failedSection === s.section && form?.error}<p class="error mb-4">{form.error}</p>{/if}
-      <form method="POST" action="?/save" class="grid gap-4 sm:grid-cols-2">
-        <Csrf token={data.csrf} />
-        <input type="hidden" name="_scope" value={data.scope} />
-        <input type="hidden" name="_section" value={s.section} />
-        {#each s.fields as f (f.key)}
-          {@const id = `f-${f.key}`}
-          {@const err = fieldErrors[f.key]}
-          {@const strVal = f.value === null || f.value === undefined ? '' : String(f.value)}
-          <input type="hidden" name="_keys" value={f.key} />
-          {#if f.type === 'list'}<input type="hidden" name="_lists" value={f.key} />{/if}
-          {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
-          {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
-          <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={f.type === 'text' || f.type === 'markdown' || f.type === 'list' ? 'sm:col-span-2' : ''}>
-            {#if f.type === 'boolean'}
-              <div class="flex flex-wrap items-center gap-4 text-sm">
-                <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="set" checked={f.source !== 'default' || f.value !== null} class="accent-primary" /> {t('settings.bool_set')}</label>
-                <label class="flex items-center gap-2"><Checkbox {id} name={f.key} checked={f.value === true} /> {t('common.active')}</label>
-                <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="inherit" checked={f.source === 'default' && f.value === null} class="accent-primary" /> {data.scope === 'global' ? t('settings.inherit_default') : t('settings.inherit_global')}</label>
-              </div>
-            {:else if f.type === 'secret'}
-              <Input {id} type="password" name={f.key} placeholder={f.secretSet ? t('settings.secret_set_placeholder') : t('settings.secret_unset_placeholder')} autocomplete="off" />
-              {#if f.secretSet}<label class="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox name={`${f.key}__clear`} /> {t('settings.secret_clear')}</label>{/if}
-            {:else if f.type === 'select' || f.type === 'theme'}
-              <Select {id} name={f.key} value={strVal}>
-                <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={strVal === o.value}>{L(o.label)}</option>{/each}
-              </Select>
-            {:else if f.type === 'route'}
-              <Select {id} name={f.key} value={strVal}>
-                <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                {#each data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
-              </Select>
-            {:else if f.type === 'locale'}
-              <Select {id} name={f.key} value={strVal}>
-                <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                {#each locales as o (o.value)}<option value={o.value} selected={strVal === o.value}>{o.label}</option>{/each}
-              </Select>
-            {:else if f.type === 'list'}
-              <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
-                {#each f.options ?? [] as o (o.value)}
-                  <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
-                {:else}<span class="text-muted-foreground">—</span>{/each}
-              </div>
-            {:else if f.type === 'text' || f.type === 'markdown'}
-              <Textarea {id} name={f.key} rows={f.type === 'markdown' ? 6 : 3} value={strVal} maxlength={f.max ?? undefined} />
-            {:else if f.type === 'number'}
-              <Input {id} type="number" name={f.key} value={strVal} min={f.min ?? undefined} max={f.max ?? undefined} step="any" />
-            {:else}
-              <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
-            {/if}
-          </Field>
-        {/each}
-        <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-          <Button type="submit"><Icon name="save" size={16} />{t('settings.save_section', { section: L(s.title) })}</Button>
-          {#each s.actions.filter((a) => can(a.permission)) as a (a.key)}
-            {@const id = `${s.section}:${a.key}`}
-            <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key)}>
-              <Icon name="refresh" size={16} />{running === id ? t('common.running') : L(a.label)}
-            </Button>
-          {/each}
-        </div>
-        {#each s.actions as a (a.key)}
-          {@const r = results[`${s.section}:${a.key}`]}
-          {#if r}
-            <div class="sm:col-span-2" data-testid={`action-result-${s.section}-${a.key}`}>
-              <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{r.message}</p>
-              {#if r.details?.length}
-                <ul class="mt-1 text-xs text-muted-foreground">
-                  {#each r.details as d, i (i)}<li>{d}</li>{/each}
-                </ul>
-              {/if}
-            </div>
+  <!-- Tab navigation -->
+  <div class="border-b border-border">
+    <div class="-mb-px flex flex-wrap gap-1 text-sm font-medium" role="tablist" aria-label={t('nav.settings')}>
+      {#each sortedSections as s (s.section)}
+        {@const isActive = (activeSection || sortedSections[0]?.section) === s.section}
+        <button
+          type="button"
+          role="tab"
+          id={`tab-${s.section}`}
+          data-tab={s.section}
+          aria-selected={isActive}
+          aria-controls={s.section}
+          tabindex={isActive ? 0 : -1}
+          onclick={() => selectTab(s.section)}
+          class={`group inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+            isActive
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+          }`}
+        >
+          <span>{L(s.title)}</span>
+          {#if s.module !== 'core'}
+            <!-- module name at label
+            <Badge variant="outline" class="text-[10px] px-1.5 py-0 uppercase tracking-wider">{s.module}</Badge>
+            -->
           {/if}
-        {/each}
-      </form>
-    </Card>
+        </button>
+      {/each}
+    </div>
+  </div>
+
+  <!-- Tab panels -->
+  {#each sortedSections as s (s.section)}
+    {@const isCurrent = (activeSection || sortedSections[0]?.section) === s.section}
+    <div
+      role="tabpanel"
+      id={s.section}
+      aria-labelledby={`tab-${s.section}`}
+      class={isCurrent ? 'block' : 'hidden'}
+    >
+      <Card title={L(s.title)} description={L(s.note) || undefined}>
+        {#snippet actions()}<Badge variant="outline">{s.module}</Badge>{/snippet}
+        {#if savedNotice === s.section}<p class="notice mb-4" role="status">{t('common.saved')}</p>{/if}
+        {#if (failedSection === s.section && form?.error) || (clientError?.section === s.section && clientError.message)}
+          <p class="error mb-4" role="alert">{clientError?.section === s.section ? clientError.message : form?.error}</p>
+        {/if}
+        <form
+          method="POST"
+          action="?/save"
+          class="grid gap-4 sm:grid-cols-2"
+          use:enhance={() => {
+            saving = s.section;
+            clientError = null;
+            return async ({ result, update }) => {
+              saving = null;
+              if (result.type === 'redirect') {
+                triggerSavedNotice(s.section);
+                await invalidateAll();
+              } else if (result.type === 'failure') {
+                const failureData = result.data as { message?: string; error?: string } | undefined;
+                clientError = {
+                  section: s.section,
+                  message: failureData?.message || failureData?.error || t('settings.error_load'),
+                };
+                await update();
+              } else {
+                await update();
+              }
+            };
+          }}
+        >
+          <Csrf token={data.csrf} />
+          <input type="hidden" name="_scope" value={data.scope} />
+          <input type="hidden" name="_section" value={s.section} />
+          {#each s.fields as f (f.key)}
+            {@const id = `f-${f.key}`}
+            {@const err = fieldErrors[f.key]}
+            {@const strVal = f.value === null || f.value === undefined ? '' : String(f.value)}
+            <input type="hidden" name="_keys" value={f.key} />
+            {#if f.type === 'list'}<input type="hidden" name="_lists" value={f.key} />{/if}
+            {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
+            {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
+            <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={f.type === 'text' || f.type === 'markdown' || f.type === 'list' ? 'sm:col-span-2' : ''}>
+              {#if f.type === 'boolean'}
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                  <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="set" checked={f.source !== 'default' || f.value !== null} class="accent-primary" /> {t('settings.bool_set')}</label>
+                  <label class="flex items-center gap-2"><Checkbox {id} name={f.key} checked={f.value === true} /> {t('common.active')}</label>
+                  <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="inherit" checked={f.source === 'default' && f.value === null} class="accent-primary" /> {data.scope === 'global' ? t('settings.inherit_default') : t('settings.inherit_global')}</label>
+                </div>
+              {:else if f.type === 'secret'}
+                <Input {id} type="password" name={f.key} placeholder={f.secretSet ? t('settings.secret_set_placeholder') : t('settings.secret_unset_placeholder')} autocomplete="off" />
+                {#if f.secretSet}<label class="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox name={`${f.key}__clear`} /> {t('settings.secret_clear')}</label>{/if}
+              {:else if f.type === 'select' || f.type === 'theme'}
+                <Select {id} name={f.key} value={strVal}>
+                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+                  {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={strVal === o.value}>{L(o.label)}</option>{/each}
+                </Select>
+              {:else if f.type === 'route'}
+                <Select {id} name={f.key} value={strVal}>
+                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+                  {#each data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
+                </Select>
+              {:else if f.type === 'locale'}
+                <Select {id} name={f.key} value={strVal}>
+                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+                  {#each locales as o (o.value)}<option value={o.value} selected={strVal === o.value}>{o.label}</option>{/each}
+                </Select>
+              {:else if f.type === 'list'}
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
+                  {#each f.options ?? [] as o (o.value)}
+                    <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
+                  {:else}<span class="text-muted-foreground">—</span>{/each}
+                </div>
+              {:else if f.type === 'text' || f.type === 'markdown'}
+                <Textarea {id} name={f.key} rows={f.type === 'markdown' ? 6 : 3} value={strVal} maxlength={f.max ?? undefined} />
+              {:else if f.type === 'number'}
+                <Input {id} type="number" name={f.key} value={strVal} min={f.min ?? undefined} max={f.max ?? undefined} step="any" />
+              {:else}
+                <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
+              {/if}
+            </Field>
+          {/each}
+          <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+            <Button type="submit" disabled={saving === s.section}>
+              <Icon name={saving === s.section ? 'refresh' : 'save'} size={16} class={saving === s.section ? 'animate-spin' : ''} />
+              {saving === s.section ? t('common.running') : t('settings.save_section', { section: L(s.title) })}
+            </Button>
+            {#each s.actions.filter((a) => can(a.permission)) as a (a.key)}
+              {@const id = `${s.section}:${a.key}`}
+              <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key)}>
+                <Icon name="refresh" size={16} />{running === id ? t('common.running') : L(a.label)}
+              </Button>
+            {/each}
+          </div>
+          {#each s.actions as a (a.key)}
+            {@const r = results[`${s.section}:${a.key}`]}
+            {#if r}
+              <div class="sm:col-span-2" data-testid={`action-result-${s.section}-${a.key}`}>
+                <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{r.message}</p>
+                {#if r.details?.length}
+                  <ul class="mt-1 text-xs text-muted-foreground">
+                    {#each r.details as d, i (i)}<li>{d}</li>{/each}
+                  </ul>
+                {/if}
+              </div>
+            {/if}
+          {/each}
+        </form>
+      </Card>
+    </div>
   {/each}
 </div>

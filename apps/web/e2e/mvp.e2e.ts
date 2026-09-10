@@ -104,6 +104,7 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
   // Settings section action (extension point 6): the AI connection test runs in place. The point
   // of the assertion is the URL — a page load here would mean the button fell back to a form post.
   await page.goto('/settings');
+  await page.locator('[data-tab="ai"]').click();
   const aiCard = page.locator('#ai');
   await aiCard.getByRole('button', { name: /Uji koneksi|Test connection/ }).click();
   await expect(page.getByTestId('action-result-ai-test')).toContainText(/Terhubung|Connected/, {
