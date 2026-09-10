@@ -8,7 +8,7 @@ Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, paka
 
 Tiga hal yang sering ditebak salah:
 
-- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber templat modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Kontraknya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
+- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber template modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Kontraknya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
 - **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core; ia punya remote, tag, dan CI-nya sendiri.
 - **Submodule adalah cara HOST memasang, bukan cara Anda bekerja.** Anda mengembangkan di repo biasa; saat dipasang, host menaruhnya sebagai submodule terkunci pada tag.
 
@@ -50,14 +50,14 @@ cd core && bun install
 
 Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkout core buatan tangan untuk setiap build. Clone itu dipakai untuk dua hal saja:
 
-1. **Mengambil templat modul.** `bun create module` membaca templat dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
+1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
 2. **Menjalankan aplikasinya saat Anda mengembangkan** (`bun dev`), supaya modul Anda bisa dilihat di browser.
 
 Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda — dan bila suatu saat modul Anda menuntutnya, itu cacat kontrak yang perlu dilaporkan, bukan diizinkan.
 
 Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
 
-Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: templat modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
+Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
@@ -65,11 +65,11 @@ Dari dalam checkout core tadi:
 
 ```bash
 cd core
-bun create module ../mod-billing          # templatnya dari .bun-create/module di core ini
+bun create module ../mod-billing          # templatenya dari .bun-create/module di core ini
 cd ../mod-billing
 bun run rename Billing                    # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
 git init -b main
-git add -A && git commit -m "modul Billing dari templat"
+git add -A && git commit -m "modul Billing dari template"
 ```
 
 Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
@@ -84,7 +84,7 @@ Peta direktorinya sekarang — dua repo bersebelahan, tidak bersarang:
 
 Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
 
-Templat ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
+Template ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
 
 ### 1a. Dorong ke repositori Anda sendiri
 
@@ -158,7 +158,7 @@ Yang Anda commit tetap hanya repo modul; `core/modules/Billing` dan `core/module
 
 ## 4. CI repo modul
 
-Templat sudah membawa `.github/workflows/ci.yml`: MySQL sebagai service, lalu satu langkah `bun run harness --web`. Itu memberi Anda typecheck, lint, migrasi, dan tes integrasi modul di setiap push — tanpa perlu core checkout buatan tangan.
+Template sudah membawa `.github/workflows/ci.yml`: MySQL sebagai service, lalu satu langkah `bun run harness --web`. Itu memberi Anda typecheck, lint, migrasi, dan tes integrasi modul di setiap push — tanpa perlu core checkout buatan tangan.
 
 ## 5. Merilis
 
