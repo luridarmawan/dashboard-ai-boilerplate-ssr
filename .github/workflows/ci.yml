@@ -6,6 +6,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Workflow ini kadang dimatikan manual untuk menjaga kuota Actions. `workflow_dispatch` membuat
+  # satu jalan bisa dipicu sendiri (`gh workflow run CI`) begitu dinyalakan lagi, tanpa perlu
+  # mendorong commit kosong hanya demi memancing `push`.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
