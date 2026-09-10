@@ -1,6 +1,6 @@
 # Membangun Modul di Dalam Repo Ini
 
-Tutorial berurutan: dari repo bersih sampai sebuah modul jalan di dasbor, lengkap dengan tabel, izin, menu, CRUD, dan tesnya. Targetnya **modul yang menjadi bagian dari produk ini sendiri** — kodenya tinggal di `modules/<Nama>` pada repo ini dan ikut siklus rilisnya.
+Tutorial berurutan: dari repo bersih sampai sebuah modul jalan di dashboard, lengkap dengan tabel, izin, menu, CRUD, dan tesnya. Targetnya **modul yang menjadi bagian dari produk ini sendiri** — kodenya tinggal di `modules/<Nama>` pada repo ini dan ikut siklus rilisnya.
 
 Kalau modul Anda milik tim lain, punya siklus rilis sendiri, atau akan dipasang ke beberapa instalasi, pakai [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) — modul di repositori sendiri, dipasang sebagai submodule terkunci.
 
@@ -40,9 +40,9 @@ db/tables.ts                                  ← tabel (netral dialect)
 permissions.ts  menu.ts  config.ts            ← izin, entri menu, setelan modul
 i18n/id.json  i18n/en.json                    ← terjemahan (tidak ada string keras di komponen)
 api/schemas.ts  api/routes.ts  api/tools.ts   ← skema TypeBox bersama, endpoint, tool MCP
-hooks.ts  jobs.ts  widgets.ts  seed.ts        ← event hook, job terjadwal, widget dasbor, seed
+hooks.ts  jobs.ts  widgets.ts  seed.ts        ← event hook, job terjadwal, widget dashboard, seed
 web/routes/invoices/…                         ← daftar, tambah, ubah (7 berkas, tanpa JS)
-web/widgets/Summary.svelte                    ← widget dasbor
+web/widgets/Summary.svelte                    ← widget dashboard
 test/integration/billing.test.ts              ← tes integrasi yang sudah jalan
 README.md
 ```
@@ -93,7 +93,7 @@ Lalu ikutkan kolom itu di `api/schemas.ts` (skema TypeBox yang dipakai API **dan
 |---|---|
 | `hooks.ts` | Berlangganan event core (mis. `user.created`) — event bus, bukan impor silang antar modul |
 | `jobs.ts` | Job terjadwal; core menjamin **berjalan tepat sekali** walau instance-nya tiga |
-| `widgets.ts` + `web/widgets/*.svelte` | Widget dasbor; boleh menyebut path `data` agar dasbor mengambilkan datanya |
+| `widgets.ts` + `web/widgets/*.svelte` | Widget dashboard; boleh menyebut path `data` agar dashboard mengambilkan datanya |
 | `api/tools.ts` | Tool yang otomatis terpapar ke MCP dan ke chat AI |
 | `config.ts` | Setelan modul yang muncul sebagai form di **Pengaturan** |
 | `seed.ts` | Data awal, idempoten |

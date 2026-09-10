@@ -1,6 +1,6 @@
 # Membangun Modul di Repositori Anda Sendiri
 
-Tutorial untuk membangun modul yang **hidup di repo Anda sendiri**, punya siklus rilis sendiri, lalu dipasang ke satu atau banyak instalasi dasbor ini. Termasuk kasus repo privat — modulnya privat, core-nya privat, atau keduanya.
+Tutorial untuk membangun modul yang **hidup di repo Anda sendiri**, punya siklus rilis sendiri, lalu dipasang ke satu atau banyak instalasi dashboard ini. Termasuk kasus repo privat — modulnya privat, core-nya privat, atau keduanya.
 
 Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, pakai [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md).
 
@@ -114,7 +114,7 @@ Jangan menyunting kode di dalam folder submodule pada host — perubahan itu han
 
 ## 7. Repo privat
 
-Semua kredensial di bawah ini urusan git dan CI Anda — dasbor ini tidak menyimpan token apa pun.
+Semua kredensial di bawah ini urusan git dan CI Anda — dashboard ini tidak menyimpan token apa pun.
 
 ### 7a. Core privat (harness perlu meng-clone-nya)
 
