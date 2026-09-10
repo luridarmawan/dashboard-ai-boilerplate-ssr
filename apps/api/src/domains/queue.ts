@@ -2,6 +2,7 @@ import { writeAudit } from '@core/auth';
 import { errorResponses, fail, Id, OkSchema, ok } from '@core/contracts';
 import {
   and,
+  count,
   desc,
   eq,
   inArray,
@@ -86,22 +87,33 @@ export const queueDomain = new Elysia({ name: 'queue', prefix: '/queue', tags: [
       if (query.status) conds.push(eq(schema.queueJobs.status, query.status));
       if (query.name) conds.push(eq(schema.queueJobs.name, query.name));
       const where = conds.filter((c): c is SQL => c !== undefined);
+      const filter = where.length ? and(...where) : undefined;
+      // A queue is the one table that grows on its own, so the admin page reads it a page at a
+      // time (`?page`) and the total comes from the database, not from the rows in hand.
+      const limit = Math.min(200, Math.max(1, Number(query.limit ?? 100)));
+      const page = Math.max(1, Math.floor(Number(query.page ?? 1)) || 1);
       const rows = await db
         .select()
         .from(schema.queueJobs)
-        .where(where.length ? and(...where) : undefined)
+        .where(filter)
         .orderBy(desc(schema.queueJobs.created_at))
-        .limit(Math.min(200, Math.max(1, Number(query.limit ?? 100))));
-      // Counts per status in the same scope, for the header strip.
-      const all = await db
-        .select({ status: schema.queueJobs.status })
+        .limit(limit)
+        .offset((page - 1) * limit);
+      const [totalRow] = await db.select({ n: count() }).from(schema.queueJobs).where(filter);
+      const total = Number(totalRow?.n ?? 0);
+      // Counts per status in the same scope, aggregated BY THE DATABASE: the old version pulled
+      // every job row into memory just to tally four numbers, which grew with the queue itself.
+      const grouped = await db
+        .select({ status: schema.queueJobs.status, n: count() })
         .from(schema.queueJobs)
-        .where(scopeOf(a, tenantState?.clientId ?? null));
+        .where(scopeOf(a, tenantState?.clientId ?? null))
+        .groupBy(schema.queueJobs.status);
       const counts = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<string, number>;
-      for (const r of all) counts[r.status] = (counts[r.status] ?? 0) + 1;
+      for (const r of grouped) counts[r.status] = Number(r.n);
       return ok({
         jobs: rows.map(view),
         counts,
+        meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
         tasks: listTasks().map((tk) => ({
           name: tk.name,
           module: tk.module,
@@ -117,12 +129,19 @@ export const queueDomain = new Elysia({ name: 'queue', prefix: '/queue', tags: [
         status: t.Optional(t.Union(STATUSES.map((s) => t.Literal(s)))),
         name: t.Optional(t.String({ maxLength: 128 })),
         limit: t.Optional(t.String()),
+        page: t.Optional(t.String()),
       }),
       response: {
         200: OkSchema(
           t.Object({
             jobs: t.Array(JobView),
             counts: t.Record(t.String(), t.Integer()),
+            meta: t.Object({
+              page: t.Integer(),
+              limit: t.Integer(),
+              total: t.Integer(),
+              totalPages: t.Integer(),
+            }),
             tasks: t.Array(
               t.Object({
                 name: t.String(),

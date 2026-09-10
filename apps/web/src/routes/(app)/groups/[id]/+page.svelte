@@ -18,6 +18,16 @@ const matrixKeys = $derived(
 );
 const extras = $derived([...granted].filter((p) => !matrixKeys.has(p)));
 const memberIds = $derived(new Set(g.members.map((m) => m.userId)));
+const mp = $derived(data.group.memberPage);
+/** Links that move through the roster keep the candidate search that is open next to it. */
+const memberHref = (page: number, q: string) => {
+  const p = new URLSearchParams();
+  if (q) p.set('mq', q);
+  if (page > 1) p.set('mpage', String(page));
+  if (data.candidateQuery) p.set('cq', data.candidateQuery);
+  const s = p.toString();
+  return s ? `?${s}` : '?';
+};
 const candidates = $derived(data.tenantUsers.filter((u) => !memberIds.has(u.id)));
 const editable = $derived(can('group.edit'));
 /** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
@@ -64,7 +74,14 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
     {#if editable}<div><button type="submit">{t('groups.detail.save_permissions')}</button></div>{/if}
   </form>
 
-  <h2>{t('groups.detail.members_count', { n: g.members.length })}</h2>
+  <h2>{t('groups.detail.members_count', { n: g.memberCount })}</h2>
+  <!-- The roster is one page of `?mpage`, searched by `?mq` — both plain GET, no JavaScript. -->
+  <form method="GET" class="row">
+    {#if data.candidateQuery}<input type="hidden" name="cq" value={data.candidateQuery} />{/if}
+    <input name="mq" value={data.memberQuery} aria-label={t('groups.detail.member_filter')} placeholder={t('groups.detail.member_filter')} />
+    <button type="submit" class="secondary">{t('common.search')}</button>
+    {#if data.memberQuery}<a href={memberHref(1, '')}>{t('groups.detail.show_all_members')}</a>{/if}
+  </form>
   <table>
     <thead><tr><th>{t('users.name')}</th><th>{t('users.email')}</th><th></th></tr></thead>
     <tbody>
@@ -86,12 +103,20 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
       {/each}
     </tbody>
   </table>
+  {#if mp.totalPages > 1}
+    <nav class="row" aria-label={t('table.pagination')}>
+      {#if mp.page > 1}<a href={memberHref(mp.page - 1, data.memberQuery)} rel="prev">{t('table.prev')}</a>{/if}
+      <span class="muted">{t('table.page')} {mp.page} {t('table.of')} {mp.totalPages} · {mp.total} {t('table.rows')}</span>
+      {#if mp.page < mp.totalPages}<a href={memberHref(mp.page + 1, data.memberQuery)} rel="next">{t('table.next')}</a>{/if}
+    </nav>
+  {/if}
   {#if editable}
     <!-- Search first, then pick: the tenant may hold thousands of users and one API page is 100
          rows, so a <select> of "everyone" would quietly leave most of them out. A GET form, so
          this works without JavaScript like the rest of the page. -->
     <form method="GET" class="row" style="margin-top:.75rem">
-      <input name="mq" value={data.memberQuery} aria-label={t('groups.detail.member_search')} placeholder={t('groups.detail.member_search')} />
+      {#if data.memberQuery}<input type="hidden" name="mq" value={data.memberQuery} />{/if}
+      <input name="cq" value={data.candidateQuery} aria-label={t('groups.detail.member_search')} placeholder={t('groups.detail.member_search')} />
       <button type="submit">{t('common.search')}</button>
     </form>
     {#if candidates.length}

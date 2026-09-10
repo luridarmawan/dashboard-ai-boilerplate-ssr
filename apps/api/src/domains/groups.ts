@@ -13,6 +13,7 @@ import {
   GroupUpdateBody,
   OkSchema,
   ok,
+  PageMetaSchema,
   PageSchema,
   page,
 } from '@core/contracts';
@@ -148,9 +149,27 @@ async function permissionsOf(ts: Scope, groupId: string) {
     .sort((a, b) => a.permission.localeCompare(b.permission));
 }
 
-async function membersOf(ts: Scope, groupId: string) {
+/**
+ * Members of one group. A tenant can hold thousands of users and a seeded group tends to hold
+ * most of them, so the page a browser asks for is SEARCHED and PAGED: handing back every row
+ * made one page render grow with the tenant. `opts` omitted = every row, which only the delete
+ * path (one admin action, and it needs the full id list for its audit entry) still asks for.
+ */
+async function membersOf(
+  ts: Scope,
+  groupId: string,
+  opts?: { limit: number; offset: number; q: string | null },
+) {
   const db = unsafeAcrossTenants(); // join; tenant condition is explicit below
-  return db
+  const where = and(
+    scopeOf(ts.tenant, schema.groupUserMaps),
+    eq(schema.groupUserMaps.group_id, groupId),
+    isNull(schema.users.deleted_at),
+    opts?.q
+      ? sql`(lower(${schema.users.name}) like ${likePattern(opts.q)} or lower(${schema.users.email}) like ${likePattern(opts.q)})`
+      : undefined,
+  );
+  const q = db
     .select({
       id: schema.groupUserMaps.id,
       userId: schema.users.id,
@@ -159,14 +178,16 @@ async function membersOf(ts: Scope, groupId: string) {
     })
     .from(schema.groupUserMaps)
     .innerJoin(schema.users, eq(schema.users.id, schema.groupUserMaps.user_id))
-    .where(
-      and(
-        scopeOf(ts.tenant, schema.groupUserMaps),
-        eq(schema.groupUserMaps.group_id, groupId),
-        isNull(schema.users.deleted_at),
-      ),
-    )
+    .where(where)
     .orderBy(asc(schema.users.name));
+  const rows = opts ? await q.limit(opts.limit).offset(opts.offset) : await q;
+  if (!opts) return { rows, total: rows.length };
+  const [c] = await db
+    .select({ n: count() })
+    .from(schema.groupUserMaps)
+    .innerJoin(schema.users, eq(schema.users.id, schema.groupUserMaps.user_id))
+    .where(where);
+  return { rows, total: Number(c?.n ?? 0) };
 }
 
 export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
@@ -214,30 +235,42 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
       )
       .get(
         '/:id',
-        async ({ params, set, requestId, tenantState }) => {
+        async ({ params, query, set, requestId, tenantState }) => {
           const ts = tenantOf(tenantState);
           const g = ts ? await liveGroup(ts, params.id) : null;
           if (!ts || !g) return notFound(set, requestId, 'Grup');
           const c = await counts(ts, [g.id]);
+          // `members` is ONE page (`?page`, `?limit`, `?q`), never the whole roster: a seeded
+          // group holds most of the tenant, so the old full array made this response — and the
+          // page rendering it — grow with the tenant. `memberPage` says what the caller is
+          // looking at; `memberCount` above stays the unfiltered total.
+          const p = paging(query, 25);
+          const m = await membersOf(ts, g.id, { limit: p.limit, offset: p.offset, q: p.q });
           return ok({
             ...view(g, c.get(g.id) ?? { permissions: 0, members: 0 }),
             permissions: await permissionsOf(ts, g.id),
-            members: await membersOf(ts, g.id),
+            members: m.rows,
+            memberPage: p.meta(m.total),
           });
         },
         {
           beforeHandle: permission('group.read'),
           params: t.Object({ id: Id }),
+          query: ListQuery,
           response: {
             200: OkSchema(
               t.Intersect([
                 Group,
-                t.Object({ permissions: t.Array(Permission), members: t.Array(Member) }),
+                t.Object({
+                  permissions: t.Array(Permission),
+                  members: t.Array(Member),
+                  memberPage: PageMetaSchema,
+                }),
               ]),
             ),
             ...errorResponses,
           },
-          detail: { summary: 'One group with its permissions and members' },
+          detail: { summary: 'One group with its permissions and one page of its members' },
         },
       )
       .post(
@@ -348,7 +381,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           if (!ts || !g) return notFound(set, requestId, 'Grup');
           if (g.is_system) return conflict(set, requestId, 'Grup sistem tidak bisa dihapus');
           const perms = await permissionsOf(ts, g.id);
-          const members = await membersOf(ts, g.id);
+          const members = (await membersOf(ts, g.id)).rows;
           await ts.tenant.delete(schema.groupUserMaps, eq(schema.groupUserMaps.group_id, g.id));
           await ts.tenant.delete(
             schema.groupPermissions,
@@ -551,20 +584,23 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
     r
       .get(
         '/:id',
-        async ({ params, set, requestId, tenantState }) => {
+        async ({ params, query, set, requestId, tenantState }) => {
           const ts = tenantOf(tenantState);
           const g = ts ? await liveGroup(ts, params.id) : null;
           if (!ts || !g) return notFound(set, requestId, 'Grup');
-          return ok({ groupId: g.id, members: await membersOf(ts, g.id) });
+          const p = paging(query, 25);
+          const m = await membersOf(ts, g.id, { limit: p.limit, offset: p.offset, q: p.q });
+          return page(m.rows, p.meta(m.total));
         },
         {
           beforeHandle: permission('group.read'),
           params: t.Object({ id: Id }),
+          query: ListQuery,
           response: {
-            200: OkSchema(t.Object({ groupId: t.String(), members: t.Array(Member) })),
+            200: PageSchema(Member),
             ...errorResponses,
           },
-          detail: { summary: 'Members of a group' },
+          detail: { summary: "One page of a group's members (`?q` searches name and e-mail)" },
         },
       )
       .post(

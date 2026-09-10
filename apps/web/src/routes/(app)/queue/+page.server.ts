@@ -8,12 +8,16 @@ export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
   const status = event.url.searchParams.get('status');
   const ok = ['pending', 'running', 'done', 'dead'] as const;
+  // A queue grows on its own, so the page is a page: `?page=` walks it, 50 rows at a time.
+  const asked = Number(event.url.searchParams.get('page') ?? '1');
+  const page = Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : 1;
   const res = await apiFor(event).v1.queue.get({
     query: {
       ...(ok.includes(status as (typeof ok)[number])
         ? { status: status as (typeof ok)[number] }
         : {}),
-      limit: '100',
+      limit: '50',
+      page: String(page),
     },
   });
   if (!res.data?.success)

@@ -397,6 +397,8 @@
   "groups.description": "Deskripsi",
   "groups.detail.add_member": "Tambah anggota",
   "groups.detail.member_search": "Cari nama atau email",
+  "groups.detail.member_filter": "Saring anggota",
+  "groups.detail.show_all_members": "Tampilkan semua",
   "groups.detail.no_candidates": "Tidak ada pengguna yang cocok dan belum jadi anggota.",
   "groups.detail.more_candidates": "{n} pengguna lain juga cocok — persempit pencariannya.",
   "groups.detail.all_groups": "Semua grup",

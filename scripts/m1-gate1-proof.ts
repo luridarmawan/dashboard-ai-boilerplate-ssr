@@ -356,13 +356,22 @@ const member = new Jar();
     groupId.length === 36 && userId.length === 36,
     `${gr.res.status} ${ur.res.status}`,
   );
-  const found = await get(admin, `/groups/${groupId}?mq=member-${run}`);
-  check('group page offers a member search', found.html.includes('name="mq"'));
+  const found = await get(admin, `/groups/${groupId}?cq=member-${run}`);
+  check(
+    'group page offers both searches: members (mq) and candidates (cq)',
+    found.html.includes('name="cq"') && found.html.includes('name="mq"'),
+  );
   check(
     'the searched user is offered as a candidate',
     found.html.includes(`value="${userId}"`),
     `${found.res.status}, ${found.html.length} bytes`,
   );
+  // The roster itself is a page now: adding the user must not put the whole tenant on the page.
+  // The action re-renders the page rather than redirecting, so 200 is the success here.
+  const added = await post(admin, `/groups/${groupId}?/addMember`, { _csrf: token, userId });
+  check('add member → 200', added.res.status === 200, `${added.res.status}`);
+  const roster = await get(admin, `/groups/${groupId}?mq=member-${run}`);
+  check('member filter narrows the roster to the searched member', roster.html.includes(email));
   await post(admin, `/groups/${groupId}?/delete`, { _csrf: token, code });
 }
 

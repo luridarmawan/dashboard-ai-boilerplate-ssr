@@ -13,14 +13,23 @@ export const load: PageServerLoad = async (event) => {
   /**
    * Candidates for "add member" are SEARCHED, not listed: a tenant can hold thousands of users
    * while one API page is `MAX_LIMIT` = 100 rows, so a fixed first page left most of them
-   * unaddable through the UI. `?mq=` filters server-side, so the picker still needs no JavaScript.
+   * unaddable through the UI. `?cq=` filters server-side, so the picker still needs no JavaScript.
+   */
+  const candidateQuery = event.url.searchParams.get('cq')?.trim() ?? '';
+  /**
+   * The member roster is paged too (`?mq=` search, `?mpage=`): a seeded group holds most of the
+   * tenant, and rendering every member made this page grow with the tenant.
    */
   const memberQuery = event.url.searchParams.get('mq')?.trim() ?? '';
+  const asked = Number(event.url.searchParams.get('mpage') ?? '1');
+  const memberPage = Number.isFinite(asked) && asked > 0 ? Math.floor(asked) : 1;
   const [group, registry, users] = await Promise.all([
-    client.v1.groups({ id: event.params.id }).get(),
+    client.v1.groups({ id: event.params.id }).get({
+      query: { ...(memberQuery ? { q: memberQuery } : {}), page: memberPage, limit: 25 },
+    }),
     client.v1.auth['permission-registry'].get(),
     client.v1.users.get({
-      query: { ...(memberQuery ? { q: memberQuery } : {}), limit: 50, sort: 'name' },
+      query: { ...(candidateQuery ? { q: candidateQuery } : {}), limit: 50, sort: 'name' },
     }),
   ]);
   if (!group.data?.success)
@@ -29,6 +38,7 @@ export const load: PageServerLoad = async (event) => {
     group: group.data.data,
     registry: registry.data?.success ? registry.data.data.resources : [],
     tenantUsers: users.data?.success ? users.data.data : [],
+    candidateQuery,
     memberQuery,
     /** Matches the select does not show: ask the reader to narrow rather than to scroll. */
     moreCandidates: users.data?.success

@@ -397,6 +397,8 @@
   "groups.description": "Description",
   "groups.detail.add_member": "Add member",
   "groups.detail.member_search": "Search name or e-mail",
+  "groups.detail.member_filter": "Filter members",
+  "groups.detail.show_all_members": "Show all",
   "groups.detail.no_candidates": "No matching user who is not already a member.",
   "groups.detail.more_candidates": "{n} more users match — narrow the search.",
   "groups.detail.all_groups": "All groups",

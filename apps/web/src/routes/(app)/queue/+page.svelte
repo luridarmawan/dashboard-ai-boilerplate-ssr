@@ -33,6 +33,14 @@ const label = (s: string) =>
       : s === 'dead'
         ? t('queue.status.dead')
         : t('queue.status.pending');
+/** Paging links keep the status filter that is open; page 1 leaves the parameter off. */
+const pageHref = (page: number) => {
+  const p = new URLSearchParams();
+  if (data.status) p.set('status', data.status);
+  if (page > 1) p.set('page', String(page));
+  const q = p.toString();
+  return q ? `/queue?${q}` : '/queue';
+};
 const short = (v: unknown) => {
   if (v === null || v === undefined) return '—';
   const s = JSON.stringify(v);
@@ -86,6 +94,14 @@ const short = (v: unknown) => {
       {/each}
     </tbody>
   </Table>
+  {#if data.meta.totalPages > 1}
+    <!-- Plain links: paging a queue must work on a page that has no JavaScript, like the rest. -->
+    <nav class="flex items-center gap-3 text-sm" aria-label={t('table.pagination')}>
+      {#if data.meta.page > 1}<a href={pageHref(data.meta.page - 1)} rel="prev">{t('table.prev')}</a>{/if}
+      <span class="text-muted-foreground">{t('table.page')} {data.meta.page} {t('table.of')} {data.meta.totalPages} · {data.meta.total} {t('table.rows')}</span>
+      {#if data.meta.page < data.meta.totalPages}<a href={pageHref(data.meta.page + 1)} rel="next">{t('table.next')}</a>{/if}
+    </nav>
+  {/if}
 
   <Card title={t('queue.tasks_title')} description={t('queue.tasks_hint')}>
     <ul class="grid gap-1 text-sm sm:grid-cols-2">

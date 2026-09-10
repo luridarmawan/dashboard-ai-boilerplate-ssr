@@ -189,6 +189,51 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((detail.data as { members: unknown[] }).members.length).toBe(1);
   });
 
+  test('group members come back one page at a time, searchable — the roster no longer scales with the tenant', async () => {
+    // Three members, asked for two at a time: enough to prove the page boundary without
+    // pretending a test tenant is a big one.
+    const ids: string[] = [];
+    for (const who of ['Ann', 'Bee', 'Cid']) {
+      const r = await post(
+        '/v1/users',
+        {
+          email: `member-${who.toLowerCase()}-${run}@example.test`,
+          name: `${who} Member ${run}`,
+          password: 'a group member password',
+          groupIds: [editorsId],
+        },
+        [admin],
+      );
+      expect(r.status).toBe(201);
+      ids.push(((await json(r)).data as { id: string }).id);
+    }
+    type Detail = {
+      memberCount: number;
+      members: { userId: string; name: string }[];
+      memberPage: { page: number; limit: number; total: number; totalPages: number };
+    };
+    const first = (await json(await call(`/v1/groups/${editorsId}?limit=2`, {}, [admin])))
+      .data as Detail;
+    expect(first.members.length).toBe(2);
+    expect(first.memberPage.total).toBe(4); // Bob is a member from the test above
+    expect(first.memberPage.totalPages).toBe(2);
+    expect(first.memberCount).toBe(4); // the unfiltered total stays whole
+    const second = (await json(await call(`/v1/groups/${editorsId}?limit=2&page=2`, {}, [admin])))
+      .data as Detail;
+    expect(second.members.length).toBe(2);
+    expect(second.members.map((m) => m.userId)).not.toEqual(first.members.map((m) => m.userId));
+    const found = (
+      await json(await call(`/v1/groups/${editorsId}?q=member-bee-${run}`, {}, [admin]))
+    ).data as Detail;
+    expect(found.members.map((m) => m.userId)).toEqual([ids[1] as string]);
+    expect(found.memberPage.total).toBe(1);
+    // The dedicated endpoint pages the same way, in the standard envelope.
+    const page1 = await json(await call(`/v1/group-members/${editorsId}?limit=1`, {}, [admin]));
+    expect((page1.data as unknown as unknown[]).length).toBe(1);
+    expect((page1 as unknown as { meta: { total: number } }).meta.total).toBe(4);
+    for (const id of ids) expect((await del(`/v1/users/${id}`, [admin])).status).toBe(200);
+  });
+
   test('system groups keep their code and cannot be deleted', async () => {
     const list = await json(await call('/v1/groups?limit=50', {}, [admin]));
     const groups = list.data as unknown as { id: string; code: string; isSystem: boolean }[];

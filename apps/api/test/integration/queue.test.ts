@@ -253,4 +253,24 @@ describe.skipIf(!enabled)('ad-hoc job queue (P2): priority, retry, dead-letter, 
       403,
     );
   });
+
+  test('the admin list is paged: page 2 is reachable and the total comes from the database', async () => {
+    type Listing = {
+      jobs: Job[];
+      counts: Record<string, number>;
+      meta: { page: number; limit: number; total: number; totalPages: number };
+    };
+    const p1 = (await json(await call('/v1/queue?limit=1', {}, [admin]))).data as Listing;
+    expect(p1.jobs.length).toBe(1);
+    // The queue outgrows any single page, so the total is counted, not derived from the rows.
+    expect(p1.meta.total).toBeGreaterThan(1);
+    expect(p1.meta.totalPages).toBe(p1.meta.total);
+    const p2 = (await json(await call('/v1/queue?limit=1&page=2', {}, [admin]))).data as Listing;
+    expect(p2.jobs.length).toBe(1);
+    expect(p2.jobs[0]?.id).not.toBe(p1.jobs[0]?.id);
+    expect(p2.meta.page).toBe(2);
+    // Counts are aggregated over the whole scope, not over the page in hand.
+    const summed = Object.values(p1.counts).reduce((a, b) => a + b, 0);
+    expect(summed).toBe(p1.meta.total);
+  });
 });
