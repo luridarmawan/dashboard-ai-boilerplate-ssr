@@ -72,7 +72,7 @@ export const requestContext = new Elysia({ name: 'request-context' })
         set.status = 500;
         logger.error('unhandled', {
           requestId: rid,
-          error: error instanceof Error ? error.message : String(error),
+          error: safeMessage(error),
           // Drizzle wraps driver errors as "Failed query: …"; the actionable part (ER_NO_DB_ERROR,
           // "Table … doesn't exist", ECONNREFUSED, "Access denied") lives in the cause chain.
           cause: describeCause(error),
@@ -80,16 +80,24 @@ export const requestContext = new Elysia({ name: 'request-context' })
         });
         return fail(
           'internal_error',
-          isProd
-            ? 'Terjadi kesalahan internal'
-            : error instanceof Error
-              ? error.message
-              : String(error),
+          isProd ? 'Terjadi kesalahan internal' : safeMessage(error),
           rid,
         );
       }
     }
   });
+
+/**
+ * An error message fit to be written down. Drizzle appends the BOUND PARAMETERS to its own
+ * message (`Failed query: <sql> params: a,b,c`), and those are values, not shape: an API key
+ * being stored, a reset token, someone's e-mail. The SQL is what makes a failure diagnosable, so
+ * keep that and drop the tail — in the log, and in the message dev builds hand back to the caller.
+ * (M-7 masks sensitive FIELDS; this is the same rule for a message that carries them inline.)
+ */
+export function safeMessage(error: unknown): string {
+  const m = error instanceof Error ? error.message : String(error);
+  return m.includes('Failed query:') ? m.replace(/\s*params:[\s\S]*$/, ' params: [disamarkan]') : m;
+}
 
 /** `code`/`errno` + message of every nested `cause`, joined — null when there is none. */
 export function describeCause(error: unknown): string | null {
@@ -98,7 +106,7 @@ export function describeCause(error: unknown): string | null {
   for (let depth = 0; cur && depth < 5; depth++) {
     const e = cur as { code?: unknown; errno?: unknown; message?: unknown; cause?: unknown };
     const tag = [e.code, e.errno].filter((x) => x !== undefined && x !== null).join('/');
-    const msg = typeof e.message === 'string' ? e.message : String(cur);
+    const msg = safeMessage(typeof e.message === 'string' ? e.message : cur);
     parts.push(tag ? `${tag}: ${msg}` : msg);
     cur = e.cause;
   }

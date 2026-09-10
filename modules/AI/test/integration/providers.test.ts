@@ -716,4 +716,44 @@ describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
     expect(pinned.length).toBe(0);
     await call(`/v1/m/ai/providers/${alphaId}`, { method: 'DELETE' }, [admin]);
   });
+
+  test('a deleted code can be used again: the buried row is resurrected, not duplicated', async () => {
+    // The unique key `(client_id, code)` counts deleted rows, so this used to reach the driver as
+    // a constraint violation — a 500 with the INSERT (and its API key) in the message.
+    const again = await call(
+      '/v1/m/ai/providers',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Alpha again',
+          code: A,
+          baseUrl: alpha.url,
+          apiKey: 'alpha-key-2',
+          defaultModel: 'a-small',
+          models: [{ model: 'a-small', priceIn: 1, priceOut: 2 }],
+        }),
+      },
+      [admin],
+    );
+    expect(again.status).toBe(201);
+    const back = (await json(again)).data as ProviderView;
+    expect(back.id).toBe(alphaId);
+    expect(back.name).toBe('Alpha again');
+    expect(back.apiKeySet).toBe(true);
+    expect(JSON.stringify(back)).not.toContain('alpha-key-2');
+    // One row for that code, alive; its old probe verdict does not carry over to a new endpoint.
+    const rows = await db
+      .select()
+      .from(schema.aiProviders)
+      .where(and(eq(schema.aiProviders.client_id, tenantId), eq(schema.aiProviders.code, A)));
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.deleted_at).toBeNull();
+    expect(rows[0]?.capabilities).toBeNull();
+    expect(rows[0]?.last_status).toBeNull();
+    const opts = (await json(await call('/v1/m/ai/providers/options', {}, [admin]))).data as {
+      code: string;
+    }[];
+    expect(opts.map((o) => o.code)).toEqual([A]);
+    await call(`/v1/m/ai/providers/${back.id}`, { method: 'DELETE' }, [admin]);
+  });
 });

@@ -30,6 +30,7 @@ import {
   eq,
   gte,
   inArray,
+  isNotNull,
   isNull,
   newId,
   schema,
@@ -1707,9 +1708,19 @@ export default defineApiRoutes(
             { is_default: false },
             isNull(schema.aiProviders.deleted_at),
           );
-        const id = newId();
-        await tenant.insert(schema.aiProviders, {
-          id,
+        /**
+         * Deleting a profile only sets `deleted_at`, and the unique key `(client_id, code)` counts
+         * buried rows too — so re-adding a code that was removed reached the database as a raw
+         * constraint violation instead of an answer. Resurrect that row instead (the `users`
+         * create path does the same for a deleted account): the id comes back, so audit entries
+         * and anything else pointing at it stay meaningful.
+         */
+        const buried = await tenant.selectOne(
+          schema.aiProviders,
+          and(eq(schema.aiProviders.code, body.code), isNotNull(schema.aiProviders.deleted_at)),
+        );
+        const id = buried?.id ?? newId();
+        const values = {
           code: body.code,
           name: body.name,
           base_url: body.baseUrl.replace(/\/$/, ''),
@@ -1717,7 +1728,29 @@ export default defineApiRoutes(
           default_model: body.defaultModel,
           enabled: body.enabled ?? true,
           is_default: isDefault,
-        });
+        };
+        if (buried) {
+          // What the old profile learned about ITS endpoint says nothing about this one: the base
+          // URL and the key may be different, so the probe starts from "never tested" again.
+          await tenant.update(
+            schema.aiProviders,
+            {
+              ...values,
+              deleted_at: null,
+              last_status: null,
+              last_error: null,
+              last_tested_at: null,
+              capabilities: null,
+              capabilities_at: null,
+              preferred_endpoint: null,
+              last_probe_error: null,
+              last_probe_ms: null,
+            },
+            eq(schema.aiProviders.id, id),
+          );
+        } else {
+          await tenant.insert(schema.aiProviders, { id, ...values });
+        }
         await replaceModels(tenant, id, body.models, body.defaultModel);
         const row = (await tenant.selectOne(
           schema.aiProviders,
@@ -1731,7 +1764,13 @@ export default defineApiRoutes(
           resourceId: id,
           ip: clientIp(request, server),
           requestId,
-          after: { code: row.code, name: row.name, baseUrl: row.base_url, apiKey: '***' },
+          after: {
+            code: row.code,
+            name: row.name,
+            baseUrl: row.base_url,
+            apiKey: '***',
+            ...(buried ? { restored: true } : {}),
+          },
         });
         set.status = 201;
         return ok(await providerView(row));
