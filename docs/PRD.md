@@ -10,7 +10,7 @@
 | **Prioritas** | API-first · SSR · Modern UI · Theming · AI |
 | **Deployment** | **Self-hosted — lokal / VPS.** Bukan serverless, bukan edge |
 | **Model kerja** | **Greenfield.** Dibangun dari nol di repositori baru; tidak ada basis kode terdahulu dan tidak ada kewajiban kompatibilitas apa pun |
-| **Dokumen terkait** | [`THEMES.md`](./THEMES.md) — spesifikasi & token empat tema bawaan (§4.8, FR-L) · [`ROADMAP.md`](./ROADMAP.md) — urutan pengerjaan, gate keluar, penjaga CI · [`MODULES.md`](./MODULES.md) — panduan membangun modul (G-13), kontrak yang berlaku saat ini |
+| **Dokumen terkait** | [`THEMES.md`](./THEMES.md) — spesifikasi & token empat tema bawaan (§4.8, FR-L) · [`ROADMAP.md`](./ROADMAP.md) — urutan pengerjaan, gate keluar, penjaga CI · [`MODULES.md`](./MODULES.md) — panduan membangun modul (G-13), kontrak yang berlaku saat ini, dengan dua tutorialnya: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) dan [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) |
 
 ---
 

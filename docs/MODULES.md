@@ -6,6 +6,7 @@
 | **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (16 titik perluasan), §4.9 (modul lintas repositori), FR-G |
 | **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
 | **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
+| **Tutorial** | Langkah demi langkah, dengan penjelasan tiap perintah: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) (modul di dalam repo ini) · [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) (repositori sendiri, termasuk repo privat). Dokumen ini kontraknya; keduanya alurnya |
 
 Dokumen ini adalah tempat yang perlu Anda baca untuk membuat modul. Kalau ada langkah yang ternyata membutuhkan perubahan pada berkas di luar `modules/` dan `modules.json`, itu **cacat pada kontrak modul** (PRD §3 prinsip 6) — laporkan, jangan tambal core.
 

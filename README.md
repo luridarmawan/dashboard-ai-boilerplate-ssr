@@ -7,6 +7,8 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 | [`docs/PRD.md`](./docs/PRD.md) | Kebutuhan produk, keputusan arsitektur, 16 titik perluasan modul, kriteria terima §8 |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Urutan milestone M0–M7 dengan gate keluar |
 | [`docs/MODULES.md`](./docs/MODULES.md) | **Membangun modul** — `bun modgen`, kontrak tiap berkas, repositori terpisah, penjaga CI |
+| [`docs/Build-Module-for-Boilerplate.md`](./docs/Build-Module-for-Boilerplate.md) | **Tutorial** langkah demi langkah: modul untuk produk ini, di dalam repo ini |
+| [`docs/Build-Module-for-Your-Apps.md`](./docs/Build-Module-for-Your-Apps.md) | **Tutorial** langkah demi langkah: modul di repositori Anda sendiri, termasuk repo privat |
 | [`docs/THEMES.md`](./docs/THEMES.md) | Tema, layout, set ikon; tema dari modul; editor tema kustom di UI admin |
 | [`docs/WEBHOOKS.md`](./docs/WEBHOOKS.md) | Webhook keluar: event inti tenant sebagai POST bertanda tangan, percobaan ulang, riwayat |
 | [`docs/AI.md`](./docs/AI.md) | Modul AI: provider OpenAI-compatible (satu atau banyak profil dengan daftar harga), streaming, tool modul, log, analitik biaya & retensi |
@@ -59,7 +61,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 
 ## Cara mengubah hal-hal yang paling sering ditanyakan
 
-- **Membuat modul** — `bun modgen`, lalu baca [`docs/MODULES.md`](./docs/MODULES.md). Di repositori sendiri: `bun create module`.
+- **Membuat modul** — mulai dari tutorialnya: [di dalam repo ini](./docs/Build-Module-for-Boilerplate.md) (`bun modgen`) atau [di repositori sendiri](./docs/Build-Module-for-Your-Apps.md) (`bun create module`, dipasang sebagai submodule terkunci). Kontrak lengkap tiap berkas: [`docs/MODULES.md`](./docs/MODULES.md).
 - **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema **kustom tanpa deploy**: admin merakitnya di **Tema kustom** (`/themes`) dari token, set ikon, dan layout terdaftar; wajib lolos kontras AA. Tema baku dan allowlist diatur di **Pengaturan → Aplikasi**.
 - **Mengganti landing page** — **Pengaturan → Aplikasi → Halaman depan (anonim)** (`app.landing_route`), berlaku seketika tanpa restart; route yang tidak ada ditolak saat disimpan. Kosongkan kolomnya untuk kembali ke `LANDING_ROUTE` di `.env` (fallback bootstrap, baku `/example`). Bila `/` tetap menampilkan halaman depan bawaan, route pilihan itu tidak bisa dirender — modulnya nonaktif untuk tenant itu, atau routenya sudah tidak ada; alasannya tercatat sebagai peringatan di log web, dan `curl -I /` menunjukkan header `x-landing-route` saat forwarding berhasil. Modul mana pun boleh menyumbang halaman publik (`public.ts`).
 - **Mengganti judul & footer** — `APP_LANDING_TITLE`, `APP_LANDING_LEAD`, dan `APP_FOOTER_TITLE` di `.env` / `.env.prod` menimpa `landing.title`, `landing.lead`, dan `shell.footer` di semua bahasa; `APP_LANDING_TITLE` sekaligus menjadi judul dokumen OpenAPI di `/docs`. Nama dan logo per tenant tetap di **Pengaturan → Aplikasi**.
