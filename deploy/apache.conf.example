@@ -21,6 +21,8 @@
     RequestHeader set X-Forwarded-Proto "https"
     RequestHeader set X-Forwarded-Host "%{HTTP_HOST}s"
     # SSE streaming (AI chat): flush every packet, no buffering, long read timeout.
+    # 8080 = Caddy in behind-proxy mode; without Docker point this at the port of
+    # `bun start` instead (default 127.0.0.1:3000) — DEPLOY.md §8e.
     ProxyPass        / http://127.0.0.1:8080/ flushpackets=on timeout=600
     ProxyPassReverse / http://127.0.0.1:8080/
     SetEnv proxy-nokeepalive 0

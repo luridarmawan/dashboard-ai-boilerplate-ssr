@@ -48,6 +48,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 | Perintah | Guna |
 |---|---|
 | `bun dev` | API + web dengan reload, `modules:sync` otomatis |
+| `bun run build` lalu `bun start` | jalankan build produksi di host ini tanpa Docker, **satu port** (baku `127.0.0.1:3000`) — nginx/apache cukup satu `proxy_pass`; `--no-proxy` untuk dua port ([DEPLOY §8e](./docs/DEPLOY.md)) |
 | `bun run check` | lint (Biome) + typecheck semua paket, kedua dialect |
 | `bun run test:unit` · `bun run test:integration:docker` | unit tanpa `.env`; integrasi dengan MySQL di Docker |
 | `bun run proof:m1:docker` | seluruh bukti gate M1–M6 lewat HTTP tanpa browser (`PROOF_ONLY=M4` untuk satu saja) |
@@ -81,7 +82,7 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 - **Email** — isi `SMTP_*` dan `MAIL_FROM_*` di `.env` untuk bootstrap, atau di **Pengaturan → Email** (nilai yang terisi di Pengaturan menang per kolom). Semua email lewat outbox dengan retry; tanpa SMTP di luar production, email dicetak ke log. Uji kredensial `.env` tanpa database: `bun run mail:test --to anda@contoh.id`.
 - **Konfigurasi runtime lain** (bahasa, retensi log, keamanan) — di **Pengaturan**, tersimpan di database per tenant dengan fallback global; `.env` hanya untuk bootstrap.
 - **Pemantauan** — `GET /metrics` (Prometheus) di tiap proses api: laju request, latensi, error, pool DB, job, hook, metrik modul; `dc --profile monitoring up -d` menjalankan Prometheus di samping stack ([`docs/DEPLOY.md`](./docs/DEPLOY.md) §7a).
-- **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah. Upgrade **tanpa downtime**: `sh deploy/upgrade.sh`; cek kesiapan kapan saja: `dc run --rm preflight`; tanpa Docker: unit systemd di `deploy/systemd/`.
+- **Deploy** — [`docs/DEPLOY.md`](./docs/DEPLOY.md): `compose.prod.yml` dengan Caddy (TLS otomatis), `--scale api=N`, backup harian, restore satu perintah. Upgrade **tanpa downtime**: `sh deploy/upgrade.sh`; cek kesiapan kapan saja: `dc run --rm preflight`; tanpa Docker: `bun start` (satu port, §8e) atau unit systemd di `deploy/systemd/`.
 
 ## Menjalankan dan menguji tanpa Docker
 

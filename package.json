@@ -56,6 +56,7 @@
     "proof:rollout": "sh scripts/ci/rollout-proof.sh",
     "scheduler:proof": "bun run scripts/scheduler-proof.ts",
     "scheduler:proof:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app oven/bun:1.4 bun run scripts/scheduler-proof.ts",
+    "start": "bun run scripts/start.ts",
     "starter:build": "bun run scripts/create-module-template.ts",
     "test": "bun run bootstrap && bun test",
     "test:integration": "INTEGRATION=1 bun test integration",

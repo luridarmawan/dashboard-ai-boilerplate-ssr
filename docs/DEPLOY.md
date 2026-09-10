@@ -316,7 +316,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now dab-api dab-web
 systemctl status dab-api dab-web; journalctl -u dab-api -f
 ```
 
-`dab-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `dab-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/dab.next`, `api migrate`, tukar simlink/folder, `systemctl restart dab-api dab-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker.
+`dab-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `dab-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/dab.next`, `api migrate`, tukar simlink/folder, `systemctl restart dab-api dab-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker. Kalau Anda tidak butuh dua unit dan hanya ingin satu port untuk diproksikan, lihat §8e (`bun start`).
 
 ### 8d. Pipeline CD contoh (Q-15)
 
@@ -329,3 +329,56 @@ Dipicu manual dari tab **Actions** (pilih commit/tag) atau otomatis saat tag `v*
 
 Mode `--pull` juga berguna tanpa GitHub: dorong image dari mesin build mana pun ke registry apa pun, lalu jalankan perintah yang sama di VPS.
 
+
+### 8e. Tanpa Docker, satu perintah: `bun start` (Q-11)
+
+Untuk host yang sudah punya nginx/apache dan database sendiri, dan Anda hanya ingin “aplikasinya hidup di sebuah port”. Tidak ada container, tidak ada Caddy:
+
+```bash
+# sekali di server: bun (https://bun.sh/install) + database dari paket OS, lalu
+git clone <repo> app && cd app && bun install
+cp .env.prod.example .env.prod && nano .env.prod     # DATABASE_URL, APP_ORIGIN, BOOTSTRAP_*, UPLOADS_DIR
+bun --env-file=.env.prod run db:migrate              # eksplisit (Q-4)
+bun --env-file=.env.prod run db:seed                 # idempoten (O-3)
+bun run build                                        # registri modul + build SvelteKit
+bun --env-file=.env.prod start                       # → http://127.0.0.1:3000
+#   → "[start] siap — http://127.0.0.1:3000 (satu port: web + /v1 + /docs)"
+```
+
+`bun start` menyalakan **dua proses yang sama seperti compose** (api + web, `NODE_ENV=production` dipaksa) lalu memasang *gateway* satu port di depan keduanya, dengan tabel rute yang sama seperti [`deploy/Caddyfile`](../deploy/Caddyfile): `/v1/*` `/docs` `/docs/*` `/openapi.json` → api, sisanya → web. Origin tetap satu, jadi cookie dan CSRF berperilaku persis seperti di §2. Reverse proxy Anda cukup satu blok:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_http_version 1.1;
+    proxy_buffering off;          # streaming AI (FR-H)
+    proxy_read_timeout 300s;
+}
+```
+
+Apache: [`deploy/apache.conf.example`](../deploy/apache.conf.example) sudah berbentuk satu `ProxyPass /` — arahkan ke `http://127.0.0.1:3000/` alih-alih ke Caddy.
+
+**Env** (dibaca dari berkas yang Anda pilih dengan `--env-file`; sisanya sama dengan [`.env.prod.example`](../.env.prod.example)):
+
+| | |
+|---|---|
+| `HOST` / `PORT` | port publik perintah ini — yang diproksikan (baku `127.0.0.1:3000`) |
+| `API_HOST` / `API_PORT` | proses api (baku `127.0.0.1:3001`) |
+| `WEB_PORT_INTERNAL` | proses web di belakang gateway (baku `3010`) |
+
+`X-Forwarded-*` dari proxy depan diteruskan apa adanya — gateway ini satu host dengan aplikasi, bukan hop kepercayaan tambahan, jadi `XFF_DEPTH` tetap **1**. Tanpa proxy depan, header itu diisi dari koneksi masuk sendiri.
+
+`bun start --no-proxy` melewatkan gateway: web di `$PORT`, api di `$API_PORT`, dan Anda mengatur dua `location` sendiri seperti [`deploy/nginx.conf.example`](../deploy/nginx.conf.example).
+
+Yang perlu diketahui:
+
+- **Artefak.** Bila ada `dist/` hasil `sh scripts/build-release.sh`, `bun start` memakai itu (binary api terkompilasi + web terbundel); kalau tidak, ia memakai `apps/web/build` + sumber api — hasil `bun run build`. Jadi `bun run build` **wajib** dulu; pesan galat menyebutkannya.
+- **Migrasi tetap eksplisit** (Q-4): `bun start` tidak menyentuh skema. Cek kesiapan kapan saja: `bun --env-file=.env.prod apps/api/src/index.ts preflight` (§8b).
+- **`/metrics` tidak dirutekan** gateway (M-6) — ambil dari `http://127.0.0.1:3001/metrics`, tidak pernah publik.
+- **Kompresi** diminta *identity* ke upstream (aset prakompres `.br`/`.gz` tidak terpakai); kompresi publik urusan nginx/apache (`gzip on`, `mod_deflate`).
+- **Tidak ada `--scale api=N` dan tidak ada rollout tanpa downtime**: restart berarti jeda beberapa detik. Kalau itu penting, pakai §8a (Docker) atau §8c (dua unit systemd + Caddy).
+- **Proses induk harus dijaga**: `pm2 start bun --name dab -- start`, `screen`, atau satu unit systemd (`WorkingDirectory=` checkout Anda, `ExecStart=/usr/local/bin/bun start`, `EnvironmentFile=/etc/dab/api.env`). `SIGTERM` ke `bun start` menghentikan kedua anak dengan rapi (SIGTERM, tunggu ≤ 25 s), dan bila salah satu anak mati sendiri seluruh perintah keluar — supaya supervisor menyalakannya ulang.
