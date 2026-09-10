@@ -756,7 +756,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | M-4 | **[P0]** Endpoint `/health` (liveness) dan `/ready` (cek DB, dan Redis hanya bila driver Redis aktif — `/ready` tidak boleh merah karena komponen opsional yang memang tidak dipasang). |
 | M-5 | **[P0]** Endpoint `/version` — nama app, versi, commit hash, tanggal build, dan daftar modul terpasang beserta versinya. |
 | M-6 | **[P1]** Metrik Prometheus: laju request, latensi p50/p95/p99, error rate, koneksi DB. |
-| M-7 | **[P0]** Data sensitif (password, token, API key, header `Authorization`, cookie sesi) **wajib disamarkan** di semua log. P0 bersama M-1: penyamaran ditulis di dalam logger sejak awal, karena menambalnya setelah pemanggilan log tersebar berarti memburu setiap call-site — dan yang terlewat baru ketahuan dari log yang sudah bocor. |
+| M-7 | **[P0]** Data sensitif (password, token, API key, header `Authorization`, cookie sesi) **wajib disamarkan** di semua log — termasuk ketika nilainya menempel di dalam sebuah PESAN, bukan di field-nya sendiri: galat driver menyertakan parameter kueri yang gagal (`Failed query: … params: …`), sehingga ekornya dipotong sebelum dicatat (`safeMessage()`, `apps/api/src/plugins/request-context.ts`). P0 bersama M-1: penyamaran ditulis di dalam logger sejak awal, karena menambalnya setelah pemanggilan log tersebar berarti memburu setiap call-site — dan yang terlewat baru ketahuan dari log yang sudah bocor. |
 
 ### FR-N · Kontrak API & Dokumentasi
 
