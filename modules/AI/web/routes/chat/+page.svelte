@@ -102,6 +102,19 @@ function scrollDown() {
 }
 
 /**
+ * Markdown is a nicety, the answer is not: if `renderMarkdown` fails — its sanitiser is a dynamic
+ * import, so a cold cache or an offline moment can reject it — return no HTML and let the bubble
+ * fall back to the plain text it already holds. Losing the formatting beats losing the reply.
+ */
+async function safeRender(src: string): Promise<string> {
+  try {
+    return await renderMarkdown(src);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * The composer starts one row tall and grows with the text up to the CSS `max-height`, after which
  * it scrolls — `height: auto` first so shrinking on delete/clear works too.
  */
@@ -185,53 +198,53 @@ async function streamSend(e: SubmitEvent) {
         if (!line.startsWith('data:')) continue;
         const d = line.slice(5).trim();
         if (!d || d === '[DONE]') continue;
+        // Only the parse is guarded — a partial line is normal, but a failure while APPLYING a
+        // frame used to be swallowed here too, which stranded the bubble on "thinking" forever.
+        type Frame = {
+          choices?: { delta?: { content?: string } }[];
+          dab?: { tool?: ToolChip; messages?: { user: string | null; assistant: string } };
+          error?: { message?: string };
+        };
+        let j: Frame;
         try {
-          const j = JSON.parse(d) as {
-            choices?: { delta?: { content?: string } }[];
-            dab?: { tool?: ToolChip; messages?: { user: string | null; assistant: string } };
-            error?: { message?: string };
-          };
-          if (j.error) {
-            streamError = t('ai.chat.error');
-            continue;
-          }
-          const stored = j.dab?.messages;
-          if (stored) {
-            // H-12: the pair is persisted — give the bubbles their real ids so Regenerate/Edit work.
-            const n = messages.length;
-            if (n >= 2 && stored.user)
-              messages[n - 2] = { ...(messages[n - 2] as Msg), id: stored.user };
-            if (n >= 1) messages[n - 1] = { ...(messages[n - 1] as Msg), id: stored.assistant };
-            leafId = stored.assistant;
-            continue;
-          }
-          const tool = j.dab?.tool;
-          if (tool) {
-            // Tool activity (extension point 8): one chip per call, updated in place when it ends.
-            const last = messages[messages.length - 1];
-            if (last) {
-              const chips = [...(last.tools ?? [])];
-              const i = chips.findIndex((c) => c.name === tool.name && c.status === 'running');
-              if (tool.status === 'running' || i < 0) chips.push(tool);
-              else chips[i] = tool;
-              messages[messages.length - 1] = { ...last, tools: chips };
-            }
-            continue;
-          }
-          const delta = j.choices?.[0]?.delta?.content;
-          if (delta) {
-            acc += delta;
-            const last = messages[messages.length - 1];
-            if (last)
-              messages[messages.length - 1] = {
-                ...last,
-                content: acc,
-                html: await renderMarkdown(acc),
-              };
-            scrollDown();
-          }
+          j = JSON.parse(d) as Frame;
         } catch {
-          /* partial line */
+          continue; /* partial line */
+        }
+        if (j.error) {
+          streamError = t('ai.chat.error');
+          continue;
+        }
+        const stored = j.dab?.messages;
+        if (stored) {
+          // H-12: the pair is persisted — give the bubbles their real ids so Regenerate/Edit work.
+          const n = messages.length;
+          if (n >= 2 && stored.user)
+            messages[n - 2] = { ...(messages[n - 2] as Msg), id: stored.user };
+          if (n >= 1) messages[n - 1] = { ...(messages[n - 1] as Msg), id: stored.assistant };
+          leafId = stored.assistant;
+          continue;
+        }
+        const tool = j.dab?.tool;
+        if (tool) {
+          // Tool activity (extension point 8): one chip per call, updated in place when it ends.
+          const last = messages[messages.length - 1];
+          if (last) {
+            const chips = [...(last.tools ?? [])];
+            const i = chips.findIndex((c) => c.name === tool.name && c.status === 'running');
+            if (tool.status === 'running' || i < 0) chips.push(tool);
+            else chips[i] = tool;
+            messages[messages.length - 1] = { ...last, tools: chips };
+          }
+          continue;
+        }
+        const delta = j.choices?.[0]?.delta?.content;
+        if (delta) {
+          acc += delta;
+          const last = messages[messages.length - 1];
+          if (last)
+            messages[messages.length - 1] = { ...last, content: acc, html: await safeRender(acc) };
+          scrollDown();
         }
       }
     }
@@ -249,6 +262,9 @@ function stop() {
   controller?.abort();
 }
 onMount(() => {
+  // Warm the markdown renderer up front: its sanitiser is a dynamic import, and paying for that
+  // load mid-stream is how a first reply gets lost (the dev server even re-optimises on discovery).
+  void safeRender('');
   const onUnload = () => controller?.abort();
   window.addEventListener('beforeunload', onUnload);
   return () => window.removeEventListener('beforeunload', onUnload);
@@ -338,7 +354,7 @@ function copy(text: string) {
                   {/each}
                 </ul>
               {/if}
-              {#if m.content}<div class="prose-chat">{@html m.html}</div>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
+              {#if m.content && m.html}<div class="prose-chat">{@html m.html}</div>{:else if m.content}<p class="whitespace-pre-wrap">{m.content}</p>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
               {#if m.content}
                 <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" onclick={() => copy(m.content)}><Icon name="copy" size={12} />{t('ai.chat.copy')}</button>

@@ -39,6 +39,9 @@ let selection = $state('');
 let controller: AbortController | null = null;
 let listEl: HTMLElement | undefined = $state();
 let inputEl: HTMLTextAreaElement | undefined = $state();
+let filesEl: HTMLInputElement | undefined = $state();
+// The file input is icon-only, so the picked names are echoed under the box (same as the chat page).
+let fileNames = $state<string[]>([]);
 
 const onChatPage = $derived(context.path.startsWith('/m/ai/chat'));
 const pageLabel = $derived(context.breadcrumb.join(' › ') || context.path);
@@ -63,7 +66,13 @@ onMount(() => {
 });
 
 function toggle() {
-  if (!open) selection = window.getSelection()?.toString().trim() ?? '';
+  if (!open) {
+    selection = window.getSelection()?.toString().trim() ?? '';
+    // Warm the markdown renderer while the panel opens: its sanitiser is a dynamic import, and
+    // paying for that load mid-stream is how a first reply gets lost. Opening is early enough to
+    // keep it off every other dashboard page.
+    void safeRender('');
+  }
   open = !open;
   if (open) queueMicrotask(() => inputEl?.focus());
 }
@@ -77,6 +86,35 @@ function scrollDown() {
   queueMicrotask(() => listEl?.scrollTo({ top: listEl.scrollHeight }));
 }
 
+/**
+ * Markdown is a nicety, the answer is not: if `renderMarkdown` fails — its sanitiser is a dynamic
+ * import, so a cold cache or an offline moment can reject it — return no HTML and let the bubble
+ * fall back to the plain text it already holds. Losing the formatting beats losing the reply.
+ */
+async function safeRender(src: string): Promise<string> {
+  try {
+    return await renderMarkdown(src);
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Same composer behaviour as the chat page: one row tall, growing with the text up to the CSS
+ * `max-height`, then scrolling — `height: auto` first so it shrinks again on delete/clear.
+ */
+function autoGrow() {
+  const el = inputEl;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+// Re-measures on every draft change and whenever the panel re-mounts the textarea.
+$effect(() => {
+  draft;
+  autoGrow();
+});
+
 async function send(e: SubmitEvent) {
   e.preventDefault();
   const content = draft.trim();
@@ -88,12 +126,17 @@ async function send(e: SubmitEvent) {
   fd.set('content', content);
   fd.set('context', pageContext);
   fd.set('history', JSON.stringify(messages.map((m) => ({ role: m.role, content: m.content }))));
+  // H-11: the stream endpoint uploads whatever rides along as `files` and names the ids.
+  for (const f of filesEl?.files ?? []) fd.append('files', f);
   messages = [
     ...messages,
     { id: `u-${Date.now()}`, role: 'user', content, html: '' },
     { id: `a-${Date.now()}`, role: 'assistant', content: '', html: '' },
   ];
   draft = '';
+  // The files are in `fd` already; clear the picker so a second send does not repeat them.
+  if (filesEl) filesEl.value = '';
+  fileNames = [];
   scrollDown();
   streaming = true;
   controller = new AbortController();
@@ -140,29 +183,29 @@ async function send(e: SubmitEvent) {
         if (!line.startsWith('data:')) continue;
         const d = line.slice(5).trim();
         if (!d || d === '[DONE]') continue;
+        // Only the parse is guarded — a partial line is normal, but a failure while APPLYING a
+        // frame used to be swallowed here too, which stranded the bubble on "thinking" forever.
+        type Frame = {
+          choices?: { delta?: { content?: string } }[];
+          error?: { message?: string };
+        };
+        let j: Frame;
         try {
-          const j = JSON.parse(d) as {
-            choices?: { delta?: { content?: string } }[];
-            error?: { message?: string };
-          };
-          if (j.error) {
-            error = t('ai.chat.error');
-            continue;
-          }
-          const delta = j.choices?.[0]?.delta?.content;
-          if (!delta) continue;
-          acc += delta;
-          const last = messages[messages.length - 1];
-          if (last)
-            messages[messages.length - 1] = {
-              ...last,
-              content: acc,
-              html: await renderMarkdown(acc),
-            };
-          scrollDown();
+          j = JSON.parse(d) as Frame;
         } catch {
-          /* partial line */
+          continue; /* partial line */
         }
+        if (j.error) {
+          error = t('ai.chat.error');
+          continue;
+        }
+        const delta = j.choices?.[0]?.delta?.content;
+        if (!delta) continue;
+        acc += delta;
+        const last = messages[messages.length - 1];
+        if (last)
+          messages[messages.length - 1] = { ...last, content: acc, html: await safeRender(acc) };
+        scrollDown();
       }
     }
   } catch (err) {
@@ -194,7 +237,7 @@ async function send(e: SubmitEvent) {
             <article class={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} data-role={m.role}>
               <div class={`max-w-[85%] rounded-lg px-3 py-2 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                 {#if m.role === 'assistant'}
-                  {#if m.content}<div class="prose-chat">{@html m.html}</div>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
+                  {#if m.content && m.html}<div class="prose-chat">{@html m.html}</div>{:else if m.content}<p class="whitespace-pre-wrap">{m.content}</p>{:else}<span class="text-muted-foreground">{t('ai.chat.thinking')}</span>{/if}
                 {:else}<p class="whitespace-pre-wrap">{m.content}</p>{/if}
               </div>
             </article>
@@ -203,12 +246,24 @@ async function send(e: SubmitEvent) {
           {/each}
           {#if error}<p class="error" role="alert">{error}</p>{/if}
         </div>
-        <form onsubmit={send} class="flex gap-2 border-t p-2">
-          <textarea bind:this={inputEl} bind:value={draft} name="content" rows="2" required placeholder={t('ai.float.placeholder')} class="min-h-10 flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm" onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
-          {#if streaming}
-            <Button type="button" variant="outline" size="sm" onclick={() => controller?.abort()} aria-label={t('ai.chat.stop')}><Icon name="stop" size={16} /></Button>
-          {:else}
-            <Button type="submit" size="sm" aria-label={t('ai.chat.send')}><Icon name="send" size={16} /></Button>
+        <form onsubmit={send} class="border-t p-2">
+          <!-- Same pill as the chat page: attach on the left, the growing textarea, send on the right. -->
+          <div class="flex items-end gap-1 rounded-3xl border border-input bg-background px-2 py-1.5 focus-within:border-ring">
+            <label class="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground" title={t('ai.chat.attach_hint')}>
+              <Icon name="plus" size={18} /><span class="sr-only">{t('ai.chat.attach')}</span>
+              <input bind:this={filesEl} type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,text/plain,text/markdown,text/csv,application/json,.md,.txt,.csv,.json" class="sr-only" data-testid="floating-chat-attach" onchange={(e) => (fileNames = Array.from((e.currentTarget as HTMLInputElement).files ?? []).map((f) => f.name))} />
+            </label>
+            <textarea bind:this={inputEl} bind:value={draft} name="content" rows="1" required placeholder={t('ai.float.placeholder')} class="max-h-32 min-h-9 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm leading-5 outline-none placeholder:text-muted-foreground" oninput={autoGrow} onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit(); } }}></textarea>
+            {#if streaming}
+              <Button type="button" variant="outline" size="icon" class="shrink-0 rounded-full" onclick={() => controller?.abort()} title={t('ai.chat.stop')} aria-label={t('ai.chat.stop')}><Icon name="stop" size={16} /></Button>
+            {:else}
+              <Button type="submit" size="icon" class="shrink-0 rounded-full" title={t('ai.chat.send')} aria-label={t('ai.chat.send')}><Icon name="send" size={16} /></Button>
+            {/if}
+          </div>
+          {#if fileNames.length}
+            <ul class="mt-2 flex flex-wrap gap-1 px-2 text-xs text-muted-foreground" aria-label={t('ai.chat.attachments')} data-testid="floating-chat-attach-names">
+              {#each fileNames as n (n)}<li class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5"><Icon name="file" size={12} />{n}</li>{/each}
+            </ul>
           {/if}
         </form>
         <a href={conversationId ? `/m/ai/chat?c=${conversationId}` : '/m/ai/chat'} class="border-t px-3 py-1.5 text-center text-xs text-muted-foreground hover:text-foreground">{t('ai.float.open_full')} →</a>
