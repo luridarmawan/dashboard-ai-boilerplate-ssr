@@ -203,11 +203,24 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       const a = actor(auth);
       const db = unsafeAcrossTenants();
       const [dup] = await db
-        .select({ id: schema.clients.id })
+        .select({ id: schema.clients.id, deletedAt: schema.clients.deleted_at })
         .from(schema.clients)
         .where(eq(schema.clients.code, body.code))
         .limit(1);
-      if (dup) return conflict(set, requestId, `Kode tenant "${body.code}" sudah dipakai`);
+      /**
+       * A deleted tenant keeps its code — and, unlike a group or an AI profile, ALL of its data:
+       * users, files, AI calls. Reviving it silently because someone typed the same code would
+       * hand a new tenant someone else's rows, so this stays a refusal. It just says which kind
+       * of refusal it is, instead of pointing at a tenant nobody can see.
+       */
+      if (dup)
+        return conflict(
+          set,
+          requestId,
+          dup.deletedAt
+            ? `Kode tenant "${body.code}" masih dipegang tenant yang sudah dihapus; datanya tidak ikut terhapus, jadi kode itu tidak dipakai ulang — pilih kode lain`
+            : `Kode tenant "${body.code}" sudah dipakai`,
+        );
       if (body.parentId) {
         const parent = await live(body.parentId);
         if (!parent || !(await canActInTenant(db, a.user, parent.id)))

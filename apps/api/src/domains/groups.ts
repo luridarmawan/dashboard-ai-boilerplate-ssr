@@ -23,6 +23,7 @@ import {
   count,
   eq,
   inArray,
+  isNotNull,
   isNull,
   newId,
   schema,
@@ -279,8 +280,22 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           const a = actor(auth);
           const ts = tenantOf(tenantState);
           if (!ts) return conflict(set, requestId, 'Tidak ada tenant aktif');
-          const dup = await ts.tenant.selectOne(schema.groups, eq(schema.groups.code, body.code));
+          /**
+           * A code belongs to a LIVE group only. Deleting a group empties it first (members and
+           * permissions are removed, then `deleted_at` is set), so the buried row is an empty
+           * shell holding a name hostage — and because the unique key counts it, the code could
+           * never be used again. Revive that shell instead, the way `users` and `ai_providers`
+           * do: same id, so audit entries that name it still lead somewhere.
+           */
+          const dup = await ts.tenant.selectOne(
+            schema.groups,
+            and(eq(schema.groups.code, body.code), isNull(schema.groups.deleted_at)),
+          );
           if (dup) return conflict(set, requestId, `Kode grup "${body.code}" sudah dipakai`);
+          const buried = await ts.tenant.selectOne(
+            schema.groups,
+            and(eq(schema.groups.code, body.code), isNotNull(schema.groups.deleted_at)),
+          );
           const bad = unknownPermissions(body.permissions ?? []);
           if (bad.length) {
             set.status = 422;
@@ -291,14 +306,22 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
               { unknown: bad },
             );
           }
-          const id = newId();
-          await ts.tenant.insert(schema.groups, {
-            id,
+          const id = buried?.id ?? newId();
+          const values = {
             code: body.code,
             name: body.name.trim(),
             description: body.description ?? null,
             is_system: false,
-          });
+          };
+          if (buried) {
+            await ts.tenant.update(
+              schema.groups,
+              { ...values, deleted_at: null },
+              eq(schema.groups.id, id),
+            );
+          } else {
+            await ts.tenant.insert(schema.groups, { id, ...values });
+          }
           const perms = normalizeGrants(body.permissions ?? []);
           if (perms.length) {
             await ts.tenant.insert(
@@ -316,7 +339,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             resourceId: id,
             ip: clientIp(request, server),
             requestId,
-            after: { ...result, permissions: perms },
+            after: { ...result, permissions: perms, ...(buried ? { restored: true } : {}) },
           });
           set.status = 201;
           return ok(result);

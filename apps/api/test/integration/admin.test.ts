@@ -19,7 +19,7 @@ interface Envelope {
   success: boolean;
   data?: Record<string, unknown>;
   meta?: { total: number };
-  error?: { code: string; details?: unknown };
+  error?: { code: string; message?: string; details?: unknown };
 }
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
@@ -232,6 +232,34 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((page1.data as unknown as unknown[]).length).toBe(1);
     expect((page1 as unknown as { meta: { total: number } }).meta.total).toBe(4);
     for (const id of ids) expect((await del(`/v1/users/${id}`, [admin])).status).toBe(200);
+  });
+
+  test('a deleted group code can be used again; a deleted TENANT code cannot, and says why', async () => {
+    // Group: deleting empties it first, so the buried row is a shell — revive it, same id.
+    const code = `revive-${run}`;
+    const made = await post('/v1/groups', { code, name: 'Revive me' }, [admin]);
+    expect(made.status).toBe(201);
+    const gid = ((await json(made)).data as { id: string }).id;
+    expect((await del(`/v1/groups/${gid}`, [admin])).status).toBe(200);
+    const again = await post('/v1/groups', { code, name: 'Revived', permissions: ['user.read'] }, [
+      admin,
+    ]);
+    expect(again.status).toBe(201);
+    const back = (await json(again)).data as { id: string; name: string; permissionCount: number };
+    expect(back.id).toBe(gid);
+    expect(back.name).toBe('Revived');
+    expect(back.permissionCount).toBe(1);
+    expect((await del(`/v1/groups/${gid}`, [admin])).status).toBe(200);
+
+    // Tenant: its data survives the delete, so the code stays taken — but the refusal explains it.
+    const tcode = `rev-t-${run}`.slice(0, 32);
+    const t1 = await post('/v1/clients', { code: tcode, name: 'Revive tenant' }, [admin]);
+    expect(t1.status).toBe(201);
+    const tid = ((await json(t1)).data as { id: string }).id;
+    expect((await del(`/v1/clients/${tid}`, [admin])).status).toBe(200);
+    const t2 = await post('/v1/clients', { code: tcode, name: 'Second try' }, [admin]);
+    expect(t2.status).toBe(409);
+    expect((await json(t2)).error?.message).toContain('sudah dihapus');
   });
 
   test('system groups keep their code and cannot be deleted', async () => {
