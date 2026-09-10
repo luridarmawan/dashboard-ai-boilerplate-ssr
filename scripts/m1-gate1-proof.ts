@@ -331,7 +331,38 @@ const member = new Jar();
   check('they are gone again afterwards', !!last && !after.html.includes(`value="${last.id}"`));
 }
 
-// 9. logout invalidates server-side
+// 9. add-member picker (D-3): candidates are searched, so a tenant of any size can be picked from
+{
+  const gpage = await get(admin, '/groups/new');
+  const token = csrfOf(gpage.html);
+  const code = `ms-${run}`;
+  const gr = await post(admin, '/groups/new', { _csrf: token, code, name: `Member search ${run}` });
+  const groupId = /\/groups\/([0-9a-f-]{36})/.exec(location(gr.res))?.[1] ?? '';
+  const upage = await get(admin, '/users/new');
+  const email = `member-${run}@example.test`;
+  const ur = await post(admin, '/users/new', {
+    _csrf: csrfOf(upage.html),
+    name: 'Member Search',
+    email,
+    password: 'a member search password 123',
+  });
+  const userId = /\/users\/([0-9a-f-]{36})/.exec(location(ur.res))?.[1] ?? '';
+  check(
+    'a group and a group-less user exist for the search',
+    groupId.length === 36 && userId.length === 36,
+    `${gr.res.status} ${ur.res.status}`,
+  );
+  const found = await get(admin, `/groups/${groupId}?mq=member-${run}`);
+  check('group page offers a member search', found.html.includes('name="mq"'));
+  check(
+    'the searched user is offered as a candidate',
+    found.html.includes(`value="${userId}"`),
+    `${found.res.status}, ${found.html.length} bytes`,
+  );
+  await post(admin, `/groups/${groupId}?/delete`, { _csrf: token, code });
+}
+
+// 10. logout invalidates server-side
 {
   const dash = await get(admin, '/dashboard');
   const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });

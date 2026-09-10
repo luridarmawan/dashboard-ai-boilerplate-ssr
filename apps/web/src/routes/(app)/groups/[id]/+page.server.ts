@@ -10,10 +10,18 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
   const client = apiFor(event);
+  /**
+   * Candidates for "add member" are SEARCHED, not listed: a tenant can hold thousands of users
+   * while one API page is `MAX_LIMIT` = 100 rows, so a fixed first page left most of them
+   * unaddable through the UI. `?mq=` filters server-side, so the picker still needs no JavaScript.
+   */
+  const memberQuery = event.url.searchParams.get('mq')?.trim() ?? '';
   const [group, registry, users] = await Promise.all([
     client.v1.groups({ id: event.params.id }).get(),
     client.v1.auth['permission-registry'].get(),
-    client.v1.users.get({ query: { limit: 100, sort: 'name' } }),
+    client.v1.users.get({
+      query: { ...(memberQuery ? { q: memberQuery } : {}), limit: 50, sort: 'name' },
+    }),
   ]);
   if (!group.data?.success)
     error(group.status === 404 ? 404 : group.status, t('groups.detail.not_found'));
@@ -21,6 +29,11 @@ export const load: PageServerLoad = async (event) => {
     group: group.data.data,
     registry: registry.data?.success ? registry.data.data.resources : [],
     tenantUsers: users.data?.success ? users.data.data : [],
+    memberQuery,
+    /** Matches the select does not show: ask the reader to narrow rather than to scroll. */
+    moreCandidates: users.data?.success
+      ? Math.max(0, users.data.meta.total - users.data.data.length)
+      : 0,
     /**
      * Deleting a group takes its members' permissions with it, so it takes two steps:
      * `?confirm=delete` opens the confirmation — a plain link, no JavaScript needed (L-22) — and

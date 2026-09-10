@@ -86,14 +86,26 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
       {/each}
     </tbody>
   </table>
-  {#if editable && candidates.length}
-    <form method="POST" action="?/addMember" class="row" style="margin-top:.75rem">
-      <Csrf token={data.csrf} />
-      <select name="userId">
-        {#each candidates as u (u.id)}<option value={u.id}>{u.name} — {u.email}</option>{/each}
-      </select>
-      <button type="submit">{t('groups.detail.add_member')}</button>
+  {#if editable}
+    <!-- Search first, then pick: the tenant may hold thousands of users and one API page is 100
+         rows, so a <select> of "everyone" would quietly leave most of them out. A GET form, so
+         this works without JavaScript like the rest of the page. -->
+    <form method="GET" class="row" style="margin-top:.75rem">
+      <input name="mq" value={data.memberQuery} aria-label={t('groups.detail.member_search')} placeholder={t('groups.detail.member_search')} />
+      <button type="submit">{t('common.search')}</button>
     </form>
+    {#if candidates.length}
+      <form method="POST" action="?/addMember" class="row" style="margin-top:.5rem">
+        <Csrf token={data.csrf} />
+        <select name="userId">
+          {#each candidates as u (u.id)}<option value={u.id}>{u.name} — {u.email}</option>{/each}
+        </select>
+        <button type="submit">{t('groups.detail.add_member')}</button>
+      </form>
+      {#if data.moreCandidates}<p class="muted">{t('groups.detail.more_candidates', { n: data.moreCandidates })}</p>{/if}
+    {:else}
+      <p class="muted">{t('groups.detail.no_candidates')}</p>
+    {/if}
   {/if}
 
   {#if can('group.manage') && !g.isSystem}

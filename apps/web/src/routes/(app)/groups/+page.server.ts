@@ -7,7 +7,13 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
   const st = tableStateFrom(event.url, { sort: 'name' });
   const res = await apiFor(event).v1.groups.get({
-    query: { ...(st.q ? { q: st.q } : {}), page: st.page, limit: st.limit, sort: st.sort, order: st.order },
+    query: {
+      ...(st.q ? { q: st.q } : {}),
+      page: st.page,
+      limit: st.limit,
+      sort: st.sort,
+      order: st.order,
+    },
   });
   const r = unwrap<{
     success: true;
