@@ -157,7 +157,7 @@ const paramOf = (location: string, key: string) => {
 
 <svelte:head><title>{t('outbox.title')}</title></svelte:head>
 
-<div class="page">
+<div id="outbox-monitor-container" class="page">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1>{t('outbox.title')}</h1>
