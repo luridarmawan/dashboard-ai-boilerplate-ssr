@@ -157,7 +157,14 @@ const paramOf = (location: string, key: string) => {
 
 <svelte:head><title>{t('outbox.title')}</title></svelte:head>
 
-<div id="outbox-monitor-container" class="page">
+<!--
+  `.page` is a bare `grid`, whose single implicit track is `auto` — sized to the MAX-CONTENT of
+  its widest child. A table with nine nowrap columns is far wider than the shell, so the track
+  grew to the table's natural width and dragged every other row (heading, filter bar, paging)
+  out with it, past the viewport. `minmax(0,1fr)` caps the track at the container instead, which
+  is what finally lets the table's own `overflow-x-auto` do its job and scroll on its own.
+-->
+<div id="outbox-monitor-container" class="page grid-cols-[minmax(0,1fr)]">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1>{t('outbox.title')}</h1>
@@ -244,7 +251,7 @@ const paramOf = (location: string, key: string) => {
   {#if delivered}<p class="notice">{t('outbox.delivered', { picked: delivered[0] ?? 0, sent: delivered[1] ?? 0, failed: delivered[2] ?? 0, deferred: delivered[3] ?? 0 })}</p>{/if}
 
   <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
-  <div aria-busy={loading} class={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+  <div aria-busy={loading} class={`min-w-0 transition-opacity ${loading ? 'opacity-60' : ''}`}>
   <Table caption={t('outbox.title')}>
     <thead>
       <tr>

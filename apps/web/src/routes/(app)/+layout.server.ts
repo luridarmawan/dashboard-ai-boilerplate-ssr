@@ -1,6 +1,6 @@
 import { resolveLayout } from '@core/ui-theme';
 import { redirect } from '@sveltejs/kit';
-import { layoutVariants } from '$lib/../generated/layout-variants';
+import { layoutVariants, pageAsides } from '$lib/../generated/layout-variants';
 import { moduleWidgets } from '$lib/../generated/widgets';
 import { buildBreadcrumb, buildMenu } from '$lib/server/menu';
 import { apiFetchData, apiFor, csrfToken } from '$lib/server/session';
@@ -83,6 +83,8 @@ export const load: LayoutServerLoad = async (event) => {
     breadcrumb: buildBreadcrumb(event.url.pathname, menu, locale),
     layoutId: layout.layout.id,
     layoutVariant: variant,
+    /** Side content this route asked for (§4.8); `+layout.ts` turns it into a component. */
+    asideId: pageAsides[event.route.id ?? ''] ?? null,
     unreadNotifications: bell.unread,
     recentNotifications: bell.items,
     shellWidgets,

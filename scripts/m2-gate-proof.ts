@@ -400,9 +400,16 @@ const admin = new Jar();
     `${footerLayout(users.html)}/${footerVariant(users.html)}`,
   );
   check(
-    '#5 a layout renders only the regions it was handed — no page fills `aside`, so no second column',
+    '#5 a layout renders only the regions it was handed — these pages name no aside, so no second column',
     !dash.html.includes('id="dummy-second-column"') &&
       !users.html.includes('id="dummy-second-column"'),
+  );
+  // …and the other half of that contract: a page that DOES name one gets it. `_aside` is resolved
+  // in the shell's load, so the side column is already in the first HTML — no JavaScript needed.
+  const withAside = await get(admin, '/examples/aside');
+  check(
+    "#5 a page that names `_aside` gets the layout's side region, server-rendered",
+    withAside.html.includes('id="dummy-second-column"'),
   );
   // Mixing is free in the other direction too: the module theme's dashboard is a MODULE layout
   // while its auth shell is a CORE one. Checked anonymously — /auth/login redirects when logged in.

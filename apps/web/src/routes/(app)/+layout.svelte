@@ -11,7 +11,8 @@ import type { LayoutData } from './$types';
 
 /**
  * The dashboard shell. Core fills the named regions (brand, nav, header, breadcrumb, footer) and
- * the resolved theme layout ARRANGES them (§4.8). Pages only ever render into `content`.
+ * the resolved theme layout ARRANGES them (§4.8). Pages render into `content`, and may name
+ * side content for `aside` (`export const _aside` — resolved server-side, like the variant).
  * Every control here is a plain form or link — the shell works with JavaScript disabled (L-22).
  */
 let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
@@ -247,7 +248,17 @@ const shellContext = $derived({
   <span>{t('shell.footer')} · tema <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
 {/snippet}
 
-<Layout {brand} {nav} {header} {breadcrumb} {content} {footer} />
+{#snippet aside()}
+  <!-- The page named this component; it reads the page's own load data through `page.data`. -->
+  {#if data.Aside}<data.Aside />{/if}
+{/snippet}
+
+<!--
+  `aside` is passed ONLY when the route named one, because that is the signal every layout
+  keys off: a layout must collapse to a single column when there is no side content rather
+  than draw an empty one (see the region contract in $lib/layouts/types.ts).
+-->
+<Layout {brand} {nav} {header} {breadcrumb} {content} {footer} {...(data.Aside ? { aside } : {})} />
 
 <!-- Shell widgets (H-13): module contributions on every dashboard page, permission-filtered on the server. -->
 {#each data.shellWidgets as w (w.id)}

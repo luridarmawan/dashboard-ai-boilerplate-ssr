@@ -98,6 +98,15 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 | `centered-card` | auth | Kartu tunggal di tengah |
 | `split-hero` | auth | Form di kiri, panel merek di kanan; menumpuk di layar sempit |
 
+**Region `aside` bersifat opsional.** Layout **wajib** menggambarnya bila diberi, dan **wajib** menciut jadi satu kolom bila tidak — layout tidak boleh mengarang isi kolom kedua sendiri. Halaman tidak bisa menyerahkan snippet ke shell (shell dirender lebih dulu), jadi halaman **menyebut nama**-nya:
+
+```ts
+// +page.server.ts (atau +page.ts)
+export const _aside = 'examples.aside';
+```
+
+Nama itu dikumpulkan `bun run layout:variants` ke `pageAsides`, diselesaikan di `(app)/+layout.server.ts`, lalu komponennya di-code-split di `(app)/+layout.ts` — persis perlakuan varian layout, jadi kolom sampingnya sudah ada di HTML pertama dan tetap tampil tanpa JavaScript. Komponen aside terdaftar di `apps/web/src/lib/asides/registry.ts`, tidak menerima props, dan membaca data `load` halamannya lewat `page.data`. Contoh hidupnya: **`/examples/aside`**.
+
 **Varian** (Keputusan K): halaman menyebut kebutuhannya (`layoutVariant = 'wide'`), tema yang memetakannya ke layout konkret. Halaman yang sama, dua susunan berbeda, nol perubahan kode: `/users` mendeklarasikan `wide` dan dijawab `sidebar-classic` oleh `base`, `topnav-compact` oleh `corporate`, `dummy.two-column`… oleh tema modul.
 
 Semua tema yang dikapalkan — keempat tema bawaan maupun tema modul `dummy.ocean` — sengaja menjawab `wide` dengan layout `default` mereka sendiri, sehingga **satu tema = satu shell untuk seluruh aplikasi**: berpindah ke halaman lebar tidak pernah menukar sidebar jadi navigasi atas di tengah jalan. Tema turunan bebas memilih sebaliknya — petakan `wide` ke layout lain kalau memang menginginkan shell berbeda untuk halaman padat tabel.

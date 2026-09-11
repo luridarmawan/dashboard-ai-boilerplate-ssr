@@ -37,6 +37,12 @@ const items = [
     text: t('examples.empty.text'),
   },
   {
+    href: '/examples/aside',
+    icon: 'columns',
+    title: t('examples.aside.title'),
+    text: t('examples.aside.text'),
+  },
+  {
     href: '/examples/errors',
     icon: 'warning',
     title: '404 · 403 · 500',
