@@ -114,6 +114,9 @@ services:
       # X-Forwarded-Proto/Host (set by Caddy, or by the front proxy in DEPLOY.md §2b), so every domain
       # listed in APP_ORIGIN works at once. An empty ORIGIN crashes adapter-node, so pin one only via a
       # compose override (environment: ORIGIN: https://one.example.com), never an empty variable.
+      # The same list the api accepts: web checks the Origin of every form post against it (A-10),
+      # so a front proxy that drops X-Forwarded-Proto/Host cannot turn every login into a 403.
+      APP_ORIGIN: ${APP_ORIGIN:-https://${DOMAIN:-localhost}}
       API_URL: http://api:3001
       # SvelteKit trusts the proxy for the client IP / protocol
       ADDRESS_HEADER: X-Forwarded-For

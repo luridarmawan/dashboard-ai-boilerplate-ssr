@@ -22,13 +22,17 @@
  *   HOST / PORT          public listener of this command (default 127.0.0.1:3000)
  *   API_HOST / API_PORT  the api process (default 127.0.0.1:3001)
  *   WEB_PORT_INTERNAL    the web process behind the gateway (default 3010; --no-proxy uses PORT)
- * APP_ORIGIN, DATABASE_URL and friends are read by the api itself — see .env.prod.example.
+ * DATABASE_URL and friends are read by the api itself — see .env.prod.example. APP_ORIGIN is read
+ * by BOTH processes (it is the Origin allow-list for form posts, A-10); with exactly one origin in
+ * it this command also hands the web process `ORIGIN`, so absolute links and the CSRF check hold
+ * even when the reverse proxy forgets X-Forwarded-Proto/Host.
  *
  * Migrations stay an explicit step (Q-4): run `bun run db:migrate` (or `dist/api migrate`) before
  * the first start and after every upgrade; this command never touches the schema.
  */
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parseOrigins } from '@core/config';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const proxied = !process.argv.includes('--no-proxy');
@@ -40,6 +44,34 @@ const apiPort = Number(process.env.API_PORT ?? 3001);
 const webPort = proxied ? Number(process.env.WEB_PORT_INTERNAL ?? 3010) : port;
 // Loopback address of the api for the web process and for the gateway: 0.0.0.0 is not dialable.
 const localApiHost = apiHost === '0.0.0.0' || apiHost === '::' ? '127.0.0.1' : apiHost;
+
+// Origin publik yang dideklarasikan instalasi ini (Keputusan E). Dipakai dua kali di bawah:
+// sebagai `ORIGIN` proses web bila hanya ada satu, dan sebagai skema yang benar ketika proxy depan lupa
+// mengirim X-Forwarded-Proto.
+const declaredOrigins = parseOrigins(process.env.APP_ORIGIN);
+/**
+ * Satu origin publik = tidak ada yang perlu direkonstruksi: beri tahu adapter-node langsung,
+ * supaya URL absolut (redirect_uri Google, tautan e-mail) dan pemeriksaan Origin benar meski
+ * reverse proxy tidak meneruskan X-Forwarded-Proto/Host. Lebih dari satu domain tetap memakai
+ * header (dan proteksi CSRF-nya membaca APP_ORIGIN langsung — apps/web/src/lib/server/origin.ts).
+ */
+const webPublicOrigin =
+  process.env.ORIGIN ?? (declaredOrigins.length === 1 ? declaredOrigins[0] : null);
+
+/**
+ * Skema yang APP_ORIGIN sebutkan untuk host ini, bila hanya satu. Proxy depan yang menutup TLS
+ * tanpa mengirim X-Forwarded-Proto akan membuat aplikasi yakin situsnya http biasa: tautan absolut
+ * salah dan Origin dari browser (https) ditolak. Kalau instalasi sudah mendeklarasikan
+ * `https://domain`, itu jawaban yang lebih baik daripada menebak `http`.
+ */
+function declaredScheme(hostHeader: string | null): string | null {
+  if (!hostHeader) return null;
+  const wanted = hostHeader.toLowerCase();
+  const schemes = new Set(
+    declaredOrigins.filter((o) => o.endsWith(`//${wanted}`)).map((o) => o.split(':')[0] as string),
+  );
+  return schemes.size === 1 ? ([...schemes][0] as string) : null;
+}
 
 const dist = process.env.DIST_DIR ?? `${root}dist`;
 const webDir = existsSync(`${dist}/web/index.js`) ? `${dist}/web` : `${root}apps/web/build`;
@@ -79,6 +111,7 @@ const procs = [
       XFF_DEPTH: process.env.XFF_DEPTH ?? '1',
       PROTOCOL_HEADER: process.env.PROTOCOL_HEADER ?? 'x-forwarded-proto',
       HOST_HEADER: process.env.HOST_HEADER ?? 'x-forwarded-host',
+      ...(webPublicOrigin ? { ORIGIN: webPublicOrigin } : {}),
     },
   },
 ];
@@ -172,8 +205,10 @@ if (proxied) {
         if (!headers.has('x-forwarded-for')) {
           headers.set('x-forwarded-for', server.requestIP(req)?.address ?? '127.0.0.1');
         }
-        if (!headers.has('x-forwarded-proto')) headers.set('x-forwarded-proto', 'http');
         const hostHeader = req.headers.get('host');
+        if (!headers.has('x-forwarded-proto')) {
+          headers.set('x-forwarded-proto', declaredScheme(hostHeader) ?? 'http');
+        }
         if (!headers.has('x-forwarded-host') && hostHeader) {
           headers.set('x-forwarded-host', hostHeader);
         }

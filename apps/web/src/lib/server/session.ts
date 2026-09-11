@@ -4,6 +4,7 @@ import { fail } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { api } from '$lib/api/client';
 import { hasPermission } from '$lib/permissions';
+import { checkRequestOrigin, forwardedOrigin } from '$lib/server/origin';
 
 /**
  * Server-side glue between the browser and the API (Decision B, A-3, A-10, B-4, C-7):
@@ -70,7 +71,11 @@ export function csrfToken(event: RequestEvent): string {
   return token;
 }
 
-/** Verify the form's hidden token against the cookie; also refuse a foreign Origin. */
+/**
+ * Verify the form's hidden token against the cookie; also refuse a foreign Origin — the same
+ * allow-list `hooks.server.ts` applies (APP_ORIGIN at runtime, see lib/server/origin.ts), so a
+ * deployment behind a proxy that rewrites Host does not silently swallow every form.
+ */
 export function checkCsrf(event: RequestEvent, form: FormData): boolean {
   const cookie = event.cookies.get(CSRF_COOKIE);
   const field = form.get(CSRF_FIELD);
@@ -78,13 +83,7 @@ export function checkCsrf(event: RequestEvent, form: FormData): boolean {
   let diff = 0;
   for (let i = 0; i < cookie.length; i++) diff |= cookie.charCodeAt(i) ^ field.charCodeAt(i);
   if (diff !== 0) return false;
-  const origin = event.request.headers.get('origin') ?? event.request.headers.get('referer');
-  if (!origin) return false;
-  try {
-    return new URL(origin).origin === event.url.origin;
-  } catch {
-    return false;
-  }
+  return checkRequestOrigin(event).ok;
 }
 
 /** The session (+csrf) cookies as one header value, for server-to-API calls made outside `apiFor`. */
@@ -115,7 +114,7 @@ export function apiFor(event: RequestEvent, clientId?: string | null) {
     requestId: event.locals.requestId,
     cookie: cookieHeader(event.cookies),
     csrf: event.cookies.get(CSRF_COOKIE),
-    origin: event.url.origin,
+    origin: forwardedOrigin(event),
     clientId: clientId ?? null,
     // The API rate-limits per client IP (A-2); without this every browser would share the web server's IP.
     clientIp: ip,
@@ -134,9 +133,10 @@ function forwardHeaders(event: RequestEvent, clientId?: string | null): Record<s
   if (cookie) headers.cookie = cookie;
   const csrf = event.cookies.get(CSRF_COOKIE);
   if (csrf) headers['x-csrf-token'] = csrf;
-  headers.origin = event.url.origin;
-  headers['x-forwarded-proto'] = event.url.protocol.replace(':', '');
-  headers['x-forwarded-host'] = event.url.host;
+  const origin = new URL(forwardedOrigin(event));
+  headers.origin = origin.origin;
+  headers['x-forwarded-proto'] = origin.protocol.replace(':', '');
+  headers['x-forwarded-host'] = origin.host;
   if (clientId) headers['x-client-id'] = clientId;
   try {
     headers['x-forwarded-for'] = event.getClientAddress();
@@ -204,9 +204,10 @@ export async function apiFetchData<T = unknown>(
   if (cookie) headers.cookie = cookie;
   const csrf = event.cookies.get(CSRF_COOKIE);
   if (csrf) headers['x-csrf-token'] = csrf;
-  headers.origin = event.url.origin;
-  headers['x-forwarded-proto'] = event.url.protocol.replace(':', '');
-  headers['x-forwarded-host'] = event.url.host;
+  const origin = new URL(forwardedOrigin(event));
+  headers.origin = origin.origin;
+  headers['x-forwarded-proto'] = origin.protocol.replace(':', '');
+  headers['x-forwarded-host'] = origin.host;
   if (clientId) headers['x-client-id'] = clientId;
   try {
     headers['x-forwarded-for'] = event.getClientAddress();
