@@ -2,7 +2,7 @@
 import { onMount, untrack } from 'svelte';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Button } from '$lib/components/ui';
+import { Button, ConfirmDelete } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import Capabilities from '../../lib/Capabilities.svelte';
 import { renderMarkdown } from '../../lib/markdown.ts';
@@ -392,7 +392,9 @@ function copy(text: string) {
           {/if}
           <!-- The labels fold away on narrow screens; the title stays readable, the actions stay reachable. -->
           <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button id="btn-chat-archive" type="submit" variant="ghost" size="sm" title={t('ai.chat.archive')} aria-label={t('ai.chat.archive')}><Icon name="archive" size={14} /><span class="hidden sm:inline">{t('ai.chat.archive')}</span></Button></form>
-          <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button id="btn-chat-delete" type="submit" variant="ghost" size="sm" class="text-destructive" title={t('ai.chat.delete')} aria-label={t('ai.chat.delete')}><Icon name="trash" size={14} /><!-- span class="hidden sm:inline">{t('ai.chat.delete')}</span> --></Button></form>
+          <ConfirmDelete compact csrf={data.csrf} href={`/m/ai/chat?c=${data.conversation.id}&confirm=delete#confirm-delete`} cancelHref={`/m/ai/chat?c=${data.conversation.id}`} confirming={data.confirmDelete} variant="ghost" size="sm" class="text-destructive" label={t('ai.chat.delete')} title={t('ai.chat.delete')} description={t('ai.chat.delete_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
+            {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} />{/snippet}
+          </ConfirmDelete>
         </div>
       {/if}
     </header>

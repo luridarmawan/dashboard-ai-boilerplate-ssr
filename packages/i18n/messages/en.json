@@ -9,6 +9,10 @@
   "common.edit": "Edit",
   "common.view": "View",
   "common.delete": "Delete",
+  "common.delete_confirm": "Confirm deletion",
+  "common.delete_confirm_lead": "This item will be deleted. You cannot undo it from this page.",
+  "common.delete_confirm_submit": "Yes, delete",
+  "common.delete_confirm_required": "The deletion has to be confirmed first — nothing was deleted.",
   "common.search": "Search",
   "common.actions": "Actions",
   "common.none": "None",
@@ -621,5 +625,9 @@
   "join.have_account": "Already have an account",
   "join.invalid": "This invitation link is unknown or has already been used.",
   "join.expired": "This invitation link has expired.",
-  "join.ask_again": "Ask the person who invited you for a new invitation, or sign in if you already have an account."
+  "join.ask_again": "Ask the person who invited you for a new invitation, or sign in if you already have an account.",
+  "themes.edit.delete_confirm_lead": "Theme {name} will be deleted. Anyone currently using it falls back to the default theme.",
+  "webhooks.detail.delete_confirm_lead": "Webhook {name} will be deleted. No further deliveries are sent for its events.",
+  "queue.delete_confirm": "Delete this job?",
+  "queue.delete_confirm_lead": "Job {id} will be removed from the queue and cannot be retried."
 }

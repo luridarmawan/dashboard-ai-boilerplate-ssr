@@ -139,5 +139,8 @@
   "ai.chat.next_version": "Versi berikutnya",
   "ai.chat.attach": "Lampirkan berkas",
   "ai.chat.attach_hint": "Gambar, teks, CSV, JSON, Markdown — maks. 5 berkas @ 5 MB",
-  "ai.chat.attachments": "Lampiran"
+  "ai.chat.attachments": "Lampiran",
+  "ai.providers.delete_confirm_lead": "Penyedia {name} akan dihapus. Percakapan yang memakainya harus memilih penyedia lain.",
+  "ai.mcps.delete_confirm_lead": "Server MCP {name} akan dihapus beserta tool yang berasal darinya.",
+  "ai.chat.delete_confirm_lead": "Percakapan “{title}” beserta seluruh pesannya akan dihapus."
 }

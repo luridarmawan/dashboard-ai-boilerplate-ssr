@@ -78,8 +78,12 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
     .getByRole('row', { name: new RegExp(`E2E Kopi ${run} v2`) })
     .getByRole('link', { name: /Ubah|Edit/ })
     .click();
-  page.once('dialog', (d) => d.accept());
-  await page.locator('main form[action="?/delete"] button[type="submit"]').click();
+  // Deleting is never one click: with JavaScript the trigger opens the confirmation as a modal
+  // (without it, the same link is a page step — the HTTP proofs cover that path).
+  await page.locator('main a[href*="confirm=delete"]').click();
+  const confirm = page.getByRole('dialog');
+  await expect(confirm).toBeVisible();
+  await confirm.locator('form[action^="?/delete"] button[type="submit"]').click();
   await expect(page).toHaveURL(/\/m\/example\/products\?saved=deleted/);
   await expect(page.getByText(`E2E Kopi ${run} v2`)).toHaveCount(0);
 

@@ -246,7 +246,17 @@ let id = '';
   );
   const list = await get(admin, `${BASE}?q=proof+${run}`);
   check('list search finds the edited row', list.html.includes(`Proof ${run} v2`));
-  const del = await post(admin, `${BASE}/${id}?/delete`, { _csrf: csrfOf(detail.html) });
+  // Destructive actions are guarded server-side, so the no-JS path has to take the confirmation
+  // step as well: a POST without `confirm=delete` is refused and the row survives.
+  const unconfirmed = await post(admin, `${BASE}/${id}?/delete`, { _csrf: csrfOf(detail.html) });
+  check(
+    'delete without the confirmation step → 422, row still there',
+    unconfirmed.res.status === 422 && (await get(admin, `${BASE}/${id}`)).res.status === 200,
+    `${unconfirmed.res.status}`,
+  );
+  const del = await post(admin, `${BASE}/${id}?/delete&confirm=delete`, {
+    _csrf: csrfOf(detail.html),
+  });
   check(
     'delete → 303 back to the list',
     del.res.status === 303 && location(del.res).startsWith(BASE),

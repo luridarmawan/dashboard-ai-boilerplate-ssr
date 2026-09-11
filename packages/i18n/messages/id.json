@@ -9,6 +9,10 @@
   "common.edit": "Ubah",
   "common.view": "Lihat",
   "common.delete": "Hapus",
+  "common.delete_confirm": "Konfirmasi penghapusan",
+  "common.delete_confirm_lead": "Item ini akan dihapus. Tindakan ini tidak bisa dibatalkan dari halaman ini.",
+  "common.delete_confirm_submit": "Ya, hapus",
+  "common.delete_confirm_required": "Penghapusan harus dikonfirmasi lebih dulu — tidak ada yang dihapus.",
   "common.search": "Cari",
   "common.actions": "Aksi",
   "common.none": "Tidak ada",
@@ -621,5 +625,9 @@
   "join.have_account": "Sudah punya akun",
   "join.invalid": "Tautan undangan tidak dikenal atau sudah dipakai.",
   "join.expired": "Tautan undangan sudah kedaluwarsa.",
-  "join.ask_again": "Minta pengundang mengirim undangan baru, atau masuk bila Anda sudah punya akun."
+  "join.ask_again": "Minta pengundang mengirim undangan baru, atau masuk bila Anda sudah punya akun.",
+  "themes.edit.delete_confirm_lead": "Tema {name} akan dihapus. Pengguna yang sedang memakainya kembali ke tema bawaan.",
+  "webhooks.detail.delete_confirm_lead": "Webhook {name} akan dihapus. Pengiriman berikutnya untuk event ini berhenti.",
+  "queue.delete_confirm": "Hapus job ini?",
+  "queue.delete_confirm_lead": "Job {id} akan dihapus dari antrean dan tidak bisa dijalankan ulang."
 }

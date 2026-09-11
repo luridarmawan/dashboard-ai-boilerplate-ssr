@@ -1,8 +1,6 @@
 <script lang="ts">
-import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
-import Icon from '$lib/components/Icon.svelte';
-import { Button, Card } from '$lib/components/ui';
+import { Card, ConfirmDelete } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { productFields } from '../_form.ts';
@@ -32,12 +30,19 @@ const fieldErrors = $derived(
       cancelHref="/m/example/products"
       cancelLabel={t('common.back')}
       notice={form?.saved || data.saved ? t('example.admin.saved') : null}
-      error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null}
+      error={form?.error && form.code !== 'confirm_failed' && Object.keys(fieldErrors).length === 0 ? form.error : null}
     />
   </Card>
   {#if can('example.product.manage')}
-    <Card>
-      <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('common.delete')}</Button></form>
+    <Card title={t('example.admin.delete_product')} description={t('example.admin.delete_hint')}>
+      <ConfirmDelete
+        csrf={data.csrf}
+        href={`/m/example/products/${p.id}?confirm=delete#confirm-delete`}
+        cancelHref={`/m/example/products/${p.id}`}
+        confirming={data.confirmDelete || form?.code === 'confirm_failed'}
+        error={form?.code === 'confirm_failed' ? form.error : null}
+        description={t('example.admin.delete_confirm_lead', { name: p.name, slug: p.slug })}
+      />
     </Card>
   {/if}
 </div>

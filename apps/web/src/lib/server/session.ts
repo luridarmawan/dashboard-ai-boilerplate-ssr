@@ -1,3 +1,4 @@
+import { createTranslator, type Locale } from '@core/i18n';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
@@ -319,6 +320,22 @@ export function actionFailure(
     ...extra,
   });
 }
+
+/**
+ * Destructive actions are never one POST away (L-22): the trigger only links to `?confirm=delete`,
+ * which re-renders the page with a confirmation — or, with JavaScript, opens it as a modal without
+ * navigating. `ConfirmDelete` renders both paths; these two are the guard behind them, because a
+ * confirmation that lives only in the markup is not a confirmation.
+ */
+export const confirmed = (event: RequestEvent): boolean =>
+  event.url.searchParams.get('confirm') === 'delete';
+
+export const confirmFail = (locale: Locale) =>
+  actionFailure({
+    status: 422,
+    code: 'confirm_failed',
+    message: createTranslator(locale)('common.delete_confirm_required'),
+  });
 
 export const str = (form: FormData, key: string): string => {
   const v = form.get(key);

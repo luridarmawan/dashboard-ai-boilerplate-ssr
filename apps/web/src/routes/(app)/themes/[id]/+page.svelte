@@ -1,7 +1,5 @@
 <script lang="ts">
-import Csrf from '$lib/components/Csrf.svelte';
-import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card } from '$lib/components/ui';
+import { Badge, Card, ConfirmDelete } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../../$types';
 import type { EditorValues } from '../_editor.ts';
@@ -53,7 +51,7 @@ const previews = $derived(
   </div>
   <ThemeEditor {values} vocab={data.vocab} csrf={data.csrf} action="?/save" isNew={false} errors={details.errors ?? {}} contrast={details.contrast ?? []} {previews} notice={submitted?.saved || data.saved ? t('themes.edit.saved') : null} error={form?.error ?? null} />
   <Card>
-    <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('themes.edit.delete')}</Button></form>
+    <ConfirmDelete csrf={data.csrf} href={`/themes/${data.theme.id}?confirm=delete#confirm-delete`} cancelHref={`/themes/${data.theme.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('themes.edit.delete')} description={t('themes.edit.delete_confirm_lead', { name: data.theme.name[locale] })} />
     <p class="mt-2 text-xs text-muted-foreground">{t('themes.edit.delete_note')}</p>
   </Card>
 </div>

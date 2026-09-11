@@ -473,14 +473,15 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
     `import { formToObject, validateForm } from '@core/contracts';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
+import { actionFailure, apiFor, checkCsrf, confirmed, confirmFail, unwrap } from '$lib/server/session';
 import { ${Res}UpdateBody } from '../../../../api/schemas.ts';
 
 export const load: ServerLoad = async (event) => {
   const id = String(event.params.id ?? '');
   const res = await apiFor(event).v1.m.${ns}.${plural}({ id }).get();
   if (!res.data?.success) error(res.status === 404 ? 404 : res.status, '${Res} tidak ditemukan');
-  return { row: res.data.data, saved: event.url.searchParams.has('saved') };
+  /** \`confirmDelete\` opens the delete confirmation; the action below checks the same flag. */
+  return { row: res.data.data, saved: event.url.searchParams.has('saved'), confirmDelete: confirmed(event) };
 };
 
 export const actions: Actions = {
@@ -499,6 +500,8 @@ ${normalize}
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' });
+    // Never one POST away: the confirmation (modal with JavaScript, a page step without it) is enforced here.
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.m.${ns}.${plural}({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/m/${ns}/${plural}?saved=deleted');
@@ -506,7 +509,7 @@ ${normalize}
 };
 `;
   files[`web/routes/${plural}/[id]/+page.svelte`] = `<script lang="ts">
-import { Button, Card, Csrf, FormBuilder, Icon } from '@core/ui';
+import { Card, ConfirmDelete, FormBuilder } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { fields } from '../_form.ts';
@@ -523,10 +526,10 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
 <div class="page">
   <h1>{r.${titleProp} ?? r.id}</h1>
   <Card>
-    <FormBuilder {fields} values={r as unknown as Record<string, unknown>} errors={fieldErrors} csrf={data.csrf} action="?/save" columns={2} readonly={!can('${perm}.edit')} cancelHref="/m/${ns}/${plural}" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('${ns}.${plural}.saved') : null} error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+    <FormBuilder {fields} values={r as unknown as Record<string, unknown>} errors={fieldErrors} csrf={data.csrf} action="?/save" columns={2} readonly={!can('${perm}.edit')} cancelHref="/m/${ns}/${plural}" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('${ns}.${plural}.saved') : null} error={form?.error && form.code !== 'confirm_failed' && Object.keys(fieldErrors).length === 0 ? form.error : null} />
   </Card>
   {#if can('${perm}.manage')}
-    <Card><form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('common.delete')}</Button></form></Card>
+    <Card><ConfirmDelete csrf={data.csrf} href={\`/m/${ns}/${plural}/\${r.id}?confirm=delete#confirm-delete\`} cancelHref={\`/m/${ns}/${plural}/\${r.id}\`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} /></Card>
   {/if}
 </div>
 `;

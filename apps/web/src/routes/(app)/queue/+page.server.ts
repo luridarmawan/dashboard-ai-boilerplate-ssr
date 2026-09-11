@@ -1,6 +1,14 @@
 import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /** Job queue (P2): what is pending, running, done and dead-lettered in my scope. */
@@ -22,7 +30,13 @@ export const load: PageServerLoad = async (event) => {
   });
   if (!res.data?.success)
     error(res.status, res.status === 403 ? t('queue.forbidden') : t('queue.load_failed'));
-  return { ...res.data.data, status: status ?? '', saved: event.url.searchParams.get('saved') };
+  return {
+    ...res.data.data,
+    status: status ?? '',
+    saved: event.url.searchParams.get('saved'),
+    /** Which row's delete confirmation is open (no-JS path); the action checks the flag too. */
+    confirmDeleteId: confirmed(event) ? event.url.searchParams.get('id') : null,
+  };
 };
 
 const csrfFail = (locale: Locale) =>
@@ -50,6 +64,7 @@ export const actions: Actions = {
   delete: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.queue({ id: str(form, 'id') })

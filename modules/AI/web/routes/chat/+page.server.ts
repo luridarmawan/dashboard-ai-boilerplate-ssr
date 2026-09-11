@@ -1,6 +1,14 @@
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import { renderMarkdown } from '../../lib/markdown.ts';
 import { activePath, siblingsAlong } from '../../lib/thread.ts';
 
@@ -95,6 +103,8 @@ export const load: ServerLoad = async (event) => {
     quota,
     aiEnabled: cfg['ai.enable'] !== false,
     error: event.url.searchParams.get('error'),
+    /** Opens the delete confirmation for the open conversation; the action checks it too. */
+    confirmDelete: confirmed(event),
   };
 };
 
@@ -273,6 +283,7 @@ export const actions: Actions = {
   delete: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail();
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     await apiFor(event)
       .v1.m.ai.conversations({ id: str(form, 'c') })
       .delete();

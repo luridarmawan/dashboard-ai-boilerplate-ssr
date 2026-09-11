@@ -2,7 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import Capabilities from '../../../lib/Capabilities.svelte';
@@ -156,7 +156,7 @@ async function runTest(e: SubmitEvent) {
   </Card>
   {#if can('ai.provider.manage')}
     <Card>
-      <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('common.delete')}</Button></form>
+      <ConfirmDelete csrf={data.csrf} href={`/m/ai/providers/${p.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/providers/${p.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.providers.delete_confirm_lead', { name: p.name })} />
     </Card>
   {/if}
 </div>

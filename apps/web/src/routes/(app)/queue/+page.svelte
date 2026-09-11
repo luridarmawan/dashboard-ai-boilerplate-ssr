@@ -1,7 +1,7 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -40,6 +40,15 @@ const pageHref = (page: number) => {
   if (page > 1) p.set('page', String(page));
   const q = p.toString();
   return q ? `/queue?${q}` : '/queue';
+};
+/** Same shape as the paging links, plus the row the confirmation is about (no-JS path). */
+const confirmHref = (id: string) => {
+  const p = new URLSearchParams();
+  if (data.status) p.set('status', data.status);
+  if (data.meta.page > 1) p.set('page', String(data.meta.page));
+  p.set('confirm', 'delete');
+  p.set('id', id);
+  return `/queue?${p}#confirm-delete`;
 };
 const short = (v: unknown) => {
   if (v === null || v === undefined) return '—';
@@ -84,7 +93,9 @@ const short = (v: unknown) => {
                 <form method="POST" action="?/retry" class="inline"><Csrf token={data.csrf} /><input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} /><Button type="submit" variant="ghost" size="sm" data-testid="queue-retry"><Icon name="refresh" size={14} />{t('queue.retry')}</Button></form>
               {/if}
               {#if j.status !== 'running'}
-                <form method="POST" action="?/delete" class="inline"><Csrf token={data.csrf} /><input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} /><Button type="submit" variant="ghost" size="sm" class="text-destructive" aria-label={t('common.delete')}><Icon name="trash" size={14} /></Button></form>
+                <ConfirmDelete compact csrf={data.csrf} href={confirmHref(j.id)} cancelHref={pageHref(data.meta.page)} confirming={data.confirmDeleteId === j.id} variant="ghost" size="sm" class="text-destructive" title={t('queue.delete_confirm')} description={t('queue.delete_confirm_lead', { id: j.id })}>
+                  {#snippet fields()}<input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} />{/snippet}
+                </ConfirmDelete>
               {/if}
             {/if}
           </td>

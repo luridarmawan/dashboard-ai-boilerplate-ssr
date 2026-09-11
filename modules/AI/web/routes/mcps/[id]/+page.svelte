@@ -2,7 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { headerLines, mcpFields } from '../_form.ts';
@@ -67,7 +67,7 @@ const tools = $derived(form?.tested?.tools ?? m.tools);
   </Card>
   {#if can('ai.mcp.manage')}
     <Card>
-      <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('common.delete')}</Button></form>
+      <ConfirmDelete csrf={data.csrf} href={`/m/ai/mcps/${m.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/mcps/${m.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.mcps.delete_confirm_lead', { name: m.name })} />
     </Card>
   {/if}
 </div>

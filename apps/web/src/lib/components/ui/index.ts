@@ -4,6 +4,7 @@ export { default as Button } from './Button.svelte';
 export { buttonVariants } from './button.ts';
 export { default as Card } from './Card.svelte';
 export { default as Checkbox } from './Checkbox.svelte';
+export { default as ConfirmDelete } from './ConfirmDelete.svelte';
 export { default as Dialog } from './Dialog.svelte';
 export { default as DropdownMenu, type MenuItem } from './DropdownMenu.svelte';
 export { default as Field } from './Field.svelte';

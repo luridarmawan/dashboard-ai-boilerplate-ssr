@@ -1,6 +1,13 @@
 import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  unwrap,
+} from '$lib/server/session';
 import { attachAssets } from '../_assets.server.ts';
 import { previewsFor } from '../_editor.server.ts';
 import { readEditorForm, toApiBody, valuesOf } from '../_editor.ts';
@@ -28,6 +35,8 @@ export const load: PageServerLoad = async (event) => {
     values,
     previews: previewsFor(values),
     saved: event.url.searchParams.has('saved'),
+    /** Opens the delete confirmation; the action checks the same flag (see `confirmed`). */
+    confirmDelete: confirmed(event),
   };
 };
 
@@ -62,6 +71,7 @@ export const actions: Actions = {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.themes.custom({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/themes?saved=deleted');

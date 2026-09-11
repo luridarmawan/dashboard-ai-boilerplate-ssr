@@ -2,7 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { webhookFields } from '../_form.ts';
@@ -93,7 +93,7 @@ const badge = (s: string) =>
   </Card>
   {#if can('webhook.manage')}
     <Card>
-      <form method="POST" action="?/delete"><Csrf token={data.csrf} /><Button type="submit" variant="destructive"><Icon name="trash" size={16} />{t('webhooks.detail.delete')}</Button></form>
+      <ConfirmDelete csrf={data.csrf} href={`/webhooks/${w.id}?confirm=delete#confirm-delete`} cancelHref={`/webhooks/${w.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('webhooks.detail.delete')} description={t('webhooks.detail.delete_confirm_lead', { name: w.name })} />
     </Card>
   {/if}
 </div>

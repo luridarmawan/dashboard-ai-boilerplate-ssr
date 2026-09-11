@@ -1,7 +1,15 @@
 import { formToObject, validateForm } from '@core/contracts';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import { McpUpdateBody } from '../../../../api/schemas.ts';
 import { parseHeaderLines } from '../_form.ts';
 
@@ -10,7 +18,12 @@ export const load: ServerLoad = async (event) => {
   const res = await apiFor(event).v1.m.ai.mcps({ id }).get();
   if (!res.data?.success)
     error(res.status === 404 ? 404 : res.status, 'Server MCP tidak ditemukan');
-  return { mcp: res.data.data, saved: event.url.searchParams.has('saved') };
+  return {
+    mcp: res.data.data,
+    saved: event.url.searchParams.has('saved'),
+    /** Opens the delete confirmation; the action checks the same flag (see `confirmed`). */
+    confirmDelete: confirmed(event),
+  };
 };
 
 const csrfFail = (values: Record<string, unknown> = {}) =>
@@ -66,6 +79,7 @@ export const actions: Actions = {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     if (!checkCsrf(event, form)) return csrfFail();
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.m.ai.mcps({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/m/ai/mcps?saved=deleted');

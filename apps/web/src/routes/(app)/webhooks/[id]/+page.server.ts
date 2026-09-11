@@ -1,7 +1,15 @@
 import { formToObject, validateForm, WebhookUpdateBody } from '@core/contracts';
 import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
@@ -19,6 +27,8 @@ export const load: PageServerLoad = async (event) => {
     // Shown once: arrives via the redirect from "new" or from rotate; never stored in the page.
     secret: event.url.searchParams.get('secret'),
     saved: event.url.searchParams.has('saved'),
+    /** Opens the delete confirmation; the action checks the same flag (see `confirmed`). */
+    confirmDelete: confirmed(event),
   };
 };
 
@@ -88,6 +98,7 @@ export const actions: Actions = {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.webhooks({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/webhooks?saved=deleted');
