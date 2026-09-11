@@ -1,7 +1,7 @@
 /**
  * Origin mana yang boleh mengirim permintaan pengubah-keadaan ke web (PRD A-10, Keputusan E).
  *
- * SvelteKit punya pemeriksaan sendiri (`kit.csrf.checkOrigin`): header `Origin` browser
+ * SvelteKit punya pemeriksaan sendiri (`kit.csrf`, dimatikan dengan `trustedOrigins: ['*']`): header `Origin` browser
  * dibandingkan dengan origin yang DIREKONSTRUKSI adapter-node per request — `ORIGIN` bila
  * disetel, kalau tidak `PROTOCOL_HEADER`/`HOST_HEADER`, dan terakhir `https://` + Host. Reverse
  * proxy yang lupa `X-Forwarded-Proto` (atau meneruskan Host miliknya sendiri) membuat

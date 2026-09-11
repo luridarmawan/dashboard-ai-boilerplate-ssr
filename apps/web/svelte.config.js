@@ -15,11 +15,11 @@ export default {
     // ulang, dan di belakang proxy yang tidak meneruskan X-Forwarded-Proto/Host rekonstruksi
     // origin milik adapter-node salah sehingga semua form POST biasa ditolak. Pasangan token
     // (`_csrf` + cookie) tetap wajib di setiap action — lihat src/lib/server/origin.ts.
-    // SvelteKit menandai opsi ini deprecated (penggantinya `csrf.trustedOrigins`, juga build-time,
-    // dan tidak bisa mematikan perbandingan same-origin) — itu sumber peringatan saat `svelte-kit
-    // sync`/build. Bila kelak benar-benar dihapus, pemeriksaan di hooks.server.ts sudah menutupi
-    // A-10; yang perlu ditinjau saat itu adalah bagaimana memberi tahu SvelteKit origin publiknya.
-    csrf: { checkOrigin: false },
+    // `trustedOrigins: ['*']` adalah cara yang tidak deprecated untuk mematikan pemeriksaan bawaan
+    // itu (`checkOrigin: false` memicu peringatan sejak SvelteKit 2.70 dan akan dihapus). Mendaftar
+    // origin satu per satu bukan pilihan: daftarnya build-time, sedangkan APP_ORIGIN baru diketahui
+    // saat deploy. Bila kelak `'*'` ikut hilang, pemeriksaan di hooks.server.ts sudah menutupi A-10.
+    csrf: { trustedOrigins: ['*'] },
     alias: {
       '@core/ui-theme': '../../packages/ui-theme',
       // Extension point 10: modules import core components as `@core/ui` (see src/lib/components/index.ts).

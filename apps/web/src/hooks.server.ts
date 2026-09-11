@@ -18,7 +18,7 @@ import { resolveRequestTheme } from '$lib/server/theme';
 export const handle: Handle = async ({ event, resolve }) => {
   event.locals.requestId = event.request.headers.get('x-request-id') ?? crypto.randomUUID();
   // A-10: tidak ada mutasi lintas-situs yang sampai ke form action atau endpoint. Ini mengganti
-  // pemeriksaan Origin bawaan SvelteKit (svelte.config.js: `csrf.checkOrigin: false`) dengan yang
+  // pemeriksaan Origin bawaan SvelteKit (svelte.config.js: `csrf.trustedOrigins: ['*']`) dengan yang
   // membaca APP_ORIGIN saat runtime dan MENYEBUTKAN apa yang ditolaknya — lihat lib/server/origin.ts.
   // Pasangan token (`_csrf` + cookie, `checkCsrf`) tetap wajib di setiap action.
   const origin = checkRequestOrigin(event);
