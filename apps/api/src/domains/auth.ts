@@ -25,7 +25,7 @@ import { env } from '@core/config';
 import { Email, errorResponses, fail, MfaLoginBody, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
-import { publicLink, sendTemplate } from '../mail.ts';
+import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import {
   authContext,
   clientIp,
@@ -251,7 +251,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         to: email,
         toName: body.name.trim(),
         template: 'verify-email',
-        locale: 'id',
+        locale: await mailLocale({ request, clientId: tenant?.id ?? null }),
         clientId: tenant?.id ?? null,
         data: { name: body.name.trim(), link: publicLink(`/auth/verify?token=${verify}`, request) },
       });
@@ -535,7 +535,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         await sendTemplate(db, {
           to: email,
           template: 'reset-password',
-          locale: 'id',
+          locale: await mailLocale({ request }),
           clientId: null,
           data: { name: '', link: publicLink(`/auth/reset?token=${token}`, request) },
         });

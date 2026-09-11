@@ -18,6 +18,34 @@ export async function sendTemplate(db: Db, input: EnqueueInput): Promise<string>
   return enqueueEmail(db, input);
 }
 
+/** The languages the templates are written in; the same two the UI ships (K-1). */
+const MAIL_LOCALES = ['id', 'en'] as const;
+export type MailLocale = (typeof MAIL_LOCALES)[number];
+function asLocale(value: string | null | undefined): MailLocale | null {
+  const tag = (value ?? '').trim().toLowerCase().split(',')[0]?.split('-')[0] ?? '';
+  return (MAIL_LOCALES as readonly string[]).includes(tag) ? (tag as MailLocale) : null;
+}
+
+/**
+ * Which language to write an e-mail in (K-2, K-3): the language of the request that asked for it —
+ * the web forwards the locale it already resolved for the visitor (preference → `dab_lang` cookie →
+ * Accept-Language) as `Accept-Language` — then the tenant's `app.default_locale`, then `id`.
+ *
+ * That is the rule for mail the recipient asked for themselves (register, password reset). When an
+ * admin sends mail to someone else, that someone's saved `users.locale` comes first; the caller
+ * applies it (`recipient.locale ?? await mailLocale(...)`) because only the caller knows who that is.
+ */
+export async function mailLocale(input: {
+  readonly request?: Request | null;
+  readonly clientId?: string | null;
+}): Promise<MailLocale> {
+  return (
+    asLocale(input.request?.headers.get('accept-language')) ??
+    asLocale(await settings.get<string | null>(input.clientId ?? null, 'app.default_locale')) ??
+    'id'
+  );
+}
+
 export async function brandFor(clientId: string | null): Promise<Brand> {
   const e = env();
   return {

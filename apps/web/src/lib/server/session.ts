@@ -119,6 +119,7 @@ export function apiFor(event: RequestEvent, clientId?: string | null) {
     clientId: clientId ?? null,
     // The API rate-limits per client IP (A-2); without this every browser would share the web server's IP.
     clientIp: ip,
+    locale: event.locals.locale?.locale,
   });
 }
 
@@ -128,6 +129,7 @@ function forwardHeaders(event: RequestEvent, clientId?: string | null): Record<s
     'x-request-id': event.locals.requestId,
     accept: 'application/json',
   };
+  if (event.locals.locale?.locale) headers['accept-language'] = event.locals.locale.locale;
   const cookie = cookieHeader(event.cookies);
   if (cookie) headers.cookie = cookie;
   const csrf = event.cookies.get(CSRF_COOKIE);

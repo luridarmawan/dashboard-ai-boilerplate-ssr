@@ -13,7 +13,7 @@ import { Email, errorResponses, fail, OkSchema, ok, Password } from '@core/contr
 import { and, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
 import { Id, notFound } from '../lib/http.ts';
-import { publicLink, sendTemplate } from '../mail.ts';
+import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import { type AuthState, authContext, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
@@ -171,7 +171,9 @@ export const invitationsDomain = new Elysia({
       }
       const db = unsafeAcrossTenants();
       const email = body.email.trim().toLowerCase();
-      const locale = body.locale ?? 'id';
+      // The invitee's own preference wins where there is one (`existing.locale` below); this is
+      // for the rest: what the inviter picked, else the language they are inviting in.
+      const locale = body.locale ?? (await mailLocale({ request, clientId }));
       const ip = clientIp(request, server);
       const tenantLabel = await tenantName(clientId);
 

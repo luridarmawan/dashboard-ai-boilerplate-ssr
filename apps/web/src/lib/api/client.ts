@@ -19,6 +19,9 @@ export interface ApiContext {
   readonly clientId?: string | null | undefined;
   /** The browser's IP, forwarded so the API's per-IP limits apply to the visitor, not to the web server. */
   readonly clientIp?: string | undefined;
+  /** The language this request was resolved to (K-2), so API-side text — e-mail above all — matches
+   *  the page the visitor is looking at. Sent as `Accept-Language`, already decided, no q-values. */
+  readonly locale?: string | undefined;
 }
 
 export function api(ctx: ApiContext | string) {
@@ -36,6 +39,7 @@ export function api(ctx: ApiContext | string) {
   }
   if (c.clientId) headers['x-client-id'] = c.clientId;
   if (c.clientIp) headers['x-forwarded-for'] = c.clientIp;
+  if (c.locale) headers['accept-language'] = c.locale;
   return treaty<App>(env.API_URL ?? 'http://127.0.0.1:3001', { headers });
 }
 

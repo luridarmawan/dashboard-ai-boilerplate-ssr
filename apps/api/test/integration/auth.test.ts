@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { eq, schema, unsafeAcrossTenants } from '@core/db';
+import { desc, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 
 /**
@@ -138,6 +138,31 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
       .from(schema.users)
       .where(eq(schema.users.email, email));
     expect(after?.v).not.toBeNull();
+  });
+
+  test('the reset e-mail is written in the language of the request that asked for it (K-2)', async () => {
+    const db = unsafeAcrossTenants();
+    const queued = async () => {
+      const [row] = await db
+        .select({ id: schema.outboxEmail.id, locale: schema.outboxEmail.locale })
+        .from(schema.outboxEmail)
+        .where(eq(schema.outboxEmail.to_address, email))
+        .orderBy(desc(schema.outboxEmail.created_at))
+        .limit(1);
+      return row;
+    };
+    // The web forwards the locale it resolved for the visitor; anything else falls back to `id`.
+    await call('/v1/auth/reset-password/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+      headers: { 'accept-language': 'en' },
+    });
+    expect((await queued())?.locale).toBe('en');
+    await call('/v1/auth/reset-password/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    expect((await queued())?.locale).toBe('id');
   });
 
   test('password reset: request is uniform, confirm revokes all sessions (A-7)', async () => {

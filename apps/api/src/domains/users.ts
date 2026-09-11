@@ -50,7 +50,7 @@ import {
 import { Elysia, t } from 'elysia';
 import { fileIdFromUrl, findAvatarFile, removeFile, storeUpload } from '../files.ts';
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
-import { publicLink, sendTemplate } from '../mail.ts';
+import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import {
   type AuthState,
   clientIp,
@@ -939,7 +939,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
             to: email,
             toName: body.name.trim(),
             template: 'set-password',
-            locale: body.locale ?? 'id',
+            locale: body.locale ?? (await mailLocale({ request, clientId: ts.clientId })),
             clientId: ts.clientId,
             data: { name: body.name.trim(), link: publicLink(`/auth/reset?token=${raw}`, request) },
           });

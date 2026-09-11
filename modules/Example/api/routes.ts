@@ -1,4 +1,4 @@
-import { publicLink, sendTemplate } from '@app/api/mail';
+import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
 import { notify } from '@app/api/notifications';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
@@ -239,7 +239,7 @@ export default defineApiRoutes(
           await sendTemplate(db, {
             to,
             template: 'contact',
-            locale: 'id',
+            locale: await mailLocale({ request, clientId: tid }),
             clientId: tid,
             data: {
               name: body.name.trim(),
