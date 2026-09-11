@@ -63,8 +63,8 @@ const name = (l: string) => (l === 'id' ? t('lang.id') : l === 'en' ? t('lang.en
   <details class={`group relative ${className}`} data-testid="language-picker" use:dropdown>
     <summary class="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent" aria-label={`${t('nav.language')}: ${name(current)}`} title={name(current)}>
       <Flag locale={current} />
-      {#if !compact}<span>{name(current)}</span>{/if}
-      <Icon name="chevron-down" size={14} class="transition-transform group-open:rotate-180" />
+      {#if !compact}<span>{name(current)}</span>
+        <Icon name="chevron-down" size={14} class="transition-transform group-open:rotate-180" />{/if}
     </summary>
     <form method="POST" action="/lang" class="absolute end-0 z-40 mt-1 min-w-48 rounded-md border bg-popover p-1 shadow-lg">
       <Csrf token={csrf} />

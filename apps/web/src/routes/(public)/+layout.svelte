@@ -19,8 +19,7 @@ const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
 {/snippet}
 {#snippet nav({ orientation }: { orientation: 'vertical' | 'horizontal' })}
   <ul class={orientation === 'horizontal' ? 'flex items-center gap-4 text-sm' : 'grid gap-1 text-sm'}>
-    <li><a href="/theme" class="text-foreground no-underline hover:underline">{t('nav.theme')}</a></li>
-    <li><LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} /></li>
+    <li><LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact /></li>
     {#if data.loggedIn}
       <li><a href="/dashboard" class="text-foreground no-underline hover:underline">{t('nav.dashboard')}</a></li>
     {:else}
