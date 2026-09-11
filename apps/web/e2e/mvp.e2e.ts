@@ -58,14 +58,14 @@ test('landing → login → CRUD produk → chat AI streaming', async ({ page })
     .getByRole('button', { name: /Simpan|Save/ })
     .click();
   await expect(page).toHaveURL(/\/m\/example\/products\/[0-9a-f-]{36}\?saved=1/);
-  await expect(page.getByText('Tersimpan')).toBeVisible();
+  await expect(page.locator('main form p.notice')).toContainText('Tersimpan');
 
   await page.fill('input[name="name"]', `E2E Kopi ${run} v2`);
   await page
     .locator('main form[action="?/save"]')
     .getByRole('button', { name: /Simpan|Save/ })
     .click();
-  await expect(page.getByText('Tersimpan')).toBeVisible();
+  await expect(page.locator('main form p.notice')).toContainText('Tersimpan');
   await expect(page.locator('h1')).toContainText(`E2E Kopi ${run} v2`);
 
   // Public detail page from the database
