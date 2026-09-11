@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="%lang%" dir="%dir%" data-app-theme="%theme%" data-mode="%mode%">
+<html lang="%lang%" dir="%dir%" data-app-theme="%theme%" data-mode="%mode%" data-sidebar="%sidebar%">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!--
-      Theme + mode are decided on the SERVER (hooks.server.ts, PRD L-12) and written into the
-      attributes above before the first byte, so the first paint already has the right palette,
-      icons and layout. This tiny inline script only refines `system` mode from the OS
+      Theme, mode and the sidebar rail (F-8) are decided on the SERVER (hooks.server.ts, PRD L-12)
+      and written into the attributes above before the first byte, so the first paint already has
+      the right palette, icons and layout. This tiny inline script only refines `system` mode from the OS
       preference before paint; without JavaScript, `system` renders light (L-4).
     -->
     <script>

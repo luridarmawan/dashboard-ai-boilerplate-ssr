@@ -432,9 +432,80 @@ const admin = new Jar();
   });
 }
 
+// ---- F-8: the sidebar rail collapses without JavaScript, and the state belongs to the USER ----
+{
+  const before = await get(admin, '/dashboard');
+  check(
+    'F-8 rail starts expanded, and the toggle is a plain form posting the NEXT state',
+    htmlAttr(before.html, 'data-sidebar') === 'expanded' &&
+      /action="\/sidebar"/.test(before.html) &&
+      /name="state" value="collapsed"/.test(before.html),
+    htmlAttr(before.html, 'data-sidebar'),
+  );
+  const toggled = await post(admin, '/sidebar', {
+    _csrf: csrfOf(before.html),
+    state: 'collapsed',
+    back: '/dashboard',
+  });
+  check(
+    'F-8 POST /sidebar → 303 back to the page',
+    toggled.res.status === 303,
+    `${toggled.res.status}`,
+  );
+  const after = await get(admin, '/dashboard');
+  check(
+    'F-8 the next HTML carries the collapsed rail (server-decided, no flash, no JavaScript)',
+    htmlAttr(after.html, 'data-sidebar') === 'collapsed' &&
+      /name="state" value="expanded"/.test(after.html) &&
+      admin.cookies.get('dab_sidebar') === 'collapsed',
+    htmlAttr(after.html, 'data-sidebar'),
+  );
+  // "Tersimpan per user", not per browser: a SECOND browser that has never toggled anything sees
+  // the same rail after logging in — which only the profile column can explain.
+  const other = new Jar();
+  const loginPage = await get(other, '/auth/login');
+  await post(other, '/auth/login', {
+    _csrf: csrfOf(loginPage.html),
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    next: '/dashboard',
+  });
+  const fresh = await get(other, '/dashboard');
+  check(
+    'F-8 the choice follows the USER: a fresh browser, no dab_sidebar cookie of its own, renders collapsed',
+    htmlAttr(fresh.html, 'data-sidebar') === 'collapsed' && !other.cookies.get('dab_sidebar'),
+    `${htmlAttr(fresh.html, 'data-sidebar')} cookie=${other.cookies.get('dab_sidebar') ?? '—'}`,
+  );
+  // Layouts without a rail neither offer the toggle nor care about the attribute (topnav-compact).
+  await post(admin, '/theme', {
+    _csrf: csrfOf((await get(admin, '/theme')).html),
+    theme: 'corporate',
+    mode: 'light',
+    back: '/dashboard',
+  });
+  const topnav = await get(admin, '/dashboard');
+  check(
+    'F-8 a layout without a sidebar offers no toggle',
+    footerLayout(topnav.html) === 'topnav-compact' && !topnav.html.includes('action="/sidebar"'),
+    footerLayout(topnav.html),
+  );
+  // back to base + expanded for whatever runs next
+  await post(admin, '/theme', {
+    _csrf: csrfOf((await get(admin, '/theme')).html),
+    theme: 'base',
+    mode: 'light',
+    back: '/dashboard',
+  });
+  await post(admin, '/sidebar', {
+    _csrf: csrfOf((await get(admin, '/dashboard')).html),
+    state: 'expanded',
+    back: '/dashboard',
+  });
+}
+
 console.log(
   failures === 0
-    ? '\nGATE M2 #1 #2 #3 #5 #6 + G-19 + L-19: LOLOS'
+    ? '\nGATE M2 #1 #2 #3 #5 #6 + G-19 + L-19 + F-8: LOLOS'
     : `\nGATE M2: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);

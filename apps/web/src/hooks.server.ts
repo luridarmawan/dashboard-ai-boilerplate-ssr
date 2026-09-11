@@ -5,6 +5,7 @@ import { cfgString, landingFallback, loadPublicConfig } from '$lib/server/config
 import { resolveRequestDirection, resolveRequestLocale } from '$lib/server/locale';
 import { checkRequestOrigin, type OriginVerdict } from '$lib/server/origin';
 import { loadSession } from '$lib/server/session';
+import { resolveRequestSidebar } from '$lib/server/sidebar';
 import { resolveRequestTheme } from '$lib/server/theme';
 
 /**
@@ -30,6 +31,9 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.theme = resolveRequestTheme(event, event.locals.config);
   event.locals.locale = resolveRequestLocale(event, event.locals.config);
   event.locals.dir = resolveRequestDirection(event, event.locals.locale.locale);
+  // F-8: the rail state belongs on <html> for the same reason theme does — the layout must be
+  // right in the first byte, without JavaScript.
+  event.locals.sidebar = resolveRequestSidebar(event);
   const { theme, mode, css } = event.locals.theme;
   const themeCss = css ? `<style data-custom-theme="${theme.id}">${css}</style>` : '';
 
@@ -72,6 +76,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         .replace('%dir%', event.locals.dir)
         .replace('%theme%', theme.id)
         .replace('%mode%', mode)
+        .replace('%sidebar%', event.locals.sidebar)
         .replace('%theme_css%', themeCss),
   });
   response.headers.set('x-request-id', event.locals.requestId);

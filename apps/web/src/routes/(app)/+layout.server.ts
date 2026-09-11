@@ -82,6 +82,8 @@ export const load: LayoutServerLoad = async (event) => {
     menu,
     breadcrumb: buildBreadcrumb(event.url.pathname, menu, locale),
     layoutId: layout.layout.id,
+    /** Sidebar rail (F-8), resolved in hooks — what `SidebarToggle` starts from. */
+    sidebarCollapsed: event.locals.sidebar === 'collapsed',
     layoutVariant: variant,
     /** Side content this route asked for (§4.8); `+layout.ts` turns it into a component. */
     asideId: pageAsides[event.route.id ?? ''] ?? null,

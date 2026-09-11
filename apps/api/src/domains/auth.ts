@@ -57,6 +57,7 @@ export const PublicUser = t.Object({
   avatarUrl: t.Nullable(t.String()),
   locale: t.String(),
   theme: t.Nullable(t.String()),
+  sidebarCollapsed: t.Boolean(),
   isSuperadmin: t.Boolean(),
   emailVerifiedAt: t.Nullable(t.String()),
   lastLoginAt: t.Nullable(t.String()),

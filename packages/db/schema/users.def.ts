@@ -18,6 +18,8 @@ export const users = defineTable({
     avatar_url: col.varchar(512).nullable(),
     locale: col.identifier(8).default('id'),
     theme: col.identifier(64).nullable(),
+    /** Sidebar rail state (F-8): follows the user across devices, like `theme`. */
+    sidebar_collapsed: col.boolean().default(false),
     /** Superadmin is a database flag, bootstrapped from env once (C-5) — never a restart. */
     is_superadmin: col.boolean().default(false),
     email_verified_at: col.datetime().nullable(),

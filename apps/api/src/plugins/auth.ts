@@ -178,6 +178,7 @@ export function publicUser(u: UserRow) {
     avatarUrl: u.avatar_url,
     locale: u.locale,
     theme: u.theme,
+    sidebarCollapsed: !!u.sidebar_collapsed,
     isSuperadmin: u.is_superadmin,
     emailVerifiedAt: u.email_verified_at?.toISOString() ?? null,
     lastLoginAt: u.last_login_at?.toISOString() ?? null,

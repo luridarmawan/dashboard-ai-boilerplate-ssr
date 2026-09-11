@@ -362,7 +362,7 @@ modules/Billing/
 └── web/{layouts,icons}/…
 ```
 
-- **Layout** (15): komponen Svelte yang hanya menyusun region — sync menolak yang region-nya bolong dengan menyebut region mana (L-8). Begitu terdaftar, tema **mana pun** (termasuk tema core) boleh memetakan varian ke id itu.
+- **Layout** (15): komponen Svelte yang hanya menyusun region — sync menolak yang region-nya bolong dengan menyebut region mana (L-8). Begitu terdaftar, tema **mana pun** (termasuk tema core) boleh memetakan varian ke id itu. Layout dasbor yang punya sidebar boleh menggambar `<SidebarToggle />` dari `@core/ui` di kepala rail-nya dan menata keadaan ciutnya lewat `html[data-sidebar="collapsed"]` (F-8, [`THEMES.md` §4](./THEMES.md)); layout tanpa sidebar cukup mengabaikannya.
 - **Tema** (14): `theme.json` boleh merujuk layout & set ikon core maupun modul; kontras WCAG AA diperiksa sama seperti tema core (L-21). Token CSS-nya digabung ke bundel lewat berkas generate.
 - **Set ikon** (16): berkas glyph mengekspor `glyphs` yang **menutup seluruh nama ikon core** — yang bolong menggagalkan sync (L-5). Modul yang memakai pustaka ikon menyatakannya sebagai dependensi sendiri (mis. `@lucide/svelte`).
 

@@ -47,6 +47,8 @@
   "shell.footer": "Dashboard AI Boilerplate",
   "shell.notifications": "Notifikasi",
   "shell.account_menu": "Menu akun",
+  "shell.sidebar_collapse": "Ciutkan sidebar",
+  "shell.sidebar_expand": "Lebarkan sidebar",
   "notifications.title": "Notifikasi",
   "notifications.empty": "Tidak ada notifikasi.",
   "notifications.unread": "belum dibaca",

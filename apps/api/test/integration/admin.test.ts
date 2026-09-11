@@ -309,6 +309,19 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
       (await put('/v1/users/profile/me', { name: 'Bobby', locale: 'en', theme: 'dark' }, [bob]))
         .status,
     ).toBe(200);
+    // F-8: the sidebar rail is a profile preference, so it answers on every session of this user.
+    const before = await json(await call('/v1/auth/me', {}, [bob]));
+    expect((before.data as { user: { sidebarCollapsed: boolean } }).user.sidebarCollapsed).toBe(
+      false,
+    );
+    expect((await put('/v1/users/profile/me', { sidebarCollapsed: true }, [bob])).status).toBe(200);
+    const after = await json(await call('/v1/auth/me', {}, [bob2]));
+    expect((after.data as { user: { sidebarCollapsed: boolean } }).user.sidebarCollapsed).toBe(
+      true,
+    );
+    expect((await put('/v1/users/profile/me', { sidebarCollapsed: false }, [bob])).status).toBe(
+      200,
+    );
     const wrong = await put(
       '/v1/users/profile/password',
       { currentPassword: 'nope nope nope', newPassword: 'a brand new password 9' },

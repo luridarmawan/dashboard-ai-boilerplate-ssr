@@ -28,6 +28,8 @@ export interface SessionUser {
   avatarUrl: string | null;
   locale: string;
   theme: string | null;
+  /** Sidebar rail collapsed (F-8) — a preference of the user, not of the browser. */
+  sidebarCollapsed: boolean;
   isSuperadmin: boolean;
   emailVerifiedAt: string | null;
   lastLoginAt: string | null;

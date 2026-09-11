@@ -97,6 +97,7 @@ const PublicUser = t.Object({
   avatarUrl: t.Nullable(t.String()),
   locale: t.String(),
   theme: t.Nullable(t.String()),
+  sidebarCollapsed: t.Boolean(),
   isSuperadmin: t.Boolean(),
   emailVerifiedAt: t.Nullable(t.String()),
   lastLoginAt: t.Nullable(t.String()),
@@ -269,6 +270,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       if (body.phone !== undefined) patch.phone = normalizePhone(body.phone);
       if (body.locale !== undefined) patch.locale = body.locale;
       if (body.theme !== undefined) patch.theme = body.theme;
+      if (body.sidebarCollapsed !== undefined) patch.sidebar_collapsed = body.sidebarCollapsed;
       if (body.avatarUrl !== undefined) patch.avatar_url = body.avatarUrl;
       if (Object.keys(patch).length) {
         await db.update(schema.users).set(patch).where(eq(schema.users.id, a.user.id));
@@ -296,7 +298,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       },
       body: ProfileBody,
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
-      detail: { summary: 'Edit my profile: name, locale, theme, avatar (D-4)' },
+      detail: { summary: 'Edit my profile: name, locale, theme, sidebar, avatar (D-4)' },
     },
   )
   // ---- impersonation (D-6): superadmin acts as a user, with banner + audit --------------------

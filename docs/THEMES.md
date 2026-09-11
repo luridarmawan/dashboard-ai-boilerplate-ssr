@@ -98,6 +98,8 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 | `centered-card` | auth | Kartu tunggal di tengah |
 | `split-hero` | auth | Form di kiri, panel merek di kanan; menumpuk di layar sempit |
 
+**Sidebar yang bisa diciutkan (F-8).** Layout yang punya rail menggambar sendiri `<SidebarToggle />` (`@core/ui`) di kepala rail-nya; layout tanpa sidebar tidak menggambarnya dan tidak terpengaruh. Keadaannya diputuskan di server (`apps/web/src/lib/server/sidebar.ts`) dan ditulis sebagai atribut `data-sidebar="expanded|collapsed"` di `<html>` sebelum byte pertama, jadi rail sempit sudah benar pada HTML pertama — tanpa kedipan, tanpa JavaScript. CSS layout-lah yang memutuskan arti "ciut" untuk dirinya (lihat `sidebar-classic/Layout.svelte`: rail 3,5rem, label di-*clip* dengan teknik sr-only supaya nama tautan tetap terbaca pembaca layar). Pilihannya melekat pada **pengguna** (kolom `users.sidebar_collapsed`, disalin ke cookie `dab_sidebar` untuk browser yang belum masuk), jadi browser lain milik orang yang sama membuka dasbor dengan rail yang sama.
+
 **Region `aside` bersifat opsional.** Layout **wajib** menggambarnya bila diberi, dan **wajib** menciut jadi satu kolom bila tidak — layout tidak boleh mengarang isi kolom kedua sendiri. Halaman tidak bisa menyerahkan snippet ke shell (shell dirender lebih dulu), jadi halaman **menyebut nama**-nya:
 
 ```ts

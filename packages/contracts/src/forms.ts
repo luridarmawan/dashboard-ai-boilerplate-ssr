@@ -36,6 +36,8 @@ export const ProfileBody = t.Object({
   locale: t.Optional(LocaleCode),
   theme: t.Optional(t.Nullable(t.String({ maxLength: 64 }))),
   avatarUrl: t.Optional(t.Nullable(t.String({ maxLength: 512 }))),
+  /** Sidebar rail (F-8): a shell preference that follows the user, not the browser. */
+  sidebarCollapsed: t.Optional(t.Boolean()),
 });
 export const PasswordChangeBody = t.Object({
   currentPassword: Password,
