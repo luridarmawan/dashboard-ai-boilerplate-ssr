@@ -1,3 +1,4 @@
+import { createTranslator } from '@core/i18n';
 import { actionFailure, apiFor, checkCsrf, csrfToken, str, unwrap } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -13,7 +14,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: createTranslator(event.locals.locale.locale)('common.form_expired'),
         },
         values,
       );
