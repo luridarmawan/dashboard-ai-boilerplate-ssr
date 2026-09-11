@@ -24,7 +24,8 @@ export const load: PageServerLoad = async (event) => {
   return {
     webhook: res.data.data,
     events: ev.data?.success ? ev.data.data.events : [],
-    // Shown once: arrives via the redirect from "new" or from rotate; never stored in the page.
+    // Shown once: arrives via the redirect from "new"; never stored in the page. Rotation hands
+    // its secret back through the action result instead (see `rotate`).
     secret: event.url.searchParams.get('secret'),
     saved: event.url.searchParams.has('saved'),
     /** Opens the delete confirmation; the action checks the same flag (see `confirmed`). */
@@ -79,7 +80,9 @@ export const actions: Actions = {
       await apiFor(event).v1.webhooks({ id })['rotate-secret'].post(),
     );
     if (!r.ok) return actionFailure(r.failure);
-    redirect(303, `/webhooks/${id}?secret=${encodeURIComponent(r.data.data.secret)}`);
+    // Returned, not redirected to `?secret=`: the new secret would otherwise sit in the URL bar,
+    // in history and in every proxy log. The page shows it once, from here.
+    return { rotated: { secret: r.data.data.secret } };
   },
   retry: async (event) => {
     const form = await event.request.formData();
