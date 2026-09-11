@@ -35,6 +35,8 @@ x-app-env: &app-env
   CACHE_DRIVER: ${CACHE_DRIVER:-database}
   RATELIMIT_DRIVER: ${RATELIMIT_DRIVER:-database}
   REDIS_URL: ${REDIS_URL:-}
+  # One live session per user (A-5): a successful login revokes the account's other sessions
+  SINGLE_LOGIN_ENABLE: ${SINGLE_LOGIN_ENABLE:-false}
   LANDING_ROUTE: ${LANDING_ROUTE:-/example}
   # Branding (§4.7): the landing headline, its lead, and the footer line of every page. The
   # first also titles the OpenAPI document. Empty = the translated defaults.
