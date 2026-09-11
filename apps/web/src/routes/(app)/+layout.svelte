@@ -53,10 +53,11 @@ const shellContext = $derived({
   </a>
 {/snippet}
 
-{#snippet navLink(item: MenuItem, sub: boolean)}
+{#snippet navLink(item: MenuItem, sub: boolean, tip = false)}
   <a
     href={item.href}
     aria-current={item.active ? 'page' : undefined}
+    title={tip ? item.label : undefined}
     class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:font-medium"
   >
     <Icon name={item.icon} size={sub ? 16 : 18} class={sub ? 'text-muted-foreground' : ''} />
@@ -80,9 +81,21 @@ const shellContext = $derived({
   </ul>
 {/snippet}
 
-{#snippet nav({ orientation }: { orientation: 'vertical' | 'horizontal' })}
+{#snippet nav({
+  orientation,
+  rail = false,
+}: {
+  orientation: 'vertical' | 'horizontal';
+  rail?: boolean;
+})}
   <!-- F-3: a short top level, then collapsible groups. <details> needs no JavaScript; a group holding
-       the current page is rendered open. Horizontal (top-nav layouts): each group is a dropdown. -->
+       the current page is rendered open. Horizontal (top-nav layouts): each group is a dropdown.
+       In a COLLAPSED rail (F-8) the labels are only readable as tooltips, and no group is rendered
+       open — an open group is what tells the layout's CSS the reader asked for the full width back,
+       so it must mean "just clicked", not "you happen to be on a page inside it". -->
+  <!-- `rail` is the layout speaking, so it is never stale; `railed` follows the data and is only
+       used where a stale value is harmless (a group left open is closed by the toggle itself). -->
+  {@const railed = rail && data.sidebarCollapsed}
   <ul class={orientation === 'horizontal' ? 'flex items-center gap-1' : 'grid gap-0.5'}>
     {#each data.menu as item (item.id)}
       <li>
@@ -90,13 +103,14 @@ const shellContext = $derived({
           <!-- vertical: a tree, open when it holds the current page; horizontal: a popover, never
                left open by the server — the active group is marked on its summary instead -->
           <details
-            open={orientation === 'vertical' && item.active}
+            open={orientation === 'vertical' && item.active && !railed}
             class="group relative"
             data-testid={`nav-${item.id}`}
             use:dropdown={orientation === 'horizontal'}
           >
             <summary
               aria-current={item.active && orientation === 'horizontal' ? 'page' : undefined}
+              title={rail ? item.label : undefined}
               class="flex cursor-pointer list-none items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground hover:bg-accent hover:text-accent-foreground aria-[current=page]:font-medium"
             >
               <Icon name={item.icon} size={18} />
@@ -112,7 +126,7 @@ const shellContext = $derived({
             {/if}
           </details>
         {:else}
-          {@render navLink(item, false)}
+          {@render navLink(item, false, rail)}
           {#if item.children.length && orientation === 'vertical'}
             {@render navChildren(item.children, orientation)}
           {/if}

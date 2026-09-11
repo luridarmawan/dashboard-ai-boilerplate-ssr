@@ -64,6 +64,11 @@ const csrfOf = (html: string) => /name="_csrf" value="([^"]+)"/.exec(html)?.[1] 
 const htmlAttr = (html: string, attr: string) =>
   new RegExp(`<html[^>]*\\s${attr}="([^"]*)"`).exec(html)?.[1] ?? '';
 const footerLayout = (html: string) => /layout <code>([a-z.-]+)<\/code>/.exec(html)?.[1] ?? '';
+/** The sidebar rail only (F-8) — the mobile menu renders the same links and would mask a bug. */
+const railOf = (html: string) => {
+  const from = html.indexOf('id="sidebar-rail"');
+  return from < 0 ? '' : html.slice(from, html.indexOf('</aside>', from));
+};
 const footerVariant = (html: string) =>
   /varian <code>([a-z.-]+)<\/code>/.exec(html)?.[1] ?? 'default';
 /** Which glyph library rendered the icons: Lucide draws `<svg class="lucide …`, Phosphor draws `<svg … viewBox="0 0 256 256"`. */
@@ -423,6 +428,11 @@ const admin = new Jar();
     '#5 icons come from the module icon set dummy.rounded-24 (Lucide, stroke 2.25)',
     /stroke-width="2.25"/.test(dash.html),
   );
+  check(
+    'F-8 a MODULE layout may own a collapsible rail too — same two moves, no core change',
+    railOf(dash.html).includes('data-testid="sidebar-toggle"') &&
+      railOf(dash.html).includes('title='),
+  );
   // back to base for whatever runs next
   await post(admin, '/theme', {
     _csrf: csrfOf((await get(admin, '/theme')).html),
@@ -460,6 +470,15 @@ const admin = new Jar();
       admin.cookies.get('dab_sidebar') === 'collapsed',
     htmlAttr(after.html, 'data-sidebar'),
   );
+  // A rail has no room for labels, so they must be reachable some other way, and a group must not
+  // arrive already open — an open group is what tells the layout to give the width back.
+  const inGroup = await get(admin, '/users');
+  check(
+    'F-8 collapsed rail: every item keeps its name as a tooltip, and no group is rendered open',
+    railOf(inGroup.html).includes('title="') &&
+      !/<details[^>]*\sopen[=\s>]/.test(railOf(inGroup.html)),
+    railOf(inGroup.html).includes('title="') ? 'ada details open' : 'tidak ada title',
+  );
   // "Tersimpan per user", not per browser: a SECOND browser that has never toggled anything sees
   // the same rail after logging in — which only the profile column can explain.
   const other = new Jar();
@@ -476,6 +495,22 @@ const admin = new Jar();
     htmlAttr(fresh.html, 'data-sidebar') === 'collapsed' && !other.cookies.get('dab_sidebar'),
     `${htmlAttr(fresh.html, 'data-sidebar')} cookie=${other.cookies.get('dab_sidebar') ?? '—'}`,
   );
+  // …and expanded, F-3 is untouched: the group holding the current page is open again.
+  await post(admin, '/sidebar', {
+    _csrf: csrfOf((await get(admin, '/dashboard')).html),
+    state: 'expanded',
+    back: '/dashboard',
+  });
+  const expanded = await get(admin, '/users');
+  check(
+    'F-8 expanded rail: the group holding the current page is open again (F-3 intact)',
+    /<details[^>]*\sopen[=\s>]/.test(railOf(expanded.html)),
+  );
+  await post(admin, '/sidebar', {
+    _csrf: csrfOf(expanded.html),
+    state: 'collapsed',
+    back: '/dashboard',
+  });
   // Layouts without a rail neither offer the toggle nor care about the attribute (topnav-compact).
   await post(admin, '/theme', {
     _csrf: csrfOf((await get(admin, '/theme')).html),

@@ -42,6 +42,12 @@ const label = $derived(collapsed ? t('shell.sidebar_expand') : t('shell.sidebar_
     const state = next;
     collapsed = state === 'collapsed';
     document.documentElement.setAttribute('data-sidebar', state);
+    // A rail has nowhere to put an open group, and an open one is exactly what tells the layout
+    // to stay wide — so collapsing closes them here, the same way the server would not render
+    // them open. (Load does not re-run: the point of this layer is that nothing reloads.)
+    if (state === 'collapsed')
+      for (const d of document.querySelectorAll<HTMLDetailsElement>('#sidebar-rail details[open]'))
+        d.open = false;
     // Nothing to re-render: no invalidation, and the redirect the action returns is ignored.
     return async () => {};
   }}

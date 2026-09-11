@@ -11,7 +11,13 @@ export type NavOrientation = 'vertical' | 'horizontal';
 
 export interface DashboardRegions {
   brand: Snippet;
-  nav: Snippet<[{ orientation: NavOrientation }]>;
+  /**
+   * `rail: true` says this nav IS the collapsible sidebar rail (F-8), not a menu that happens to
+   * be vertical: only then does the shell drop the labels to tooltips and stop pre-opening the
+   * active group — a mobile dropdown in the same layout must keep both. Optional, so layouts
+   * written before F-8 (module ones included) keep compiling and keep their old behaviour.
+   */
+  nav: Snippet<[{ orientation: NavOrientation; rail?: boolean }]>;
   header: Snippet;
   breadcrumb: Snippet;
   content: Snippet;
