@@ -1,8 +1,11 @@
 <script lang="ts">
+import { useT } from '$lib/i18n';
 import type { AuthRegions } from '$lib/layouts/types';
 
 /** `split-hero` — form on the left, brand panel on the right; stacks under lg. Auth pages. */
 let { brand, content, footer }: AuthRegions = $props();
+/** Panel copy is deploy-time branding: `landing.lead` ← APP_LANDING_LEAD, `shell.footer` ← APP_FOOTER_TITLE. */
+const t = useT();
 </script>
 
 <div class="grid min-h-dvh lg:grid-cols-2">
@@ -12,7 +15,7 @@ let { brand, content, footer }: AuthRegions = $props();
     <footer class="text-xs text-muted-foreground">{@render footer()}</footer>
   </div>
   <div class="hidden bg-primary text-primary-foreground lg:flex lg:flex-col lg:justify-end lg:p-16" aria-hidden="true">
-    <p class="text-3xl font-semibold leading-tight">Satu dashboard,<br />modul apa pun.</p>
-    <p class="mt-3 max-w-md text-primary-foreground/80">API-first, multi-tenant, tema yang mengubah warna, ikon, dan susunan halaman.</p>
+    <p class="text-3xl font-semibold leading-tight">{t('landing.lead')}</p>
+    <p class="mt-3 max-w-md text-primary-foreground/80">{t('shell.footer')}</p>
   </div>
 </div>
