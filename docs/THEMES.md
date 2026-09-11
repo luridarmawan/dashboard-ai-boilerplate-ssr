@@ -120,14 +120,21 @@ Tema yang tidak memetakan sebuah varian jatuh ke `default` miliknya dengan perin
 ## 5. Menambah tema baru
 
 ```bash
-cp -r packages/ui-theme/themes/base packages/ui-theme/themes/<id>
-# 1. ubah selektor [data-app-theme='base'] -> [data-app-theme='<id>'] di tokens.css
-# 2. ubah "id" dan "name" di theme.json
-# 3. pilih set ikon & layout (harus yang terdaftar)
-node packages/ui-theme/validate.mjs
+bun themegen senja --from warm --name "Senja" --name-en "Dusk"
 ```
 
-Validator akan memberi tahu persis apa yang kurang: token yang belum terdefinisi, set ikon atau layout yang tidak terdaftar, atau pasangan warna yang gagal kontras — lengkap dengan rasio yang didapat dan yang dibutuhkan.
+Generator (P-11) menurunkan tema baru dari tema yang **sudah** lolos kontrak, lalu **mendaftarkannya** — bagian yang tidak bisa dilakukan `cp -r`:
+
+1. `packages/ui-theme/themes/<id>/tokens.css` — salinan palet tema sumber dengan **seluruh** selektornya ditulis ulang ke id baru (blok terang dan gelap), jadi tidak ada sisa yang diam-diam masih menata tema sumber
+2. `packages/ui-theme/themes/<id>/theme.json` — id, nama, deskripsi, set ikon, dan peta layout (ikut tema sumber kecuali ditimpa `--icons` / `--layout-dashboard|public|auth`)
+3. **`packages/ui-theme/src/registry.ts`** — import manifest, disisipkan urut path supaya `bun run lint` tetap hijau, plus daftar tema bawaan
+4. **`apps/web/src/app.css`** — import tokens, sebelum blok tema modul
+
+Tanpa dua yang terakhir tema itu tidak pernah muncul di runtime dan tokennya tidak ikut ter-bundle. Langkah terakhir generator adalah `bun run theme:validate`, jadi yang dihasilkannya sudah lolos gate yang sama dengan tema tulis tangan. Set ikon atau layout yang tidak terdaftar ditolak **sebelum** ada berkas ditulis (L-5, L-8).
+
+Flag lain: `--module <Nama>` menulis tema ke `modules/<Nama>/themes/<id>` sebagai `<ns>.<id>` dan menjalankan `modules:sync` — **tanpa menyentuh satu pun berkas core** (titik perluasan 14); `--dry-run` hanya mencetak rencana; `--force` menimpa folder yang sudah ada; `--no-register` menulis berkas saja.
+
+Yang **masih pekerjaan Anda** sesudahnya: warnanya. Hasil generator adalah palet tema sumber — sunting `tokens.css`, lalu jalankan `bun run theme:validate` lagi. Validator memberi tahu persis apa yang kurang: token yang belum terdefinisi, set ikon atau layout yang tidak terdaftar, atau pasangan warna yang gagal kontras — lengkap dengan rasio yang didapat dan yang dibutuhkan. Ganti `--font-sans`? Tambahkan juga `@import "@fontsource/<font>/…"` di `apps/web/src/app.css` (§7: font di-host sendiri).
 
 Modul menyumbang tema lewat titik perluasan 14 dengan bentuk folder yang sama persis (§4.5). Tidak ada perlakuan istimewa untuk tema core.
 
