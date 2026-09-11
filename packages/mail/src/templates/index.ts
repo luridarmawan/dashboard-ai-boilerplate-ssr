@@ -101,13 +101,18 @@ function escapeHtml(s: string): string {
 }
 
 function shell(brand: Brand, locale: string, title: string, bodyHtml: string): string {
-  const logo = brand.logoUrl
-    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.appName)}" height="32" style="height:32px">`
-    : `<strong style="font-size:18px;color:${brand.primary}">${escapeHtml(brand.appName)}</strong>`;
+  // The app name always shows; with a logo it sits to its right, in a two-cell table because
+  // Outlook ignores flex and inline-block alignment. `alt=""` keeps the name from being read twice.
+  const name = `<strong style="font-size:18px;color:${brand.primary}">${escapeHtml(brand.appName)}</strong>`;
+  const header = brand.logoUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
+      `<td style="padding-right:12px;vertical-align:middle"><img src="${escapeHtml(brand.logoUrl)}" alt="" height="32" style="height:32px;display:block"></td>` +
+      `<td style="vertical-align:middle">${name}</td></tr></table>`
+    : name;
   return `<!doctype html><html lang="${locale}"><body style="margin:0;background:#f4f4f5;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#18181b">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:12px;overflow:hidden">
-<tr><td style="padding:24px 32px;border-bottom:4px solid ${brand.primary}">${logo}</td></tr>
+<tr><td style="padding:24px 32px;border-bottom:4px solid ${brand.primary}">${header}</td></tr>
 <tr><td style="padding:32px"><h1 style="margin:0 0 16px;font-size:20px">${escapeHtml(title)}</h1>${bodyHtml}</td></tr>
 <tr><td style="padding:16px 32px;background:#fafafa;color:#71717a;font-size:12px">${tr(locale, 'footer', { app: brand.appName })}</td></tr>
 </table></td></tr></table></body></html>`;

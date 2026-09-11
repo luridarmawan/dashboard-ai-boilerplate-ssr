@@ -28,6 +28,24 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(id.html).toContain('Acme Dash');
     expect(id.text).toContain('https://acme.test/auth/reset?token=abc');
   });
+  test('the header carries the app name, beside the logo when there is one', () => {
+    const plain = renderTemplate('invite', 'id', { link: 'https://acme.test/join/abc' }, brand);
+    expect(plain.html).toContain('>Acme Dash</strong>');
+    const withLogo = renderTemplate(
+      'invite',
+      'id',
+      { link: 'https://acme.test/join/abc' },
+      {
+        ...brand,
+        logoUrl: 'https://acme.test/logo.png',
+      },
+    );
+    const head = withLogo.html.slice(0, withLogo.html.indexOf('<h1'));
+    expect(head).toContain('https://acme.test/logo.png');
+    expect(head).toContain('>Acme Dash</strong>');
+    // The logo is decorative now that the name is spelled out next to it.
+    expect(head).toContain('alt=""');
+  });
   test('user-supplied text is escaped in HTML', () => {
     const r = renderTemplate(
       'contact',
