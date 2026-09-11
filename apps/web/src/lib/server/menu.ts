@@ -140,6 +140,15 @@ export const CORE_MENU: readonly Entry[] = [
     order: 46,
     group: 'monitoring',
   },
+  {
+    id: 'core.outbox',
+    label: { id: 'Outbox email', en: 'Email outbox' },
+    href: '/outbox',
+    icon: 'mail',
+    permission: 'mail.read',
+    order: 47,
+    group: 'monitoring',
+  },
 ];
 
 /** Every group that can exist: the core ones plus one per installed module. */

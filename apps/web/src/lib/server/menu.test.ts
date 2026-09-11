@@ -41,7 +41,11 @@ describe('buildMenu (F-3 groups)', () => {
       'Outgoing webhooks',
       'MCP servers',
     ]);
-    expect(labels(group(menu, 'monitoring')?.children ?? [])).toEqual(['Job queue', 'AI log']);
+    expect(labels(group(menu, 'monitoring')?.children ?? [])).toEqual([
+      'Job queue',
+      'Email outbox',
+      'AI log',
+    ]);
   });
 
   test('module entries without a group land in the module’s own group, titled from module.json', () => {

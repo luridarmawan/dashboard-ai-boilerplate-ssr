@@ -698,7 +698,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | ID | Kebutuhan |
 |---|---|
 | J-1 | **[P0]** Layanan email SMTP untuk: verifikasi email, reset password, undangan user, dan form kontak landing page (R-5). |
-| J-2 | **[P0]** Pola **outbox** — email ditulis ke tabel `outbox_email` lalu dikirim worker, dengan retry dan status. Benar-benar asinkron, tidak menahan request. |
+| J-2 | **[P0]** Pola **outbox** — email ditulis ke tabel `outbox_email` lalu dikirim worker, dengan retry dan status. Benar-benar asinkron, tidak menahan request. Isinya dipantau dari halaman `/outbox` (grup Pemantauan, izin `mail.read`): terbaru di atas, dengan filter status/template/rentang tanggal, pencarian penerima & subjek, dan aksi ulangi / kirim sekarang untuk pemegang `mail.manage`. |
 | J-3 | **[P0]** Template email mendukung i18n dan mengikuti brand (logo, warna dari token tema aktif). |
 | J-4 | **[P1]** Notifikasi dalam aplikasi (bell di header), lengkap dengan backend-nya. |
 | J-5 | **[P2]** Webhook keluar untuk event penting. |
