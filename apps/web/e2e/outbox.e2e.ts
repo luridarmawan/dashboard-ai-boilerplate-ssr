@@ -59,6 +59,14 @@ test('outbox: search, filter and deliver run over fetch, not page loads', async 
   await expect(page).toHaveURL(/[?&]limit=20/, { timeout: 10_000 });
   expect(await survived()).toBe(mark);
 
+  // Dates read DD/MM HH:MM on a 24-hour clock — no year, no seconds, no AM/PM. The full
+  // timestamp stays in `title`, so the short form loses nothing.
+  const firstDate = page.locator('[data-testid="outbox-row"] td').first();
+  if (await firstDate.count()) {
+    await expect(firstDate).toHaveText(/^\d{2}\/\d{2} \d{2}:\d{2}$/);
+    expect(await firstDate.getAttribute('title')).toBeTruthy();
+  }
+
   // "Deliver now" posts over fetch: a toast reports the worker pass and the URL stays put —
   // the no-JS path would have redirected to `?delivered=…` instead.
   const urlBefore = page.url();

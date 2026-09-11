@@ -25,8 +25,22 @@ let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props()
 const t = useT();
 const locale = useLocale() === 'en' ? 'en' : 'id';
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-const fmt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
+/**
+ * `DD/MM HH:MM`, always 24-hour. An outbox is scanned by day and minute — the year is noise in
+ * a column that repeats on every row — so it is built from the parts rather than left to
+ * `toLocaleString`, whose separators and 12/24-hour choice follow the locale. The full
+ * timestamp stays one hover away in `title`, so nothing is actually lost.
+ */
+const two = (n: number) => String(n).padStart(2, '0');
+const fmt = (iso: string | null) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return `${two(d.getDate())}/${two(d.getMonth() + 1)} ${two(d.getHours())}:${two(d.getMinutes())}`;
+};
+/** The unabridged value for `title`: full date, in the reader's locale. */
+const fmtFull = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '';
 const badge = (s: string): 'success' | 'secondary' | 'outline' | 'destructive' =>
   s === 'sent'
     ? 'success'
@@ -268,17 +282,17 @@ const paramOf = (location: string, key: string) => {
     <tbody>
       {#each data.rows as r (r.id)}
         <tr data-testid="outbox-row" data-status={r.status}>
-          <td class="whitespace-nowrap text-muted-foreground">{fmt(r.createdAt)}</td>
+          <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.createdAt)}>{fmt(r.createdAt)}</td>
           <td><span class="block">{r.to}</span>{#if r.toName}<span class="block text-xs text-muted-foreground">{r.toName}</span>{/if}</td>
           <td class="max-w-[22rem] truncate" title={r.subject}>{r.subject}</td>
           <td><code>{r.template}</code> <span class="text-xs text-muted-foreground">{r.locale}</span></td>
           <td>
             <Badge variant={badge(r.status)}>{label(r.status)}</Badge>
             {#if r.lastError}<span class="block max-w-[18rem] truncate text-xs text-destructive" title={r.lastError}>{r.lastError}</span>{/if}
-            {#if r.status === 'pending' && r.nextAttemptAt}<span class="block text-xs text-muted-foreground">{t('outbox.next_attempt')} {fmt(r.nextAttemptAt)}</span>{/if}
+            {#if r.status === 'pending' && r.nextAttemptAt}<span class="block text-xs text-muted-foreground" title={fmtFull(r.nextAttemptAt)}>{t('outbox.next_attempt')} {fmt(r.nextAttemptAt)}</span>{/if}
           </td>
           <td class="text-end">{r.attempts}</td>
-          <td class="whitespace-nowrap text-muted-foreground">{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
+          <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.sentAt)}>{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
           <td class="text-end whitespace-nowrap">
             {#if can('mail.manage') && r.status === 'failed'}
               <form
