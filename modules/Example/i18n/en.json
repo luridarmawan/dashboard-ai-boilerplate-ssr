@@ -98,5 +98,18 @@
   "example.pricing.business.f2": "Wholesale pricing",
   "example.pricing.business.f3": "Monthly invoicing",
   "example.contact.eyebrow": "Talk to us",
-  "example.contact.hours": "Mon–Sat, 09:00–17:00 WIB"
+  "example.contact.hours": "Mon–Sat, 09:00–17:00 WIB",
+  "example.catalog.title": "Product catalogue",
+  "example.catalog.lead": "Every product in one list — search it, sort it, open it. The same module’s second public arrangement (R-9).",
+  "example.catalog.to_storefront": "See the storefront",
+  "example.catalog.search": "Search products",
+  "example.catalog.search_hint": "Name or summary…",
+  "example.catalog.featured_only": "Featured only",
+  "example.catalog.apply": "Apply",
+  "example.catalog.reset": "Reset",
+  "example.catalog.sort": "Sort",
+  "example.catalog.sort_default": "Shop order",
+  "example.catalog.sort_name": "Name",
+  "example.catalog.sort_price": "Price",
+  "example.catalog.no_match": "No product matches this search."
 }

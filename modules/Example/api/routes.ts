@@ -116,13 +116,33 @@ export default defineApiRoutes(
             query.featured === '1' ? eq(schema.exampleProducts.featured, true) : undefined,
           ),
         );
-        const sorted = rows
-          .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name))
-          .slice(0, Number(query.limit ?? 50));
-        return page(sorted.map(view), pageMeta(1, sorted.length || 1, rows.length));
+        // R-9: the catalog arrangement searches and sorts the SAME rows the storefront shows.
+        // Filtering belongs to the API, not the browser — the no-JavaScript page must get the
+        // same answer as the enhanced one (L-20 over L-22).
+        const q = (query.q ?? '').trim().toLowerCase();
+        const found = q
+          ? rows.filter((r) => `${r.name} ${r.summary ?? ''}`.toLowerCase().includes(q))
+          : rows;
+        const dir = query.order === 'asc' ? 1 : -1;
+        const sorted = [...found].sort((a, b) => {
+          if (query.sort === 'price')
+            return (a.price - b.price) * dir || a.name.localeCompare(b.name);
+          if (query.sort === 'name') return a.name.localeCompare(b.name) * dir;
+          // Default: the merchandising order the admin set, exactly as before.
+          return a.sort - b.sort || a.name.localeCompare(b.name);
+        });
+        const limited = sorted.slice(0, Number(query.limit ?? 50));
+        return page(limited.map(view), pageMeta(1, limited.length || 1, found.length));
       },
       {
-        query: t.Object({ featured: t.Optional(t.String()), limit: t.Optional(t.String()) }),
+        query: t.Object({
+          featured: t.Optional(t.String()),
+          limit: t.Optional(t.String()),
+          /** Free-text search over name + summary (R-9). */
+          q: t.Optional(t.String({ maxLength: 191 })),
+          sort: t.Optional(t.Union([t.Literal('name'), t.Literal('price')])),
+          order: t.Optional(t.Union([t.Literal('asc'), t.Literal('desc')])),
+        }),
         response: { 200: PageSchema(Product), ...errorResponses },
         detail: { summary: 'Storefront products (public; default tenant unless X-Client-ID)' },
       },

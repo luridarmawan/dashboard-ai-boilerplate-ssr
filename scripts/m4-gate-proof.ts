@@ -218,6 +218,85 @@ const admin = new Jar();
   );
 }
 
+// ---- R-9: a SECOND public arrangement from the same module, and `/` may point at it ----
+{
+  const cat = await get(anon, '/catalog');
+  check(
+    'R-9 /catalog → 200, server-rendered from the same tables, arranged differently',
+    cat.res.status === 200 &&
+      cat.html.includes('data-testid="catalog-items"') &&
+      cat.html.includes('Gayo Arabika') &&
+      cat.html.includes('data-testid="catalog-filters"') &&
+      // …and it is NOT the storefront: that page's sections are simply not rendered here.
+      // (Marker must be MARKUP, not copy: the i18n catalogue itself ships in every page payload.)
+      !cat.html.includes('id="products"'),
+    `${cat.res.status}`,
+  );
+  check(
+    'R-9 SEO of its own: title, canonical /catalog, ItemList JSON-LD',
+    /<title>[^<]+<\/title>/.test(cat.html) &&
+      cat.html.includes(`${WEB}/catalog`) &&
+      cat.html.includes('"@type":"ItemList"'),
+  );
+  // The filter is the API's work, so it answers the same with JavaScript off (L-20 over L-22).
+  const rows = (html: string) => (html.match(/<li><a href="\/product\//g) ?? []).length;
+  const all = rows(cat.html);
+  const search = await get(anon, '/catalog?q=gayo');
+  const featured = await get(anon, '/catalog?featured=1');
+  const none = await get(anon, '/catalog?q=tidakadaproduksepertiini');
+  check(
+    'R-9 search, featured filter and sort work WITHOUT JavaScript (plain GET, server-side)',
+    rows(search.html) === 1 && rows(featured.html) < all && rows(featured.html) > 0,
+    `semua=${all} cari=${rows(search.html)} unggulan=${rows(featured.html)}`,
+  );
+  check(
+    'R-9 a search with no hits says so instead of showing everything',
+    rows(none.html) === 0 && none.html.includes('data-testid="catalog-empty"'),
+  );
+  const asc = await get(anon, '/catalog?sort=price&order=asc');
+  const desc = await get(anon, '/catalog?sort=price&order=desc');
+  const firstPrice = (html: string) =>
+    /<strong class="block text-foreground">([^<]+)<\/strong>/.exec(html)?.[1] ?? '';
+  check(
+    'R-9 sorting by price flips with `order`',
+    firstPrice(asc.html) !== '' && firstPrice(asc.html) !== firstPrice(desc.html),
+    `${firstPrice(asc.html)} vs ${firstPrice(desc.html)}`,
+  );
+  const sm = await get(anon, '/sitemap.xml', 'application/xml');
+  check('R-9 both arrangements are in the sitemap', sm.html.includes(`${WEB}/catalog`));
+
+  // F-5/F-7: which arrangement answers `/` is an admin's setting, not a deploy.
+  const settings = await get(admin, '/settings?scope=global');
+  const saved = await post(admin, '/settings?/save', {
+    _csrf: csrfOf(settings.html),
+    _scope: 'global',
+    _section: 'app',
+    _keys: ['app.landing_route'],
+    'app.landing_route': '/catalog',
+  });
+  const front = await get(anon, '/');
+  check(
+    'R-9 `app.landing_route=/catalog` → `/` serves the catalogue on the next request, no restart',
+    saved.res.status === 303 &&
+      front.res.status === 200 &&
+      front.res.headers.get('x-landing-route') === '/catalog' &&
+      front.html.includes('data-testid="catalog-items"'),
+    `${saved.res.status} ${front.res.headers.get('x-landing-route')}`,
+  );
+  const back = await get(admin, '/settings?scope=global');
+  await post(admin, '/settings?/save', {
+    _csrf: csrfOf(back.html),
+    _scope: 'global',
+    _section: 'app',
+    _keys: ['app.landing_route'],
+    'app.landing_route': '',
+  });
+  check(
+    'R-9 back to the default landing for whatever runs next',
+    (await get(anon, '/')).res.headers.get('x-landing-route') === '/example',
+  );
+}
+
 // ---- #4: Example disabled → app whole, / falls back ----
 {
   const modules = await get(admin, '/modules');
@@ -263,6 +342,8 @@ const admin = new Jar();
 }
 
 console.log(
-  failures === 0 ? '\nGATE M4 #1 #3 #4 (+R-3/R-4/F-7): LOLOS' : `\nGATE M4: GAGAL (${failures})`,
+  failures === 0
+    ? '\nGATE M4 #1 #3 #4 (+R-3/R-4/R-9/F-7): LOLOS'
+    : `\nGATE M4: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);

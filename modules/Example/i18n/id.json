@@ -98,5 +98,18 @@
   "example.pricing.business.f2": "Harga grosir",
   "example.pricing.business.f3": "Faktur bulanan",
   "example.contact.eyebrow": "Bicara dengan kami",
-  "example.contact.hours": "Senin–Sabtu, 09.00–17.00 WIB"
+  "example.contact.hours": "Senin–Sabtu, 09.00–17.00 WIB",
+  "example.catalog.title": "Katalog produk",
+  "example.catalog.lead": "Semua produk dalam satu daftar — cari, urutkan, buka detailnya. Susunan publik kedua dari modul yang sama (R-9).",
+  "example.catalog.to_storefront": "Lihat halaman toko",
+  "example.catalog.search": "Cari produk",
+  "example.catalog.search_hint": "Nama atau ringkasan…",
+  "example.catalog.featured_only": "Unggulan saja",
+  "example.catalog.apply": "Terapkan",
+  "example.catalog.reset": "Reset",
+  "example.catalog.sort": "Urutkan",
+  "example.catalog.sort_default": "Pilihan toko",
+  "example.catalog.sort_name": "Nama",
+  "example.catalog.sort_price": "Harga",
+  "example.catalog.no_match": "Tidak ada produk yang cocok dengan pencarian ini."
 }
