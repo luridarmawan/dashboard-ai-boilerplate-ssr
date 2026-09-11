@@ -399,6 +399,11 @@ const admin = new Jar();
     footerVariant(users.html) === 'wide' && footerLayout(users.html) === 'dummy.two-column',
     `${footerLayout(users.html)}/${footerVariant(users.html)}`,
   );
+  check(
+    '#5 a layout renders only the regions it was handed — no page fills `aside`, so no second column',
+    !dash.html.includes('id="dummy-second-column"') &&
+      !users.html.includes('id="dummy-second-column"'),
+  );
   // Mixing is free in the other direction too: the module theme's dashboard is a MODULE layout
   // while its auth shell is a CORE one. Checked anonymously — /auth/login redirects when logged in.
   await post(anon, '/theme', { _csrf: pickerCsrf, theme: 'dummy.ocean', mode: 'light', back: '/' });

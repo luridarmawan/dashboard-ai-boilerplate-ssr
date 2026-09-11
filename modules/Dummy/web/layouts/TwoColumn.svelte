@@ -5,8 +5,13 @@ import Icon from '$lib/components/Icon.svelte';
 
 /**
  * `dummy.two-column` — a layout contributed by a module. It only ARRANGES the regions core hands
- * it (§4.8): a slim icon rail on the left, header on top, content in a two-column grid. It does
- * not fetch, and it knows no module names — not even its own.
+ * it (§4.8): a slim icon rail on the left, header on top, content beside an optional second
+ * column. It does not fetch, and it knows no module names — not even its own.
+ *
+ * `aside` is OPTIONAL and no dashboard page fills it today, so the second column is rendered
+ * only when one is handed over — exactly like the core layouts. It used to render regardless,
+ * with placeholder text naming this module, which squeezed every page to two thirds of the
+ * width for a column that held nothing: a layout must not invent content it was not given.
  *
  * Under `md` the rail would stack ABOVE the header and push it off screen, so it is hidden there
  * and the nav moves into a menu button inside the header — which stays stuck to the top on every
@@ -51,11 +56,11 @@ let {
       <div class="ms-auto flex items-center gap-2">{@render header()}</div>
     </header>
     <div class="px-4 pt-3 text-sm text-muted-foreground">{@render breadcrumb()}</div>
-    <div class="grid flex-1 gap-6 px-4 pb-8 pt-2 lg:grid-cols-[2fr_1fr]">
+    <div class={`grid flex-1 gap-6 px-4 pb-8 pt-2 ${aside ? 'lg:grid-cols-[2fr_1fr]' : ''}`}>
       <main id="content" class="min-w-0">{@render content()}</main>
-      <aside id="dummy-second-column" class="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
-        {#if aside}{@render aside()}{:else}Kolom kedua layout <code>dummy.two-column</code> — disumbang modul Dummy.{/if}
-      </aside>
+      {#if aside}
+        <aside id="dummy-second-column" class="rounded-lg border bg-card p-4 text-sm text-muted-foreground">{@render aside()}</aside>
+      {/if}
     </div>
     <footer class="border-t px-4 py-3 text-xs text-muted-foreground">{@render footer()}</footer>
   </div>
