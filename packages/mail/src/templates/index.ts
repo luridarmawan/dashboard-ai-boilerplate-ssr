@@ -30,24 +30,20 @@ const T: Record<'id' | 'en', Dict> = {
   id: {
     hello: 'Halo {name},',
     'verify.subject': 'Verifikasi email Anda — {app}',
-    'verify.body':
-      'Terima kasih telah mendaftar. Klik tombol di bawah untuk memverifikasi alamat email Anda.',
+    'verify.body': 'Terima kasih telah mendaftar. Klik tombol di bawah untuk memverifikasi alamat email Anda.',
     'verify.cta': 'Verifikasi email',
     'reset.subject': 'Atur ulang kata sandi — {app}',
-    'reset.body':
-      'Kami menerima permintaan untuk mengatur ulang kata sandi Anda. Tautan ini berlaku 1 jam dan hanya sekali pakai.',
+    'reset.body': 'Kami menerima permintaan untuk mengatur ulang kata sandi Anda. Tautan ini berlaku 1 jam dan hanya sekali pakai.',
     'reset.cta': 'Atur ulang kata sandi',
     'set.subject': 'Selamat datang di {app} — atur kata sandi Anda',
-    'set.body':
-      'Akun Anda telah dibuat oleh administrator. Atur kata sandi Anda lewat tombol di bawah (berlaku 24 jam).',
+    'set.body': 'Akun Anda telah dibuat oleh administrator. Atur kata sandi Anda lewat tombol di bawah (berlaku 24 jam).',
     'set.cta': 'Atur kata sandi',
     'invite.subject': 'Undangan bergabung ke {tenant} — {app}',
     'invite.body': '{inviter} mengundang Anda bergabung ke {tenant}.',
     'invite.cta': 'Terima undangan',
     'invite.expires': 'Tautan ini berlaku {hours} jam.',
     'invite_existing.subject': 'Anda sudah punya akun di {app}',
-    'invite_existing.body':
-      '{inviter} mengundang Anda bergabung ke {tenant}. Alamat email ini sudah terdaftar, jadi cukup masuk dengan akun Anda — tenant tersebut sudah ditambahkan. Lupa kata sandi? Gunakan "Lupa kata sandi" di halaman masuk.',
+    'invite_existing.body': '{inviter} mengundang Anda bergabung ke {tenant}. Alamat email ini sudah terdaftar, jadi cukup masuk dengan akun Anda — tenant tersebut sudah ditambahkan. Lupa kata sandi? Gunakan "Lupa kata sandi" di halaman masuk.',
     'invite_existing.cta': 'Masuk',
     'contact.subject': 'Pesan baru dari {name} — {app}',
     'contact.body': 'Pesan masuk lewat formulir kontak:',
@@ -62,20 +58,17 @@ const T: Record<'id' | 'en', Dict> = {
     'verify.body': 'Thanks for signing up. Click the button below to verify your email address.',
     'verify.cta': 'Verify email',
     'reset.subject': 'Reset your password — {app}',
-    'reset.body':
-      'We received a request to reset your password. This link is valid for 1 hour and can be used once.',
+    'reset.body': 'We received a request to reset your password. This link is valid for 1 hour and can be used once.',
     'reset.cta': 'Reset password',
     'set.subject': 'Welcome to {app} — set your password',
-    'set.body':
-      'An administrator created your account. Set your password with the button below (valid 24 hours).',
+    'set.body': 'An administrator created your account. Set your password with the button below (valid 24 hours).',
     'set.cta': 'Set password',
     'invite.subject': 'You are invited to {tenant} — {app}',
     'invite.body': '{inviter} invited you to join {tenant}.',
     'invite.cta': 'Accept invitation',
     'invite.expires': 'This link is valid for {hours} hours.',
     'invite_existing.subject': 'You already have an account at {app}',
-    'invite_existing.body':
-      '{inviter} invited you to join {tenant}. This e-mail address is already registered, so simply sign in with your account — that tenant has been added for you. Forgot your password? Use "Forgot password" on the sign-in page.',
+    'invite_existing.body': '{inviter} invited you to join {tenant}. This e-mail address is already registered, so simply sign in with your account — that tenant has been added for you. Forgot your password? Use "Forgot password" on the sign-in page.',
     'invite_existing.cta': 'Sign in',
     'contact.subject': 'New message from {name} — {app}',
     'contact.body': 'A message arrived through the contact form:',
@@ -106,8 +99,8 @@ function shell(brand: Brand, locale: string, title: string, bodyHtml: string): s
   const name = `<strong style="font-size:18px;color:${brand.primary}">${escapeHtml(brand.appName)}</strong>`;
   const header = brand.logoUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
-      `<td style="padding-right:12px;vertical-align:middle"><img src="${escapeHtml(brand.logoUrl)}" alt="" height="32" style="height:32px;display:block"></td>` +
-      `<td style="vertical-align:middle">${name}</td></tr></table>`
+    `<td style="padding-right:12px;vertical-align:middle"><img src="${escapeHtml(brand.logoUrl)}" alt="" height="32" style="height:32px;display:block"></td>` +
+    `<td style="vertical-align:middle">${name}</td></tr></table>`
     : name;
   return `<!doctype html><html lang="${locale}"><body style="margin:0;background:#f4f4f5;font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#18181b">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
