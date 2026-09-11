@@ -86,6 +86,16 @@ const envSchema = z
       .enum(['true', 'false'])
       .optional()
       .transform((v) => (v === undefined ? undefined : v === 'true')),
+    /**
+     * One live session per user (A-5). With `true`, a successful login revokes every OTHER session
+     * of that account server-side — the previous browser is signed out on its very next request.
+     * Off by default: signing in on a phone must not end the session on a laptop unless a
+     * deployment says so.
+     */
+    SINGLE_LOGIN_ENABLE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     /** Session lifetime; the cookie and the row expire together (A-3). */
     SESSION_TTL_HOURS: z.coerce
       .number()

@@ -128,6 +128,12 @@ export async function issueSession(p: {
       ((await settings.get<number | null>(null, 'security.session_hours')) ?? e.SESSION_TTL_HOURS) *
       3600,
   });
+  /**
+   * Single login (SINGLE_LOGIN_ENABLE): this session becomes the ONLY one. Every other session of
+   * the account is revoked server-side, so the other browser is signed out on its next request
+   * (A-5) rather than merely losing its cookie. Off = the usual many-devices behaviour.
+   */
+  const revoked = e.SINGLE_LOGIN_ENABLE ? await revokeAllSessions(p.db, p.user.id, session.id) : 0;
   await p.db
     .update(schema.users)
     .set({ last_login_at: new Date() })
@@ -137,6 +143,12 @@ export async function issueSession(p: {
     ...cookieAttributes(p.request),
     expires: session.expiresAt,
   });
+  const after = {
+    ...(p.mfa ? { mfa: p.mfa } : {}),
+    ...(p.sso ? { sso: p.sso } : {}),
+    ...(revoked ? { singleLoginRevoked: revoked } : {}),
+  };
+  const detail = Object.keys(after).length ? after : undefined;
   await writeAudit(p.db, {
     clientId,
     actorId: p.user.id,
@@ -145,10 +157,7 @@ export async function issueSession(p: {
     resourceId: p.user.id,
     ip: p.ip,
     requestId: p.requestId,
-    after:
-      p.mfa || p.sso
-        ? { ...(p.mfa ? { mfa: p.mfa } : {}), ...(p.sso ? { sso: p.sso } : {}) }
-        : undefined,
+    after: detail,
   });
   return { user: publicUser(p.user), clientId };
 }

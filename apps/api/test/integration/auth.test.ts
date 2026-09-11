@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import { resetEnvCache } from '@core/config';
 import { desc, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 
@@ -234,5 +235,36 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
     const c = sessionCookie(login);
     expect((await call('/v1/auth/logout', { method: 'POST' }, [c])).status).toBe(200);
     expect((await call('/v1/auth/me', {}, [c])).status).toBe(401);
+  });
+
+  test('SINGLE_LOGIN_ENABLE=true: the newest login is the only live session', async () => {
+    const pw = 'another fine password 2';
+    const signIn = async () =>
+      sessionCookie(
+        await call('/v1/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password: pw }),
+        }),
+      );
+    const first = await signIn();
+    expect((await call('/v1/auth/me', {}, [first])).status).toBe(200);
+
+    let second = '';
+    process.env.SINGLE_LOGIN_ENABLE = 'true';
+    resetEnvCache();
+    try {
+      second = await signIn();
+      expect(second).not.toBe(first);
+      expect((await call('/v1/auth/me', {}, [first])).status).toBe(401); // revoked, not just cookie-less
+      expect((await call('/v1/auth/me', {}, [second])).status).toBe(200);
+    } finally {
+      delete process.env.SINGLE_LOGIN_ENABLE;
+      resetEnvCache();
+    }
+
+    // Default (off): a second device does not end the first one's session.
+    const third = await signIn();
+    expect((await call('/v1/auth/me', {}, [second])).status).toBe(200);
+    expect((await call('/v1/auth/me', {}, [third])).status).toBe(200);
   });
 });
