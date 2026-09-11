@@ -8,7 +8,7 @@
 
 ## Apa yang dikirim
 
-Setiap **event inti** yang menyangkut sebuah tenant — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled`, `notification.created` — diantrekan untuk semua webhook aktif tenant itu yang berlangganan event tersebut (atau `*`). Event tanpa tenant (`system.ping`, konfigurasi global) tidak dikirim: webhook milik tenant. Pengiriman berjalan di luar jalur request: baris antrean dibuat saat event terjadi, lalu dikirim segera oleh proses yang sama dan disapu ulang tiap menit oleh job `core.webhooks.deliver`.
+Setiap **event inti** yang menyangkut sebuah tenant — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled`, `notification.created`, `job.started`, `job.finished` — diantrekan untuk semua webhook aktif tenant itu yang berlangganan event tersebut (atau `*`). Event tanpa tenant (`system.ping`, konfigurasi global) tidak dikirim: webhook milik tenant. Pengiriman berjalan di luar jalur request: baris antrean dibuat saat event terjadi, lalu dikirim segera oleh proses yang sama dan disapu ulang tiap menit oleh job `core.webhooks.deliver`.
 
 Permintaan yang diterima tujuan:
 
@@ -23,6 +23,16 @@ X-DAB-Signature: sha256=…        # HMAC-SHA256(secret, "<timestamp>.<body>")
 
 {"id":"01a0…","event":"user.created","occurredAt":"2026-09-08T09:00:00.000Z","clientId":"…","requestId":"…","data":{"userId":"…","clientId":"…"}}
 ```
+
+### Event job (antrean ad-hoc)
+
+`job.started` dan `job.finished` terbit sekali **per percobaan** baris `queue_jobs` (lihat [`JOBS-QUEUE.md`](./JOBS-QUEUE.md)): mulai saat worker berhasil mengklaim baris, selesai saat percobaan itu berakhir dengan `status` yang menjadi nasib barisnya — `done`, `retried` (masih ada sisa percobaan), atau `dead` (habis `maxAttempts`). Jadi satu job yang gagal dua kali lalu sukses mengirim tiga pasang event, bukan satu.
+
+```json
+{"event":"job.finished","data":{"jobId":"01a0…","name":"billing.invoice.render","clientId":"…","attempt":2,"maxAttempts":5,"status":"done","durationMs":812,"error":null}}
+```
+
+Hanya job yang di-`enqueue` dengan `clientId` yang sampai ke webhook — job tanpa tenant (pemeliharaan inti) tetap internal, sama seperti event lain. Worker yang mati meninggalkan baris `running`; saat lease-nya kedaluwarsa, pass berikutnya yang memulihkannya mengirim `job.finished` (`retried`/`dead`, `error: "lease habis …"`) agar penerima tidak menunggu akhir yang tak pernah datang. Job berkala (`jobs.ts` / `defineJobs`, G-18) **tidak** menerbitkan event ini: ia milik proses, bukan tenant.
 
 ## Verifikasi di penerima
 

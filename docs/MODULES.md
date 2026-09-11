@@ -69,7 +69,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 6 | Konfigurasi | `config.ts` (`defineConfig`) → section di `/settings`, `settings.get()` | `modules/AI/config.ts` | `scripts/m3-gate-proof.ts` |
 | 7 | i18n | `i18n/<locale>.json`, kunci `<ns>.*`, `t('<ns>.x')` di halaman | `modules/Example/i18n/` | m6 proof: halaman berganti bahasa lewat `/lang` |
 | 8 | Tool AI / MCP | `api/tools.ts` (`defineTools`) → ditawarkan ke asisten AI (function calling) dan `GET/POST /v1/tools`; izin + tenant ditegakkan registry core (I-3, I-6) | `modules/Example/api/tools.ts`, `modules/Dummy/api/tools.ts` | `apps/api/test/integration/tools.test.ts` (I-6), tes modul AI (loop tool stream & non-stream), m6 proof: tool tidak ditawarkan bagi user tanpa izin |
-| 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
+| 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled`, `job.started`, `job.finished` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
 | 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
 | 12 | Job terjadwal | `jobs.ts` (`defineJobs`) — sekali per interval di semua instance | `modules/AI/jobs.ts` | `bun scheduler:proof` (M0 #6), m6 proof: terdaftar saat boot |
@@ -392,7 +392,7 @@ export default defineHooks('Billing', {
 });
 ```
 
-Event yang tersedia dan payload-nya adalah **kontrak** (`CoreEventPayloads` di `@core/module-kit`): `user.created` · `user.deleted` · `tenant.switched` · `config.saved` · `module.toggled` · `system.ping`. Nama yang tidak dikenal ditolak saat definisi dan saat sync. Handler dijalankan **berurutan sesuai urutan init modul** setelah aksi inti berhasil; handler yang melempar **dicatat dan tidak menggagalkan aksi** (G-7) — jangan mengandalkan hook untuk membatalkan sesuatu.
+Event yang tersedia dan payload-nya adalah **kontrak** (`CoreEventPayloads` di `@core/module-kit`): `user.created` · `user.deleted` · `tenant.switched` · `config.saved` · `module.toggled` · `notification.created` · `job.started` · `job.finished` · `system.ping`. Nama yang tidak dikenal ditolak saat definisi dan saat sync. Handler dijalankan **berurutan sesuai urutan init modul** setelah aksi inti berhasil; handler yang melempar **dicatat dan tidak menggagalkan aksi** (G-7) — jangan mengandalkan hook untuk membatalkan sesuatu.
 
 ### `jobs.ts` — pekerjaan berkala (titik perluasan 12)
 
@@ -453,7 +453,7 @@ await enqueue('billing.invoice.render', { invoiceId }, {
 });
 ```
 
-Worker `core.queue.work` (tiap 10 detik, plus *nudge* segera setelah enqueue) mengklaim baris yang jatuh tempo dengan satu UPDATE bersyarat — di `--scale api=3` setiap baris tetap dijalankan **sekali** — urut prioritas tertinggi lalu `run_at`. Handler yang melempar atau melewati `timeoutMs` dicoba lagi dengan backoff 10 dtk → 1 → 5 → 30 mnt → 2 jam; setelah `maxAttempts` barisnya menjadi **dead-letter** yang tampil di **Antrean pekerjaan** (`/queue`, izin `queue.read`; `queue.manage` untuk *Ulangi*/hapus, teraudit). `dedupeKey` menolak enqueue kedua selagi yang pertama pending/running. Lease yang kedaluwarsa (worker mati) dipulihkan pada pass berikutnya. Baris selesai/dead dipangkas retensi `logs.queue_retention_days`. Metrik: `queue_jobs_total{name,status}`, `queue_job_duration_seconds`. Bukti: `apps/api/test/integration/queue.test.ts`.
+Worker `core.queue.work` (tiap 10 detik, plus *nudge* segera setelah enqueue) mengklaim baris yang jatuh tempo dengan satu UPDATE bersyarat — di `--scale api=3` setiap baris tetap dijalankan **sekali** — urut prioritas tertinggi lalu `run_at`. Handler yang melempar atau melewati `timeoutMs` dicoba lagi dengan backoff 10 dtk → 1 → 5 → 30 mnt → 2 jam; setelah `maxAttempts` barisnya menjadi **dead-letter** yang tampil di **Antrean pekerjaan** (`/queue`, izin `queue.read`; `queue.manage` untuk *Ulangi*/hapus, teraudit). `dedupeKey` menolak enqueue kedua selagi yang pertama pending/running. Lease yang kedaluwarsa (worker mati) dipulihkan pada pass berikutnya. Baris selesai/dead dipangkas retensi `logs.queue_retention_days`. Metrik: `queue_jobs_total{name,status}`, `queue_job_duration_seconds`. Setiap percobaan menerbitkan `job.started` lalu `job.finished` (`status`: `done`/`retried`/`dead`) di bus inti, jadi modul lain bisa mendengarnya lewat `hooks.ts` dan baris ber-`clientId` ikut terkirim ke webhook keluar tenant itu ([`WEBHOOKS.md`](./WEBHOOKS.md)). Bukti: `apps/api/test/integration/queue.test.ts`.
 
 ### Berkas unggahan dari modul (Q-16)
 

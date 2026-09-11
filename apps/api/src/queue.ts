@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, lt, lte, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
 import { metrics } from './metrics.ts';
+import { emit } from './services.ts';
 
 /**
  * Ad-hoc job queue (PRD P2): run a named task later, off the request path, with retries.
@@ -16,6 +17,10 @@ import { metrics } from './metrics.ts';
  *
  * Unlike scheduled jobs (G-18, periodic, no payload) this is for work that happens because of
  * something: an import, a report, a bulk email, a slow third-party call.
+ *
+ * Every attempt emits `job.started` and then `job.finished` (`done` / `retried` / `dead`) on the
+ * core bus (G-17), so modules can hook them and rows carrying a `clientId` reach that tenant's
+ * outgoing webhooks (J-5).
  */
 export type QueueRow = typeof schema.queueJobs.$inferSelect;
 export type QueueStatus = 'pending' | 'running' | 'done' | 'dead';
@@ -221,6 +226,18 @@ export async function workQueueOnce(limit = 20, now = new Date()): Promise<WorkR
         out.dead++;
         jobsTotal.inc({ name: row.name, status: 'dead' });
       }
+      // The instance that started this attempt is gone, so nobody emitted its end: do it here,
+      // otherwise a listener that saw `job.started` would wait forever for a job that is `dead`.
+      emit('job.finished', {
+        jobId: row.id,
+        name: row.name,
+        clientId: row.client_id,
+        attempt: row.attempts,
+        maxAttempts: row.max_attempts,
+        status: dead ? 'dead' : 'retried',
+        durationMs: row.started_at ? now.getTime() - row.started_at.getTime() : 0,
+        error: `lease habis (instance ${row.locked_by ?? '?'} tidak selesai)`,
+      });
     }
   }
   const due = await db
@@ -251,6 +268,15 @@ export async function workQueueOnce(limit = 20, now = new Date()): Promise<WorkR
     out.picked++;
     const attempt = row.attempts + 1;
     const started = performance.now();
+    // Events (G-17): one `job.started` per attempt, one `job.finished` with what the row became.
+    // Rows with a `clientId` also reach that tenant's webhooks (J-5); global rows stay internal.
+    emit('job.started', {
+      jobId: row.id,
+      name: row.name,
+      clientId: row.client_id,
+      attempt,
+      maxAttempts: row.max_attempts,
+    });
     // One timer drives both the handler's signal and the race; cleared in `finally` so a handler
     // that finished in time never leaves a rejecting promise behind.
     const ac = new AbortController();
@@ -287,6 +313,16 @@ export async function workQueueOnce(limit = 20, now = new Date()): Promise<WorkR
         .where(eq(schema.queueJobs.id, row.id));
       out.done++;
       jobsTotal.inc({ name: row.name, status: 'done' });
+      emit('job.finished', {
+        jobId: row.id,
+        name: row.name,
+        clientId: row.client_id,
+        attempt,
+        maxAttempts: row.max_attempts,
+        status: 'done',
+        durationMs: Math.round(performance.now() - started),
+        error: null,
+      });
     } catch (err) {
       const message = (err instanceof Error ? err.message : String(err)).slice(0, 2000);
       const dead = attempt >= row.max_attempts;
@@ -320,6 +356,16 @@ export async function workQueueOnce(limit = 20, now = new Date()): Promise<WorkR
           error: message,
         });
       }
+      emit('job.finished', {
+        jobId: row.id,
+        name: row.name,
+        clientId: row.client_id,
+        attempt,
+        maxAttempts: row.max_attempts,
+        status: dead ? 'dead' : 'retried',
+        durationMs: Math.round(performance.now() - started),
+        error: message,
+      });
     } finally {
       clearTimeout(timedOut);
       jobDuration.observeMs({ name: row.name }, performance.now() - started);

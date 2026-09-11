@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
 import { type Db, eq, schema, unsafeAcrossTenants } from '@core/db';
+import { createEventBus } from '@core/runtime';
 import { app } from '../../src/app.ts';
 import {
   BACKOFF_S,
@@ -10,12 +11,14 @@ import {
   unregisterTask,
   workQueueOnce,
 } from '../../src/queue.ts';
+import { setBus } from '../../src/services.ts';
 
 /**
  * Integration (INTEGRATION=1): the ad-hoc job queue (PRD P2). Due rows run by priority; a failing
  * handler is retried on the backoff schedule and dead-lettered after maxAttempts; a dedupe key
- * drops duplicates while one is pending; a lease that expires is recovered; the admin API lists
- * in scope, retries dead letters (attempts reset) and deletes; permissions apply.
+ * drops duplicates while one is pending; a lease that expires is recovered; every attempt emits
+ * `job.started` / `job.finished` on the core bus; the admin API lists in scope, retries dead
+ * letters (attempts reset) and deletes; permissions apply.
  */
 const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
@@ -252,6 +255,57 @@ describe.skipIf(!enabled)('ad-hoc job queue (P2): priority, retry, dead-letter, 
     expect((await call(`/v1/queue/${dead?.id}/retry`, { method: 'POST' }, [member])).status).toBe(
       403,
     );
+  });
+
+  test('every attempt emits job.started and job.finished with what the row became', async () => {
+    type Ev = { event: string; jobId: string; status?: string; attempt: number };
+    const seen: Ev[] = [];
+    const bus = createEventBus({ log: () => {} });
+    for (const event of ['job.started', 'job.finished'] as const)
+      bus.on(event, (p) => {
+        seen.push({ event, ...(p as Omit<Ev, 'event'>) });
+      });
+    setBus(bus);
+    // `emit` is fire-and-forget, so the assertions wait for the bus to catch up with the worker.
+    const eventsOf = async (id: string, want: number) => {
+      for (let i = 0; i < 40 && seen.filter((e) => e.jobId === id).length < want; i++)
+        await new Promise((r) => setTimeout(r, 25));
+      return seen.filter((e) => e.jobId === id);
+    };
+    try {
+      const past = new Date(Date.now() - 60_000);
+      const okJob = await enqueue(T_OK, { tag: 'evt' }, { runAt: past, clientId: tenantId });
+      await workQueueOnce(50);
+      await settled(db, okJob.id);
+      const okEvents = await eventsOf(okJob.id, 2);
+      expect(okEvents.map((e) => e.event)).toEqual(['job.started', 'job.finished']);
+      expect(okEvents[0]).toMatchObject({ attempt: 1 });
+      expect(okEvents[1]).toMatchObject({ status: 'done', attempt: 1 });
+      expect((okEvents[1] as unknown as { clientId: string }).clientId).toBe(tenantId);
+      expect((okEvents[1] as unknown as { durationMs: number }).durationMs).toBeGreaterThanOrEqual(
+        0,
+      );
+
+      // A failing task ends `retried` while attempts remain, `dead` on the last one.
+      const bad = await enqueue(T_FAIL, { n: 1 }, { runAt: past, clientId: tenantId });
+      for (let i = 0; i < 3; i++) {
+        await db
+          .update(schema.queueJobs)
+          .set({ run_at: past })
+          .where(eq(schema.queueJobs.id, bad.id));
+        await workQueueOnce(50);
+        await settled(db, bad.id);
+      }
+      const badEvents = await eventsOf(bad.id, 6);
+      expect(badEvents.filter((e) => e.event === 'job.started').length).toBe(3);
+      expect(badEvents.filter((e) => e.event === 'job.finished').map((e) => e.status)).toEqual([
+        'retried',
+        'retried',
+        'dead',
+      ]);
+    } finally {
+      setBus(createEventBus({ log: () => {} }));
+    }
   });
 
   test('the admin list is paged: page 2 is reachable and the total comes from the database', async () => {

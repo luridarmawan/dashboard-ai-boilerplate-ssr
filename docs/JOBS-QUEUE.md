@@ -32,9 +32,9 @@ registerTask  →  enqueue  →  queue_jobs (pending)  →  workQueueOnce claim 
                                               ↑ nudge 50ms + tiap 10 dtk
 ```
 
-1. **Daftar handler saat boot.** Setiap instance memanggil `registerTask()` yang sama, jadi instance mana pun boleh mengklaim baris mana pun (`apps/api/src/queue.ts:78`).
-2. **Tulis baris dari route.** `enqueue()` menulis `name, payload, priority, run_at, dedupe_key, max_attempts` (`apps/api/src/queue.ts:102`). `dedupeKey` menolak enqueue kedua selagi ada baris `pending/running` dengan kunci sama.
-3. **Klaim dan jalankan.** `workQueueOnce()` (`apps/api/src/queue.ts:196`) memulihkan lease kedaluwarsa lalu mengklaim baris jatuh tempo (`run_at <= now`) urut `priority DESC, run_at ASC, created_at ASC` dengan **satu `UPDATE ... WHERE status='pending'` bersyarat** — di `--scale api=3` setiap baris tetap dieksekusi sekali (`apps/api/src/queue.ts:240`).
+1. **Daftar handler saat boot.** Setiap instance memanggil `registerTask()` yang sama, jadi instance mana pun boleh mengklaim baris mana pun (`apps/api/src/queue.ts:83`).
+2. **Tulis baris dari route.** `enqueue()` menulis `name, payload, priority, run_at, dedupe_key, max_attempts` (`apps/api/src/queue.ts:107`). `dedupeKey` menolak enqueue kedua selagi ada baris `pending/running` dengan kunci sama.
+3. **Klaim dan jalankan.** `workQueueOnce()` (`apps/api/src/queue.ts:201`) memulihkan lease kedaluwarsa lalu mengklaim baris jatuh tempo (`run_at <= now`) urut `priority DESC, run_at ASC, created_at ASC` dengan **satu `UPDATE ... WHERE status='pending'` bersyarat** — di `--scale api=3` setiap baris tetap dieksekusi sekali (`apps/api/src/queue.ts:260`).
 
 ## 3. Kontrak task
 
@@ -63,7 +63,7 @@ await enqueue('billing.invoice.render', { invoiceId }, {
 });
 ```
 
-Aturan nama: `NAME_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$/` (`apps/api/src/queue.ts:63`) — wajib `<ns>.<task>` (`core.*` atau `<modul>.*`). Daftar terdaftar bisa dilihat di `GET /v1/queue → tasks` dan halaman `/queue`.
+Aturan nama: `NAME_RE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$/` (`apps/api/src/queue.ts:68`) — wajib `<ns>.<task>` (`core.*` atau `<modul>.*`). Daftar terdaftar bisa dilihat di `GET /v1/queue → tasks` dan halaman `/queue`.
 
 ```ts
 // util lain
@@ -82,22 +82,36 @@ pending → running → done
 running --lease habis--> pending/dead (dipulihkan pass berikutnya)
 ```
 
-* **Sukses:** `status='done'`, `result` disimpan (JSON, dipotong 4000 karakter, `safeResult()` `apps/api/src/queue.ts:169`).
-* **Gagal/timeout:** `last_error` diisi, `run_at` dijadwalkan ulang dengan `BACKOFF_S = [10, 60, 300, 1800, 7200]` detik (`apps/api/src/queue.ts:58`). Setelah `attempt >= max_attempts` → `dead`.
-* **Lease kedaluwarsa:** worker yang mati meninggalkan `running` lewat `locked_until`; pass berikutnya mengembalikan ke `pending` (atau `dead`) (`apps/api/src/queue.ts:200`).
+* **Sukses:** `status='done'`, `result` disimpan (JSON, dipotong 4000 karakter, `safeResult()` `apps/api/src/queue.ts:174`).
+* **Gagal/timeout:** `last_error` diisi, `run_at` dijadwalkan ulang dengan `BACKOFF_S = [10, 60, 300, 1800, 7200]` detik (`apps/api/src/queue.ts:63`). Setelah `attempt >= max_attempts` → `dead`.
+* **Lease kedaluwarsa:** worker yang mati meninggalkan `running` lewat `locked_until`; pass berikutnya mengembalikan ke `pending` (atau `dead`) (`apps/api/src/queue.ts:205`).
 
 Kolom penting `queue_jobs` (`packages/db/schema/queue_jobs.def.ts:10`): `name, payload(json), client_id, priority, status(pending|running|done|dead), attempts, max_attempts, run_at, locked_by, locked_until, last_error, dedupe_key, request_id, started_at, finished_at, result(json)`. Tabel **global** (`tenant: false`) dengan `client_id` informasional; worker bersifat process-level.
 
-## 5. Operasional
+## 5. Event siklus hidup
+
+Setiap percobaan menerbitkan dua event inti di bus (G-17), jadi modul bisa mendengarnya lewat `hooks.ts` dan baris ber-`clientId` otomatis sampai ke webhook keluar tenant itu (J-5, [`WEBHOOKS.md`](./WEBHOOKS.md)):
+
+| Event | Kapan | Payload |
+|---|---|---|
+| `job.started` | klaim `pending → running` berhasil | `jobId, name, clientId, attempt, maxAttempts` |
+| `job.finished` | percobaan itu berakhir | di atas + `status` (`done` \| `retried` \| `dead`), `durationMs`, `error` |
+
+* **Sekali per percobaan, bukan per baris.** Job yang gagal dua kali lalu sukses menerbitkan tiga pasang `started`/`finished` (`retried`, `retried`, `done`).
+* **Lease kedaluwarsa** (worker mati): pass yang memulihkan baris menerbitkan `job.finished` dengan `error: "lease habis …"` dan `status` `retried`/`dead` — `job.started`-nya sudah terbit di instance yang hilang, dan pendengar tidak boleh menunggu akhir yang tak pernah datang.
+* **`clientId` opsional.** Baris tanpa tenant (pemeliharaan inti) tetap menerbitkan event, tapi `enqueueEvent` tidak mengirimnya ke webhook mana pun — webhook milik tenant.
+* Job berkala (`defineJobs`, G-18) tidak memakai event ini; status jalannya ada di `scheduler_runs` dan metrik `job_runs_total`.
+
+## 6. Operasional
 
 * **Skala horizontal:** tanpa Redis. Klaim kondisional + `locked_by/locked_until` membuat `--scale api=N` aman.
-* **Nudge:** `nudgeQueue()` (`apps/api/src/queue.ts:339`) single-flight per proses, `setTimeout 50ms → workQueueOnce()`, jadi enqueue yang jatuh tempo dieksekusi dalam <1 detik tanpa menunggu tick 10 dtk.
+* **Nudge:** `nudgeQueue()` (`apps/api/src/queue.ts:385`) single-flight per proses, `setTimeout 50ms → workQueueOnce()`, jadi enqueue yang jatuh tempo dieksekusi dalam <1 detik tanpa menunggu tick 10 dtk.
 * **Halaman `/queue`:** strip hitungan per status (diagregasi database dengan `GROUP BY`, bukan ditarik ke memori), daftar task yang dikenal build ini, dan **paginasi `?page=`** — 50 baris per halaman, tautan biasa yang tetap jalan tanpa JavaScript. Filter halaman hanya `?status=`; `name` dan `limit` (maks 200) ada di API tapi belum dipakai halaman. Respons `GET /v1/queue` menyertakan `counts` per status dan `meta { page, limit, total, totalPages }`.
 * **Aksi:** **Ulangi** (retry) muncul untuk baris `dead`, **Hapus** untuk semua kecuali `running`. Keduanya teraudit (`queue.retry`, `queue.delete`) dan scope tenant: superadmin melihat semua, lainnya `client_id = aktif OR NULL` (`apps/api/src/domains/queue.ts:71`).
 * **Retensi:** baris `done/dead` dipangkas job `core.logs.retention` sesuai `logs.queue_retention_days`.
-* **Metrik:** `queue_jobs_total{name,status}` (`enqueued|done|retried|dead`) dan `queue_job_duration_seconds{name}` di `GET /metrics` (`apps/api/src/queue.ts:65`).
+* **Metrik:** `queue_jobs_total{name,status}` (`enqueued|done|retried|dead`) dan `queue_job_duration_seconds{name}` di `GET /metrics` (`apps/api/src/queue.ts:70`).
 
-## 6. Apakah sudah dipakai
+## 7. Apakah sudah dipakai
 
 **Belum ada pemanggil produksi.** `grep` `registerTask|enqueue` di `modules/` tidak menghasilkan pemanggil (hanya `controller.enqueue` untuk SSE di `modules/AI/api/routes.ts:1020`). Satu-satunya pemanggil nyata adalah test:
 
@@ -106,14 +120,14 @@ Kolom penting `queue_jobs` (`packages/db/schema/queue_jobs.def.ts:10`): `name, p
 
 Contoh di `docs/MODULES.md:444` (`billing.invoice.render`) adalah ilustrasi kontrak, bukan implementasi. Modul `AI`/`Example`/`Dummy` memakai `defineJobs` (job berkala) bukan antrean ini.
 
-## 7. Kapan memakai apa
+## 8. Kapan memakai apa
 
 * **Perlu payload & dipicu kejadian** (impor, render, kirim massal) → antrean ad-hoc ini.
 * **Perlu berjalan tiap interval tanpa payload** (sapu harian, pengingat) → `jobs.ts` / `defineJobs` (`modules/AI/jobs.ts`).
 * **Kirim email** → `enqueueEmail()` (outbox).
 * **Kirim webhook** → `enqueueEvent()` — event inti otomatis, event modul manual.
 
-## 8. Rujukan
+## 9. Rujukan
 
 * Implementasi: `apps/api/src/queue.ts`, `apps/api/src/runtime.ts:96`, `packages/db/schema/queue_jobs.def.ts`
 * Admin: `apps/api/src/domains/queue.ts`, `apps/web/src/routes/(app)/queue/+page.server.ts`

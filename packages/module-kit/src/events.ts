@@ -23,6 +23,25 @@ export interface CoreEventPayloads {
   'module.toggled': { module: string; clientId: string; enabled: boolean };
   /** In-app notifications were written for these users (J-4); modules may fan out (webhook, push). */
   'notification.created': { clientId: string; type: string; userIds: readonly string[] };
+  /** A queue job attempt started (P2, `queue_jobs`). */
+  'job.started': {
+    jobId: string;
+    name: string;
+    clientId: string | null;
+    attempt: number;
+    maxAttempts: number;
+  };
+  /** A queue job attempt ended; `status` is what the row became. */
+  'job.finished': {
+    jobId: string;
+    name: string;
+    clientId: string | null;
+    attempt: number;
+    maxAttempts: number;
+    status: 'done' | 'retried' | 'dead';
+    durationMs: number;
+    error: string | null;
+  };
   /** Diagnostic event used by tests and the M0 gate; never emitted in production flows. */
   'system.ping': { at: string; note?: string };
 }
@@ -37,6 +56,8 @@ export const CORE_EVENTS = [
   'config.saved',
   'module.toggled',
   'notification.created',
+  'job.started',
+  'job.finished',
   'system.ping',
 ] as const satisfies readonly CoreEventName[];
 
