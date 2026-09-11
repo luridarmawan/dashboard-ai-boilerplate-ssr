@@ -53,7 +53,7 @@ let {
     <div class="px-4 pt-3 text-sm text-muted-foreground">{@render breadcrumb()}</div>
     <div class="grid flex-1 gap-6 px-4 pb-8 pt-2 lg:grid-cols-[2fr_1fr]">
       <main id="content" class="min-w-0">{@render content()}</main>
-      <aside class="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
+      <aside id="dummy-second-column" class="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         {#if aside}{@render aside()}{:else}Kolom kedua layout <code>dummy.two-column</code> — disumbang modul Dummy.{/if}
       </aside>
     </div>
