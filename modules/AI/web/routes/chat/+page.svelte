@@ -391,7 +391,7 @@ function copy(text: string) {
             {/if}
           {/if}
           <!-- The labels fold away on narrow screens; the title stays readable, the actions stay reachable. -->
-          <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button id="btn-chat-archive" type="submit" variant="ghost" size="sm" title={t('ai.chat.archive')} aria-label={t('ai.chat.archive')}><Icon name="folder" size={14} /><span class="hidden sm:inline">{t('ai.chat.archive')}</span></Button></form>
+          <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button id="btn-chat-archive" type="submit" variant="ghost" size="sm" title={t('ai.chat.archive')} aria-label={t('ai.chat.archive')}><Icon name="archive" size={14} /><span class="hidden sm:inline">{t('ai.chat.archive')}</span></Button></form>
           <form method="POST" action="?/delete"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><Button id="btn-chat-delete" type="submit" variant="ghost" size="sm" class="text-destructive" title={t('ai.chat.delete')} aria-label={t('ai.chat.delete')}><Icon name="trash" size={14} /><!-- span class="hidden sm:inline">{t('ai.chat.delete')}</span> --></Button></form>
         </div>
       {/if}

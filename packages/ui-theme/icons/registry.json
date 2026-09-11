@@ -51,6 +51,7 @@
     "clock",
     "file",
     "folder",
+    "archive",
     "image",
     "link",
     "logout",

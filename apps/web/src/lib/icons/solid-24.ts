@@ -4,6 +4,7 @@
  * `scripts/ci/icon-coverage.ts` fails the build if a core name is missing here.
  */
 
+import ArchiveGlyph from 'phosphor-svelte/lib/ArchiveIcon';
 import ArrowLeftGlyph from 'phosphor-svelte/lib/ArrowLeftIcon';
 import ArrowRightGlyph from 'phosphor-svelte/lib/ArrowRightIcon';
 import ExternalLinkGlyph from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -137,6 +138,7 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   clock: ClockGlyph as unknown as Component<Record<string, unknown>>,
   file: FileGlyph as unknown as Component<Record<string, unknown>>,
   folder: FolderGlyph as unknown as Component<Record<string, unknown>>,
+  archive: ArchiveGlyph as unknown as Component<Record<string, unknown>>,
   image: ImageGlyph as unknown as Component<Record<string, unknown>>,
   link: LinkGlyph as unknown as Component<Record<string, unknown>>,
   logout: LogoutGlyph as unknown as Component<Record<string, unknown>>,
