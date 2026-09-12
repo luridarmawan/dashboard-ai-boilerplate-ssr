@@ -623,6 +623,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | F-7 | **[P0]** Route publik (dari modul, titik perluasan 13) terdaftar di sitemap dan menghormati `robots.txt` yang dapat dikonfigurasi. |
 | F-8 | **[P1]** Sidebar bisa diciutkan; state tersimpan per user. |
 | F-9 | **[P1]** Command palette (⌘K) untuk lompat antar halaman dan aksi. |
+| F-10 | **[P1]** Tombol **kembali ke atas** di pojok bawah setiap halaman, muncul begitu pembaca menggulir jauh dan menggulir balik ke puncak halaman (mulus, kecuali pembaca meminta gerak minimal). Berbagi pojok dengan widget shell (H-13) tanpa saling menutupi. |
 
 ### FR-G · Sistem Modul
 

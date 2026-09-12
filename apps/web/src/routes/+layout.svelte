@@ -1,6 +1,7 @@
 <script lang="ts">
 import '../app.css';
 import { setContext } from 'svelte';
+import ScrollTop from '$lib/components/ScrollTop.svelte';
 import Toaster from '$lib/components/ui/Toaster.svelte';
 import { provideI18n } from '$lib/i18n';
 import type { LayoutData } from './$types';
@@ -46,4 +47,5 @@ provideI18n({
 </svelte:head>
 
 {@render children()}
+<ScrollTop />
 <Toaster />

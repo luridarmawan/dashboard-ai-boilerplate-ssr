@@ -228,7 +228,7 @@ async function send(e: SubmitEvent) {
 </script>
 
 {#if ctx && !onChatPage}
-  <div class="fixed end-4 bottom-4 z-40 flex flex-col items-end gap-2 print:hidden" data-testid="floating-chat">
+  <div class="fixed end-4 bottom-4 z-40 flex flex-col items-end gap-2 print:hidden" data-testid="floating-chat" data-shell-dock="bottom-end" data-shell-dock-open={open || undefined}>
     {#if open}
       <section class="flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-lg" style="height: min(32rem, calc(100vh - 6rem))" aria-label={t('ai.float.title')} data-testid="floating-chat-panel">
         <header class="flex items-center gap-2 border-b px-3 py-2">

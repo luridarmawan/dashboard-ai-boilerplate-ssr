@@ -49,6 +49,7 @@
   "shell.account_menu": "Account menu",
   "shell.sidebar_collapse": "Collapse sidebar",
   "shell.sidebar_expand": "Expand sidebar",
+  "shell.scroll_top": "Back to top",
   "notifications.title": "Notifications",
   "notifications.empty": "No notifications.",
   "notifications.unread": "unread",
