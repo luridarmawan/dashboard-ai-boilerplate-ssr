@@ -20,9 +20,11 @@ export interface ColumnDef<Row> {
 export interface RowAction<Row> {
   label: string;
   href?: (row: Row) => string;
-  /** Form action URL for a POST (needs CSRF); rendered as a small form. */
+  /** Form action URL for a POST (needs CSRF); rendered as a small form posting the row id. */
   action?: (row: Row) => string;
   icon?: string;
+  /** Draw the icon alone; `label` becomes the hover tooltip and the accessible name. */
+  iconOnly?: boolean;
   destructive?: boolean;
   /** Hide the action for rows where this returns false. */
   when?: (row: Row) => boolean;

@@ -530,6 +530,7 @@
   "users.empty_hint_search": "Try another keyword.",
   "users.empty_title": "No users yet",
   "users.groups": "Groups",
+  "users.impersonate": "Sign in as this user",
   "users.last_login": "Last login",
   "users.name": "Name",
   "users.new.email_hint": "An existing account with this email will be added to this tenant.",

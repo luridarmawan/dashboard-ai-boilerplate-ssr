@@ -530,6 +530,7 @@
   "users.empty_hint_search": "Coba kata kunci lain.",
   "users.empty_title": "Belum ada pengguna",
   "users.groups": "Grup",
+  "users.impersonate": "Masuk sebagai pengguna ini",
   "users.last_login": "Login terakhir",
   "users.name": "Nama",
   "users.new.email_hint": "Akun yang sudah ada dengan email ini akan ditambahkan ke tenant ini.",

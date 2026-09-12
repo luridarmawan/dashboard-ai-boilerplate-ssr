@@ -137,16 +137,6 @@ const shellContext = $derived({
 {/snippet}
 
 {#snippet header()}
-  {#if data.impersonator}
-    <!-- Impersonation (D-6): unmistakable, on every page, with the way out. -->
-    <form method="POST" action="/auth/stop-impersonate" class="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-2 py-1 text-xs" role="status" data-testid="impersonation-banner">
-      <Csrf token={data.csrf} />
-      <input type="hidden" name="back" value={`/users/${data.user.id}`} />
-      <Icon name="eye" size={14} />
-      <span>{t('shell.impersonating', { name: data.user.name, admin: data.impersonator.name })}</span>
-      <Button type="submit" variant="destructive" size="sm">{t('shell.impersonate_stop')}</Button>
-    </form>
-  {/if}
   <!-- Bell (J-4): the badge is still rendered server-side; the newest unread open in a <details>
        dropdown, the same no-JS pattern as the account menu (`use:dropdown` only adds outside-click
        and Escape closing). Every control inside is a form posting to the /notifications actions —
@@ -193,15 +183,32 @@ const shellContext = $derived({
   <!-- Account menu: the avatar + name open a <details> dropdown (no JavaScript needed; `use:dropdown`
        adds outside-click/Escape/after-navigation closing) with the profile, the theme picker, the language picker, and sign-out. -->
   <details id="account-menu" class="group relative" data-testid="account-menu" use:dropdown>
-    <summary class="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm hover:bg-accent" aria-label={t('shell.account_menu')}>
+    <summary class={`flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm hover:bg-accent ${data.impersonator ? 'ring-2 ring-destructive' : ''}`} aria-label={data.impersonator ? `${t('shell.account_menu')} — ${t('shell.impersonating', { name: data.user.name, admin: data.impersonator.name })}` : t('shell.account_menu')}>
       {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}
-      <span class="hidden max-w-40 truncate sm:inline">{data.user.name}</span>
+      {#if data.impersonator}
+        <!-- Impersonation (D-6): the mark rides on the account menu, so it is top right on every
+             page — the impersonated name in the alert colour, the way out one click inside. -->
+        <span class="inline-flex items-center gap-1 rounded-md bg-destructive px-1.5 py-0.5 text-xs font-semibold text-destructive-foreground" title={t('shell.impersonating', { name: data.user.name, admin: data.impersonator.name })} data-testid="impersonation-badge">
+          <Icon name="eye" size={14} />
+          <span class="max-w-32 truncate">{data.user.name}</span>
+        </span>
+      {:else}
+        <span class="hidden max-w-40 truncate sm:inline">{data.user.name}</span>
+      {/if}
       <Icon name="chevron-down" size={14} class="transition-transform group-open:rotate-180" />
     </summary>
     <div id="user-menu-dropdown" class="absolute end-0 z-40 mt-1 w-64 rounded-md border bg-popover p-1 text-popover-foreground shadow-lg">
+      {#if data.impersonator}
+        <form method="POST" action="/auth/stop-impersonate" class="grid gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-2 text-xs" role="status" data-testid="impersonation-banner">
+          <Csrf token={data.csrf} />
+          <input type="hidden" name="back" value={`/users/${data.user.id}`} />
+          <p class="flex items-start gap-1.5"><Icon name="eye" size={14} class="mt-0.5" /><span>{t('shell.impersonating', { name: data.user.name, admin: data.impersonator.name })}</span></p>
+          <Button type="submit" variant="destructive" size="sm">{t('shell.impersonate_stop')}</Button>
+        </form>
+      {/if}
       <div class="flex items-center gap-3 px-2 py-2">
         {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-10 w-10 rounded-full object-cover" />{:else}<span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name="user" size={20} /></span>{/if}
-        <div class="min-w-0"><p class="truncate text-sm font-medium">{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p>{#if activeTenant}<p class="truncate text-xs text-muted-foreground"><Icon name="building" size={12} class="me-1 inline align-[-1px]" />{activeTenant.name}</p>{/if}</div>
+        <div class="min-w-0"><p class={`truncate text-sm font-medium ${data.impersonator ? 'text-destructive' : ''}`}>{data.user.name}</p><p class="truncate text-xs text-muted-foreground">{data.user.email}</p>{#if activeTenant}<p class="truncate text-xs text-muted-foreground"><Icon name="building" size={12} class="me-1 inline align-[-1px]" />{activeTenant.name}</p>{/if}</div>
       </div>
       <ul class="grid gap-0.5 border-t pt-1">
         <li><a href="/profile" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:no-underline"><Icon name="user" size={16} class="text-muted-foreground" />{t('nav.profile')}</a></li>

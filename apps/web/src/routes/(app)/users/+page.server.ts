@@ -1,7 +1,16 @@
 import { createTranslator } from '@core/i18n';
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { tableStateFrom } from '$lib/components/table';
-import { actionFailure, apiFor, checkCsrf, csrfToken, str, unwrap } from '$lib/server/session';
+import {
+  type ApiFailure,
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  csrfToken,
+  forwardSetCookies,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -37,7 +46,39 @@ export const load: PageServerLoad = async (event) => {
   };
 };
 
+/**
+ * `actionFailure` with the action stamped on it: this page has four actions and one `form` prop,
+ * so a refused impersonation has to say so — otherwise the invite card below claims the message.
+ */
+const impersonateFailure = (f: ApiFailure) =>
+  fail(f.status >= 400 && f.status < 600 ? f.status : 500, {
+    error: f.message,
+    code: f.code,
+    impersonate: true,
+  });
+
 export const actions: Actions = {
+  /**
+   * Impersonate (D-6) straight from the list — the same call the user detail page makes. The API
+   * is the guard: superadmin only, never yourself, another superadmin, or a deactivated user.
+   */
+  impersonate: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return impersonateFailure({
+        status: 403,
+        code: 'csrf_failed',
+        message: t('common.form_expired'),
+      });
+    const res = await apiFor(event)
+      .v1.users({ id: str(form, 'id') })
+      .impersonate.post();
+    const r = unwrap(res);
+    if (!r.ok) return impersonateFailure(r.failure);
+    forwardSetCookies(event, res.response);
+    redirect(303, '/dashboard');
+  },
   /** Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over. */
   invite: async (event) => {
     const t = createTranslator(event.locals.locale.locale);

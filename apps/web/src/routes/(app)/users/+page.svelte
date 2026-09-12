@@ -2,7 +2,7 @@
 import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { type ColumnDef, DataTable } from '$lib/components/table';
+import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -40,6 +40,31 @@ const columns: ColumnDef<Row>[] = [
     value: (r) => new Date(r.createdAt).toLocaleDateString(dateLocale),
   },
 ];
+/**
+ * Row actions are icons only (the label is the tooltip and the accessible name).
+ * Impersonation (D-6) is superadmin-only and never nested; the API enforces exactly the same
+ * rules — not yourself, no other superadmin, no deactivated user — this only hides a button
+ * that could not work.
+ */
+const rowActions: RowAction<Row>[] = $derived([
+  {
+    label: can('user.edit') ? t('common.edit') : t('common.view'),
+    icon: can('user.edit') ? 'edit' : 'eye',
+    iconOnly: true,
+    href: (r) => `/users/${r.id}`,
+  },
+  ...(data.user.isSuperadmin && !data.impersonator
+    ? [
+        {
+          label: t('users.impersonate'),
+          icon: 'login',
+          iconOnly: true,
+          action: () => '?/impersonate',
+          when: (r: Row) => !r.isSuperadmin && r.id !== data.user.id && r.statusId === 1,
+        },
+      ]
+    : []),
+]);
 const deactivated = $derived(page.url.searchParams.get('deactivated'));
 </script>
 
@@ -50,6 +75,8 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
     <h1>{t('nav.users')}</h1>
   </div>
   {#if deactivated}<p class="notice">{t('users.deactivated', { n: deactivated })}</p>{/if}
+  <!-- A refused impersonation belongs above the table, not inside the invite card below it. -->
+  {#if form?.impersonate && form?.error}<p class="error" role="alert" data-testid="impersonate-error">{form.error}</p>{/if}
 
   <DataTable
     rows={data.users}
@@ -60,7 +87,7 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
     searchPlaceholder={t('users.search_placeholder')}
     emptyTitle={t('users.empty_title')}
     emptyHint={data.state.q ? t('users.empty_hint_search') : t('users.empty_hint_add')}
-    rowActions={[{ label: can('user.edit') ? t('common.edit') : t('common.view'), icon: can('user.edit') ? 'edit' : 'eye', href: (r) => `/users/${r.id}` }]}
+    {rowActions}
     bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true }] : []}
   >
     {#snippet toolbar()}
@@ -88,7 +115,7 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
           <p class="text-xs">{t('users.invite.link_hint')} <code class="select-all break-all">{form.invited.link}</code></p>
         </div>
       {/if}
-      {#if form?.error && !form?.invited}<p class="error" role="alert">{form.error}</p>{/if}
+      {#if form?.error && !form?.invited && !form?.impersonate}<p class="error" role="alert">{form.error}</p>{/if}
       <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form">
         <Csrf token={data.csrf} />
         <label class="grid gap-1 text-sm">{t('users.invite.email')} <input name="email" type="email" required autocomplete="off" class="h-9 w-72 rounded-md border border-input bg-background px-2 text-sm" value={form?.values?.email ?? ''} /></label>
