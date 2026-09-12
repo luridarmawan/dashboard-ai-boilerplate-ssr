@@ -16,7 +16,7 @@
 # Every service is capped (Q-14, *_MEM_LIMIT / *_CPUS in .env.prod) so one runaway container cannot
 # take the VPS down; the defaults fit a 2 vCPU / 4 GB host with 3 api replicas (§8 #25).
 
-name: dab-prod
+name: crk-prod
 
 x-logging: &logging
   # JSON logs must never fill a small VPS disk (Q-7)
@@ -105,7 +105,7 @@ services:
         DB_DIALECT: '${DB_DIALECT:-mysql}'
         APP_COMMIT: '${APP_COMMIT:-dev}'
         APP_BUILT_AT: '${APP_BUILT_AT:-}'
-    image: ${IMAGE_PREFIX:-dab}/web:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-crk}/web:${IMAGE_TAG:-local}
     restart: unless-stopped
     mem_limit: ${WEB_MEM_LIMIT:-384m}
     cpus: ${WEB_CPUS:-1.0}
@@ -145,7 +145,7 @@ services:
         DB_DIALECT: '${DB_DIALECT:-mysql}'
         APP_COMMIT: '${APP_COMMIT:-dev}'
         APP_BUILT_AT: '${APP_BUILT_AT:-}'
-    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-crk}/api:${IMAGE_TAG:-local}
     restart: unless-stopped
     mem_limit: ${API_MEM_LIMIT:-384m}
     cpus: ${API_CPUS:-1.0}
@@ -164,7 +164,7 @@ services:
 
   migrate:
     # One-off, explicit (Q-4): `docker compose -f compose.prod.yml run --rm migrate`
-    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-crk}/api:${IMAGE_TAG:-local}
     profiles: ['ops']
     environment:
       <<: *app-env
@@ -180,7 +180,7 @@ services:
     # `run --rm preflight` — read-only readiness checks with actionable messages (Q-13): env complete,
     # no placeholder secrets, database reachable, migrations up to date, seed present, Redis when
     # enabled, uploads volume writable. deploy/upgrade.sh runs it before every rollout.
-    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-crk}/api:${IMAGE_TAG:-local}
     profiles: ['ops']
     environment:
       <<: *app-env
@@ -198,7 +198,7 @@ services:
   seed:
     # One-off, idempotent (O-3): default tenant, system groups, first superadmin from
     # BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD. Safe to re-run on every deploy.
-    image: ${IMAGE_PREFIX:-dab}/api:${IMAGE_TAG:-local}
+    image: ${IMAGE_PREFIX:-crk}/api:${IMAGE_TAG:-local}
     profiles: ['ops']
     environment:
       <<: *app-env

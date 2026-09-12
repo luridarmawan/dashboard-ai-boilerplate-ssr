@@ -157,25 +157,25 @@ jobs:
           APP_COMMIT=$GITHUB_SHA APP_BUILT_AT=$(date -u +%FT%TZ) docker compose --env-file .env.prod -f compose.prod.yml build
       - name: ukuran image — Q-2 mewajibkan < 150 MB untuk api dan web
         run: |
-          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep '^dab/'
-          for img in dab/api:local dab/web:local; do
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep '^crk/'
+          for img in crk/api:local crk/web:local; do
             mb=$(( $(docker image inspect "$img" --format '{{.Size}}') / 1000000 ))
             [ "$mb" -lt 150 ] || { echo "::error::$img = ${mb} MB, melebihi target Q-2 (< 150 MB)"; exit 1; }
           done
       - name: image api = satu binary tanpa bun/node_modules; `version` menjawab
         run: |
-          docker run --rm --entrypoint sh dab/api:local -c '! command -v bun >/dev/null && [ ! -d /app/node_modules ] && [ -x /app/api ]'
-          docker run --rm -e APP_COMMIT=$GITHUB_SHA dab/api:local version | grep -q "$GITHUB_SHA"
+          docker run --rm --entrypoint sh crk/api:local -c '! command -v bun >/dev/null && [ ! -d /app/node_modules ] && [ -x /app/api ]'
+          docker run --rm -e APP_COMMIT=$GITHUB_SHA crk/api:local version | grep -q "$GITHUB_SHA"
       - name: image api naik, HEALTHCHECK bawaan (`api health`) menjadi healthy, /v1/health menjawab
         run: |
-          docker run -d --name api-smoke -e DATABASE_URL=mysql://x:y@127.0.0.1:3306/z -e SCHEDULER_ENABLED=false -p 3001:3001 dab/api:local
+          docker run -d --name api-smoke -e DATABASE_URL=mysql://x:y@127.0.0.1:3306/z -e SCHEDULER_ENABLED=false -p 3001:3001 crk/api:local
           for i in $(seq 1 45); do [ "$(docker inspect -f '{{.State.Health.Status}}' api-smoke)" = healthy ] && break; sleep 1; done
           [ "$(docker inspect -f '{{.State.Health.Status}}' api-smoke)" = healthy ] || { docker logs api-smoke; exit 1; }
           curl -sf http://127.0.0.1:3001/v1/health | grep -q '"status":"ok"'
       - name: image web naik (bundle adapter-node tanpa node_modules) dan menyajikan halaman + aset
         run: |
           docker network create smoke && docker network connect --alias api smoke api-smoke
-          docker run -d --name web-smoke --network smoke -e API_URL=http://api:3001 -e ORIGIN=http://127.0.0.1:3000 -p 3000:3000 dab/web:local
+          docker run -d --name web-smoke --network smoke -e API_URL=http://api:3001 -e ORIGIN=http://127.0.0.1:3000 -p 3000:3000 crk/web:local
           for i in $(seq 1 45); do [ "$(docker inspect -f '{{.State.Health.Status}}' web-smoke)" = healthy ] && break; sleep 1; done
           [ "$(docker inspect -f '{{.State.Health.Status}}' web-smoke)" = healthy ] || { docker logs web-smoke; exit 1; }
           html=$(curl -sf http://127.0.0.1:3000/auth/login)
@@ -270,7 +270,7 @@ jobs:
       RATELIMIT_DRIVER: redis
       REDIS_URL: redis://127.0.0.1:6379
       # O-2: several apps may share one database — every table, index, FK and the journal get the prefix
-      TABLE_PREFIX: dab_
+      TABLE_PREFIX: crk_
       INTEGRATION: '1'
     steps:
       - uses: actions/checkout@v5
@@ -357,7 +357,7 @@ jobs:
       - name: Q-12 · rollout api + web tanpa request gagal
         run: sh scripts/ci/rollout-proof.sh
       - name: §8 #25 · RAM idle seluruh stack (3 replika api) < 1,5 GB
-        run: PROJECT=dab-prod SETTLE_SECONDS=20 sh scripts/ci/idle-memory.sh
+        run: PROJECT=crk-prod SETTLE_SECONDS=20 sh scripts/ci/idle-memory.sh
       - if: always()
         run: test -f .env.prod && docker compose --env-file .env.prod -f compose.prod.yml down -v || true
 

@@ -4,7 +4,7 @@
 # Jalankan manual dari tab Actions (workflow_dispatch) atau otomatis saat tag `v*` didorong.
 # Rahasia repo yang dibutuhkan:
 #   DEPLOY_HOST   host/IP VPS            DEPLOY_USER  user SSH (anggota grup docker)
-#   DEPLOY_SSH_KEY kunci privat SSH      DEPLOY_PATH  direktori checkout di VPS (berisi .env.prod), mis. /opt/dab
+#   DEPLOY_SSH_KEY kunci privat SSH      DEPLOY_PATH  direktori checkout di VPS (berisi .env.prod), mis. /opt/crk
 #   GHCR_PULL_TOKEN (opsional) PAT read:packages untuk `docker login ghcr.io` di VPS bila paket privat;
 #                  tanpa itu paket harus publik (Settings → Packages → Change visibility).
 # Di VPS, .env.prod harus memuat IMAGE_PREFIX=ghcr.io/<owner>/<repo> (huruf kecil) — upgrade.sh
