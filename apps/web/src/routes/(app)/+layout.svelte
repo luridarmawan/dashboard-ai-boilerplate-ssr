@@ -192,7 +192,7 @@ const shellContext = $derived({
   </details>
   <!-- Account menu: the avatar + name open a <details> dropdown (no JavaScript needed; `use:dropdown`
        adds outside-click/Escape/after-navigation closing) with the profile, the theme picker, the language picker, and sign-out. -->
-  <details class="group relative" data-testid="account-menu" use:dropdown>
+  <details id="account-menu" class="group relative" data-testid="account-menu" use:dropdown>
     <summary class="flex h-8 cursor-pointer list-none items-center gap-2 rounded-md px-2 text-sm hover:bg-accent" aria-label={t('shell.account_menu')}>
       {#if data.user.avatarUrl}<img src={data.user.avatarUrl} alt="" class="h-6 w-6 rounded-full object-cover" />{:else}<Icon name="user" size={18} />{/if}
       <span class="hidden max-w-40 truncate sm:inline">{data.user.name}</span>
