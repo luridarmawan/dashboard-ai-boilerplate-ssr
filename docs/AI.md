@@ -28,7 +28,7 @@ Tanpa API key, permintaan dijawab **422** dengan alasan `no_api_key` dan tautan 
 
 ## Lebih dari satu penyedia & model (H-10)
 
-**Pengaturan → AI** adalah penyedia *implisit* — cukup untuk satu provider. Untuk beberapa provider atau model dengan harga berbeda, admin (`ai.provider.manage`) membuat **profil penyedia** di **Penyedia AI** (`/m/ai/providers`): nama, kode, base URL kompatibel-OpenAI, API key (rahasia: tidak pernah ditampilkan lagi; `***`/kosong = pertahankan), model baku, dan **daftar model berharga** — satu baris per model: `model | label | harga input per 1M token | harga output per 1M token`. Tombol **Uji koneksi** memanggil `GET /models` di penyedia dengan key tersimpan: membuktikan URL + key dan menampilkan id model yang bisa dimasukkan ke daftar.
+**Pengaturan → AI** adalah penyedia *implisit* — cukup untuk satu provider. Untuk beberapa provider atau model dengan harga berbeda, admin (`ai.provider.manage`) membuat **profil penyedia** di **Penyedia AI** (`/m/ai/providers`): nama, kode, base URL kompatibel-OpenAI, API key (rahasia: tidak pernah ditampilkan lagi; `***`/kosong = pertahankan), model baku, dan **daftar model berharga** — satu baris per model: `model | label | harga input per 1M token | harga output per 1M token`. Tombol **Uji koneksi** menjalankan probe kemampuan (AI-Roadmap §4.1) dengan key tersimpan: `GET /models`, lalu `/responses` dan `/chat/completions`, streaming, reasoning, dan tools — membuktikan URL + key, menampilkan id model yang bisa dimasukkan ke daftar, dan merekam matriks kemampuannya.
 
 Aturannya:
 
@@ -38,7 +38,17 @@ Aturannya:
 - Pemilih (`GET /v1/m/ai/providers/options`, izin `ai.chat.read`) hanya membawa kode, nama, dan model — bukan URL atau key. Menghapus profil melepaskan percakapan yang menggunakannya kembali ke baku.
 - Hapus itu lunak (`deleted_at`), sementara kunci unik `(client_id, code)` ikut menghitung baris terkubur — jadi **membuat profil dengan kode yang pernah dihapus akan membangkitkan baris lama itu**, bukan menolaknya: id-nya kembali (audit tetap menunjuk sesuatu), sedangkan URL, key, model, dan seluruh kolom hasil probe diganti yang baru — kapabilitas endpoint lama tidak boleh diwariskan ke endpoint baru.
 
-Tabel: `ai_providers`, `ai_models` (per tenant), kolom `ai_conversations.provider_id`, `ai_calls.provider` (migrasi 0012). Bukti: `modules/AI/test/integration/providers.test.ts` (dua provider tiruan; routing per percakapan, biaya dari daftar harga, key tak pernah bocor, uji `/models`, profil nonaktif, hapus).
+### Uji koneksi per model
+
+Probe tingkat penyedia menjawab *"apa yang dikuasai base URL ini"* — dan ia selalu menjalankannya dengan **model baku**. Itu jawaban yang salah untuk sebagian besar baris daftar harga: di balik satu base URL lazimnya ada model reasoning, model chat saja, dan model tanpa function calling. Karena itu setiap baris daftar harga punya tombol **Uji model** sendiri (`POST /v1/m/ai/providers/:id/models/test`, izin `ai.provider.manage`), dan kolom **Kemampuan** di sebelahnya menampilkan matriks milik model itu.
+
+- Probe-nya sama persis, hanya id modelnya yang berbeda. Modelnya diambil dari daftar penyedia, **tidak pernah** dari request sebagai teks bebas — probe membelanjakan key milik tenant, jadi model di luar daftar dijawab `404`.
+- Hasilnya disimpan di baris modelnya (`ai_models`: `capabilities`, `capabilities_at`, `preferred_endpoint`, `last_status`, `last_error`, `last_tested_at`, `last_probe_ms` — migrasi 0024, aditif). Aturannya sama dengan tingkat penyedia: **probe yang gagal tidak menghapus matriks yang sudah terbukti**; kegagalannya dicatat di sebelahnya.
+- **Matriks bertahan saat profil disimpan.** Menyimpan profil menulis ulang seluruh daftar harga (hapus lalu sisipkan), tetapi matriks melekat pada *id model*, bukan pada baris yang kebetulan memuatnya — tanpa itu, mengubah satu harga akan menghapus semua yang sudah diuji.
+- Uji koneksi tingkat penyedia **ikut mengisi baris model bakunya**, karena uji itu memang probe atas model baku.
+- Di UI hasil disimpan per id model, bukan satu slot "hasil terakhir" — alasan menguji model kedua adalah membandingkannya dengan yang pertama. Jalur tanpa JavaScript (`?/testModel`) memanggil endpoint API yang sama.
+
+Tabel: `ai_providers`, `ai_models` (per tenant), kolom `ai_conversations.provider_id`, `ai_calls.provider` (migrasi 0012; kolom probe per model 0024). Bukti: `modules/AI/test/integration/providers.test.ts` (dua provider tiruan; routing per percakapan, biaya dari daftar harga, key tak pernah bocor, probe kemampuan, profil nonaktif, hapus) — termasuk satu penyedia dengan **dua model yang berbeda verdict** di balik satu base URL dan satu key: reasoning ✓/✗, tools ✓/✗, rekomendasi ★/–, lalu diperiksa lagi setelah daftar harga disimpan.
 
 ## Kuota & saldo (B-6, H-14)
 
@@ -102,4 +112,4 @@ Isi `ai.baseurl` dengan URL itu dan `ai.key` dengan nilai apa pun. Proof `bun ru
 
 ## Kompatibilitas API
 
-Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah dua field opsional: `conversation_id` untuk persistensi (H-6) dan `tools: boolean` untuk menawarkan tool modul ke model (I-3; baku mengikuti `ai.tools_enable`). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Profil penyedia: `GET /v1/m/ai/providers/options` (pemilih), `GET/POST /v1/m/ai/providers`, `GET/PUT/DELETE /v1/m/ai/providers/:id`, `POST /v1/m/ai/providers/:id/test`. Analitik: `GET /v1/m/ai/analytics?days=`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`, `ai.provider.*`) dan tenancy.
+Endpoint chat mengikuti bentuk OpenAI (`messages`, `model`, `stream`, `temperature`, `max_tokens`) dan menambah dua field opsional: `conversation_id` untuk persistensi (H-6) dan `tools: boolean` untuk menawarkan tool modul ke model (I-3; baku mengikuti `ai.tools_enable`). Percakapan: `GET/POST /v1/m/ai/conversations`, `GET/PATCH/DELETE /v1/m/ai/conversations/:id`. Profil penyedia: `GET /v1/m/ai/providers/options` (pemilih), `GET/POST /v1/m/ai/providers`, `GET/PUT/DELETE /v1/m/ai/providers/:id`, `POST /v1/m/ai/providers/:id/test` (probe penyedia, memakai model baku), `POST /v1/m/ai/providers/:id/models/test` (probe satu model, body `{ model }`). Analitik: `GET /v1/m/ai/analytics?days=`. Semua tunduk RBAC (`ai.chat.*`, `ai.log.read`, `ai.provider.*`) dan tenancy.
