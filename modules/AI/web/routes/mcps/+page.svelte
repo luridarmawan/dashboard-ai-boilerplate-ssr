@@ -1,13 +1,15 @@
 <script lang="ts">
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Table } from '$lib/components/ui';
-import { useT } from '$lib/i18n';
+import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 
 let { data } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
+const locale = useLocale();
+const fmt = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
 </script>
 
 <svelte:head><title>{t('ai.mcps.title')}</title></svelte:head>
@@ -20,7 +22,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
   <p class="text-sm text-muted-foreground">{t('ai.mcps.intro')}</p>
   {#if data.saved === 'deleted'}<p class="notice">{t('ai.mcps.deleted')}</p>{/if}
   <Table caption={t('ai.mcps.title')}>
-    <thead><tr><th>Nama</th><th>Kode</th><th>URL</th><th>{t('ai.mcps.tools')}</th><th>{t('ai.mcps.status')}</th><th></th></tr></thead>
+    <thead><tr><th>{t('ai.mcps.name')}</th><th>{t('ai.mcps.code')}</th><th>{t('ai.mcps.url')}</th><th>{t('ai.mcps.tools')}</th><th>{t('ai.mcps.status')}</th><th></th></tr></thead>
     <tbody>
       {#each data.mcps as m (m.id)}
         <tr data-testid="mcp-row">

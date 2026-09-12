@@ -14,5 +14,5 @@ const fieldErrors = $derived(
 
 <div class="page">
   <h1>{t('ai.mcps.new')}</h1>
-  <FormBuilder fields={mcpFields} values={(form?.values as Record<string, unknown> | undefined) ?? { transport: 'http', enabled: true }} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/ai/mcps" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+  <FormBuilder fields={mcpFields(t)} values={(form?.values as Record<string, unknown> | undefined) ?? { transport: 'http', enabled: true }} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/ai/mcps" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
 </div>

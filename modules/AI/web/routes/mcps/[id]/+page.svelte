@@ -28,7 +28,7 @@ const tools = $derived(form?.tested?.tools ?? m.tools);
   </div>
   <Card>
     <FormBuilder
-      fields={mcpFields}
+      fields={mcpFields(t)}
       values={{ name: m.name, code: m.code, transport: m.transport, url: m.url, headers: headerLines(m.headers), enabled: m.enabled }}
       errors={fieldErrors}
       csrf={data.csrf}
@@ -55,7 +55,7 @@ const tools = $derived(form?.tested?.tools ?? m.tools);
       <p class="error" role="alert">{t('ai.mcps.tested_fail')}: {m.lastError}</p>
     {/if}
     <Table caption={t('ai.mcps.tools')}>
-      <thead><tr><th>Tool</th><th>{t('ai.mcps.wire_hint')}</th><th>Deskripsi</th></tr></thead>
+      <thead><tr><th>{t('ai.mcps.tool')}</th><th>{t('ai.mcps.wire_hint')}</th><th>{t('ai.mcps.description')}</th></tr></thead>
       <tbody>
         {#each tools as tl (tl.id)}
           <tr><td class="font-medium">{tl.name}</td><td><code>{tl.wireName}</code></td><td class="text-muted-foreground">{tl.description ?? '—'}</td></tr>
