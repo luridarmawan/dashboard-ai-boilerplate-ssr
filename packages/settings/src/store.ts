@@ -107,6 +107,18 @@ export class SettingsStore {
         endpoint: a.endpoint,
         permission: a.permission ?? null,
         note: a.note ?? null,
+        // The one value the operator may type before running the action; `default` is what the
+        // input starts with (the API may replace it with something only the server can resolve).
+        input: a.input
+          ? {
+              key: a.input.key,
+              label: a.input.label,
+              type: a.input.type ?? 'text',
+              placeholder: a.input.placeholder ?? null,
+              max: a.input.max ?? null,
+              default: a.input.default ?? '',
+            }
+          : null,
       })),
       fields: [...s.fields]
         .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))

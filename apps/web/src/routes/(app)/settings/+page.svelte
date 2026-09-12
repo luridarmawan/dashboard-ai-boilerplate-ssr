@@ -31,7 +31,8 @@ const locales = [
 /**
  * Section actions (extension point 6): a module declares a button, this page runs it over fetch
  * and shows the verdict in place. Nothing here knows what any particular action does — the
- * result is always one message plus optional detail lines.
+ * result is always one message plus optional detail lines, and an action that needs one value
+ * from the operator (where to send a test e-mail) declares that input in the same metadata.
  */
 type ActionResult = { ok: boolean; message: string; details?: string[] };
 let running = $state<string | null>(null);
@@ -39,7 +40,29 @@ let results = $state<Record<string, ActionResult>>({});
 const can = (p: string | null) =>
   !p || data.user.isSuperadmin || hasPermission(data.permissions, p);
 
-async function runAction(section: string, key: string) {
+/**
+ * Per action, what its input currently holds — seeded once from the prefill the API resolved for
+ * THIS scope, then left alone so typing survives a re-render. The scope is part of the key: the
+ * global and the tenant form are two different configurations, so they prefill differently.
+ */
+let inputs = $state<Record<string, string>>({});
+const inputId = (section: string, key: string) => `${data.scope}:${section}:${key}`;
+$effect(() => {
+  const next = { ...inputs };
+  let seeded = false;
+  for (const s of data.sections) {
+    for (const a of s.actions) {
+      const id = inputId(s.section, a.key);
+      if (a.input && next[id] === undefined) {
+        next[id] = a.input.default ?? '';
+        seeded = true;
+      }
+    }
+  }
+  if (seeded) inputs = next;
+});
+
+async function runAction(section: string, key: string, inputKey?: string | null) {
   const id = `${section}:${key}`;
   running = id;
   try {
@@ -48,6 +71,7 @@ async function runAction(section: string, key: string) {
     body.set('section', section);
     body.set('action', key);
     body.set('scope', data.scope);
+    if (inputKey) body.set(`input.${inputKey}`, inputs[inputId(section, key)] ?? '');
     const res = await fetch('/settings/action', { method: 'POST', body });
     results = { ...results, [id]: (await res.json()) as ActionResult };
   } catch (err) {
@@ -312,7 +336,29 @@ $effect(() => {
             </Button>
             {#each s.actions.filter((a) => can(a.permission)) as a (a.key)}
               {@const id = `${s.section}:${a.key}`}
-              <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key)}>
+              {#if a.input}
+                <!-- The one value the action asks for; it travels under the field name the API declared. -->
+                <label class="flex min-w-0 items-center gap-2 text-sm" for={`action-${id}`}>
+                  <span class="text-muted-foreground">{L(a.input.label)}</span>
+                  <Input
+                    id={`action-${id}`}
+                    type={a.input.type === 'email' ? 'email' : 'text'}
+                    class="w-64 max-w-full"
+                    maxlength={a.input.max ?? undefined}
+                    placeholder={L(a.input.placeholder) || undefined}
+                    bind:value={inputs[inputId(s.section, a.key)]}
+                    onkeydown={(e) => {
+                      // Enter here means "run the action", not "save the section" — the input sits
+                      // inside the save form but belongs to the button next to it.
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        runAction(s.section, a.key, a.input?.key);
+                      }
+                    }}
+                  />
+                </label>
+              {/if}
+              <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key, a.input?.key)}>
                 <Icon name="refresh" size={16} />{running === id ? t('common.running') : L(a.label)}
               </Button>
             {/each}

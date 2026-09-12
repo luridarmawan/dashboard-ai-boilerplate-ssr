@@ -336,11 +336,30 @@ export interface ConfigSectionActionDef {
   /** Stable id, unique per section. */
   readonly key: string;
   readonly label: LocalizedText;
-  /** API path under `/v1/`, e.g. `/v1/m/ai/settings/test`. POSTed with an empty JSON body. */
+  /** API path under `/v1/`, e.g. `/v1/m/ai/settings/test`. POSTed with a JSON body. */
   readonly endpoint: string;
   /** Permission the caller needs; the endpoint MUST enforce it too — this only hides the button. */
   readonly permission?: string;
   readonly note?: LocalizedText;
+  /** One optional value the operator types before running it (e.g. where to send a test e-mail). */
+  readonly input?: ConfigActionInputDef;
+}
+
+/**
+ * The single text input an action may ask for. The page renders it beside the button and POSTs
+ * it as `{ [key]: value }`; the endpoint decides what an empty value means (usually "use the
+ * sensible default"), because only it knows the configuration behind the section.
+ */
+export interface ConfigActionInputDef {
+  /** Field name in the POSTed body. */
+  readonly key: string;
+  readonly label: LocalizedText;
+  /** `email` only changes the input type in the browser; the endpoint still validates. */
+  readonly type?: 'text' | 'email';
+  readonly placeholder?: LocalizedText;
+  readonly max?: number;
+  /** Static prefill. A value only the server can know is filled in by the configuration API. */
+  readonly default?: string;
 }
 
 /** What a section action answers. Rendered generically: one verdict, optional detail lines. */
@@ -397,6 +416,12 @@ export function defineConfig(
       if (actionKeys.has(a.key))
         throw new ModuleContractError(`aksi section "${a.key}" duplikat di "${s.section}"`);
       actionKeys.add(a.key);
+      // The input's key becomes a field name in the POSTed body — keep it a plain identifier.
+      if (a.input && !/^[a-z][a-z0-9_]*$/.test(a.input.key)) {
+        throw new ModuleContractError(
+          `aksi "${a.key}": kunci input "${a.input.key}" tidak valid (huruf kecil, angka, garis bawah)`,
+        );
+      }
       // The core settings page POSTs this path as-is; keep it inside the module's own API tree so
       // a section can never point the button at an unrelated part of the API.
       if (!a.endpoint.startsWith(`/v1/m/${ns}/`) || a.endpoint.includes('..')) {

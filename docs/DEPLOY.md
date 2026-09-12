@@ -87,7 +87,9 @@ curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/version          # 
 #    Email: isi SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/MAIL_FROM_ADDRESS di .env.prod (lalu `dc up -d`),
 #    atau lewat Pengaturan → Email; nilai di Pengaturan menang per kolom.
 #    Uji kredensial .env.prod: `bun --env-file=.env.prod run mail:test --to anda@contoh.id`
-#    (koneksi + autentikasi + satu email uji, tanpa database); lalu ujung-ke-ujung: minta reset kata sandi dari /auth/forgot.
+#    (koneksi + autentikasi + satu email uji, tanpa database) — atau tombol "Kirim email uji" di Pengaturan → Email,
+#    yang menguji konfigurasi yang benar-benar dipakai lingkup itu (Pengaturan dulu, lalu .env) termasuk per tenant;
+#    lalu ujung-ke-ujung: minta reset kata sandi dari /auth/forgot.
 ```
 
 Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump segera lalu tiap 24 jam ke `./backups/`).

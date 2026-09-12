@@ -21,6 +21,7 @@ export {
   CORE_ACTIONS,
   CORE_MENU_GROUPS,
   CORE_PERMISSION_OWNERS,
+  type ConfigActionInputDef,
   type ConfigActionResult,
   type ConfigFieldDef,
   type ConfigFieldType,

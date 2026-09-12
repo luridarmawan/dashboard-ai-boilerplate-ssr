@@ -312,8 +312,18 @@ Tipe: `string · text · number · boolean · select · secret · markdown · ro
     endpoint: '/v1/m/billing/settings/test',       // WAJIB di bawah /v1/m/<ns>/
     permission: 'billing.manage',                  // menyembunyikan tombol; endpoint tetap wajib menjaganya sendiri
     note: { id: 'Menguji kredensial yang tersimpan.', en: 'Tests the stored credentials.' },
+    input: {                                       // opsional — satu nilai yang diketik operator
+      key: 'to',                                   // nama field di body JSON yang di-POST
+      type: 'email',                               // 'text' (baku) atau 'email'
+      label: { id: 'Email tujuan', en: 'Recipient' },
+      placeholder: { id: 'akun SMTP', en: 'the SMTP account' },
+      max: 191,
+      default: '',                                 // prefill statis; kosong = endpoint yang memutuskan
+    },
   }] }
 ```
+
+`input` menambahkan **satu** kotak isian di samping tombol. Nilainya dikirim sebagai `{ "<key>": "<isi>" }` — nama fieldnya diambil dari metadata, bukan dari browser — dan endpoint yang menentukan arti nilai kosong (lazimnya "pakai nilai yang masuk akal"). Contoh nyata: bagian **Email** core (`/v1/configuration/mail/test`) memakai `input.to`, dan API mengisinya lebih dulu dengan akun SMTP yang berlaku untuk lingkup yang sedang dibuka — prefill yang hanya bisa diketahui server, jadi field `default` di registry dipakai bila server tidak menyediakannya.
 
 Halaman menjalankannya lewat `fetch` — tanpa memuat ulang — dan merender hasilnya secara generik, jadi endpoint harus menjawab bentuk `ConfigActionResult`:
 

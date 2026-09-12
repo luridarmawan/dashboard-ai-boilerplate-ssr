@@ -85,9 +85,15 @@ export interface TestMessage {
 export function buildTestMessage(
   smtp: SmtpConfig,
   to: string,
-  opts: { readonly subject?: string | undefined; readonly sentAt?: Date | undefined } = {},
+  opts: {
+    readonly subject?: string | undefined;
+    readonly sentAt?: Date | undefined;
+    /** Who asked for it, for the footer — the CLI by default, "Pengaturan → Email" from the app. */
+    readonly sentBy?: string | undefined;
+  } = {},
 ): TestMessage {
   const sentAt = opts.sentAt ?? new Date();
+  const sentBy = opts.sentBy ?? 'bun run mail:test';
   const subject = opts.subject ?? `Tes SMTP — ${smtp.fromName} (${sentAt.toISOString()})`;
   const rows: [string, string][] = [
     ['Server', `${smtp.host}:${smtp.port}`],
@@ -102,7 +108,7 @@ export function buildTestMessage(
     '',
     ...rows.map(([k, v]) => `${k.padEnd(12)} ${v}`),
     '',
-    'Dikirim oleh `bun run mail:test` — abaikan jika tidak Anda kenali.',
+    `Dikirim oleh \`${sentBy}\` — abaikan jika tidak Anda kenali.`,
   ].join('\n');
   const esc = (s: string) =>
     s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -118,7 +124,7 @@ ${rows
   )
   .join('\n')}
 </table>
-<p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Dikirim oleh <code>bun run mail:test</code> — abaikan jika tidak Anda kenali.</p>
+<p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Dikirim oleh <code>${esc(sentBy)}</code> — abaikan jika tidak Anda kenali.</p>
 </div></body></html>`;
   return { to, from: formatFrom(smtp), subject, text, html };
 }
@@ -137,6 +143,7 @@ export interface MailSender {
 
 export interface SendTestOptions extends TransportOptions {
   readonly subject?: string | undefined;
+  readonly sentBy?: string | undefined;
   /** Injectable for tests; defaults to a real transport for `smtp`. */
   readonly transport?: MailSender | undefined;
 }
@@ -148,7 +155,7 @@ export async function sendTestEmail(
   opts: SendTestOptions = {},
 ): Promise<TestSendResult> {
   const transport = opts.transport ?? createSmtpTransport(smtp, opts);
-  const msg = buildTestMessage(smtp, to, { subject: opts.subject });
+  const msg = buildTestMessage(smtp, to, { subject: opts.subject, sentBy: opts.sentBy });
   const info = (await transport.sendMail(msg)) as {
     messageId?: string;
     accepted?: (string | { address: string })[];

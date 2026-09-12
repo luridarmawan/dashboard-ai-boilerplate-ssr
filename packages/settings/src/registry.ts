@@ -356,6 +356,29 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       en: 'Delivery goes through the outbox: core.outbox.deliver sends every minute. Empty fields fall back to SMTP_* / MAIL_* from .env; without either, outside production the log transport is used.',
     },
     order: 20,
+    // Extension point 6: "send a test e-mail" beside Save. It sends ONE message straight through
+    // SMTP — no outbox, no scheduler wait — so the verdict on the page is about the credentials
+    // in front of the operator, for this scope (tenant or global) exactly as a real send resolves
+    // them (settings, else .env). The recipient defaults to the SMTP account in effect.
+    actions: [
+      {
+        key: 'test',
+        label: { id: 'Kirim email uji', en: 'Send test e-mail' },
+        endpoint: '/v1/configuration/mail/test',
+        permission: 'config.edit',
+        note: {
+          id: 'Menguji konfigurasi yang tersimpan (bukan yang belum disimpan di formulir ini) — simpan dulu, lalu uji. Langsung lewat SMTP, tidak lewat outbox.',
+          en: 'Tests the stored configuration (not unsaved edits in this form) — save first, then test. Sent straight over SMTP, not through the outbox.',
+        },
+        input: {
+          key: 'to',
+          type: 'email',
+          label: { id: 'Email tujuan', en: 'Recipient' },
+          placeholder: { id: 'akun SMTP', en: 'the SMTP account' },
+          max: 191,
+        },
+      },
+    ],
     fields: [
       {
         key: 'mail.from_name',

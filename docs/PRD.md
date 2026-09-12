@@ -698,7 +698,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 
 | ID | Kebutuhan |
 |---|---|
-| J-1 | **[P0]** Layanan email SMTP untuk: verifikasi email, reset password, undangan user, dan form kontak landing page (R-5). |
+| J-1 | **[P0]** Layanan email SMTP untuk: verifikasi email, reset password, undangan user, dan form kontak landing page (R-5). Kredensialnya bisa diuji dari **Pengaturan → Email** — tombol **Kirim email uji** (aksi section, titik perluasan 6; `POST /v1/configuration/mail/test`, izin `config.edit`) mengirim satu email langsung lewat SMTP (bukan lewat outbox J-2) dengan konfigurasi lingkup yang sedang dibuka — global atau tenant, seperti pengiriman sungguhan menyelesaikannya: setting dulu, lalu `SMTP_*`/`MAIL_*` dari `.env` (E-6). Alamat tujuannya bisa diketik, baku = akun SMTP yang berlaku. |
 | J-2 | **[P0]** Pola **outbox** — email ditulis ke tabel `outbox_email` lalu dikirim worker, dengan retry dan status. Benar-benar asinkron, tidak menahan request. Isinya dipantau dari halaman `/outbox` (grup Pemantauan, izin `mail.read`): terbaru di atas, dengan filter status/template/rentang tanggal, pencarian penerima & subjek, dan aksi ulangi / kirim sekarang untuk pemegang `mail.manage`. |
 | J-3 | **[P0]** Template email mendukung i18n dan mengikuti brand (logo, warna dari token tema aktif). |
 | J-4 | **[P1]** Notifikasi dalam aplikasi (bell di header), lengkap dengan backend-nya. |
