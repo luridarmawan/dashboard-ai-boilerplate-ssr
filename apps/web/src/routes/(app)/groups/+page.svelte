@@ -40,7 +40,7 @@ const columns: ColumnDef<Row>[] = [
     searchPlaceholder={t('groups.search_placeholder')}
     emptyTitle={t('groups.empty_title')}
     emptyHint={data.state.q ? t('groups.empty_hint_search') : t('groups.empty_hint_add')}
-    rowActions={[{ label: can('group.edit') ? t('groups.manage') : t('common.view'), icon: can('group.edit') ? 'edit' : 'eye', href: (r) => `/groups/${r.id}` }]}
+    rowActions={[{ label: can('group.edit') ? t('groups.manage') : t('common.view'), icon: can('group.edit') ? 'edit' : 'eye', iconOnly: true, href: (r) => `/groups/${r.id}` }]}
   >
     {#snippet toolbar()}
       {#if can('group.create')}<Button href="/groups/new" size="sm"><Icon name="plus" size={16} />{t('groups.add')}</Button>{/if}

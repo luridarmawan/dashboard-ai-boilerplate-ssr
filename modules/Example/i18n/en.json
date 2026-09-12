@@ -45,6 +45,7 @@
   "example.admin.featured": "Featured",
   "example.admin.price": "Price",
   "example.admin.slug": "Slug",
+  "example.admin.open_public": "Open the public page",
   "example.admin.saved": "Saved.",
   "example.admin.deleted": "Deleted.",
   "example.admin.delete_product": "Delete product",

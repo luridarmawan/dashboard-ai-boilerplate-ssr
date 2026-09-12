@@ -8,6 +8,7 @@ import { cn } from '$lib/utils';
 import {
   type BulkAction,
   type ColumnDef,
+  iconActionClass,
   type RowAction,
   type TableState,
   withParams,
@@ -88,13 +89,6 @@ const sortHref = (c: ColumnDef<Row>) => {
 const align = (c: ColumnDef<Row>) =>
   c.align === 'right' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start';
 const hasBulk = $derived(bulkActions.length > 0 && csrf !== '');
-/**
- * Icon-only row action: a square button whose `title` is the hover tooltip and whose `aria-label`
- * is the accessible name. A native tooltip, like the collapsed rail's (F-8) — a positioned one
- * would be clipped by the table's own horizontal scroll container.
- */
-const iconAction =
-  'ms-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
 const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
 </script>
 
@@ -184,13 +178,13 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
                     {#each rowActions as a (a.label)}
                       {#if !a.when || a.when(row)}
                         {#if a.href}
-                          <a href={a.href(row)} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconAction : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
+                          <a href={a.href(row)} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
                         {:else if a.action && csrf}
                           <form method="POST" action={a.action(row)} class="ms-2 inline">
                             <Csrf token={csrf} />
                             <!-- A row action is row-scoped, so the id rides along: the server action reads `id` instead of the URL. -->
                             <input type="hidden" name="id" value={row.id} />
-                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconAction : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
+                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
                           </form>
                         {/if}
                       {/if}

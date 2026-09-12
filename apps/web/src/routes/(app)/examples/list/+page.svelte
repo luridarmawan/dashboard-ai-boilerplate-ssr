@@ -55,8 +55,8 @@ const columns: ColumnDef<Row>[] = [
     caption={t('examples.list.caption')}
     searchPlaceholder={t('examples.list.search_placeholder')}
     rowActions={[
-      { label: t('common.detail'), icon: 'eye', href: (r) => `/examples/detail?id=${r.id}` },
-      { label: t('common.edit'), icon: 'edit', href: (r) => `/examples/form?id=${r.id}` },
+      { label: t('common.detail'), icon: 'eye', iconOnly: true, href: (r) => `/examples/detail?id=${r.id}` },
+      { label: t('common.edit'), icon: 'edit', iconOnly: true, href: (r) => `/examples/form?id=${r.id}` },
     ]}
     bulkActions={[{ action: '?/archive', label: t('examples.list.archive'), icon: 'folder' }]}
   >

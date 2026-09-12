@@ -17,6 +17,15 @@ export interface ColumnDef<Row> {
   class?: string;
 }
 
+/**
+ * Icon-only row action: a square button whose `title` is the hover tooltip and whose `aria-label`
+ * is the accessible name. A native tooltip, like the collapsed rail's (F-8) — a positioned one
+ * would be clipped by the table's own horizontal scroll container. Exported because the pages
+ * that build a plain `<Table>` by hand have to draw the same button as `DataTable`.
+ */
+export const iconActionClass =
+  'ms-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
+
 export interface RowAction<Row> {
   label: string;
   href?: (row: Row) => string;

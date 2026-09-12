@@ -47,7 +47,7 @@ const columns: ColumnDef<Row>[] = [
     searchPlaceholder={t('tenants.search_placeholder')}
     emptyTitle={t('tenants.empty_title')}
     emptyHint={data.state.q ? t('tenants.empty_hint_search') : t('tenants.empty_hint_add')}
-    rowActions={[{ label: can('client.edit') ? t('common.edit') : t('common.view'), icon: can('client.edit') ? 'edit' : 'eye', href: (r) => `/tenants/${r.id}` }]}
+    rowActions={[{ label: can('client.edit') ? t('common.edit') : t('common.view'), icon: can('client.edit') ? 'edit' : 'eye', iconOnly: true, href: (r) => `/tenants/${r.id}` }]}
   >
     {#snippet toolbar()}
       {#if can('client.create')}<Button href="/tenants/new" size="sm"><Icon name="plus" size={16} />{t('tenants.add')}</Button>{/if}

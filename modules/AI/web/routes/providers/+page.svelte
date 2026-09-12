@@ -1,5 +1,6 @@
 <script lang="ts">
 import Icon from '$lib/components/Icon.svelte';
+import { iconActionClass } from '$lib/components/table';
 import { Badge, Button, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -8,14 +9,9 @@ import Capabilities from '../../lib/Capabilities.svelte';
 let { data } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-/**
- * Row action is an icon, like /users (DataTable): `title` is the hover tooltip and `aria-label`
- * the accessible name — a native tooltip, so the table's own scroll container cannot clip it.
- */
+/** Row action is an icon, like /users. */
 const manage = $derived(can('ai.provider.manage'));
 const rowAction = $derived(manage ? t('common.edit') : t('common.view'));
-const iconAction =
-  'ms-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
 </script>
 
@@ -49,7 +45,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
             {:else}<span class="text-muted-foreground">{t('ai.providers.never')}</span>{/if}
             <span class="ms-1 text-xs text-muted-foreground">{fmt(p.lastTestedAt)}</span>
           </td>
-          <td class="text-end whitespace-nowrap"><a href={`/m/ai/providers/${p.id}`} title={rowAction} aria-label={rowAction} class={iconAction}><Icon name={manage ? 'edit' : 'eye'} size={16} /></a></td>
+          <td class="text-end whitespace-nowrap"><a href={`/m/ai/providers/${p.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={16} /></a></td>
         </tr>
       {:else}
         <tr><td colspan="7" class="py-8 text-center text-muted-foreground">{t('ai.providers.empty')}</td></tr>

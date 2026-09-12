@@ -45,6 +45,7 @@
   "example.admin.featured": "Unggulan",
   "example.admin.price": "Harga",
   "example.admin.slug": "Slug",
+  "example.admin.open_public": "Buka halaman publik",
   "example.admin.saved": "Tersimpan.",
   "example.admin.deleted": "Dihapus.",
   "example.admin.delete_product": "Hapus produk",

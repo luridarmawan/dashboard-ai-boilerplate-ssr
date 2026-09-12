@@ -1,5 +1,6 @@
 <script lang="ts">
 import Icon from '$lib/components/Icon.svelte';
+import { iconActionClass } from '$lib/components/table';
 import { Badge, Button, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -10,6 +11,9 @@ let { data }: { data: PageData & LayoutData } = $props();
 const t = useT();
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
+/** Row action is an icon, like /users. */
+const manage = $derived(can('webhook.manage'));
+const rowAction = $derived(manage ? t('webhooks.manage') : t('common.view'));
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
 </script>
@@ -19,7 +23,7 @@ const fmt = (iso: string | null) =>
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('webhooks.title')}</h1>
-    {#if can('webhook.manage')}<Button href="/webhooks/new" size="sm"><Icon name="plus" size={16} />{t('webhooks.add')}</Button>{/if}
+    {#if manage}<Button href="/webhooks/new" size="sm"><Icon name="plus" size={16} />{t('webhooks.add')}</Button>{/if}
   </div>
   <p class="text-sm text-muted-foreground">{t('webhooks.lead')}</p>
   {#if data.saved === 'deleted'}<p class="notice">{t('webhooks.deleted')}</p>{/if}
@@ -37,7 +41,7 @@ const fmt = (iso: string | null) =>
             {:else}<span class="text-muted-foreground">{t('webhooks.no_delivery_yet')}</span>{/if}
             <span class="ms-1 text-xs text-muted-foreground">{fmt(w.lastDeliveredAt)}</span>
           </td>
-          <td class="text-end"><a href={`/webhooks/${w.id}`}>{can('webhook.manage') ? t('webhooks.manage') : t('common.view')}</a></td>
+          <td class="text-end whitespace-nowrap"><a href={`/webhooks/${w.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={16} /></a></td>
         </tr>
       {:else}
         <tr><td colspan="5" class="py-8 text-center text-muted-foreground">{t('webhooks.empty')}</td></tr>

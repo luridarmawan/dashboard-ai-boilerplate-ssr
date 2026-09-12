@@ -1,5 +1,7 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
+import Icon from '$lib/components/Icon.svelte';
+import { iconActionClass } from '$lib/components/table';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../../$types';
@@ -93,7 +95,8 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
               <form method="POST" action="?/removeMember" class="row">
                 <Csrf token={data.csrf} />
                 <input type="hidden" name="userId" value={m.userId} />
-                <button type="submit" class="secondary">{t('groups.detail.remove_member')}</button>
+                <!-- Icon-only, like a row action elsewhere: the label is the tooltip and the accessible name. -->
+                <button type="submit" class={iconActionClass} title={t('groups.detail.remove_member')} aria-label={t('groups.detail.remove_member')}><Icon name="x" size={16} /></button>
               </form>
             {/if}
           </td>
