@@ -306,9 +306,10 @@ const paramOf = (location: string, key: string) => {
                 <Csrf token={data.csrf} />
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="query" value={currentQuery} />
-                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} data-testid="outbox-retry">
+                <!-- Icon only: one row action per row, and the label rides along as tooltip and
+                     accessible name so nothing is lost for a screen reader. -->
+                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} title={t('outbox.retry')} aria-label={t('outbox.retry')} data-testid="outbox-retry">
                   <Icon name="refresh" size={14} class={busy === `retry:${r.id}` ? 'animate-spin' : ''} />
-                  {t('outbox.retry')}
                 </Button>
               </form>
             {/if}

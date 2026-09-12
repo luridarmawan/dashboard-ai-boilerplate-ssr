@@ -196,7 +196,7 @@ async function runTest(e: SubmitEvent) {
                 <form method="POST" action="?/testModel" onsubmit={runModelTest} class="inline">
                   <Csrf token={data.csrf} />
                   <input type="hidden" name="model" value={m.model} />
-                  <Button type="submit" variant="outline" size="sm" disabled={testingModel !== null}><Icon name="refresh" size={16} />{testingModel === m.model ? t('common.running') : t('ai.providers.model_test')}</Button>
+                  <Button type="submit" variant="outline" size="sm" disabled={testingModel !== null}><Icon name="refresh" size={16} class={testingModel === m.model ? 'animate-spin' : ''} />{testingModel === m.model ? t('common.running') : t('ai.providers.model_test')}</Button>
                 </form>
               {/if}
             </td>
@@ -207,7 +207,7 @@ async function runTest(e: SubmitEvent) {
   </Card>
   <Card title={t('ai.providers.test')}>
     {#if can('ai.provider.manage')}
-      <form method="POST" action="?/test" class="mb-3" onsubmit={runTest}><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm" disabled={testing}><Icon name="refresh" size={16} />{testing ? t('common.running') : t('ai.providers.test')}</Button></form>
+      <form method="POST" action="?/test" class="mb-3" onsubmit={runTest}><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm" disabled={testing}><Icon name="refresh" size={16} class={testing ? 'animate-spin' : ''} />{testing ? t('common.running') : t('ai.providers.test')}</Button></form>
     {/if}
     {#if tested}
       {#if tested.ok}
