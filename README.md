@@ -8,9 +8,10 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 
 ## Architecture
 
-[![architecture](docs/screenshot/architecture.png)](docs/architecture.html)
+[![architecture](docs/screenshot/architecture.png)](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/)
 
-[See Architecture)](docs/architecture.html)
+Diagram interaktif: komponen, jalur permintaan, dan pekerjaan latar — tiap node tertaut ke berkas sumber yang dibacanya.
+**[Lihat arsitektur — English](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/architecture.html)** · **[Bahasa Indonesia](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/architecture.id.html)**
 
 ## Document
 
