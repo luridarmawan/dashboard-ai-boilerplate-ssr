@@ -15,7 +15,7 @@ const t = useT();
     <footer class="text-xs text-muted-foreground">{@render footer()}</footer>
   </div>
   <div class="hidden bg-primary text-primary-foreground lg:flex lg:flex-col lg:justify-end lg:p-16" aria-hidden="true">
-    <p class="text-3xl font-semibold leading-tight">{t('landing.lead')}</p>
-    <p class="mt-3 max-w-md text-primary-foreground/80">{t('shell.footer')}</p>
+    <p class="text-3xl font-semibold leading-tight">{t('landing.title')}</p>
+    <p class="mt-3 max-w-md text-primary-foreground/80">{t('landing.lead')}</p>
   </div>
 </div>
