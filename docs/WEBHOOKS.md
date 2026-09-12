@@ -16,10 +16,10 @@ Permintaan yang diterima tujuan:
 POST <url>
 Content-Type: application/json
 User-Agent: dab-webhooks/1.0
-X-DAB-Event: user.created
-X-DAB-Delivery: 01a0…            # id pengiriman, unik — pakai untuk idempotensi
-X-DAB-Timestamp: 1788860000      # detik Unix saat dikirim
-X-DAB-Signature: sha256=…        # HMAC-SHA256(secret, "<timestamp>.<body>")
+X-CRK-Event: user.created
+X-CRK-Delivery: 01a0…            # id pengiriman, unik — pakai untuk idempotensi
+X-CRK-Timestamp: 1788860000      # detik Unix saat dikirim
+X-CRK-Signature: sha256=…        # HMAC-SHA256(secret, "<timestamp>.<body>")
 
 {"id":"01a0…","event":"user.created","occurredAt":"2026-09-08T09:00:00.000Z","clientId":"…","requestId":"…","data":{"userId":"…","clientId":"…"}}
 ```
@@ -36,7 +36,7 @@ Hanya job yang di-`enqueue` dengan `clientId` yang sampai ke webhook — job tan
 
 ## Verifikasi di penerima
 
-Hitung `HMAC-SHA256(secret, timestamp + "." + bodyMentah)` dan bandingkan dengan `X-DAB-Signature` (setelah awalan `sha256=`) memakai perbandingan waktu-konstan; tolak bila `X-DAB-Timestamp` lebih tua dari 5 menit. Secret diperlihatkan **sekali** saat webhook dibuat (dan saat **Ganti secret**); yang tersimpan hanya di tabel `webhooks` dan tidak pernah dikembalikan API. Contoh Node/Bun:
+Hitung `HMAC-SHA256(secret, timestamp + "." + bodyMentah)` dan bandingkan dengan `X-CRK-Signature` (setelah awalan `sha256=`) memakai perbandingan waktu-konstan; tolak bila `X-CRK-Timestamp` lebih tua dari 5 menit. Secret diperlihatkan **sekali** saat webhook dibuat (dan saat **Ganti secret**); yang tersimpan hanya di tabel `webhooks` dan tidak pernah dikembalikan API. Contoh Node/Bun:
 
 ```ts
 const expected = 'sha256=' + createHmac('sha256', SECRET).update(`${ts}.${raw}`).digest('hex');

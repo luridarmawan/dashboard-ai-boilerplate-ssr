@@ -59,7 +59,7 @@ const badge = (s: string) =>
   <div class="notice" role="status" data-testid="webhook-secret">
     <p class="font-medium">{t('webhooks.detail.secret_title')}</p>
     <code class="mt-2 block select-all break-all rounded-md border bg-background px-3 py-2 text-sm">{secret}</code>
-    <p class="mt-2 text-sm text-muted-foreground">{t('webhooks.detail.verify_1')}<code>HMAC_SHA256(secret, `${'{'}X-DAB-Timestamp{'}'}.${'{'}body{'}'}`)</code>{t('webhooks.detail.verify_2')}<code>X-DAB-Signature</code>{t('webhooks.detail.verify_3')}<code>sha256=</code>{t('webhooks.detail.verify_4')}</p>
+    <p class="mt-2 text-sm text-muted-foreground">{t('webhooks.detail.verify_1')}<code>HMAC_SHA256(secret, `${'{'}X-CRK-Timestamp{'}'}.${'{'}body{'}'}`)</code>{t('webhooks.detail.verify_2')}<code>X-CRK-Signature</code>{t('webhooks.detail.verify_3')}<code>sha256=</code>{t('webhooks.detail.verify_4')}</p>
   </div>
 {/snippet}
 

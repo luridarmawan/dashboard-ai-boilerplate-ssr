@@ -389,7 +389,7 @@
   "webhooks.form.all_events": "* — semua event",
   "webhooks.form.enabled": "Aktif — event dikirim",
   "webhooks.form.url": "URL tujuan",
-  "webhooks.form.url_hint": "Menerima POST JSON dengan header X-DAB-Event, X-DAB-Delivery, X-DAB-Timestamp, X-DAB-Signature (HMAC-SHA256 dari \"<timestamp>.<body>\" memakai secret).",
+  "webhooks.form.url_hint": "Menerima POST JSON dengan header X-CRK-Event, X-CRK-Delivery, X-CRK-Timestamp, X-CRK-Signature (HMAC-SHA256 dari \"<timestamp>.<body>\" memakai secret).",
   "webhooks.last_status": "Status terakhir",
   "webhooks.lead": "Event inti tenant ini (pengguna dibuat, konfigurasi disimpan, modul di-toggle, notifikasi, …) dikirim sebagai POST JSON bertanda tangan ke URL yang Anda daftarkan, dengan percobaan ulang otomatis.",
   "webhooks.load_failed": "Webhook tidak bisa dimuat",

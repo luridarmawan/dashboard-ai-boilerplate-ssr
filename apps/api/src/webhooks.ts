@@ -11,7 +11,7 @@ import { metrics } from './metrics.ts';
  *   deliver      `core.webhooks.deliver` (every minute) and a nudge right after enqueue POST the due
  *                rows; a non-2xx or network error schedules a retry (1m, 5m, 30m, 2h, 12h), then
  *                the row is marked `failed`
- *   signature    `X-DAB-Signature: sha256=HMAC_SHA256(secret, "<timestamp>.<body>")` so a receiver
+ *   signature    `X-CRK-Signature: sha256=HMAC_SHA256(secret, "<timestamp>.<body>")` so a receiver
  *                can verify origin and freshness; the secret is only ever shown at creation
  *
  * Events without a tenant (`system.ping`, config/user events with `clientId: null`) are not
@@ -134,10 +134,10 @@ export async function attemptDelivery(
       headers: {
         'content-type': 'application/json',
         'user-agent': USER_AGENT,
-        'x-dab-event': d.event,
-        'x-dab-delivery': d.id,
-        'x-dab-timestamp': timestamp,
-        'x-dab-signature': await sign(hook.secret, timestamp, body),
+        'x-crk-event': d.event,
+        'x-crk-delivery': d.id,
+        'x-crk-timestamp': timestamp,
+        'x-crk-signature': await sign(hook.secret, timestamp, body),
       },
       body,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -252,9 +252,9 @@ export async function sendTestPing(hook: WebhookRow): Promise<{
       headers: {
         'content-type': 'application/json',
         'user-agent': USER_AGENT,
-        'x-dab-event': 'webhook.test',
-        'x-dab-timestamp': timestamp,
-        'x-dab-signature': await sign(hook.secret, timestamp, body),
+        'x-crk-event': 'webhook.test',
+        'x-crk-timestamp': timestamp,
+        'x-crk-signature': await sign(hook.secret, timestamp, body),
       },
       body,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

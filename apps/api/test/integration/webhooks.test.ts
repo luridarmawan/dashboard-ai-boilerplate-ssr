@@ -160,7 +160,7 @@ describe.skipIf(!enabled)(
 
       const r = await deliverWebhooksOnce();
       expect(r.delivered).toBeGreaterThanOrEqual(1);
-      const got = received.find((x) => x.headers['x-dab-event'] === 'user.created');
+      const got = received.find((x) => x.headers['x-crk-event'] === 'user.created');
       expect(got).toBeDefined();
       const body = JSON.parse((got as Received).body) as {
         id: string;
@@ -173,15 +173,15 @@ describe.skipIf(!enabled)(
       expect(body.clientId).toBe(tenantId);
       expect(body.requestId).toBe('r1');
       expect(body.data.clientId).toBe(tenantId);
-      expect((got as Received).headers['x-dab-delivery']).toBe(body.id);
+      expect((got as Received).headers['x-crk-delivery']).toBe(body.id);
       expect((got as Received).headers['user-agent']).toContain('dab-webhooks');
       // Receiver-side verification: HMAC of "<timestamp>.<body>" with the once-shown secret.
       const expected = await sign(
         secret,
-        (got as Received).headers['x-dab-timestamp'] as string,
+        (got as Received).headers['x-crk-timestamp'] as string,
         (got as Received).body,
       );
-      expect((got as Received).headers['x-dab-signature']).toBe(expected);
+      expect((got as Received).headers['x-crk-signature']).toBe(expected);
       // Delivery row + webhook status.
       const detail = (await json(await call(`/v1/webhooks/${hookId}`, {}, [admin]))).data as {
         lastStatus: string;
@@ -270,7 +270,7 @@ describe.skipIf(!enabled)(
         status: number;
       };
       expect(ping).toMatchObject({ ok: true, status: 200 });
-      expect(received.at(-1)?.headers['x-dab-event']).toBe('webhook.test');
+      expect(received.at(-1)?.headers['x-crk-event']).toBe('webhook.test');
       const rotated = (
         await json(await call(`/v1/webhooks/${hookId}/rotate-secret`, { method: 'POST' }, [admin]))
       ).data as { secret: string };

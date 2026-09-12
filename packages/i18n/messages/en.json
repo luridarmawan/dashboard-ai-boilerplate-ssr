@@ -389,7 +389,7 @@
   "webhooks.form.all_events": "* — all events",
   "webhooks.form.enabled": "Active — events are sent",
   "webhooks.form.url": "Destination URL",
-  "webhooks.form.url_hint": "Receives a JSON POST with the headers X-DAB-Event, X-DAB-Delivery, X-DAB-Timestamp, X-DAB-Signature (HMAC-SHA256 of \"<timestamp>.<body>\" using the secret).",
+  "webhooks.form.url_hint": "Receives a JSON POST with the headers X-CRK-Event, X-CRK-Delivery, X-CRK-Timestamp, X-CRK-Signature (HMAC-SHA256 of \"<timestamp>.<body>\" using the secret).",
   "webhooks.last_status": "Last status",
   "webhooks.lead": "This tenant's core events (user created, configuration saved, module toggled, notifications, …) are sent as signed JSON POSTs to the URLs you register, with automatic retries.",
   "webhooks.load_failed": "Webhooks could not be loaded",
