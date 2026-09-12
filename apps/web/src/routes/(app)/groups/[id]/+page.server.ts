@@ -1,6 +1,14 @@
 import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -48,8 +56,13 @@ export const load: PageServerLoad = async (event) => {
      * Deleting a group takes its members' permissions with it, so it takes two steps:
      * `?confirm=delete` opens the confirmation — a plain link, no JavaScript needed (L-22) — and
      * the action below still refuses a POST whose typed code does not match.
+     *
+     * `&member=` says the confirmation being asked for is a ROW's, not the whole group's: both
+     * live on this page, so without the distinction one link would open both confirmations.
      */
-    confirmDelete: event.url.searchParams.get('confirm') === 'delete',
+    confirmDelete: confirmed(event) && !event.url.searchParams.has('member'),
+    /** Which member's removal is awaiting confirmation, if any. */
+    confirmRemoveId: confirmed(event) ? event.url.searchParams.get('member') : null,
   };
 };
 
@@ -107,6 +120,9 @@ export const actions: Actions = {
   removeMember: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    // Losing a group's permissions is not undone by adding the person back into a picker, so the
+    // confirmation is enforced here as well — one in the markup alone is not a confirmation.
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1['group-members']({ id: event.params.id })({ userId: str(form, 'userId') })

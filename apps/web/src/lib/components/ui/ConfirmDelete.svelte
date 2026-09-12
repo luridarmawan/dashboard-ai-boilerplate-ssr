@@ -39,6 +39,12 @@ interface Props {
   class?: string;
   /** Row-sized: no alert box, buttons sit inline where the trigger was. */
   compact?: boolean;
+  /**
+   * Glyph for the trigger and the confirm button. Defaults to the bin, but not every destructive
+   * step is a deletion — removing someone from a group does not delete the person — and a trigger
+   * that says "delete" about something else is a worse warning than no icon.
+   */
+  icon?: string;
   /** Extra hidden inputs the action needs (row id, current filter, …). */
   fields?: Snippet;
 }
@@ -57,6 +63,7 @@ let {
   size = 'default',
   class: className,
   compact = false,
+  icon = 'trash',
   fields,
 }: Props = $props();
 const t = useT();
@@ -72,7 +79,7 @@ const post = $derived(`${action}${action.includes('?') ? '&' : '?'}confirm=delet
     <Csrf token={csrf} />
     {@render fields?.()}
     <Button type="submit" variant="destructive" size={compact && !inDialog ? 'sm' : 'default'}>
-      <Icon name="trash" size={16} />{submitLabel}
+      <Icon name={icon} size={16} />{submitLabel}
     </Button>
     {#if inDialog}
       <Button variant="secondary" onclick={() => { open = false; }}>{t('common.cancel')}</Button>
@@ -103,6 +110,7 @@ const post = $derived(`${action}${action.includes('?') ? '&' : '?'}confirm=delet
     class={cn(buttonVariants({ variant, size }), className)}
     aria-haspopup="dialog"
     aria-label={label ?? t('common.delete')}
+    title={label ?? t('common.delete')}
     onclick={(e) => {
       // Leave the modified clicks alone — the link still points at a real page.
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -110,7 +118,7 @@ const post = $derived(`${action}${action.includes('?') ? '&' : '?'}confirm=delet
       open = true;
     }}
   >
-    <Icon name="trash" size={16} />{#if !compact}{label ?? t('common.delete')}{/if}
+    <Icon name={icon} size={16} />{#if !compact}{label ?? t('common.delete')}{/if}
   </a>
   <Dialog bind:open title={heading} description={lead}>
     {@render form(true)}

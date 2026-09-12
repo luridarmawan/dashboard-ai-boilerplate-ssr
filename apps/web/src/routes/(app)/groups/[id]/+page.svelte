@@ -1,7 +1,6 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
-import Icon from '$lib/components/Icon.svelte';
-import { iconActionClass } from '$lib/components/table';
+import { ConfirmDelete } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../../$types';
@@ -29,6 +28,20 @@ const memberHref = (page: number, q: string) => {
   if (data.candidateQuery) p.set('cq', data.candidateQuery);
   const s = p.toString();
   return s ? `?${s}` : '?';
+};
+/**
+ * Removing a member is confirmed like every other destructive step (L-21/L-22): the trigger links
+ * to this same page with the row named, and `ConfirmDelete` turns that into a modal when there is
+ * JavaScript. `&member=` is what keeps it apart from the group's own `?confirm=delete` below.
+ */
+const confirmMemberHref = (userId: string) => {
+  const p = new URLSearchParams();
+  if (data.memberQuery) p.set('mq', data.memberQuery);
+  if (mp.page > 1) p.set('mpage', String(mp.page));
+  if (data.candidateQuery) p.set('cq', data.candidateQuery);
+  p.set('confirm', 'delete');
+  p.set('member', userId);
+  return `?${p}#members`;
 };
 const candidates = $derived(data.tenantUsers.filter((u) => !memberIds.has(u.id)));
 const editable = $derived(can('group.edit'));
@@ -76,7 +89,7 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
     {#if editable}<div><button type="submit">{t('groups.detail.save_permissions')}</button></div>{/if}
   </form>
 
-  <h2>{t('groups.detail.members_count', { n: g.memberCount })}</h2>
+  <h2 id="members">{t('groups.detail.members_count', { n: g.memberCount })}</h2>
   <!-- The roster is one page of `?mpage`, searched by `?mq` — both plain GET, no JavaScript. -->
   <form method="GET" class="row">
     {#if data.candidateQuery}<input type="hidden" name="cq" value={data.candidateQuery} />{/if}
@@ -92,12 +105,24 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
           <td>{m.name}</td><td>{m.email}</td>
           <td>
             {#if editable}
-              <form method="POST" action="?/removeMember" class="row">
-                <Csrf token={data.csrf} />
-                <input type="hidden" name="userId" value={m.userId} />
-                <!-- Icon-only, like a row action elsewhere: the label is the tooltip and the accessible name. -->
-                <button type="submit" class={iconActionClass} title={t('groups.detail.remove_member')} aria-label={t('groups.detail.remove_member')}><Icon name="x" size={16} /></button>
-              </form>
+              <ConfirmDelete
+                compact
+                icon="x"
+                csrf={data.csrf}
+                action="?/removeMember"
+                href={confirmMemberHref(m.userId)}
+                cancelHref={memberHref(mp.page, data.memberQuery)}
+                confirming={data.confirmRemoveId === m.userId}
+                variant="ghost"
+                size="sm"
+                class="text-destructive"
+                label={t('groups.detail.remove_member')}
+                title={t('groups.detail.remove_member')}
+                confirmLabel={t('groups.detail.remove_confirm_submit')}
+                description={t('groups.detail.remove_confirm_lead', { name: m.name, group: g.name })}
+              >
+                {#snippet fields()}<input type="hidden" name="userId" value={m.userId} />{/snippet}
+              </ConfirmDelete>
             {/if}
           </td>
         </tr>

@@ -431,6 +431,8 @@
   "groups.detail.no_members": "No members yet.",
   "groups.detail.not_found": "Group not found",
   "groups.detail.remove_member": "Remove",
+  "groups.detail.remove_confirm_lead": "{name} will be removed from the group {group} and loses every permission this group grants, at once. The account stays, and can be added again.",
+  "groups.detail.remove_confirm_submit": "Yes, remove",
   "groups.detail.resource": "Resource",
   "groups.detail.save_permissions": "Save permissions",
   "groups.detail.saved": "Saved — the change applies to all members immediately.",

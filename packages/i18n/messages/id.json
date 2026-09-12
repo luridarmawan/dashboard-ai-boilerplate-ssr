@@ -431,6 +431,8 @@
   "groups.detail.no_members": "Belum ada anggota.",
   "groups.detail.not_found": "Grup tidak ditemukan",
   "groups.detail.remove_member": "Keluarkan",
+  "groups.detail.remove_confirm_lead": "{name} akan dikeluarkan dari grup {group} dan langsung kehilangan seluruh izin yang diberikan grup ini. Akunnya tetap ada dan bisa ditambahkan lagi.",
+  "groups.detail.remove_confirm_submit": "Ya, keluarkan",
   "groups.detail.resource": "Resource",
   "groups.detail.save_permissions": "Simpan izin",
   "groups.detail.saved": "Tersimpan — perubahan langsung berlaku untuk semua anggota.",
