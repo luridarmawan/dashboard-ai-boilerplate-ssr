@@ -375,6 +375,27 @@ const member = new Jar();
   await post(admin, `/groups/${groupId}?/delete`, { _csrf: token, code });
 }
 
+// ---- D-5 presence, without JavaScript ----
+{
+  const list = await get(admin, '/users');
+  // The admin is signing these very requests, so they must be the one row that reads "online".
+  const dots = [...list.html.matchAll(/data-testid="presence" data-online="(true|false)"/g)].map(
+    (m) => m[1],
+  );
+  check(
+    'D-5 the user list carries a presence dot per row, and this signed-in admin is online',
+    dots.length > 0 && dots.includes('true'),
+    `${dots.filter((d) => d === 'true').length}/${dots.length} online`,
+  );
+  check(
+    'D-5 the dot is never colour alone: the wording is in the HTML for screen readers',
+    /title="[^"]*"[^>]*data-testid="presence"|data-testid="presence"[^>]*title="[^"]*"/.test(
+      list.html,
+    ),
+  );
+
+}
+
 // 10. logout invalidates server-side
 {
   const dash = await get(admin, '/dashboard');

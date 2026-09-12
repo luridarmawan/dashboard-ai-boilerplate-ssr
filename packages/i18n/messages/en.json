@@ -694,5 +694,10 @@
   "examples.aside.step_optional": "Other pages may have no aside",
   "examples.aside.data_title": "From the page data",
   "examples.aside.data_hint": "The aside takes no props",
-  "examples.aside.rendered_at": "Load data produced at:"
+  "examples.aside.rendered_at": "Load data produced at:",
+  "presence.online": "Online",
+  "presence.never": "Never seen",
+  "presence.just_now": "just now",
+  "presence.last_seen": "Last seen {when}",
+  "users.presence": "Activity"
 }

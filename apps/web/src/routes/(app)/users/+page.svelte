@@ -2,16 +2,20 @@
 import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
+import Presence from '$lib/components/Presence.svelte';
 import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import { presenceText } from '$lib/presence';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
+/** D-5: the wording lives with the dashboard (see $lib/presence), the dot with the component. */
+const seen = (r: { online: boolean; lastSeenAt: string | null }) => presenceText(r, dateLocale, t);
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 type Row = (typeof data.users)[number];
 
@@ -25,6 +29,8 @@ const columns: ColumnDef<Row>[] = [
     value: (r) => r.groups.map((g) => g.name).join(', ') || '—',
   },
   { key: 'status', label: t('users.status') },
+  /** D-5: off by default — the dot next to the name already says it; this spells it out. */
+  { key: 'presence', label: t('users.presence'), hidden: true },
   {
     key: 'lastLogin',
     label: t('users.last_login'),
@@ -96,8 +102,10 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
     {#snippet cell(row, col)}
       {#if col.key === 'status'}
         <Badge variant={row.statusId === 1 ? 'success' : 'secondary'}>{row.statusId === 1 ? t('common.active') : t('common.inactive')}</Badge>
+      {:else if col.key === 'presence'}
+        <Presence online={row.online} text={seen(row)} label />
       {:else if col.key === 'name'}
-        <a href={`/users/${row.id}`} class="font-medium text-foreground">{row.name}</a>{#if row.isSuperadmin} <Badge variant="outline">superadmin</Badge>{/if}
+        <span class="inline-flex items-center gap-2"><Presence online={row.online} text={seen(row)} /><a href={`/users/${row.id}`} class="font-medium text-foreground">{row.name}</a></span>{#if row.isSuperadmin} <Badge variant="outline">superadmin</Badge>{/if}
       {:else}
         {col.value ? (col.value(row) ?? '—') : '—'}
       {/if}

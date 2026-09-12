@@ -694,5 +694,10 @@
   "examples.aside.step_optional": "Halaman lain boleh tidak punya aside",
   "examples.aside.data_title": "Dari data halaman",
   "examples.aside.data_hint": "Aside tidak menerima props",
-  "examples.aside.rendered_at": "Data load dibuat pada:"
+  "examples.aside.rendered_at": "Data load dibuat pada:",
+  "presence.online": "Online",
+  "presence.never": "Belum pernah aktif",
+  "presence.just_now": "baru saja",
+  "presence.last_seen": "Terakhir aktif {when}",
+  "users.presence": "Aktivitas"
 }

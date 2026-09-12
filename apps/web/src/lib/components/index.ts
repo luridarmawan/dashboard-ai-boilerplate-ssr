@@ -7,6 +7,7 @@
 export { default as Csrf } from './Csrf.svelte';
 export * from './form/index.ts';
 export { default as Icon } from './Icon.svelte';
+export { default as Presence } from './Presence.svelte';
 export { default as SidebarToggle } from './SidebarToggle.svelte';
 export * from './table/index.ts';
 export * from './ui/index.ts';

@@ -157,6 +157,36 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((await put(`/v1/users/${adminId}`, { isSuperadmin: false }, [admin])).status).toBe(409);
   });
 
+  test('presence: a signed-in member is online, a brand-new one has never been seen (D-5)', async () => {
+    const seen = await json(await call(`/v1/users/${bobId}`, {}, [admin]));
+    const bobRow = seen.data as unknown as { online: boolean; lastSeenAt: string | null };
+    // Bob has a live session from the tests above, and it was touched on this very request.
+    expect(bobRow.online).toBe(true);
+    expect(bobRow.lastSeenAt).not.toBeNull();
+    expect(Date.now() - new Date(bobRow.lastSeenAt ?? 0).getTime()).toBeLessThan(5 * 60_000);
+
+    const created = await post(
+      '/v1/users',
+      { email: `ghost-${run}@example.test`, name: 'Ghost', password: 'a password for ghost 1' },
+      [admin],
+    );
+    expect(created.status).toBe(201);
+    const ghostId = ((await json(created)).data as { id: string }).id;
+    const ghost = await json(await call(`/v1/users/${ghostId}`, {}, [admin]));
+    // An account that exists is not a person who is here: no session, no presence.
+    expect((ghost.data as unknown as { online: boolean }).online).toBe(false);
+    expect((ghost.data as unknown as { lastSeenAt: string | null }).lastSeenAt).toBeNull();
+
+    // …and signing out takes the light off without erasing when they were last around.
+    const ghostSession = await login(`ghost-${run}@example.test`, 'a password for ghost 1');
+    const on = await json(await call(`/v1/users/${ghostId}`, {}, [admin]));
+    expect((on.data as unknown as { online: boolean }).online).toBe(true);
+    expect((await post('/v1/auth/logout', {}, [ghostSession])).status).toBe(200);
+    const off = await json(await call(`/v1/users/${ghostId}`, {}, [admin]));
+    expect((off.data as unknown as { online: boolean }).online).toBe(false);
+    expect((off.data as unknown as { lastSeenAt: string | null }).lastSeenAt).not.toBeNull();
+  });
+
   test('group permissions: replace set is audited-in, takes effect immediately; members add/remove', async () => {
     const rep = await put(`/v1/group-permissions/${editorsId}`, { permissions: ['user.read'] }, [
       admin,

@@ -2,9 +2,11 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
+import Presence from '$lib/components/Presence.svelte';
 import { Alert, Badge, Button, Card, Field, Input } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import { presenceText } from '$lib/presence';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
@@ -73,6 +75,8 @@ const fieldErrors = $derived(
     <span class="text-muted-foreground">{u.email}</span>
     {#if u.isSuperadmin}<Badge variant="outline">superadmin</Badge>{/if}
     <Badge variant={u.statusId === 1 ? 'success' : 'secondary'}>{u.statusId === 1 ? t('common.active') : t('common.inactive')}</Badge>
+    <!-- D-5: "is this account enabled" and "is this person here" are different questions. -->
+    <Presence online={u.online} text={presenceText(u, dateLocale, t)} label />
   </div>
   {#if data.created}<p class="notice">{t('users.detail.created')}</p>{/if}
   {#if can('user.impersonate') && !data.impersonator && !u.isSuperadmin && u.id !== data.viewer.id && u.statusId === 1}

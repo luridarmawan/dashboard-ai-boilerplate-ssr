@@ -111,8 +111,57 @@ const TenantUser = t.Intersect([
   t.Object({
     statusId: t.Integer(),
     groups: t.Array(t.Object({ id: t.String(), code: t.String(), name: t.String() })),
+    /** D-5: newest `sessions.last_seen_at` of this account, live or not; null once purged. */
+    lastSeenAt: t.Nullable(t.String()),
+    /** D-5: a live session touched within ONLINE_WINDOW — "here now", not "has an account". */
+    online: t.Boolean(),
   }),
 ]);
+
+/**
+ * Presence (D-5). `last_seen_at` is touched at most once a minute per session
+ * (`TOUCH_INTERVAL_MS` in @core/auth), so the window has to be comfortably wider than that;
+ * five minutes reads as "still here" without calling someone online who closed the tab.
+ */
+const ONLINE_WINDOW_MS = 5 * 60_000;
+
+interface Presence {
+  readonly lastSeenAt: Date;
+  readonly online: boolean;
+}
+
+/**
+ * One query for a whole page of users, not one per row: every session row of these accounts,
+ * reduced here. `online` counts only sessions that are still live (not revoked, not expired),
+ * while `lastSeenAt` is the newest touch of any session — a logged-out user still has a last
+ * time they were around, which is exactly what the column is for.
+ */
+async function presenceOf(userIds: readonly string[]): Promise<Map<string, Presence>> {
+  const out = new Map<string, Presence>();
+  if (!userIds.length) return out;
+  const db = unsafeAcrossTenants(); // sessions is a global table (B-0)
+  const rows = await db
+    .select({
+      userId: schema.sessions.user_id,
+      lastSeenAt: schema.sessions.last_seen_at,
+      expiresAt: schema.sessions.expires_at,
+      revokedAt: schema.sessions.revoked_at,
+    })
+    .from(schema.sessions)
+    .where(inArray(schema.sessions.user_id, [...new Set(userIds)]));
+  const now = Date.now();
+  for (const r of rows) {
+    const live = !r.revokedAt && r.expiresAt.getTime() > now;
+    const fresh = now - r.lastSeenAt.getTime() < ONLINE_WINDOW_MS;
+    const prev = out.get(r.userId);
+    out.set(r.userId, {
+      lastSeenAt:
+        prev && prev.lastSeenAt.getTime() > r.lastSeenAt.getTime() ? prev.lastSeenAt : r.lastSeenAt,
+      online: (prev?.online ?? false) || (live && fresh),
+    });
+  }
+  return out;
+}
 
 type UserRow = typeof schema.users.$inferSelect;
 
@@ -194,8 +243,19 @@ async function memberRow(tenant: TenantState['tenant'], userId: string): Promise
   return row?.user ?? null;
 }
 
-async function tenantUser(tenant: TenantState['tenant'], u: UserRow) {
-  return { ...publicUser(u), statusId: u.status_id, groups: await groupsOf(tenant, u.id) };
+async function tenantUser(
+  tenant: TenantState['tenant'],
+  u: UserRow,
+  presence?: ReadonlyMap<string, Presence>,
+) {
+  const seen = presence?.get(u.id) ?? null;
+  return {
+    ...publicUser(u),
+    statusId: u.status_id,
+    groups: await groupsOf(tenant, u.id),
+    lastSeenAt: seen?.lastSeenAt.toISOString() ?? null,
+    online: seen?.online ?? false,
+  };
 }
 
 /** Replace the user's group memberships in the active tenant; unknown group ids → error string. */
@@ -864,8 +924,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         .orderBy(p.order === 'desc' ? desc(col) : asc(col))
         .limit(p.limit)
         .offset(p.offset);
+      const presence = await presenceOf(rows.map((r) => r.user.id));
       const data = [];
-      for (const r of rows) data.push(await tenantUser(ts.tenant, r.user));
+      for (const r of rows) data.push(await tenantUser(ts.tenant, r.user, presence));
       return page(data, p.meta(Number(totalRow?.n ?? 0)));
     },
     {
@@ -881,7 +942,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       const ts = tenantOf(tenantState);
       const row = ts ? await memberRow(ts.tenant, params.id) : null;
       if (!ts || !row) return notFound(set, requestId, 'Pengguna');
-      return ok(await tenantUser(ts.tenant, row));
+      return ok(await tenantUser(ts.tenant, row, await presenceOf([row.id])));
     },
     {
       beforeHandle: permission('user.read'),
