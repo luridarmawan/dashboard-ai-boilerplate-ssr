@@ -8,7 +8,7 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 
 ## Architecture
 
-[![architecture](docs/screenshot/architecture.png)](docs\architecture.html)
+[![architecture](docs/screenshot/architecture.png)](docs/architecture.html)
 
 [See Architecture)](docs\architecture.html)
 
