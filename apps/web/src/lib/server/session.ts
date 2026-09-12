@@ -1,4 +1,4 @@
-import { createTranslator, type Locale } from '@core/i18n';
+import { createTranslator, type Locale, type MessageKey } from '@core/i18n';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
@@ -327,19 +327,24 @@ export function actionFailure(
 }
 
 /**
- * Destructive actions are never one POST away (L-22): the trigger only links to `?confirm=delete`,
+ * Destructive actions are never one POST away (L-22): the trigger only links to `?confirm=<token>`,
  * which re-renders the page with a confirmation — or, with JavaScript, opens it as a modal without
  * navigating. `ConfirmDelete` renders both paths; these two are the guard behind them, because a
- * confirmation that lives only in the markup is not a confirmation.
+ * confirmation that lives only in the markup is not a confirmation. The token is `delete` unless
+ * the step is something else worth asking about first (`archive`, …), so two confirmations on the
+ * same page never answer for each other.
  */
-export const confirmed = (event: RequestEvent): boolean =>
-  event.url.searchParams.get('confirm') === 'delete';
+export const confirmed = (event: RequestEvent, token = 'delete'): boolean =>
+  event.url.searchParams.get('confirm') === token;
 
-export const confirmFail = (locale: Locale) =>
+export const confirmFail = (
+  locale: Locale,
+  message: MessageKey = 'common.delete_confirm_required',
+) =>
   actionFailure({
     status: 422,
     code: 'confirm_failed',
-    message: createTranslator(locale)('common.delete_confirm_required'),
+    message: createTranslator(locale)(message),
   });
 
 export const str = (form: FormData, key: string): string => {

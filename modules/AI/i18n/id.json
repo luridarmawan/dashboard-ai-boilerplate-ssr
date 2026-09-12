@@ -179,5 +179,7 @@
   "ai.chat.attachments": "Lampiran",
   "ai.providers.delete_confirm_lead": "Penyedia {name} akan dihapus. Percakapan yang memakainya harus memilih penyedia lain.",
   "ai.mcps.delete_confirm_lead": "Server MCP {name} akan dihapus beserta tool yang berasal darinya.",
-  "ai.chat.delete_confirm_lead": "Percakapan “{title}” beserta seluruh pesannya akan dihapus."
+  "ai.chat.delete_confirm_lead": "Percakapan “{title}” beserta seluruh pesannya akan dihapus.",
+  "ai.chat.archive_confirm": "Konfirmasi pengarsipan",
+  "ai.chat.archive_confirm_lead": "Percakapan “{title}” akan dipindahkan ke arsip dan hilang dari daftar. Anda bisa mengeluarkannya lagi dari arsip."
 }

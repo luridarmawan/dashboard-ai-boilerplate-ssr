@@ -179,5 +179,7 @@
   "ai.chat.attachments": "Attachments",
   "ai.providers.delete_confirm_lead": "Provider {name} will be deleted. Conversations using it have to pick another provider.",
   "ai.mcps.delete_confirm_lead": "MCP server {name} will be deleted, along with the tools it brought in.",
-  "ai.chat.delete_confirm_lead": "Conversation “{title}” and all of its messages will be deleted."
+  "ai.chat.delete_confirm_lead": "Conversation “{title}” and all of its messages will be deleted.",
+  "ai.chat.archive_confirm": "Confirm archiving",
+  "ai.chat.archive_confirm_lead": "Conversation “{title}” moves to the archive and leaves the list. You can bring it back from there."
 }

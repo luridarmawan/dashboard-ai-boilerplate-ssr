@@ -391,7 +391,9 @@ function copy(text: string) {
             {/if}
           {/if}
           <!-- The labels fold away on narrow screens; the title stays readable, the actions stay reachable. -->
-          <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" /><Button id="btn-chat-archive" type="submit" variant="ghost" size="sm" title={t('ai.chat.archive')} aria-label={t('ai.chat.archive')}><Icon name="archive" size={14} /><span class="hidden sm:inline">{t('ai.chat.archive')}</span></Button></form>
+          <ConfirmDelete compact compactLabel csrf={data.csrf} confirm="archive" action="?/archive" icon="archive" confirmVariant="default" href={`/m/ai/chat?c=${data.conversation.id}&confirm=archive#confirm-archive`} cancelHref={`/m/ai/chat?c=${data.conversation.id}`} confirming={data.confirmArchive} variant="ghost" size="sm" label={t('ai.chat.archive')} title={t('ai.chat.archive_confirm')} confirmLabel={t('ai.chat.archive')} description={t('ai.chat.archive_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
+            {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" />{/snippet}
+          </ConfirmDelete>
           <ConfirmDelete compact csrf={data.csrf} href={`/m/ai/chat?c=${data.conversation.id}&confirm=delete#confirm-delete`} cancelHref={`/m/ai/chat?c=${data.conversation.id}`} confirming={data.confirmDelete} variant="ghost" size="sm" class="text-destructive" label={t('ai.chat.delete')} title={t('ai.chat.delete')} description={t('ai.chat.delete_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
             {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} />{/snippet}
           </ConfirmDelete>

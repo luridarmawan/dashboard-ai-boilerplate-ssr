@@ -13,6 +13,7 @@
   "common.delete_confirm_lead": "Item ini akan dihapus. Tindakan ini tidak bisa dibatalkan dari halaman ini.",
   "common.delete_confirm_submit": "Ya, hapus",
   "common.delete_confirm_required": "Penghapusan harus dikonfirmasi lebih dulu — tidak ada yang dihapus.",
+  "common.confirm_required": "Tindakan ini harus dikonfirmasi lebih dulu — tidak ada yang diubah.",
   "common.search": "Cari",
   "common.actions": "Aksi",
   "common.none": "Tidak ada",

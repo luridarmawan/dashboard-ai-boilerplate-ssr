@@ -105,6 +105,8 @@ export const load: ServerLoad = async (event) => {
     error: event.url.searchParams.get('error'),
     /** Opens the delete confirmation for the open conversation; the action checks it too. */
     confirmDelete: confirmed(event),
+    /** Same, for archiving — a separate token so one confirmation never answers for the other. */
+    confirmArchive: confirmed(event, 'archive'),
   };
 };
 
@@ -274,6 +276,10 @@ export const actions: Actions = {
   archive: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail();
+    // Archiving takes the conversation off the list; it is undone from the archive, not from here,
+    // so it is asked about first (L-22) — and the guard, not the markup, is what enforces that.
+    if (!confirmed(event, 'archive'))
+      return confirmFail(event.locals.locale.locale, 'common.confirm_required');
     const id = str(form, 'c');
     await apiFor(event)
       .v1.m.ai.conversations({ id })

@@ -13,6 +13,7 @@
   "common.delete_confirm_lead": "This item will be deleted. You cannot undo it from this page.",
   "common.delete_confirm_submit": "Yes, delete",
   "common.delete_confirm_required": "The deletion has to be confirmed first — nothing was deleted.",
+  "common.confirm_required": "This step has to be confirmed first — nothing was changed.",
   "common.search": "Search",
   "common.actions": "Actions",
   "common.none": "None",
