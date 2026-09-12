@@ -594,7 +594,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | D-3 | **[P0]** CRUD tenant (`clients`), termasuk endpoint "scope" — daftar tenant yang boleh diakses user saat ini. |
 | D-4 | **[P0]** Halaman profil sendiri: info dasar, ubah password, avatar, dan preferensi (bahasa, **tema**). |
 | D-5 | **[P1]** Indikator status online berdasarkan `last_seen`. |
-| D-6 | **[P2]** Impersonasi user oleh superadmin, dengan banner peringatan dan audit log. |
+| D-6 | **[P2]** Impersonasi user oleh pemegang izin `user.impersonate` (superadmin selalu termasuk), dengan penanda peringatan di menu akun dan audit log. Non-superadmin hanya menjangkau anggota tenant aktifnya, dan tidak boleh memerankan user yang memegang izin di luar miliknya (C-5). |
 
 ### FR-E · Konfigurasi Runtime
 

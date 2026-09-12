@@ -4,7 +4,7 @@ import { and, type Db, desc, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 
 /**
- * Integration (INTEGRATION=1): impersonation by a superadmin (PRD D-6). A second cookie carries a
+ * Integration (INTEGRATION=1): impersonation (PRD D-6). A second cookie carries a
  * session opened AS the target; requests then act as the target while `/me` names the admin behind
  * it; the admin's own session is untouched, credential changes are refused meanwhile, both ends
  * are audited, and stopping revokes the impersonated session and drops the cookie.
@@ -45,7 +45,7 @@ type Me = { user: { id: string; email: string }; impersonator: { id: string } | 
 const me = async (cookies: string[]) =>
   (await json(await call('/v1/auth/me', {}, cookies))).data as Me;
 
-describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
+describe.skipIf(!enabled)('impersonation (D-6)', () => {
   let db: Db;
   let admin = '';
   let adminId = '';
@@ -69,7 +69,7 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
     memberId = (await me([member])).user.id;
   });
 
-  test('only a superadmin may start; not on self, another superadmin, or an unknown user', async () => {
+  test('user.impersonate is required to start; not on self, another superadmin, or an unknown user', async () => {
     const asMember = await call(`/v1/users/${adminId}/impersonate`, { method: 'POST' }, [member]);
     expect(asMember.status).toBe(403);
     expect((await call(`/v1/users/${memberId}/impersonate`, { method: 'POST' })).status).toBe(401);
@@ -180,6 +180,88 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
       .orderBy(desc(schema.auditLog.created_at))
       .limit(1);
     expect(audit?.actor_id).toBe(adminId);
+  });
+
+  /**
+   * The permission (C-4) opens impersonation to a non-superadmin — but only downwards and only
+   * inside the tenant they are acting in, or `user.impersonate` alone would be a ladder into
+   * the tenant's admin group and a way out of one's own tenant.
+   */
+  test('a delegate with user.impersonate acts downwards inside its own tenant only', async () => {
+    const post = (
+      path: string,
+      body: unknown,
+      cookies: string[],
+      headers?: Record<string, string>,
+    ) =>
+      call(
+        path,
+        { method: 'POST', body: JSON.stringify(body), ...(headers ? { headers } : {}) },
+        cookies,
+      );
+    const idOf = async (r: Response) => ((await json(r)).data as { id: string }).id;
+    const mkGroup = async (code: string, permissions: string[]) => {
+      const r = await post('/v1/groups', { code, name: code, permissions }, [admin]);
+      expect(r.status).toBe(201);
+      return idOf(r);
+    };
+    const mkUser = async (
+      email: string,
+      extra: Record<string, unknown>,
+      headers?: Record<string, string>,
+    ) => {
+      const r = await post(
+        '/v1/users',
+        { email, name: email, phone: null, ...extra },
+        [admin],
+        headers,
+      );
+      expect(r.status).toBe(201);
+      return idOf(r);
+    };
+    const delegatePassword = 'a delegate account password';
+    const delegateEmail = `imp-delegate-${run}@example.test`;
+    const delegateId = await mkUser(delegateEmail, {
+      password: delegatePassword,
+      groupIds: [await mkGroup(`imp-del-${run}`, ['user.read', 'user.impersonate'])],
+    });
+    const delegate = cookieOf(await login(delegateEmail, delegatePassword), 'crk_session');
+    expect(delegate).not.toBe('');
+
+    // Downwards: the member holds nothing the delegate does not.
+    const started = await call(`/v1/users/${memberId}/impersonate`, { method: 'POST' }, [delegate]);
+    expect(started.status).toBe(200);
+    const impCookie = cookieOf(started, 'crk_impersonate');
+    const asMember = await me([delegate, impCookie]);
+    expect(asMember.user.id).toBe(memberId);
+    expect(asMember.impersonator?.id).toBe(delegateId);
+    await call('/v1/users/impersonate/stop', { method: 'POST' }, [delegate, impCookie]);
+
+    // A user of another tenant is simply not there (B-3) — a superadmin still reaches them.
+    const otherTenant = await post('/v1/clients', { code: `imp-t-${run}`, name: 'Other' }, [admin]);
+    expect(otherTenant.status).toBe(201);
+    const outsiderId = await mkUser(
+      `imp-outsider-${run}@example.test`,
+      { password: 'an outsider account password' },
+      { 'x-client-id': await idOf(otherTenant) },
+    );
+    expect(
+      (await call(`/v1/users/${outsiderId}/impersonate`, { method: 'POST' }, [delegate])).status,
+    ).toBe(404);
+
+    // Upwards: the member now holds a permission the delegate does not.
+    const put = await call(
+      `/v1/users/${memberId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ groupIds: [await mkGroup(`imp-high-${run}`, ['config.read'])] }),
+      },
+      [admin],
+    );
+    expect(put.status).toBe(200);
+    const refused = await call(`/v1/users/${memberId}/impersonate`, { method: 'POST' }, [delegate]);
+    expect(refused.status).toBe(403);
+    expect((await json(refused)).error?.details?.permission).toBe('config.read');
   });
 
   test('logout drops both cookies', async () => {

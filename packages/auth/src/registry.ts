@@ -9,7 +9,16 @@ import { modulePermissions } from '@core/module-kit/registry';
  */
 
 export const CORE_PERMISSIONS: readonly PermissionDef[] = [
-  { resource: 'user', actions: CORE_ACTIONS, name: { id: 'Pengguna', en: 'Users' } },
+  {
+    resource: 'user',
+    /**
+     * `impersonate` (D-6) is an extra verb, not one of the CRUD four: acting as someone else is
+     * not editing them. Like every action it is implied by `user.manage` and the wildcards, and
+     * the endpoint additionally refuses a target who holds permissions the caller does not (C-5).
+     */
+    actions: [...CORE_ACTIONS, 'impersonate'],
+    name: { id: 'Pengguna', en: 'Users' },
+  },
   {
     resource: 'group',
     actions: CORE_ACTIONS,

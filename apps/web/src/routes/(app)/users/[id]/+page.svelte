@@ -75,7 +75,7 @@ const fieldErrors = $derived(
     <Badge variant={u.statusId === 1 ? 'success' : 'secondary'}>{u.statusId === 1 ? t('common.active') : t('common.inactive')}</Badge>
   </div>
   {#if data.created}<p class="notice">{t('users.detail.created')}</p>{/if}
-  {#if data.viewer.isSuperadmin && !data.impersonator && !u.isSuperadmin && u.id !== data.viewer.id && u.statusId === 1}
+  {#if can('user.impersonate') && !data.impersonator && !u.isSuperadmin && u.id !== data.viewer.id && u.statusId === 1}
     <!-- Impersonation (D-6): one click, then the banner on every page and a way back. -->
     <form method="POST" action="?/impersonate" class="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="impersonate-form">
       <Csrf token={data.csrf} />

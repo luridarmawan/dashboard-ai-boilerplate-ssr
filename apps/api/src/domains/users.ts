@@ -1,12 +1,15 @@
 import {
+  allPermissionStrings,
   createSession,
   defaultTenantOf,
   detachTenantFromSessions,
+  effectivePermissions,
   generateRecoveryCodes,
   generateTotpSecret,
   hashPassword,
   hashRecoveryCode,
   hashToken,
+  hasPermission,
   invalidateUserSessions,
   isMemberOf,
   otpauthUrl,
@@ -131,23 +134,6 @@ function mfaStatus(row: typeof schema.userMfa.$inferSelect | undefined) {
 }
 /** Impersonated sessions live one hour at most (D-6). */
 const IMPERSONATION_TTL_S = 3600;
-const superadminOnly = ({
-  auth,
-  set,
-  requestId,
-}: {
-  auth: AuthState | null;
-  set: { status?: number | string };
-  requestId: string;
-}) => {
-  if (auth?.user.is_superadmin) return;
-  set.status = auth ? 403 : 401;
-  return fail(
-    auth ? 'forbidden' : 'unauthorized',
-    auth ? 'Hanya superadmin' : 'Sesi tidak ada atau sudah berakhir',
-    requestId,
-  );
-};
 const sessionGuard = ({
   auth,
   set,
@@ -301,17 +287,25 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       detail: { summary: 'Edit my profile: name, locale, theme, sidebar, avatar (D-4)' },
     },
   )
-  // ---- impersonation (D-6): superadmin acts as a user, with banner + audit --------------------
+  // ---- impersonation (D-6): acting as a user, with the account-menu mark + audit --------------
   .post(
     '/:id/impersonate',
     async ({ auth, params, set, request, server, requestId, cookie, tenantState }) => {
       const a = actor(auth);
       const db = unsafeAcrossTenants();
-      const [target] = await db
-        .select()
-        .from(schema.users)
-        .where(and(eq(schema.users.id, params.id), isNull(schema.users.deleted_at)))
-        .limit(1);
+      /**
+       * A superadmin reaches every account; anyone else only the members of the tenant they are
+       * acting in — otherwise `user.impersonate` would be a way out of one's own tenant (B-3).
+       */
+      const target = a.user.is_superadmin
+        ? (
+            await db
+              .select()
+              .from(schema.users)
+              .where(and(eq(schema.users.id, params.id), isNull(schema.users.deleted_at)))
+              .limit(1)
+          )[0]
+        : await memberRow(tenantState?.tenant ?? null, params.id);
       if (!target) {
         set.status = 404;
         return fail('not_found', 'Pengguna tidak ditemukan', requestId);
@@ -328,10 +322,35 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         set.status = 409;
         return fail('conflict', 'Pengguna nonaktif', requestId);
       }
+      /**
+       * The impersonated session is pinned to the tenant the admin is acting in — the target may
+       * belong to tenants this admin cannot see. A superadmin has no active-tenant constraint, so
+       * their session starts where the target's own would (D-6, unchanged).
+       */
+      const clientId = a.user.is_superadmin
+        ? await defaultTenantOf(db, target.id)
+        : (tenantState?.clientId ?? null);
+      /**
+       * C-5: impersonation must never hand out more than the caller already holds, or the
+       * permission alone would be a ladder into the tenant's admin group. Compare the concrete
+       * permissions each side ends up with — the registry is the closed list to expand against.
+       */
+      if (!a.user.is_superadmin) {
+        const targetGrants = await effectivePermissions(db, target, clientId);
+        const beyond = allPermissionStrings().find(
+          (p) => hasPermission(targetGrants, p) && !tenantState?.can(p),
+        );
+        if (beyond) {
+          set.status = 403;
+          return fail('forbidden', 'Pengguna ini memegang izin yang tidak Anda miliki', requestId, {
+            permission: beyond,
+          });
+        }
+      }
       const ip = clientIp(request, server) ?? 'unknown';
       const session = await createSession(db, {
         userId: target.id,
-        clientId: await defaultTenantOf(db, target.id),
+        clientId,
         ip,
         userAgent: request.headers.get('user-agent'),
         ttlSeconds: IMPERSONATION_TTL_S,
@@ -355,7 +374,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       return ok({ user: publicUser(target), expiresAt: session.expiresAt.toISOString() });
     },
     {
-      beforeHandle: [notImpersonating, superadminOnly],
+      beforeHandle: [notImpersonating, permission('user.impersonate')],
       params: t.Object({ id: Id }),
       response: {
         200: OkSchema(t.Object({ user: PublicUser, expiresAt: t.String() })),
@@ -363,7 +382,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       },
       detail: {
         summary:
-          'Superadmin: act as this user for one hour (second cookie; own session kept); audited (D-6)',
+          'user.impersonate: act as this user for one hour (second cookie; own session kept); audited (D-6)',
       },
     },
   )

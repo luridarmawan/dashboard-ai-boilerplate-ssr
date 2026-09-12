@@ -25,9 +25,11 @@ import { Elysia } from 'elysia';
 
 export const SESSION_COOKIE = 'crk_session';
 /**
- * Impersonation (D-6): a second cookie names a session the superadmin opened AS another user. It
- * only counts while the superadmin's own `crk_session` is still valid and matches the session's
+ * Impersonation (D-6): a second cookie names a session an admin opened AS another user. It only
+ * counts while that admin's own `crk_session` is still valid and matches the session's
  * `impersonator_id`, so the admin never loses their own login and stopping is just dropping it.
+ * The binding to `impersonator_id` IS the proof: only the permission-guarded impersonate endpoint
+ * writes that column, so the cookie can never mean more than what its opener was allowed to do.
  */
 export const IMPERSONATE_COOKIE = 'crk_impersonate';
 
@@ -74,7 +76,7 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
     const found = await findSession(db, token);
     if (!found) return { auth: null };
     const impToken = cookie[IMPERSONATE_COOKIE]?.value;
-    if (typeof impToken === 'string' && looksLikeToken(impToken) && found.user.is_superadmin) {
+    if (typeof impToken === 'string' && looksLikeToken(impToken)) {
       const imp = await findSession(db, impToken);
       if (imp && imp.session.impersonator_id === found.user.id)
         return {

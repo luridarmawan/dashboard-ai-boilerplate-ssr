@@ -42,9 +42,9 @@ const columns: ColumnDef<Row>[] = [
 ];
 /**
  * Row actions are icons only (the label is the tooltip and the accessible name).
- * Impersonation (D-6) is superadmin-only and never nested; the API enforces exactly the same
- * rules — not yourself, no other superadmin, no deactivated user — this only hides a button
- * that could not work.
+ * Impersonation (D-6) needs `user.impersonate` and is never nested; the API enforces the rest —
+ * not yourself, no other superadmin, no deactivated user, and nobody holding permissions the
+ * caller lacks — so this only hides a button that could not work.
  */
 const rowActions: RowAction<Row>[] = $derived([
   {
@@ -53,7 +53,7 @@ const rowActions: RowAction<Row>[] = $derived([
     iconOnly: true,
     href: (r) => `/users/${r.id}`,
   },
-  ...(data.user.isSuperadmin && !data.impersonator
+  ...(can('user.impersonate') && !data.impersonator
     ? [
         {
           label: t('users.impersonate'),
