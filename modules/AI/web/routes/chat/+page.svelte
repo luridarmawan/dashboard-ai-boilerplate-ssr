@@ -1,8 +1,10 @@
 <script lang="ts">
 import { onMount, untrack } from 'svelte';
+import { enhance } from '$app/forms';
+import { goto, invalidateAll } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Button, ConfirmDelete } from '$lib/components/ui';
+import { Button, ConfirmDelete, toast } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import Capabilities from '../../lib/Capabilities.svelte';
 import { renderMarkdown } from '../../lib/markdown.ts';
@@ -50,6 +52,22 @@ $effect(() => {
   // and yank the reader straight back down.
   untrack(() => scrollDown(true));
 });
+/**
+ * Out of the archive without a page load (L-20 over L-22): the same action the plain form posts,
+ * read back over fetch. The redirect it answers with is where the conversation now lives — the
+ * live list — so we follow it as a client-side navigation instead of reloading onto it.
+ */
+const unarchiveSubmit =
+  () =>
+  async ({ result }: { result: { type: string; location?: string } }) => {
+    if (result.type !== 'redirect') {
+      toast({ title: t('common.action_failed'), variant: 'error' });
+      return;
+    }
+    await goto(result.location ?? '/m/ai/chat', { invalidateAll: true });
+    toast({ title: t('ai.chat.unarchived'), variant: 'success' });
+  };
+
 // Every link inside the sidebar keeps the view the user is in, so opening an archived
 // conversation does not silently drop them back on the live list.
 const viewParam = $derived(data.archived ? '&archived=1' : '');
@@ -172,6 +190,9 @@ $effect(() => {
 
 async function streamSend(e: SubmitEvent) {
   const formEl = e.currentTarget as HTMLFormElement;
+  // The API clears `archived_at` on the same write that stores the message, so a send from inside
+  // the archive silently changes the list under us — remembered here, told about below.
+  const wasArchived = data.conversation?.archived ?? false;
   const content = draft.trim();
   if (!content || streaming) {
     e.preventDefault();
@@ -296,6 +317,12 @@ async function streamSend(e: SubmitEvent) {
     // A new conversation was created server-side on first send: reload ON it so the URL, the
     // sidebar and the persisted history line up (H-6).
     if (!data.conversation) location.href = createdId ? `/m/ai/chat?c=${createdId}` : '/m/ai/chat';
+    else if (wasArchived && !streamError) {
+      // It is back on the live list now; re-read so the badge, the sidebar and the view the user
+      // is in all say the same thing, and say out loud what the send just did.
+      await invalidateAll();
+      toast({ title: t('ai.chat.unarchived_auto'), variant: 'info' });
+    }
   }
 }
 function stop() {
@@ -385,6 +412,9 @@ function copy(text: string) {
   <section id="message-container" class="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-card">
     <header class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b px-3 py-2 sm:px-4">
       <h1 class="min-w-0 flex-1 truncate text-base font-semibold">{data.conversation?.title ?? t('ai.chat.title')}</h1>
+      {#if data.conversation?.archived}
+        <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-muted-foreground" data-testid="archived-badge"><Icon name="archive" size={12} />{t('ai.chat.archived_badge')}</span>
+      {/if}
       {#if data.conversation}
         <div class="flex flex-wrap items-center gap-1">
           {#if data.providers.length}
@@ -409,7 +439,7 @@ function copy(text: string) {
           {#if data.conversation.archived}
             <!-- Out of the archive is a plain POST: it undoes, and asking first would make the
                  archive feel as final as a deletion — which is the whole difference between them. -->
-            <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="0" /><Button id="btn-chat-unarchive" type="submit" variant="secondary" size="sm" title={t('ai.chat.unarchive')} aria-label={t('ai.chat.unarchive')}><Icon name="upload" size={14} /><span class="hidden sm:inline">{t('ai.chat.unarchive')}</span></Button></form>
+            <form method="POST" action="?/archive" use:enhance={unarchiveSubmit}><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="0" /><Button id="btn-chat-unarchive" type="submit" variant="secondary" size="sm" title={t('ai.chat.unarchive')} aria-label={t('ai.chat.unarchive')}><Icon name="upload" size={14} /><span class="hidden sm:inline">{t('ai.chat.unarchive')}</span></Button></form>
           {:else}
             <ConfirmDelete compact compactLabel csrf={data.csrf} confirm="archive" action="?/archive" icon="archive" confirmVariant="default" href={`/m/ai/chat?c=${data.conversation.id}${viewParam}&confirm=archive#confirm-archive`} cancelHref={`/m/ai/chat?c=${data.conversation.id}${viewParam}`} confirming={data.confirmArchive} variant="ghost" size="sm" label={t('ai.chat.archive')} title={t('ai.chat.archive_confirm')} confirmLabel={t('ai.chat.archive')} description={t('ai.chat.archive_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
               {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" />{/snippet}
@@ -421,6 +451,7 @@ function copy(text: string) {
         </div>
       {/if}
     </header>
+    {#if data.conversation?.archived}<p class="mx-4 mt-2 text-xs text-muted-foreground">{t('ai.chat.archived_hint')}</p>{/if}
     {#if !data.aiEnabled}<p class="error m-4">{t('ai.chat.disabled')}</p>{/if}
     {#if data.quota && (data.quota.tenant.limit || data.quota.user.limit || data.quota.credit.balanceMicro !== null)}
       <p class={`mx-4 mt-2 text-xs ${data.quota.ok ? 'text-muted-foreground' : 'text-destructive'}`} data-testid="quota-line">

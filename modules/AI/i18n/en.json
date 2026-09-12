@@ -186,5 +186,9 @@
   "ai.chat.filter_live": "Active",
   "ai.chat.archive_tab": "Archive",
   "ai.chat.archive_empty": "The archive is empty.",
-  "ai.chat.search_archive": "Search the archive"
+  "ai.chat.search_archive": "Search the archive",
+  "ai.chat.archived_badge": "Archived",
+  "ai.chat.archived_hint": "This conversation sits in the archive. Sending a message brings it back to the live list.",
+  "ai.chat.unarchived": "Conversation is out of the archive",
+  "ai.chat.unarchived_auto": "The new message brought this conversation back to the live list"
 }

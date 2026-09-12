@@ -767,6 +767,10 @@ export default defineApiRoutes(
               last_message_at: new Date(),
               model,
               provider_id: p.id,
+              // A message brings the conversation back out of the archive — the archive is a shelf,
+              // not a lock, and a conversation that is being written in has no business hiding from
+              // its own list. Every path that stores a message comes through here.
+              archived_at: null,
             };
             if (conv.title === 'Percakapan baru' || conv.title === 'New conversation')
               patch.title = lastUser.content.replace(/\s+/g, ' ').trim().slice(0, 80) || conv.title;

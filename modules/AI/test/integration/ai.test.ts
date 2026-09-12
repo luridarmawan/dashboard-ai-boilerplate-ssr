@@ -448,6 +448,49 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect((log?.latency_ms ?? -1) >= 0).toBe(true);
   });
 
+  test('H-6: the archive is a shelf, not a lock — a new message brings the conversation back', async () => {
+    const conv = await json(await call('/v1/m/ai/conversations', { method: 'POST' }, [admin]));
+    const id = String(conv.data?.id);
+    expect(
+      (
+        await json(
+          await call(
+            `/v1/m/ai/conversations/${id}`,
+            { method: 'PATCH', body: JSON.stringify({ archived: true }) },
+            [admin],
+          ),
+        )
+      ).success,
+    ).toBe(true);
+    const idsOf = async (query: string) =>
+      (
+        (await json(await call(`/v1/m/ai/conversations${query}`, {}, [admin]))).data as unknown as {
+          id: string;
+        }[]
+      ).map((c) => c.id);
+    expect(await idsOf('')).not.toContain(id); // off the live list
+    expect(await idsOf('?archived=only')).toContain(id); // and only in the archive
+    expect(
+      (
+        await call(
+          '/v1/m/ai/chat/completions',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              messages: [{ role: 'user', content: 'Masih di sana?' }],
+              conversation_id: id,
+            }),
+          },
+          [admin],
+        )
+      ).status,
+    ).toBe(200);
+    const one = await json(await call(`/v1/m/ai/conversations/${id}`, {}, [admin]));
+    expect(one.data?.archivedAt).toBe(null);
+    expect(await idsOf('')).toContain(id);
+    expect(await idsOf('?archived=only')).not.toContain(id);
+  });
+
   test('H-13: `context` reaches the provider as a second system message behind the tenant prompt and is never persisted', async () => {
     const conv = await json(await call('/v1/m/ai/conversations', { method: 'POST' }, [admin]));
     const id = String(conv.data?.id);

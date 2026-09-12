@@ -186,5 +186,9 @@
   "ai.chat.filter_live": "Aktif",
   "ai.chat.archive_tab": "Arsip",
   "ai.chat.archive_empty": "Arsip masih kosong.",
-  "ai.chat.search_archive": "Cari di arsip"
+  "ai.chat.search_archive": "Cari di arsip",
+  "ai.chat.archived_badge": "Diarsipkan",
+  "ai.chat.archived_hint": "Percakapan ini ada di arsip. Mengirim pesan akan mengembalikannya ke daftar aktif.",
+  "ai.chat.unarchived": "Percakapan dikeluarkan dari arsip",
+  "ai.chat.unarchived_auto": "Percakapan kembali ke daftar aktif karena ada pesan baru"
 }
