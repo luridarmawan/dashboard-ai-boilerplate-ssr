@@ -3,20 +3,22 @@ import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
-import { useT } from '$lib/i18n';
+import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import Capabilities from '../../../lib/Capabilities.svelte';
 import { modelLines, providerFields } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
+const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const p = $derived(data.provider);
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
 const money = (n: number) => (n ? n.toFixed(n < 0.01 ? 4 : 2) : '—');
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
+const fmt = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
 
 /**
  * The probe over fetch: the card fills in without a page load. The form below is untouched, so
@@ -150,7 +152,7 @@ async function runTest(e: SubmitEvent) {
   </div>
   <Card>
     <FormBuilder
-      fields={providerFields}
+      fields={providerFields(t)}
       values={{ name: p.name, code: p.code, baseUrl: p.baseUrl, apiKey: '', defaultModel: p.defaultModel, models: modelLines(p.models), enabled: p.enabled, isDefault: p.isDefault }}
       errors={fieldErrors}
       csrf={data.csrf}
@@ -167,7 +169,7 @@ async function runTest(e: SubmitEvent) {
   <Card title={t('ai.providers.price_list')}>
     <p class="mb-3 text-xs text-muted-foreground">{t('ai.providers.model_test_hint')} {t('ai.providers.model_default_hint')}</p>
     <Table caption={t('ai.providers.price_list')}>
-      <thead><tr><th>Model</th><th>Label</th><th class="text-end">{t('ai.providers.price_in')}</th><th class="text-end">{t('ai.providers.price_out')}</th><th>{t('ai.providers.capabilities')}</th><th></th></tr></thead>
+      <thead><tr><th>{t('ai.providers.model')}</th><th>{t('ai.providers.model_label')}</th><th class="text-end">{t('ai.providers.price_in')}</th><th class="text-end">{t('ai.providers.price_out')}</th><th>{t('ai.providers.capabilities')}</th><th></th></tr></thead>
       <tbody>
         {#each p.models as m (m.id)}
           <!-- A fresh probe wins over the stored row; a FAILED one leaves the stored matrix

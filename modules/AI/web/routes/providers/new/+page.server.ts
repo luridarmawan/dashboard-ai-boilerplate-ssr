@@ -1,4 +1,5 @@
 import { formToObject, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import type { Actions } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
@@ -7,6 +8,7 @@ import { parseModelLines } from '../_form.ts';
 
 export const actions: Actions = {
   default: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const raw = formToObject(form);
     const apiKey = str(form, 'apiKey');
@@ -24,7 +26,7 @@ export const actions: Actions = {
         {
           status: 403,
           code: 'csrf_failed',
-          message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
+          message: t('common.form_expired'),
         },
         values,
       );
@@ -34,7 +36,7 @@ export const actions: Actions = {
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         values,

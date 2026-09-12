@@ -1,4 +1,5 @@
 import { formToObject, validateForm } from '@core/contracts';
+import { createTranslator, type Locale } from '@core/i18n';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import {
@@ -15,10 +16,10 @@ import { ProviderUpdateBody } from '../../../../api/schemas.ts';
 import { parseModelLines } from '../_form.ts';
 
 export const load: ServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const id = String(event.params.id ?? '');
   const res = await apiFor(event).v1.m.ai.providers({ id }).get();
-  if (!res.data?.success)
-    error(res.status === 404 ? 404 : res.status, 'Penyedia AI tidak ditemukan');
+  if (!res.data?.success) error(res.status === 404 ? 404 : res.status, t('ai.providers.not_found'));
   return {
     provider: res.data.data,
     saved: event.url.searchParams.has('saved'),
@@ -27,14 +28,19 @@ export const load: ServerLoad = async (event) => {
   };
 };
 
-const csrfFail = (values: Record<string, unknown> = {}) =>
+const csrfFail = (locale: Locale, values: Record<string, unknown> = {}) =>
   actionFailure(
-    { status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' },
+    {
+      status: 403,
+      code: 'csrf_failed',
+      message: createTranslator(locale)('common.form_expired'),
+    },
     values,
   );
 
 export const actions: Actions = {
   save: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
     const raw = formToObject(form);
@@ -48,14 +54,14 @@ export const actions: Actions = {
       isDefault: raw.isDefault !== undefined,
     };
     const values = { ...raw, apiKey: '' };
-    if (!checkCsrf(event, form)) return csrfFail(values);
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale, values);
     const v = validateForm(ProviderUpdateBody, input);
     if (!v.ok)
       return actionFailure(
         {
           status: 422,
           code: 'validation_failed',
-          message: 'Periksa isian yang ditandai',
+          message: t('common.check_fields'),
           details: v.errors,
         },
         values,
@@ -68,7 +74,7 @@ export const actions: Actions = {
   test: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{
       success: true;
       data: {
@@ -93,7 +99,7 @@ export const actions: Actions = {
   testModel: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap<{
       success: true;
       data: {
@@ -118,7 +124,7 @@ export const actions: Actions = {
   delete: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return csrfFail();
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.m.ai.providers({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);

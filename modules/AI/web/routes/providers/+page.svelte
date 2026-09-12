@@ -2,17 +2,19 @@
 import Icon from '$lib/components/Icon.svelte';
 import { iconActionClass } from '$lib/components/table';
 import { Badge, Button, Table } from '$lib/components/ui';
-import { useT } from '$lib/i18n';
+import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import Capabilities from '../../lib/Capabilities.svelte';
 
 let { data } = $props();
 const t = useT();
+const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 /** Row action is an icon, like /users. */
 const manage = $derived(can('ai.provider.manage'));
 const rowAction = $derived(manage ? t('common.edit') : t('common.view'));
-const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID') : '—');
+const fmt = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
 </script>
 
 <svelte:head><title>{t('ai.providers.title')}</title></svelte:head>
@@ -26,7 +28,7 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('id-ID')
   <p class="text-xs text-muted-foreground">{t('ai.providers.sorted_hint')}</p>
   {#if data.saved === 'deleted'}<p class="notice">{t('ai.providers.deleted')}</p>{/if}
   <Table caption={t('ai.providers.title')}>
-    <thead><tr><th>Nama</th><th>Kode</th><th>Base URL</th><th>{t('ai.providers.models')}</th><th>{t('ai.providers.capabilities')}</th><th>{t('ai.providers.status')}</th><th></th></tr></thead>
+    <thead><tr><th>{t('ai.providers.name')}</th><th>{t('ai.providers.code')}</th><th>Base URL</th><th>{t('ai.providers.models')}</th><th>{t('ai.providers.capabilities')}</th><th>{t('ai.providers.status')}</th><th></th></tr></thead>
     <tbody>
       {#each data.providers as p (p.id)}
         <tr data-testid="provider-row">

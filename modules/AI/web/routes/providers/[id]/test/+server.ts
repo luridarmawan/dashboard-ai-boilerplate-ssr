@@ -1,3 +1,4 @@
+import { createTranslator } from '@core/i18n';
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { apiFor, checkCsrf } from '$lib/server/session';
 
@@ -7,12 +8,10 @@ import { apiFor, checkCsrf } from '$lib/server/session';
  * and both call exactly the same API endpoint — this route adds no behaviour of its own.
  */
 export const POST: RequestHandler = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const form = await event.request.formData();
   if (!checkCsrf(event, form)) {
-    return json(
-      { ok: false, error: 'Sesi formulir kedaluwarsa — muat ulang halaman' },
-      { status: 403 },
-    );
+    return json({ ok: false, error: t('common.form_expired') }, { status: 403 });
   }
   const id = String(event.params.id ?? '');
   const res = await apiFor(event).v1.m.ai.providers({ id }).test.post();
@@ -24,7 +23,9 @@ export const POST: RequestHandler = async (event) => {
     return json(
       {
         ok: false,
-        error: (body as { error?: { message?: string } })?.error?.message ?? 'Uji koneksi gagal',
+        error:
+          (body as { error?: { message?: string } })?.error?.message ??
+          t('ai.providers.test_failed'),
       },
       { status: res.status || 502 },
     );

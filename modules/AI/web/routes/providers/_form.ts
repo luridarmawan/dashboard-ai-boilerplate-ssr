@@ -1,53 +1,56 @@
+import type { Translate } from '@core/i18n';
 import type { FieldDef } from '$lib/components/form';
 
 /** Field declarations for the provider profile form (FormBuilder, L-17); shared by new + edit. */
-export const providerFields: FieldDef[] = [
-  { name: 'name', type: 'string', label: 'Nama', required: true, maxlength: 191 },
-  {
-    name: 'code',
-    type: 'string',
-    label: 'Kode',
-    required: true,
-    pattern: '[a-z0-9]+(-[a-z0-9]+)*',
-    maxlength: 40,
-    hint: 'Huruf kecil/angka/tanda hubung; tercatat di setiap baris log AI.',
-  },
-  {
-    name: 'baseUrl',
-    type: 'string',
-    label: 'Base URL (kompatibel-OpenAI)',
-    required: true,
-    maxlength: 512,
-    placeholder: 'https://api.openai.com/v1',
-    span: 2,
-  },
-  {
-    name: 'apiKey',
-    type: 'password',
-    label: 'API key',
-    maxlength: 4000,
-    autocomplete: 'off',
-    hint: 'Disimpan sebagai rahasia dan tidak pernah ditampilkan lagi; biarkan *** untuk mempertahankan.',
-  },
-  {
-    name: 'defaultModel',
-    type: 'string',
-    label: 'Model baku',
-    required: true,
-    maxlength: 120,
-    placeholder: 'gpt-4o-mini',
-  },
-  {
-    name: 'models',
-    type: 'text',
-    label: 'Daftar model & harga',
-    rows: 6,
-    span: 2,
-    hint: 'Satu per baris: model | label | harga input per 1M token | harga output per 1M token — mis. "gpt-4o-mini | GPT-4o mini | 0.15 | 0.60". Harga dalam mata uang yang Anda pakai; 0 = tidak dihitung.',
-  },
-  { name: 'enabled', type: 'boolean', label: 'Aktif — bisa dipilih di chat' },
-  { name: 'isDefault', type: 'boolean', label: 'Jadikan baku untuk percakapan baru' },
-];
+export function providerFields(t: Translate): FieldDef[] {
+  return [
+    { name: 'name', type: 'string', label: t('ai.providers.name'), required: true, maxlength: 191 },
+    {
+      name: 'code',
+      type: 'string',
+      label: t('ai.providers.code'),
+      required: true,
+      pattern: '[a-z0-9]+(-[a-z0-9]+)*',
+      maxlength: 40,
+      hint: t('ai.providers.form.code_hint'),
+    },
+    {
+      name: 'baseUrl',
+      type: 'string',
+      label: t('ai.providers.form.base_url'),
+      required: true,
+      maxlength: 512,
+      placeholder: 'https://api.openai.com/v1',
+      span: 2,
+    },
+    {
+      name: 'apiKey',
+      type: 'password',
+      label: t('ai.providers.form.api_key'),
+      maxlength: 4000,
+      autocomplete: 'off',
+      hint: t('ai.providers.form.api_key_hint'),
+    },
+    {
+      name: 'defaultModel',
+      type: 'string',
+      label: t('ai.providers.form.default_model'),
+      required: true,
+      maxlength: 120,
+      placeholder: 'gpt-4o-mini',
+    },
+    {
+      name: 'models',
+      type: 'text',
+      label: t('ai.providers.form.models'),
+      rows: 6,
+      span: 2,
+      hint: t('ai.providers.form.models_hint'),
+    },
+    { name: 'enabled', type: 'boolean', label: t('ai.providers.form.enabled') },
+    { name: 'isDefault', type: 'boolean', label: t('ai.providers.form.is_default') },
+  ];
+}
 
 export interface ModelLine {
   model: string;
