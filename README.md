@@ -2,9 +2,15 @@
 
 Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang di satu VPS: Bun + Elysia (API) dan SvelteKit (web), MySQL/MariaDB/PostgreSQL, RBAC, konfigurasi runtime, tema & layout bertukar, modul AI, landing komersil, dan penjaga CI yang membuktikan modularitas alih-alih menjanjikannya.
 
-| Dokumen | Isi |
+|   |   |
 |---|---|
 | ![Home](docs/screenshot/home.png) | ![Settings](docs/screenshot/settings.png) |
+
+## Architecture
+
+[![architecture](docs/screenshot/architecture.png)](docs\architecture.html)
+
+[See Architecture)](docs\architecture.html)
 
 | Dokumen | Isi |
 |---|---|

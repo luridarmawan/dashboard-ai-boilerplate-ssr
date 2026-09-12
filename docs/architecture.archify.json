@@ -1,0 +1,445 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Dashboard AI Boilerplate (SSR) — Architecture",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "1a7669cc22e9c27434d46cf8367159350b7012c3"
+    },
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Request path",
+        "focus": [
+          "clients",
+          "caddy",
+          "web",
+          "guard",
+          "api",
+          "db"
+        ],
+        "note": "One browser request: Caddy, SvelteKit SSR, the API gate, then the database."
+      },
+      {
+        "id": "modularity",
+        "label": "Modularity",
+        "focus": [
+          "modules",
+          "web",
+          "api",
+          "ai"
+        ],
+        "note": "modules:sync composes modules statically into web and API, touching no core file."
+      },
+      {
+        "id": "background-work",
+        "label": "Background work",
+        "focus": [
+          "api",
+          "jobs",
+          "db",
+          "smtp",
+          "storage"
+        ],
+        "note": "Scheduler, queue, mail outbox and outgoing webhooks all rest on the database."
+      }
+    ],
+    "locale": "en"
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      64
+    ],
+    "cols": 5,
+    "cellW": 190,
+    "cellH": 88,
+    "gapX": 84,
+    "gapY": 76
+  },
+  "components": [
+    {
+      "id": "clients",
+      "type": "external",
+      "label": "Browser & MCP clients",
+      "sublabel": "full HTML, no JS required",
+      "row": 1,
+      "col": 0,
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "cloud",
+      "label": "Caddy",
+      "sublabel": "automatic TLS, one origin",
+      "tag": "lb round_robin",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        {
+          "path": "deploy/Caddyfile",
+          "label": "routes /v1 vs web"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "SvelteKit SSR",
+      "sublabel": "web:3000 · adapter-node",
+      "brand": "svelte",
+      "row": 0,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/web/src/hooks.server.ts",
+          "label": "session, theme, locale"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "Request gate",
+      "sublabel": "session, RBAC, CSRF, tenancy",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/api/src/plugins/auth.ts",
+          "label": "session & permissions"
+        },
+        {
+          "path": "apps/api/src/plugins/csrf.ts",
+          "label": "double-submit"
+        },
+        {
+          "path": "apps/api/src/plugins/tenancy.ts",
+          "label": "active tenant"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Elysia API",
+      "sublabel": "api:3001 · /v1 · /docs",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        {
+          "path": "apps/api/src/app.ts",
+          "label": "domain composition"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "modules",
+      "type": "backend",
+      "label": "Modules",
+      "sublabel": "Example · AI · Dummy",
+      "tag": "modules.json",
+      "row": 0,
+      "col": 3,
+      "sources": [
+        {
+          "path": "packages/module-kit/src/sync.ts",
+          "label": "codegen shims"
+        },
+        {
+          "path": "modules.json",
+          "label": "registration"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Valkey",
+      "sublabel": "session & rate-limit cache",
+      "tag": "optional",
+      "row": 0,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/auth/src/redis.ts",
+          "label": "fail-open to DB"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Database",
+      "sublabel": "MySQL · MariaDB · PostgreSQL",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/db/src/descriptor.ts",
+          "label": "neutral descriptor"
+        },
+        {
+          "path": "packages/db/src/migrate.ts",
+          "label": "versioned migrations"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "File storage",
+      "sublabel": "uploads volume or S3",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        {
+          "path": "packages/storage/src/index.ts",
+          "label": "local | s3"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "external",
+      "label": "AI provider",
+      "sublabel": "OpenAI-compatible",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        {
+          "path": "modules/AI/api/providers.ts",
+          "label": "per-tenant profiles"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "jobs",
+      "type": "messagebus",
+      "label": "Scheduler & queue",
+      "sublabel": "outbox, webhooks, dead-letter",
+      "row": 2,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/runtime/src/scheduler.ts",
+          "label": "claim lease"
+        },
+        {
+          "path": "apps/api/src/queue.ts",
+          "label": "enqueue & retry"
+        },
+        {
+          "path": "apps/api/src/webhooks.ts",
+          "label": "signed delivery"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP & webhooks",
+      "sublabel": "outgoing mail, HMAC POST",
+      "row": 3,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/mail/src/index.ts",
+          "label": "outbox"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "API process — Bun + Elysia (--scale api=N)",
+      "wraps": [
+        "guard",
+        "api"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "clients-caddy",
+      "from": "clients",
+      "to": "caddy",
+      "label": "HTTPS :443",
+      "variant": "emphasis"
+    },
+    {
+      "id": "caddy-web",
+      "from": "caddy",
+      "to": "web",
+      "label": "SSR HTML → web:3000"
+    },
+    {
+      "id": "caddy-api",
+      "from": "caddy",
+      "to": "guard",
+      "label": "/v1/*, /docs → api:3001",
+      "labelDy": 55
+    },
+    {
+      "id": "web-guard",
+      "from": "web",
+      "to": "guard",
+      "label": "Eden Treaty · cookie + CSRF",
+      "labelDy": 24
+    },
+    {
+      "id": "guard-api",
+      "from": "guard",
+      "to": "api",
+      "label": "effective permissions & tenant",
+      "variant": "security",
+      "labelDy": 69,
+      "labelDx": -86
+    },
+    {
+      "id": "modules-web",
+      "from": "modules",
+      "to": "web",
+      "label": "route & widget shims",
+      "variant": "dashed",
+      "labelDy": -32
+    },
+    {
+      "id": "modules-api",
+      "from": "modules",
+      "to": "api",
+      "label": "plugin /v1/m/<ns>",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "id": "api-db",
+      "from": "api",
+      "to": "db",
+      "label": "SQL (Drizzle)",
+      "labelDy": 16
+    },
+    {
+      "id": "api-cache",
+      "from": "api",
+      "to": "cache",
+      "label": "session & rate-limit cache",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-storage",
+      "from": "api",
+      "to": "storage",
+      "label": "POST /v1/files"
+    },
+    {
+      "id": "api-ai",
+      "from": "api",
+      "to": "ai",
+      "label": "chat & tool streaming",
+      "labelDy": 60
+    },
+    {
+      "id": "api-jobs",
+      "from": "api",
+      "to": "jobs",
+      "label": "enqueue · scheduler tick",
+      "fromSide": "bottom"
+    },
+    {
+      "id": "jobs-db",
+      "from": "jobs",
+      "to": "db",
+      "label": "claim lease & status"
+    },
+    {
+      "id": "jobs-smtp",
+      "from": "jobs",
+      "to": "smtp",
+      "label": "outbox & signed POST",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Edge & SSR",
+      "items": [
+        "One origin: /v1 and pages share a single domain",
+        "Full HTML — session, permissions, theme, locale in the first byte",
+        "One x-request-id spans web → API → log"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "API core & modules",
+      "items": [
+        "OpenAPI and /metrics published from route schemas",
+        "One gate: session, effective permissions, CSRF, tenant",
+        "modules:sync composes modules without touching core"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Data & work",
+      "items": [
+        "One descriptor → MySQL, MariaDB, PostgreSQL migrations",
+        "Jobs claimed by one conditional UPDATE: exactly once at any scale",
+        "Mail outbox, HMAC webhooks, files to a volume or S3"
+      ]
+    }
+  ]
+}

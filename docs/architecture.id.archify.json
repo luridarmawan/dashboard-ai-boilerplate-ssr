@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Dashboard AI Boilerplate (SSR) — Arsitektur",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "1a7669cc22e9c27434d46cf8367159350b7012c3"
+    },
+    "views": [
+      {
+        "id": "jalur-permintaan",
+        "label": "Jalur permintaan",
+        "focus": [
+          "clients",
+          "caddy",
+          "web",
+          "guard",
+          "api",
+          "db"
+        ],
+        "note": "Satu permintaan peramban: Caddy, SSR SvelteKit, gerbang API, lalu database."
+      },
+      {
+        "id": "modularitas",
+        "label": "Modularitas",
+        "focus": [
+          "modules",
+          "web",
+          "api",
+          "ai"
+        ],
+        "note": "Modul dirakit statis ke web dan API oleh modules:sync, tanpa menyentuh berkas core."
+      },
+      {
+        "id": "pekerjaan-latar",
+        "label": "Pekerjaan latar",
+        "focus": [
+          "api",
+          "jobs",
+          "db",
+          "smtp",
+          "storage"
+        ],
+        "note": "Scheduler, antrean, outbox email, dan webhook keluar — semuanya bersandar pada database."
+      }
+    ]
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      40,
+      64
+    ],
+    "cols": 5,
+    "cellW": 190,
+    "cellH": 88,
+    "gapX": 84,
+    "gapY": 76
+  },
+  "components": [
+    {
+      "id": "clients",
+      "type": "external",
+      "label": "Peramban & klien MCP",
+      "sublabel": "HTML utuh, tanpa JS wajib",
+      "row": 1,
+      "col": 0,
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "caddy",
+      "type": "cloud",
+      "label": "Caddy",
+      "sublabel": "TLS otomatis, satu origin",
+      "tag": "lb round_robin",
+      "row": 1,
+      "col": 1,
+      "sources": [
+        {
+          "path": "deploy/Caddyfile",
+          "label": "rute /v1 vs web"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "SvelteKit SSR",
+      "sublabel": "web:3000 · adapter-node",
+      "brand": "svelte",
+      "row": 0,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/web/src/hooks.server.ts",
+          "label": "sesi, tema, bahasa"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "Gerbang permintaan",
+      "sublabel": "sesi, RBAC, CSRF, tenancy",
+      "row": 1,
+      "col": 2,
+      "sources": [
+        {
+          "path": "apps/api/src/plugins/auth.ts",
+          "label": "sesi & izin"
+        },
+        {
+          "path": "apps/api/src/plugins/csrf.ts",
+          "label": "double-submit"
+        },
+        {
+          "path": "apps/api/src/plugins/tenancy.ts",
+          "label": "tenant aktif"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Elysia API",
+      "sublabel": "api:3001 · /v1 · /docs",
+      "row": 1,
+      "col": 3,
+      "sources": [
+        {
+          "path": "apps/api/src/app.ts",
+          "label": "komposisi domain"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "modules",
+      "type": "backend",
+      "label": "Modul",
+      "sublabel": "Example · AI · Dummy",
+      "tag": "modules.json",
+      "row": 0,
+      "col": 3,
+      "sources": [
+        {
+          "path": "packages/module-kit/src/sync.ts",
+          "label": "codegen shim"
+        },
+        {
+          "path": "modules.json",
+          "label": "registrasi"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "cache",
+      "type": "database",
+      "label": "Valkey",
+      "sublabel": "cache sesi & rate limit",
+      "tag": "opsional",
+      "row": 0,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/auth/src/redis.ts",
+          "label": "fail-open ke DB"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "Database",
+      "sublabel": "MySQL · MariaDB · PostgreSQL",
+      "row": 1,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/db/src/descriptor.ts",
+          "label": "deskriptor netral"
+        },
+        {
+          "path": "packages/db/src/migrate.ts",
+          "label": "migrasi ter-versi"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "storage",
+      "type": "cloud",
+      "label": "Penyimpanan berkas",
+      "sublabel": "volume uploads atau S3",
+      "row": 2,
+      "col": 2,
+      "sources": [
+        {
+          "path": "packages/storage/src/index.ts",
+          "label": "local | s3"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "ai",
+      "type": "external",
+      "label": "Provider AI",
+      "sublabel": "OpenAI-compatible",
+      "row": 2,
+      "col": 3,
+      "sources": [
+        {
+          "path": "modules/AI/api/providers.ts",
+          "label": "profil per tenant"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "jobs",
+      "type": "messagebus",
+      "label": "Scheduler & antrean",
+      "sublabel": "outbox, webhook, dead-letter",
+      "row": 2,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/runtime/src/scheduler.ts",
+          "label": "klaim lease"
+        },
+        {
+          "path": "apps/api/src/queue.ts",
+          "label": "enqueue & retry"
+        },
+        {
+          "path": "apps/api/src/webhooks.ts",
+          "label": "kirim bertanda tangan"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    },
+    {
+      "id": "smtp",
+      "type": "external",
+      "label": "SMTP & webhook",
+      "sublabel": "email keluar, POST HMAC",
+      "row": 3,
+      "col": 4,
+      "sources": [
+        {
+          "path": "packages/mail/src/index.ts",
+          "label": "outbox"
+        }
+      ],
+      "size": [
+        180,
+        76
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Proses API — Bun + Elysia (--scale api=N)",
+      "wraps": [
+        "guard",
+        "api"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "clients-caddy",
+      "from": "clients",
+      "to": "caddy",
+      "label": "HTTPS :443",
+      "variant": "emphasis"
+    },
+    {
+      "id": "caddy-web",
+      "from": "caddy",
+      "to": "web",
+      "label": "HTML SSR → web:3000"
+    },
+    {
+      "id": "caddy-api",
+      "from": "caddy",
+      "to": "guard",
+      "label": "/v1/*, /docs → api:3001",
+      "labelDy": 55
+    },
+    {
+      "id": "web-guard",
+      "from": "web",
+      "to": "guard",
+      "label": "Eden Treaty · cookie + CSRF",
+      "labelDy": 24
+    },
+    {
+      "id": "guard-api",
+      "from": "guard",
+      "to": "api",
+      "label": "izin efektif & tenant aktif",
+      "variant": "security",
+      "labelDy": 69,
+      "labelDx": -80
+    },
+    {
+      "id": "modules-web",
+      "from": "modules",
+      "to": "web",
+      "label": "shim rute & widget",
+      "variant": "dashed"
+    },
+    {
+      "id": "modules-api",
+      "from": "modules",
+      "to": "api",
+      "label": "plugin /v1/m/<ns>",
+      "variant": "dashed",
+      "labelDy": 24
+    },
+    {
+      "id": "api-db",
+      "from": "api",
+      "to": "db",
+      "label": "SQL (Drizzle)",
+      "labelDy": 16
+    },
+    {
+      "id": "api-cache",
+      "from": "api",
+      "to": "cache",
+      "label": "cache sesi & rate limit",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-storage",
+      "from": "api",
+      "to": "storage",
+      "label": "POST /v1/files"
+    },
+    {
+      "id": "api-ai",
+      "from": "api",
+      "to": "ai",
+      "label": "chat & tool streaming",
+      "labelDy": 60
+    },
+    {
+      "id": "api-jobs",
+      "from": "api",
+      "to": "jobs",
+      "label": "enqueue · tick scheduler",
+      "fromSide": "bottom"
+    },
+    {
+      "id": "jobs-db",
+      "from": "jobs",
+      "to": "db",
+      "label": "klaim lease & status"
+    },
+    {
+      "id": "jobs-smtp",
+      "from": "jobs",
+      "to": "smtp",
+      "label": "outbox & POST bertanda tangan",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Tepi & SSR",
+      "items": [
+        "Satu origin: /v1 dan halaman berbagi satu domain",
+        "HTML lengkap — sesi, izin, tema, bahasa di byte pertama",
+        "Satu x-request-id menembus web → API → log"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Inti API & modul",
+      "items": [
+        "OpenAPI dan /metrics terbit dari skema rute",
+        "Gerbang tunggal: sesi, izin efektif, CSRF, tenant",
+        "modules:sync merakit modul tanpa menyentuh core"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Data & pekerjaan",
+      "items": [
+        "Satu deskriptor → migrasi MySQL, MariaDB, PostgreSQL",
+        "Job diklaim satu UPDATE: tepat sekali walau api diskalakan",
+        "Outbox email, webhook HMAC, berkas ke volume atau S3"
+      ]
+    }
+  ]
+}
