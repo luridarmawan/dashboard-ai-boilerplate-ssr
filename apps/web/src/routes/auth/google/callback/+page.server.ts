@@ -48,7 +48,17 @@ export const load: PageServerLoad = async (event) => {
     success: true;
     data: { mfaRequired?: true; challenge?: string; user?: unknown };
   }>(res);
-  if (!r.ok) return { csrf, error: 'api', message: r.failure.message };
+  if (!r.ok) {
+    // The API answers in its own language; the page shows a translated copy keyed on
+    // `reason`/`code` and keeps the API message only as the last resort (K-4).
+    const reason = (r.failure.details as { reason?: unknown } | null)?.reason;
+    return {
+      csrf,
+      error: 'api' as const,
+      code: r.failure.code,
+      reason: typeof reason === 'string' ? reason : null,
+    };
+  }
   const next = safeNext(kept?.n, home);
   if (r.data.data.mfaRequired && r.data.data.challenge)
     return { csrf, mfa: { challenge: r.data.data.challenge, next } };

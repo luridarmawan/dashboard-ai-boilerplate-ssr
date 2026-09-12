@@ -202,7 +202,9 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
           after: { sso: PROVIDER, ...detail },
         });
         set.status = status;
-        return fail(code, message, requestId);
+        // `reason` travels with the envelope so the web app can show its own translated copy
+        // (K-4); it says no more than the message it stands in for.
+        return fail(code, message, requestId, { reason: detail.reason });
       };
 
       let identity: OAuthIdentity | null = null;
