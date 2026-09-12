@@ -23,7 +23,7 @@ export interface MenuItem {
   readonly icon: string;
   readonly order: number;
   readonly badge?: string | number;
-  /** Leaves the SvelteKit router (a page the API serves): navigate for real, do not route it. */
+  /** Not a SvelteKit route (a page the API serves): opens in a new tab, never client-routed. */
   readonly external?: boolean;
   readonly children: MenuItem[];
   readonly active: boolean;
@@ -39,7 +39,7 @@ interface Entry {
   parent?: string;
   /** undefined → the owning module's group; null → top level; string → a core group id. */
   group?: string | null;
-  /** Not a SvelteKit route: the shell renders it as a full navigation. */
+  /** Not a SvelteKit route: the shell opens it in a new tab. */
   external?: boolean;
 }
 
@@ -51,19 +51,20 @@ interface GroupDef {
 }
 
 /** Shared groups. Module groups sort between `integration` and `monitoring` (default order 100). */
+// Order: Settings 10, Integration 20, module groups 100+, Monitoring 900, Documentation 910 (last).
 export const CORE_GROUPS: readonly GroupDef[] = [
   { id: 'settings', label: { id: 'Pengaturan', en: 'Settings' }, icon: 'settings', order: 10 },
   { id: 'integration', label: { id: 'Integrasi', en: 'Integration' }, icon: 'plug', order: 20 },
   /**
-   * Reference material, not a place where anything is changed — so it sits after the module groups
-   * and before Monitoring. Its entries carry their own permissions; a reader who holds neither
-   * never sees the group at all (`buildMenu` does not build an empty one).
+   * Reference material, not a place where anything is changed — so it sits at the very bottom,
+   * below Monitoring. Its entries carry their own permissions; a reader who holds neither never
+   * sees the group at all (`buildMenu` does not build an empty one).
    */
   {
     id: 'documentation',
     label: { id: 'Dokumentasi', en: 'Documentation' },
     icon: 'file',
-    order: 800,
+    order: 910,
   },
   {
     id: 'monitoring',
@@ -176,9 +177,10 @@ export const CORE_MENU: readonly Entry[] = [
   /**
    * The API reference is served by the API itself (`/docs`, Scalar over the generated OpenAPI) and
    * only LOOKS like a dashboard route — Caddy in production and the Vite proxy in development both
-   * resolve it on this origin. `external` is what stops the client router from trying to route it
-   * and 404-ing. Gated on `config.read`: it describes every endpoint of the installation, which is
-   * the same audience that may read its configuration.
+   * resolve it on this origin. `external` opens it in a new tab: it is a reference to read BESIDE
+   * the dashboard, and it also stops the client router from trying to route it and 404-ing. Gated
+   * on `config.read`: it describes every endpoint of the installation, which is the same audience
+   * that may read its configuration.
    */
   {
     id: 'core.apidocs',

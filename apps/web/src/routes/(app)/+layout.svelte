@@ -58,7 +58,7 @@ const shellContext = $derived({
     href={item.href}
     aria-current={item.active ? 'page' : undefined}
     title={tip ? item.label : undefined}
-    {...item.external ? { 'data-sveltekit-reload': '' } : {}}
+    {...item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {}}
     class="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:font-medium"
   >
     <Icon name={item.icon} size={sub ? 16 : 18} class={sub ? 'text-muted-foreground' : ''} />

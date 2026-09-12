@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { buildMenu } from './menu.ts';
 import type { Session } from './session.ts';
 
-/** Sidebar shape (F-3) against the real generated registry: top level, then groups, Monitoring last. */
+/** Sidebar shape (F-3) against the real generated registry: top level, then groups, Documentation last. */
 const admin = {
   user: { id: 'u', isSuperadmin: true },
   clientId: 'c',
@@ -20,12 +20,12 @@ const group = (items: ReturnType<typeof buildMenu>, id: string) =>
 describe('buildMenu (F-3 groups)', () => {
   const menu = buildMenu(admin, '/m/ai/providers', 'en');
 
-  test('top-level links first, then groups, Monitoring last', () => {
+  test('top-level links first, then groups, Documentation last', () => {
     const kinds = menu.map((i) => i.kind);
     expect(kinds.indexOf('group')).toBeGreaterThan(0);
     expect(kinds.slice(kinds.indexOf('group')).every((k) => k === 'group')).toBe(true);
     expect(labels(menu).slice(0, 2)).toEqual(['Dashboard', 'AI assistant']);
-    expect(menu.at(-1)?.id).toBe('group.monitoring');
+    expect(menu.at(-1)?.id).toBe('group.documentation');
   });
 
   test('core groups hold the core pages; AI joins Integration and Monitoring', () => {
@@ -48,15 +48,16 @@ describe('buildMenu (F-3 groups)', () => {
     ]);
   });
 
-  test('Documentation holds the reference pages; the API reference leaves the router', () => {
+  test('Documentation is the last group; the API reference opens outside the router', () => {
     const docs = group(menu, 'documentation');
     expect(labels(docs?.children ?? [])).toEqual(['Permission guide', 'API Docs']);
-    // `/docs` is served by the API on this origin, so the shell must navigate rather than route it.
+    // `/docs` is served by the API on this origin: a new tab, never a client-side route.
     expect(docs?.children.find((c) => c.id === 'core.apidocs')?.external).toBe(true);
     expect(docs?.children.find((c) => c.id === 'core.permissions')?.external).toBeUndefined();
-    // It sits before Monitoring, which stays the last group.
+    // Reference material sits below Monitoring, at the very bottom of the menu.
     const ids = menu.filter((i) => i.kind === 'group').map((i) => i.id);
-    expect(ids.indexOf('group.documentation')).toBe(ids.indexOf('group.monitoring') - 1);
+    expect(ids.at(-1)).toBe('group.documentation');
+    expect(ids.at(-2)).toBe('group.monitoring');
   });
 
   test('a reader without the permissions never gets the group at all', () => {
