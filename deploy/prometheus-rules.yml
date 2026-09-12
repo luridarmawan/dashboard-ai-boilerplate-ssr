@@ -2,7 +2,7 @@
 # in Prometheus' UI (Alerts tab) and in Grafana. To be paged, point Prometheus at an Alertmanager
 # (add `alerting: alertmanagers:` to prometheus.yml) — that part is deliberately left to the operator.
 groups:
-  - name: dab-api
+  - name: crk-api
     rules:
       - alert: ApiInstanceDown
         expr: up{job="api"} == 0

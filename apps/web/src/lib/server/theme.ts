@@ -4,14 +4,14 @@ import { cfgList, cfgString, type PublicConfig } from './config.ts';
 
 /**
  * Theme and mode for ONE request (PRD L-4, L-10…L-12), decided on the server before render:
- *   theme: user preference → `dab_theme` cookie → tenant default → global default → `base`
- *   mode : `dab_mode` cookie → `system`
+ *   theme: user preference → `crk_theme` cookie → tenant default → global default → `base`
+ *   mode : `crk_mode` cookie → `system`
  * Tenant/global defaults and the allowlist come from runtime configuration (`app.default_theme`,
  * `app.allowed_themes`, per tenant with global fallback — E-2), never from .env (E-6). A theme
  * contributed by a module that is disabled for the tenant is treated as absent (L-14).
  */
-export const THEME_COOKIE = 'dab_theme';
-export const MODE_COOKIE = 'dab_mode';
+export const THEME_COOKIE = 'crk_theme';
+export const MODE_COOKIE = 'crk_mode';
 
 export interface ResolvedTheme extends ThemeResolution {
   readonly mode: Mode;

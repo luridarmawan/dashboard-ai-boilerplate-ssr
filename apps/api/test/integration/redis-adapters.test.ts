@@ -24,7 +24,7 @@ const adminPassword = 'a bootstrap admin password';
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -33,7 +33,7 @@ const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 
 describe.skipIf(!enabled)('Redis adapters for sessions and rate limits (M7 #4)', () => {
@@ -51,7 +51,7 @@ describe.skipIf(!enabled)('Redis adapters for sessions and rate limits (M7 #4)',
     const keys = async (pattern: string) => (await redis.send('KEYS', [pattern])) as string[];
 
     await runSeed(unsafeAcrossTenants(), { adminEmail, adminPassword });
-    const before = (await keys('dab:sess:*')).length;
+    const before = (await keys('crk:sess:*')).length;
     const login = await call('/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: adminEmail, password: adminPassword }),
@@ -59,11 +59,11 @@ describe.skipIf(!enabled)('Redis adapters for sessions and rate limits (M7 #4)',
     expect(login.status).toBe(200);
     const cookie = sessionCookie(login);
     // The rate-limit window for this IP lives in Redis (INCR), not only in the table.
-    expect((await keys(`dab:rl:login:ip:${RUN_IP}:*`)).length).toBeGreaterThan(0);
+    expect((await keys(`crk:rl:login:ip:${RUN_IP}:*`)).length).toBeGreaterThan(0);
 
     // First authenticated request resolves from the database and caches; the second is a cache hit.
     expect((await call('/v1/auth/me', {}, [cookie])).status).toBe(200);
-    const cached = await keys('dab:sess:*');
+    const cached = await keys('crk:sess:*');
     expect(cached.length).toBeGreaterThan(before);
     expect((await call('/v1/auth/me', {}, [cookie])).status).toBe(200);
 

@@ -40,7 +40,7 @@ function cacheFor<T>(name: string) {
   const e = env();
   if (e.CACHE_DRIVER === 'redis' && e.REDIS_URL) {
     const client = redisClient();
-    if (client) return new RedisCache<T>(client, `dab:${name}`, 300);
+    if (client) return new RedisCache<T>(client, `crk:${name}`, 300);
   }
   if (e.CACHE_DRIVER === 'memory') return new NoCache<T>();
   return undefined; // SettingsStore / ModuleStateStore default to the database version cache

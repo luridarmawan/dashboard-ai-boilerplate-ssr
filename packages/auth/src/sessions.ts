@@ -12,7 +12,7 @@ import { hashToken, randomToken } from './tokens.ts';
  * below evicts the cached copies it affects. Redis down = plain database behaviour.
  */
 
-const CACHE_PREFIX = 'dab:sess:';
+const CACHE_PREFIX = 'crk:sess:';
 const keyFor = (tokenHash: string) => `${CACHE_PREFIX}${tokenHash}`;
 const idKey = (sessionId: string) => `${CACHE_PREFIX}id:${sessionId}`;
 const userKey = (userId: string) => `${CACHE_PREFIX}u:${userId}`;

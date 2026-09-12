@@ -29,7 +29,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = [], ip = freshIp()) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', ip);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -39,7 +39,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 const invite = (email: string, cookie: string) =>
   call('/v1/invitations', { method: 'POST', body: JSON.stringify({ email }) }, [cookie]);
@@ -63,7 +63,7 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
       body: JSON.stringify({ email: adminEmail, password: adminPassword }),
     });
     admin = sessionCookie(login);
-    expect(admin).toMatch(/^dab_session=/);
+    expect(admin).toMatch(/^crk_session=/);
     // The point of A-13: invitations work while self-service sign-up is OFF.
     process.env.SIGNUP_ENABLED = 'false';
     resetEnvCache();
@@ -140,7 +140,7 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
     const ok = await join(code, 'Joiner');
     expect(ok.status).toBe(201);
     const cookie = sessionCookie(ok);
-    expect(cookie).toMatch(/^dab_session=/);
+    expect(cookie).toMatch(/^crk_session=/);
     const me = (await json(await call('/v1/auth/me', {}, [cookie]))).data as {
       user: { email: string; emailVerifiedAt: string | null };
       clientId: string | null;

@@ -13,7 +13,7 @@ import { Elysia } from 'elysia';
 
 /**
  * Session resolution (PRD A-3, A-4, B-2). Runs on every request: an `Authorization: Bearer`
- * header names an API token (A-4, non-browser clients such as MCP); otherwise the `dab_session`
+ * header names an API token (A-4, non-browser clients such as MCP); otherwise the `crk_session`
  * cookie names a session. Both are looked up in the database (no per-process cache — Decision M
  * / D1), and exposed as `auth` to handlers. Routes that need a user opt in with `requireAuth`;
  * everything else in the API is protected by default because the domain groups mount it
@@ -23,13 +23,13 @@ import { Elysia } from 'elysia';
  * the active tenant is only KNOWN after the session is read.
  */
 
-export const SESSION_COOKIE = 'dab_session';
+export const SESSION_COOKIE = 'crk_session';
 /**
  * Impersonation (D-6): a second cookie names a session the superadmin opened AS another user. It
- * only counts while the superadmin's own `dab_session` is still valid and matches the session's
+ * only counts while the superadmin's own `crk_session` is still valid and matches the session's
  * `impersonator_id`, so the admin never loses their own login and stopping is just dropping it.
  */
-export const IMPERSONATE_COOKIE = 'dab_impersonate';
+export const IMPERSONATE_COOKIE = 'crk_impersonate';
 
 export interface AuthState {
   /** The cookie session; null when the request authenticated with an API token (A-4). */

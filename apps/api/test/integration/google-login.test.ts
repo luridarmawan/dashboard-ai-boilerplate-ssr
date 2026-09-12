@@ -29,7 +29,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, ip = freshIp()) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', `dab_csrf=${TOKEN}`);
+  headers.set('cookie', `crk_csrf=${TOKEN}`);
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', ip);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -39,7 +39,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 const googleLogin = (code: string) =>
   call('/v1/auth/google-login', {
@@ -192,7 +192,7 @@ describe.skipIf(!enabled)('Sign in with Google (A-8)', () => {
     expect(lastExchange?.grant_type).toBe('authorization_code');
     expect(lastExchange?.client_secret).toBe('shh-secret');
     const cookie = sessionCookie(r);
-    expect(cookie).toMatch(/^dab_session=/);
+    expect(cookie).toMatch(/^crk_session=/);
     const me = await app.handle(new Request(`${ORIGIN}/v1/auth/me`, { headers: { cookie } }));
     expect(me.status).toBe(200);
     const [link] = await db

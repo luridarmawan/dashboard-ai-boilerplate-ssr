@@ -5,7 +5,7 @@
 #   dist/web/         adapter-node server bundled into index.js + client/ (+ prerendered/), run with `bun index.js`
 #
 #   DB_DIALECT=mysql sh scripts/build-release.sh
-#   → copy dist/ to /opt/dab on the server (see deploy/systemd/ and DEPLOY.md §8c)
+#   → copy dist/ to /opt/crk on the server (see deploy/systemd/ and DEPLOY.md §8c)
 set -eu
 cd "$(dirname "$0")/.."
 export DB_DIALECT="${DB_DIALECT:-mysql}" NODE_ENV=production

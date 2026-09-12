@@ -27,7 +27,7 @@ import { callTool, listTools, type ToolCaller, toolResultText } from '../tools.t
  *   - no session or bearer token → 401 before any JSON-RPC is read;
  *   - the active tenant comes from the token (or `X-Client-ID` when the user is a member);
  *   - tools not visible to the caller are absent from the list and refused on call;
- *   - `resources/read dab://me` tells the client who it is acting as.
+ *   - `resources/read crk://me` tells the client who it is acting as.
  *
  * Stateless: one `Server` per request, JSON responses (no server-side session table), which is
  * what `--scale api=3` needs. Cookie-session callers must pass CSRF like any other mutation;
@@ -35,7 +35,7 @@ import { callTool, listTools, type ToolCaller, toolResultText } from '../tools.t
  */
 
 const SERVER_INFO = { name: 'dashboard-ai-boilerplate', version: '0.0.0' };
-const ME_URI = 'dab://me';
+const ME_URI = 'crk://me';
 
 function callerOf(
   a: AuthState,
@@ -64,7 +64,7 @@ export function buildMcpServer(
   const server = new Server(SERVER_INFO, {
     capabilities: { tools: {}, resources: {}, prompts: {} },
     instructions:
-      'Tools act as the authenticated dashboard user, inside their active tenant, under their permissions. Read dab://me to learn who that is.',
+      'Tools act as the authenticated dashboard user, inside their active tenant, under their permissions. Read crk://me to learn who that is.',
   });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

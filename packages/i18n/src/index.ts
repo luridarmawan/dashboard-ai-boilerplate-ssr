@@ -72,7 +72,7 @@ export function createTranslator(locale: Locale, onMissing?: (key: string) => vo
 export interface LocaleResolutionInput {
   /** The user's saved preference (D-4). */
   readonly user?: string | null;
-  /** `dab_lang` cookie — anonymous visitors, and persistence for the picker (K-7). */
+  /** `crk_lang` cookie — anonymous visitors, and persistence for the picker (K-7). */
   readonly cookie?: string | null;
   /** Raw `Accept-Language` header. */
   readonly acceptLanguage?: string | null;

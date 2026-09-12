@@ -51,7 +51,7 @@ if (cmd === 'write') {
       method: 'POST',
       headers: {
         origin: ORIGIN,
-        cookie: `dab_csrf=${TOKEN}`,
+        cookie: `crk_csrf=${TOKEN}`,
         'x-csrf-token': TOKEN,
         'content-type': 'application/json',
       },
@@ -68,14 +68,14 @@ if (cmd === 'write') {
   const session =
     login.headers
       .getSetCookie()
-      .find((c) => c.startsWith('dab_session='))
+      .find((c) => c.startsWith('crk_session='))
       ?.split(';')[0] ?? '';
   const me = await app.handle(
-    new Request(`${ORIGIN}/v1/auth/me`, { headers: { cookie: `dab_csrf=${TOKEN}; ${session}` } }),
+    new Request(`${ORIGIN}/v1/auth/me`, { headers: { cookie: `crk_csrf=${TOKEN}; ${session}` } }),
   );
   const tenants = await app.handle(
     new Request(`${ORIGIN}/v1/clients?q=${encodeURIComponent(code as string)}`, {
-      headers: { cookie: `dab_csrf=${TOKEN}; ${session}` },
+      headers: { cookie: `crk_csrf=${TOKEN}; ${session}` },
     }),
   );
   const list = (await tenants.json()) as { data?: { code: string }[] };

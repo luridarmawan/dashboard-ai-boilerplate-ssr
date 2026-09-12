@@ -2,14 +2,14 @@ import type { RequestEvent } from '@sveltejs/kit';
 
 /**
  * Sidebar rail state for ONE request (PRD F-8), decided on the server before render — the same
- * shape as theme and language (L-12, K-2): user preference → `dab_sidebar` cookie → expanded.
+ * shape as theme and language (L-12, K-2): user preference → `crk_sidebar` cookie → expanded.
  *
  * Why both: the profile column makes the choice follow the user across devices (D-4), while the
  * cookie answers on the very first request of a browser that is not logged in yet, and keeps the
  * shell right if writing the profile fails. The state is stamped on <html> as `data-sidebar`, so
  * the rail is already narrow in the first byte — no flash of a wide sidebar, no JavaScript.
  */
-export const SIDEBAR_COOKIE = 'dab_sidebar';
+export const SIDEBAR_COOKIE = 'crk_sidebar';
 
 export type SidebarState = 'expanded' | 'collapsed';
 

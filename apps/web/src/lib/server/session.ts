@@ -10,15 +10,15 @@ import { checkRequestOrigin, forwardedOrigin } from '$lib/server/origin';
  * Server-side glue between the browser and the API (Decision B, A-3, A-10, B-4, C-7):
  *   - `apiFor(event)`  a client that carries this browser's session and the CSRF pair
  *   - `loadSession()`  who is logged in, active tenant, tenants, effective permissions — for SSR
- *   - CSRF: a `dab_csrf` cookie on the browser + `_csrf` hidden field on every form; an action
+ *   - CSRF: a `crk_csrf` cookie on the browser + `_csrf` hidden field on every form; an action
  *     verifies them here first, then the API verifies its own pair. No JavaScript required.
  *   - `forwardSetCookies()` copies cookies the API set (login, logout) onto the browser.
  */
 
-export const SESSION_COOKIE = 'dab_session';
+export const SESSION_COOKIE = 'crk_session';
 /** Impersonation (D-6): rides along with the admin's own session cookie. */
-export const IMPERSONATE_COOKIE = 'dab_impersonate';
-export const CSRF_COOKIE = 'dab_csrf';
+export const IMPERSONATE_COOKIE = 'crk_impersonate';
+export const CSRF_COOKIE = 'crk_csrf';
 export const CSRF_FIELD = '_csrf';
 
 export interface SessionUser {

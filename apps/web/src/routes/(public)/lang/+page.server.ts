@@ -14,7 +14,7 @@ export const load: PageServerLoad = async (event) => {
     locales: [...LOCALES],
     /** K-9: the direction in force, and whether the RTL preview cookie is what forces it. */
     dir: event.locals.dir,
-    rtlPreview: event.cookies.get('dab_dir') === 'rtl',
+    rtlPreview: event.cookies.get('crk_dir') === 'rtl',
     back: back?.startsWith('/') && !back.startsWith('//') ? back : null,
   };
 };

@@ -31,7 +31,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   if (!headers.has('x-forwarded-for')) headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -41,7 +41,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 const post = (
   path: string,

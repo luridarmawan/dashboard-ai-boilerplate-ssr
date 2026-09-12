@@ -18,7 +18,7 @@ const SENSITIVE_KEY =
 const ALLOW_KEY =
   /^(token_type|hasPassword|password_changed_at|requestId|sessionId|tokenId|session_count|hash_algo)$/;
 const BEARER_RE = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi;
-const COOKIE_PAIR_RE = /\b(dab_session|dab_csrf|sessionid|sid|jwt)=([^;\s]+)/gi;
+const COOKIE_PAIR_RE = /\b(crk_session|crk_csrf|sessionid|sid|jwt)=([^;\s]+)/gi;
 const LONG_SECRET_RE = /\b(sk|pk|ghp|xox[bap]|AKIA)[A-Za-z0-9_-]{12,}\b/g;
 
 export const MASK = '***';

@@ -531,7 +531,7 @@ Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (cha
 | Argumen sesuai skema | divalidasi TypeBox sebelum `run`; yang tidak valid dijawab ke model sebagai galat, bukan dieksekusi |
 | Teraudit | setiap panggilan menulis `audit_log` (`tool.call`, resource = nama tool), sukses maupun ditolak |
 
-Tool yang sama tersaji ke klien MCP eksternal lewat `/v1/mcp` ([`MCP.md`](./MCP.md)). Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `dab.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
+Tool yang sama tersaji ke klien MCP eksternal lewat `/v1/mcp` ([`MCP.md`](./MCP.md)). Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `crk.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
 
 Aturan: `name` diawali namespace dan ≤ 64 karakter dalam bentuk kawat (`<ns>_<nama>`); `permission` milik modul sendiri harus dideklarasikan di `permissions.ts` (sync menolak yang tidak ada); `input` harus skema objek. Modul **tidak boleh** memanggil tool modul lain lewat internal — pakai `POST /v1/tools/call` atau tunggu MCP.
 

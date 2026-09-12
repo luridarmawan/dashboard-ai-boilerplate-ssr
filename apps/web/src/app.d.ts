@@ -17,7 +17,7 @@ declare global {
       config: PublicConfig;
       /** Language for this request (K-2), resolved before render. */
       locale: LocaleResolution;
-      /** Writing direction (K-9): from the locale, or the `dab_dir` preview cookie. */
+      /** Writing direction (K-9): from the locale, or the `crk_dir` preview cookie. */
       dir: Direction;
       /** Sidebar rail (F-8): the user's own preference, resolved before render. */
       sidebar: SidebarState;

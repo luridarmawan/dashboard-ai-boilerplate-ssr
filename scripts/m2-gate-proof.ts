@@ -118,10 +118,10 @@ let pickerCsrf = '';
     back: '/',
   });
   check(
-    'POST picker → 303 back, cookies dab_theme/dab_mode set',
+    'POST picker → 303 back, cookies crk_theme/crk_mode set',
     r.res.status === 303 &&
-      anon.cookies.get('dab_theme') === 'corporate' &&
-      anon.cookies.get('dab_mode') === 'dark',
+      anon.cookies.get('crk_theme') === 'corporate' &&
+      anon.cookies.get('crk_mode') === 'dark',
     `${r.res.status}`,
   );
   const after = await get(anon, '/');
@@ -139,8 +139,8 @@ let pickerCsrf = '';
   check(
     'unknown theme is ignored, mode still applied',
     bad.res.status === 303 &&
-      anon.cookies.get('dab_theme') === 'corporate' &&
-      anon.cookies.get('dab_mode') === 'light',
+      anon.cookies.get('crk_theme') === 'corporate' &&
+      anon.cookies.get('crk_mode') === 'light',
   );
 }
 
@@ -267,8 +267,8 @@ const admin = new Jar();
     back: '/auth/login',
   });
   check(
-    '#6 POST /lang (no JS) → 303 back, dab_lang cookie',
-    r.res.status === 303 && fresh.cookies.get('dab_lang') === 'en',
+    '#6 POST /lang (no JS) → 303 back, crk_lang cookie',
+    r.res.status === 303 && fresh.cookies.get('crk_lang') === 'en',
   );
   const login = await get(fresh, '/auth/login');
   check(
@@ -467,7 +467,7 @@ const admin = new Jar();
     'F-8 the next HTML carries the collapsed rail (server-decided, no flash, no JavaScript)',
     htmlAttr(after.html, 'data-sidebar') === 'collapsed' &&
       /name="state" value="expanded"/.test(after.html) &&
-      admin.cookies.get('dab_sidebar') === 'collapsed',
+      admin.cookies.get('crk_sidebar') === 'collapsed',
     htmlAttr(after.html, 'data-sidebar'),
   );
   // A rail has no room for labels, so they must be reachable some other way, and a group must not
@@ -491,9 +491,9 @@ const admin = new Jar();
   });
   const fresh = await get(other, '/dashboard');
   check(
-    'F-8 the choice follows the USER: a fresh browser, no dab_sidebar cookie of its own, renders collapsed',
-    htmlAttr(fresh.html, 'data-sidebar') === 'collapsed' && !other.cookies.get('dab_sidebar'),
-    `${htmlAttr(fresh.html, 'data-sidebar')} cookie=${other.cookies.get('dab_sidebar') ?? '—'}`,
+    'F-8 the choice follows the USER: a fresh browser, no crk_sidebar cookie of its own, renders collapsed',
+    htmlAttr(fresh.html, 'data-sidebar') === 'collapsed' && !other.cookies.get('crk_sidebar'),
+    `${htmlAttr(fresh.html, 'data-sidebar')} cookie=${other.cookies.get('crk_sidebar') ?? '—'}`,
   );
   // …and expanded, F-3 is untouched: the group holding the current page is open again.
   await post(admin, '/sidebar', {

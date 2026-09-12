@@ -39,7 +39,7 @@ export interface MigrateResult {
  * per rewritten content, i.e. per prefix — consistent across runs of the same prefix.
  */
 export function materializeMigrations(prefix = ''): string {
-  const out = mkdtempSync(join(tmpdir(), `dab-migrations-${prefix || 'core'}-`));
+  const out = mkdtempSync(join(tmpdir(), `crk-migrations-${prefix || 'core'}-`));
   mkdirSync(join(out, 'meta'), { recursive: true });
   const tables = prefix ? collectTableNames(files.map((f) => f.sql)) : new Set<string>();
   for (const f of files) {

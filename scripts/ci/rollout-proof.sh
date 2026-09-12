@@ -10,11 +10,11 @@ cd "$(dirname "$0")/../.."
 ENV_FILE="${ENV_FILE:-.env.prod}"
 DC="docker compose --env-file $ENV_FILE -f compose.prod.yml"
 val() { grep -E "^$1=" "$ENV_FILE" | head -1 | cut -d= -f2- | sed -e 's/[[:space:]]*#.*$//' -e 's/^"//' -e 's/"$//'; }
-PREFIX="$(val IMAGE_PREFIX)"; PREFIX="${PREFIX:-dab}"
+PREFIX="$(val IMAGE_PREFIX)"; PREFIX="${PREFIX:-crk}"
 FROM_TAG="$(val IMAGE_TAG)"; FROM_TAG="${FROM_TAG:-local}"
 NEW_TAG="rollout-$(date +%s)"
 MAX_FAILS="${ROLLOUT_MAX_FAILS:-0}"
-TRAFFIC="dab-rollout-traffic"
+TRAFFIC="crk-rollout-traffic"
 
 CADDY="$($DC ps -q caddy)"
 [ -n "$CADDY" ] || { echo "rollout-proof: stack belum jalan (caddy tidak ditemukan)"; exit 1; }

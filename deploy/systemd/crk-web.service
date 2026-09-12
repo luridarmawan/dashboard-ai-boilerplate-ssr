@@ -1,21 +1,21 @@
 # systemd unit for the web app without Docker (PRD Q-11). Needs the `bun` runtime on the host
-# (https://bun.sh/install → /usr/local/bin/bun) and dist/web from scripts/build-release.sh at /opt/dab/web.
-#   sudo cp deploy/systemd/web.env.example /etc/dab/web.env   # then edit
-#   sudo cp deploy/systemd/dab-web.service /etc/systemd/system/ && sudo systemctl enable --now dab-web
+# (https://bun.sh/install → /usr/local/bin/bun) and dist/web from scripts/build-release.sh at /opt/crk/web.
+#   sudo cp deploy/systemd/web.env.example /etc/crk/web.env   # then edit
+#   sudo cp deploy/systemd/crk-web.service /etc/systemd/system/ && sudo systemctl enable --now crk-web
 # Put your reverse proxy in front (deploy/nginx.conf.example or Caddy from the OS packages):
 # / → 127.0.0.1:3000, /v1 /docs /openapi.json → 127.0.0.1:3001.
 [Unit]
 Description=Dashboard AI Boilerplate — Web (SvelteKit SSR)
-After=network-online.target dab-api.service
-Wants=network-online.target dab-api.service
+After=network-online.target crk-api.service
+Wants=network-online.target crk-api.service
 
 [Service]
 Type=simple
-User=dab
-Group=dab
-EnvironmentFile=/etc/dab/web.env
-WorkingDirectory=/opt/dab/web
-ExecStart=/usr/local/bin/bun /opt/dab/web/index.js
+User=crk
+Group=crk
+EnvironmentFile=/etc/crk/web.env
+WorkingDirectory=/opt/crk/web
+ExecStart=/usr/local/bin/bun /opt/crk/web/index.js
 Restart=always
 RestartSec=3
 KillSignal=SIGTERM

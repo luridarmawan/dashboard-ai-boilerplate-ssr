@@ -110,7 +110,7 @@ describe('Redis adapters (Decision M, ROADMAP §8 item 7)', () => {
     const next = await consume(db, 'login:ip:1.2.3.4', rule, new Date(t0.getTime() + 60_000));
     expect(next).toMatchObject({ allowed: true, remaining: 2 });
     const keys = [...store.keys()];
-    expect(keys.some((k) => k.startsWith('dab:rl:login:ip:1.2.3.4:'))).toBe(true);
+    expect(keys.some((k) => k.startsWith('crk:rl:login:ip:1.2.3.4:'))).toBe(true);
     expect(calls.filter((c) => c === 'PEXPIREAT').length).toBe(2); // once per window
     expect(hits.n).toBe(0);
   });

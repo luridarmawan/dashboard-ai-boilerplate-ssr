@@ -73,7 +73,7 @@ import {
   ProviderUpdateBody,
 } from './schemas.ts';
 
-/** What the UI is told about each tool call (`dab.tool` frames in the stream, `x_tools` in JSON). */
+/** What the UI is told about each tool call (`crk.tool` frames in the stream, `x_tools` in JSON). */
 interface ToolTrace {
   name: string;
   ok: boolean;
@@ -95,7 +95,7 @@ const TOOL_RESULT_MAX = 32_000;
  * permission held — are offered to the model; a `tool_calls` reply is executed through the core
  * registry (`callTool`: permission + tenancy + schema, audited), the results are appended as
  * `tool` messages and the provider is called again, at most MAX_TOOL_ROUNDS times. Streaming
- * hides the intermediate `[DONE]`s and adds `dab.tool` frames so the UI can show what ran.
+ * hides the intermediate `[DONE]`s and adds `crk.tool` frames so the UI can show what ran.
  */
 
 type Row = typeof schema.aiConversations.$inferSelect;
@@ -1171,7 +1171,7 @@ export default defineApiRoutes(
                     ...(await runToolCalls(list, (t, phase) =>
                       frame({
                         choices: [{ index: 0, delta: {} }],
-                        dab: {
+                        crk: {
                           tool:
                             phase === 'start'
                               ? { name: t.name, status: 'running' }
@@ -1185,7 +1185,7 @@ export default defineApiRoutes(
                 if (conversationId)
                   frame({
                     choices: [{ index: 0, delta: {} }],
-                    dab: {
+                    crk: {
                       messages: {
                         user: userMsgId ?? body.parent_id ?? null,
                         assistant: assistantMsgId,

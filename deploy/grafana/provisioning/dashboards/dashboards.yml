@@ -1,6 +1,6 @@
 apiVersion: 1
 providers:
-  - name: dab
+  - name: crk
     folder: Dashboard AI Boilerplate
     type: file
     disableDeletion: false

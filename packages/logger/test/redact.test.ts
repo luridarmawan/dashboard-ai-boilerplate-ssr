@@ -11,7 +11,7 @@ describe('masking lives inside the logger (M-7)', () => {
         token_hash: 'abc',
         list: [{ authorization: 'Bearer zzz' }],
       },
-      headers: { cookie: 'dab_session=abc; dab_csrf=def', 'x-request-id': 'r1' },
+      headers: { cookie: 'crk_session=abc; crk_csrf=def', 'x-request-id': 'r1' },
     });
     expect(out.email).toBe('a@b.co');
     expect(out.password).toBe(MASK);
@@ -24,12 +24,12 @@ describe('masking lives inside the logger (M-7)', () => {
   test('secret-looking strings inside free text are masked; ids stay', () => {
     const out = redact({
       note: 'sent Bearer eyJhbGciOiJIUzI1NiJ9.abc.def to api',
-      link: 'https://x/reset?dab_session=abcdef',
+      link: 'https://x/reset?crk_session=abcdef',
       key: 'sk-ant-api03-verysecretvalue',
       requestId: '01900000-0000-7000-8000-000000000001',
     });
     expect(out.note).toBe('sent Bearer *** to api');
-    expect(out.link).toBe('https://x/reset?dab_session=***');
+    expect(out.link).toBe('https://x/reset?crk_session=***');
     expect(out.key).toBe(MASK); // key name matches
     expect(out.requestId).toBe('01900000-0000-7000-8000-000000000001');
   });

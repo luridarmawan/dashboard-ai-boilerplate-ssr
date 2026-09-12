@@ -83,7 +83,7 @@ describe('CSRF plugin on the real app — refuses in onRequest, before validatio
   test('cross-origin POST /v1/auth/login → 403 csrf_failed', async () => {
     const res = await post(
       '/v1/auth/login',
-      { origin: 'https://evil.example', cookie: `dab_csrf=${TOKEN}`, 'x-csrf-token': TOKEN },
+      { origin: 'https://evil.example', cookie: `crk_csrf=${TOKEN}`, 'x-csrf-token': TOKEN },
       { email: 'attacker@example.com', password: 'x' },
     );
     expect(res.status).toBe(403);
@@ -133,7 +133,7 @@ describe('ordering: CSRF is decided before body validation', () => {
         headers: {
           'content-type': 'application/json',
           origin: 'http://api.test',
-          cookie: `dab_csrf=${TOKEN}`,
+          cookie: `crk_csrf=${TOKEN}`,
           'x-csrf-token': TOKEN,
         },
         body: '{"email":"not-an-email"}',

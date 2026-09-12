@@ -6,12 +6,12 @@ import { rateLimitRedis, warnRedis } from './redis.ts';
  *
  *   database (default)  one row per key; the increment is a conditional UPDATE so concurrent
  *                       instances never lose counts
- *   redis               `INCR` on `dab:rl:<key>:<window>` + `PEXPIREAT` at the window end — the
+ *   redis               `INCR` on `crk:rl:<key>:<window>` + `PEXPIREAT` at the window end — the
  *                       same semantics, one round trip, no table growth; falls back to the
  *                       database when Redis errors (never fails open)
  */
 
-const RL_PREFIX = 'dab:rl:';
+const RL_PREFIX = 'crk:rl:';
 
 export interface RateLimitRule {
   readonly limit: number;

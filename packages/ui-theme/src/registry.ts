@@ -116,7 +116,7 @@ export function registerLayout(layout: LayoutDef): void {
 export interface ThemeResolutionInput {
   /** The user's saved preference (D-4), if logged in. */
   readonly user?: string | null;
-  /** `dab_theme` cookie — anonymous visitors and cross-session persistence (L-11). */
+  /** `crk_theme` cookie — anonymous visitors and cross-session persistence (L-11). */
   readonly cookie?: string | null;
   /** `app.default_theme` for the active tenant (L-10); configuration UI lands in M3. */
   readonly tenantDefault?: string | null;

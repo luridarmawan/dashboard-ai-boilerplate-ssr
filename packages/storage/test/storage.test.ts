@@ -15,7 +15,7 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2
 
 describe('@core/storage (Q-9, Q-16)', () => {
   test('local adapter: put/get/exists/delete under the root; content type travels with the object', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'dab-storage-'));
+    const root = mkdtempSync(join(tmpdir(), 'crk-storage-'));
     const s = new LocalStorage(root);
     await s.put('t1/2026/09/a.png', PNG, 'image/png');
     expect(await s.exists('t1/2026/09/a.png')).toBe(true);
@@ -29,7 +29,7 @@ describe('@core/storage (Q-9, Q-16)', () => {
   });
 
   test('keys cannot escape the root or carry odd characters', async () => {
-    const s = new LocalStorage(mkdtempSync(join(tmpdir(), 'dab-storage-')));
+    const s = new LocalStorage(mkdtempSync(join(tmpdir(), 'crk-storage-')));
     for (const bad of ['../etc/passwd', '/abs', 'a//b', 'x;rm', 'ü.png', '']) {
       expect(() => assertKey(bad), bad).toThrow();
       await expect(s.put(bad, PNG, 'image/png')).rejects.toThrow();

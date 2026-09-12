@@ -24,7 +24,7 @@ export type DeliveryRow = typeof schema.webhookDeliveries.$inferSelect;
 /** Retry schedule in seconds after attempt n (index = attempts made so far). */
 export const RETRY_SCHEDULE_S: readonly number[] = [60, 300, 1800, 7200, 43_200];
 export const REQUEST_TIMEOUT_MS = 10_000;
-const USER_AGENT = 'dab-webhooks/1.0';
+const USER_AGENT = 'crk-webhooks/1.0';
 
 const sentTotal = metrics.counter(
   'webhook_deliveries_total',

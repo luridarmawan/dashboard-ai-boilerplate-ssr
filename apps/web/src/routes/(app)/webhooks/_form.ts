@@ -11,7 +11,7 @@ export function webhookFields(events: readonly string[], t: Translate): FieldDef
       label: t('webhooks.form.url'),
       required: true,
       maxlength: 512,
-      placeholder: 'https://hooks.contoh.id/dab',
+      placeholder: 'https://hooks.contoh.id/crk',
       span: 2,
       hint: t('webhooks.form.url_hint'),
     },

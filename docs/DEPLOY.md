@@ -44,7 +44,7 @@ alias dc='docker compose --env-file .env.prod -f compose.prod.yml'
 #   ACME_EMAIL=ops@example.com        ← untuk pemberitahuan sertifikat Let's Encrypt
 #   MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD ← acak, HANYA huruf/angka (dipakai di URL)
 #   DATABASE_NAME=app                 ← opsional; nama database di service mysql, mis. app_boilerplate
-#   TABLE_PREFIX=dab_                 ← opsional; prefiks semua tabel bila satu database dipakai beberapa aplikasi (O-2).
+#   TABLE_PREFIX=crk_                 ← opsional; prefiks semua tabel bila satu database dipakai beberapa aplikasi (O-2).
 #                                       Tetapkan SEBELUM migrate pertama; mengubahnya = database baru + migrate ulang.
 #   BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD ← akun superadmin pertama
 #   (jangan pakai @ : / ? # % di kata sandi database — dipakai di DATABASE_URL dan diparse skrip backup)
@@ -59,11 +59,11 @@ dc config | grep -E 'MYSQL_DATABASE|DATABASE_URL|APP_ORIGIN|ORIGIN:|HTTP_PORT|pu
 # 3. Build image api + web (≈ 3–5 mnt tergantung CPU; sekali per versi)
 export APP_COMMIT=$(git rev-parse --short HEAD) APP_BUILT_AT=$(date -u +%FT%TZ)
 dc build
-#   → terlihat: "dab/api" dan "dab/web" di `docker image ls`
+#   → terlihat: "crk/api" dan "crk/web" di `docker image ls`
 
 # 4. Nyalakan database dan tunggu sehat (≈ 30 dtk)
 dc up -d --wait mysql
-#   → terlihat: "Container dab-prod-mysql-1 Healthy"
+#   → terlihat: "Container crk-prod-mysql-1 Healthy"
 
 # 5. Migrasi skema — langkah eksplisit, bukan otomatis (≈ 10 dtk)
 dc run --rm migrate
@@ -172,7 +172,7 @@ dc --profile redis up -d --wait --scale api=3
 
 **Restart otomatis (Q-6):** `restart: unless-stopped` di semua service; Docker menyalakannya kembali saat proses mati dan saat host reboot (pastikan `systemctl is-enabled docker` = `enabled`).
 
-**Berkas unggahan (Q-9, Q-16):** bawaan `STORAGE_DRIVER=local` — volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`); dengan `--scale api=N` semua replika berbagi volume yang sama di satu host. Sertakan dalam backup host bila ada berkas: `docker run --rm -v dab-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
+**Berkas unggahan (Q-9, Q-16):** bawaan `STORAGE_DRIVER=local` — volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`); dengan `--scale api=N` semua replika berbagi volume yang sama di satu host. Sertakan dalam backup host bila ada berkas: `docker run --rm -v crk-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
 
 Untuk lebih dari satu host, atau agar bucket yang menanggung penyimpanan: `STORAGE_DRIVER=s3` + `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` di `.env.prod` (blok contoh ada di `.env.prod.example`; bekerja dengan AWS S3, MinIO, Cloudflare R2, DigitalOcean Spaces — path-style bawaan, `S3_VIRTUAL_HOSTED_STYLE=true` bila provider menolaknya). Metadata tetap di tabel `files`, jadi backup database + bucket adalah backup lengkap. `S3_PUBLIC_URL` opsional: berkas **publik** (logo tema) ditautkan langsung ke bucket/CDN alih-alih lewat API; berkas privat selalu lewat API dengan pemeriksaan izin. Berpindah driver tidak memindahkan objek lama — tiap baris `files` mengingat `storage`-nya, jadi lakukan `aws s3 sync` dari volume ke bucket dulu bila ingin berpindah dengan data. Preflight memeriksa driver yang aktif: volume bisa ditulis, atau bucket terjangkau dengan kredensial itu.
 
@@ -195,8 +195,8 @@ Satu `Dockerfile`, dua target. Tahap `build` (image `oven/bun:alpine`) melakukan
 
 | Image | Ukuran | Isi | Runtime |
 |---|---|---|---|
-| `dab/api` | ±92 MB terpasang (±40 MB saat pull) | **satu binary** `/app/api` (`bun build --compile`, ±80 MB — runtime Bun + kode + dependensi) · alpine + `ca-certificates`, `libstdc++`, `libgcc` | tanpa `bun`, tanpa sumber, tanpa `node_modules`; user `app` (uid 1000) |
-| `dab/web` | ±94 MB terpasang (±45 MB saat pull) | `index.js` (adapter-node + seluruh dependensinya dibundel jadi satu berkas, ±2 MB) · `client/` aset statis · runtime `oven/bun:alpine` | `bun index.js`, user `bun` |
+| `crk/api` | ±92 MB terpasang (±40 MB saat pull) | **satu binary** `/app/api` (`bun build --compile`, ±80 MB — runtime Bun + kode + dependensi) · alpine + `ca-certificates`, `libstdc++`, `libgcc` | tanpa `bun`, tanpa sumber, tanpa `node_modules`; user `app` (uid 1000) |
+| `crk/web` | ±94 MB terpasang (±45 MB saat pull) | `index.js` (adapter-node + seluruh dependensinya dibundel jadi satu berkas, ±2 MB) · `client/` aset statis · runtime `oven/bun:alpine` | `bun index.js`, user `bun` |
 
 Keduanya memenuhi PRD Q-2 (< 150 MB); job CI `docker-build` gagal bila salah satu melewati batas itu.
 
@@ -286,7 +286,7 @@ Bukti: `scripts/ci/rollout-proof.sh` (job CI `scale-proof`) menembakkan request 
 
 | Pemeriksaan | Gagal bila | Petunjuk yang dicetak |
 |---|---|---|
-| `env` | variabel wajib kosong/salah bentuk (satu baris per masalah) | isi di `.env.prod` / `/etc/dab/api.env` |
+| `env` | variabel wajib kosong/salah bentuk (satu baris per masalah) | isi di `.env.prod` / `/etc/crk/api.env` |
 | `secrets` (production) | `DATABASE_URL` atau `BOOTSTRAP_ADMIN_PASSWORD` masih nilai contoh (`change-me`) | ganti, lalu `db-init` |
 | `origin`, `signup`, `smtp` (production) | peringatan: origin tanpa https, pendaftaran terbuka, SMTP kosong | — |
 | `dialect` | image dibuild untuk dialect lain dari `DB_DIALECT` | build ulang dengan `--build-arg DB_DIALECT` |
@@ -305,18 +305,18 @@ Unit systemd memanggilnya sebagai `ExecStartPre`, sehingga host yang setengah te
 # di mesin build (atau server, bila ada bun):
 DB_DIALECT=mysql sh scripts/build-release.sh        # → dist/api (binary) + dist/web/ (bundel + aset)
 # di server:
-sudo useradd -r -s /usr/sbin/nologin dab
-sudo mkdir -p /opt/dab /etc/dab /var/lib/dab/uploads && sudo cp -r dist/* /opt/dab/ && sudo chown -R dab:dab /opt/dab /var/lib/dab
-sudo cp deploy/systemd/api.env.example /etc/dab/api.env && sudo cp deploy/systemd/web.env.example /etc/dab/web.env
-sudo chmod 600 /etc/dab/*.env && sudo nano /etc/dab/api.env       # DATABASE_URL, APP_ORIGIN, BOOTSTRAP_*
-sudo -u dab -- env $(grep -v '^#' /etc/dab/api.env | xargs) /opt/dab/api migrate   # eksplisit (Q-4)
-sudo -u dab -- env $(grep -v '^#' /etc/dab/api.env | xargs) /opt/dab/api seed
-sudo cp deploy/systemd/dab-api.service deploy/systemd/dab-web.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now dab-api dab-web
-systemctl status dab-api dab-web; journalctl -u dab-api -f
+sudo useradd -r -s /usr/sbin/nologin crk
+sudo mkdir -p /opt/crk /etc/crk /var/lib/crk/uploads && sudo cp -r dist/* /opt/crk/ && sudo chown -R crk:crk /opt/crk /var/lib/crk
+sudo cp deploy/systemd/api.env.example /etc/crk/api.env && sudo cp deploy/systemd/web.env.example /etc/crk/web.env
+sudo chmod 600 /etc/crk/*.env && sudo nano /etc/crk/api.env       # DATABASE_URL, APP_ORIGIN, BOOTSTRAP_*
+sudo -u crk -- env $(grep -v '^#' /etc/crk/api.env | xargs) /opt/crk/api migrate   # eksplisit (Q-4)
+sudo -u crk -- env $(grep -v '^#' /etc/crk/api.env | xargs) /opt/crk/api seed
+sudo cp deploy/systemd/crk-api.service deploy/systemd/crk-web.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now crk-api crk-web
+systemctl status crk-api crk-web; journalctl -u crk-api -f
 ```
 
-`dab-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `dab-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/dab.next`, `api migrate`, tukar simlink/folder, `systemctl restart dab-api dab-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker. Kalau Anda tidak butuh dua unit dan hanya ingin satu port untuk diproksikan, lihat §8e (`bun start`).
+`crk-web.service` membutuhkan `bun` di `/usr/local/bin/bun` (https://bun.sh/install) dan berjalan setelah `crk-api`. Database dan Valkey dipasang dari paket OS; reverse proxy dari paket OS (nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) — `/` → :3000, `/v1` `/docs` `/openapi.json` → :3001; atau Caddy). Upgrade di mode ini: `build-release`, salin `dist/` ke `/opt/crk.next`, `api migrate`, tukar simlink/folder, `systemctl restart crk-api crk-web` — ada jeda beberapa detik; rollout tanpa downtime (§8a) adalah jalur Docker. Kalau Anda tidak butuh dua unit dan hanya ingin satu port untuk diproksikan, lihat §8e (`bun start`).
 
 ### 8d. Pipeline CD contoh (Q-15)
 
@@ -382,4 +382,4 @@ Yang perlu diketahui:
 - **Kompresi** diminta *identity* ke upstream (aset prakompres `.br`/`.gz` tidak terpakai); kompresi publik urusan nginx/apache (`gzip on`, `mod_deflate`).
 - **Tidak ada `--scale api=N` dan tidak ada rollout tanpa downtime**: restart berarti jeda beberapa detik. Kalau itu penting, pakai §8a (Docker) atau §8c (dua unit systemd + Caddy).
 - **Form 403 "Cross-site POST form submissions are forbidden" / "Permintaan ditolak oleh proteksi CSRF"**: origin yang dikirim browser tidak ada di `APP_ORIGIN`. Gejalanya khas — tema, bahasa, login dan reset kata sandi (form POST biasa) gagal sementara tombol ber-AJAX jalan. Tambahkan origin publik Anda ke `APP_ORIGIN` (mis. `APP_ORIGIN=https://app.example.com`) lalu jalankan ulang; log web menuliskan satu baris `warn` berisi `seen`, `allowed` dan `derived` sehingga jelas origin mana yang ditolak. Dengan **satu** entri di `APP_ORIGIN`, `bun start` sekalian menyetel `ORIGIN` untuk proses web — tautan absolut (redirect_uri Google, e-mail) ikut benar tanpa mengandalkan header proxy. Proxy depan tetap sebaiknya mengirim `X-Forwarded-Proto` dan `X-Forwarded-Host` (contoh di atas).
-- **Proses induk harus dijaga**: `pm2 start bun --name dab -- start`, `screen`, atau satu unit systemd (`WorkingDirectory=` checkout Anda, `ExecStart=/usr/local/bin/bun start`, `EnvironmentFile=/etc/dab/api.env`). `SIGTERM` ke `bun start` menghentikan kedua anak dengan rapi (SIGTERM, tunggu ≤ 25 s), dan bila salah satu anak mati sendiri seluruh perintah keluar — supaya supervisor menyalakannya ulang.
+- **Proses induk harus dijaga**: `pm2 start bun --name crk -- start`, `screen`, atau satu unit systemd (`WorkingDirectory=` checkout Anda, `ExecStart=/usr/local/bin/bun start`, `EnvironmentFile=/etc/crk/api.env`). `SIGTERM` ke `bun start` menghentikan kedua anak dengan rapi (SIGTERM, tunggu ≤ 25 s), dan bila salah satu anak mati sendiri seluruh perintah keluar — supaya supervisor menyalakannya ulang.

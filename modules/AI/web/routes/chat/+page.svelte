@@ -236,7 +236,7 @@ async function streamSend(e: SubmitEvent) {
         // frame used to be swallowed here too, which stranded the bubble on "thinking" forever.
         type Frame = {
           choices?: { delta?: { content?: string } }[];
-          dab?: { tool?: ToolChip; messages?: { user: string | null; assistant: string } };
+          crk?: { tool?: ToolChip; messages?: { user: string | null; assistant: string } };
           error?: { message?: string };
         };
         let j: Frame;
@@ -249,7 +249,7 @@ async function streamSend(e: SubmitEvent) {
           streamError = t('ai.chat.error');
           continue;
         }
-        const stored = j.dab?.messages;
+        const stored = j.crk?.messages;
         if (stored) {
           // H-12: the pair is persisted — give the bubbles their real ids so Regenerate/Edit work.
           const n = messages.length;
@@ -259,7 +259,7 @@ async function streamSend(e: SubmitEvent) {
           leafId = stored.assistant;
           continue;
         }
-        const tool = j.dab?.tool;
+        const tool = j.crk?.tool;
         if (tool) {
           // Tool activity (extension point 8): one chip per call, updated in place when it ends.
           const last = messages[messages.length - 1];

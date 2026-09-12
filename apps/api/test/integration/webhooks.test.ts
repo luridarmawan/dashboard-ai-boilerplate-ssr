@@ -38,7 +38,7 @@ const call = (
   const headers = new Headers(init.headers);
   for (const [k, v] of Object.entries(extra)) headers.set(k, v);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -48,7 +48,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 
 type Received = { headers: Record<string, string>; body: string };
@@ -174,7 +174,7 @@ describe.skipIf(!enabled)(
       expect(body.requestId).toBe('r1');
       expect(body.data.clientId).toBe(tenantId);
       expect((got as Received).headers['x-crk-delivery']).toBe(body.id);
-      expect((got as Received).headers['user-agent']).toContain('dab-webhooks');
+      expect((got as Received).headers['user-agent']).toContain('crk-webhooks');
       // Receiver-side verification: HMAC of "<timestamp>.<body>" with the once-shown secret.
       const expected = await sign(
         secret,

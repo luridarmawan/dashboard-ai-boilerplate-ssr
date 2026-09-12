@@ -73,7 +73,7 @@ export async function runPreflight(
         name: 'env',
         status: 'fail',
         detail: p,
-        hint: 'isi variabel itu di .env.prod (Docker) atau /etc/dab/api.env (systemd); lihat .env.prod.example',
+        hint: 'isi variabel itu di .env.prod (Docker) atau /etc/crk/api.env (systemd); lihat .env.prod.example',
       });
     return { ok: false, checks };
   }
@@ -274,7 +274,7 @@ export async function runPreflight(
         name: 'uploads',
         status: 'fail',
         detail: `${e.UPLOADS_DIR}: ${err instanceof Error ? err.message : String(err)}`,
-        hint: 'volume harus dimiliki uid 1000 (user app): `docker run --rm -v dab-prod_uploads:/u alpine chown -R 1000:1000 /u`; systemd: chown dab:dab',
+        hint: 'volume harus dimiliki uid 1000 (user app): `docker run --rm -v crk-prod_uploads:/u alpine chown -R 1000:1000 /u`; systemd: chown crk:crk',
       });
     }
   }

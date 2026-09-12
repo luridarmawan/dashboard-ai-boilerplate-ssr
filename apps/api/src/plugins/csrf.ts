@@ -9,7 +9,7 @@ import { Elysia } from 'elysia';
  *
  * Two independent checks, both required for cookie-authenticated requests:
  *   1. Origin — the `Origin` (or `Referer`) header must match this deployment's origin.
- *   2. Double-submit — the `dab_csrf` cookie must equal the `x-csrf-token` header, compared in
+ *   2. Double-submit — the `crk_csrf` cookie must equal the `x-csrf-token` header, compared in
  *      constant time. The API accepts the token in the HEADER only: browser forms post to
  *      SvelteKit (same origin, `_csrf` hidden field), and SvelteKit calls the API with the header.
  *
@@ -23,7 +23,7 @@ import { Elysia } from 'elysia';
  * (login CSRF is real). The web app fetches a token during SSR and posts it back.
  */
 
-export const CSRF_COOKIE = 'dab_csrf';
+export const CSRF_COOKIE = 'crk_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 export const CSRF_FIELD = '_csrf';
 

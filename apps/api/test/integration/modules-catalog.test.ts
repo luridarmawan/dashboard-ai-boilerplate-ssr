@@ -26,7 +26,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -36,7 +36,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 type Entry = {
   name: string;
@@ -52,7 +52,7 @@ describe.skipIf(!enabled)('module catalog (G-16)', () => {
   let admin = '';
   let member = '';
   const prevFile = process.env.MODULES_CATALOG_FILE;
-  const tmp = `/tmp/dab-catalog-${run}.json`;
+  const tmp = `/tmp/crk-catalog-${run}.json`;
 
   beforeAll(async () => {
     if (!enabled) return;

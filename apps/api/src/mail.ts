@@ -28,7 +28,7 @@ function asLocale(value: string | null | undefined): MailLocale | null {
 
 /**
  * Which language to write an e-mail in (K-2, K-3): the language of the request that asked for it —
- * the web forwards the locale it already resolved for the visitor (preference → `dab_lang` cookie →
+ * the web forwards the locale it already resolved for the visitor (preference → `crk_lang` cookie →
  * Accept-Language) as `Accept-Language` — then the tenant's `app.default_locale`, then `id`.
  *
  * That is the rule for mail the recipient asked for themselves (register, password reset). When an

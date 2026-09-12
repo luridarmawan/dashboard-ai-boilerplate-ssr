@@ -19,7 +19,7 @@ const adminPassword = 'an ai admin password';
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   if (!headers.has('x-forwarded-for')) headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -34,7 +34,7 @@ const json = (r: Response) =>
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** The call log is written AFTER the response (H-9): poll for it instead of guessing a delay. */
@@ -544,7 +544,7 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     const ac = new AbortController();
     const headers = new Headers({
       origin: ORIGIN,
-      cookie: `dab_csrf=${TOKEN}; ${admin}`,
+      cookie: `crk_csrf=${TOKEN}; ${admin}`,
       'x-csrf-token': TOKEN,
       'content-type': 'application/json',
       'x-forwarded-for': RUN_IP,
@@ -604,7 +604,7 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect(body.x_tools.map((t) => [t.name, t.ok])).toEqual([['dummy.ping', true]]);
   });
 
-  test('I-3 tools, streaming: tool-call deltas stay server-side, dab.tool frames show progress, one [DONE]', async () => {
+  test('I-3 tools, streaming: tool-call deltas stay server-side, crk.tool frames show progress, one [DONE]', async () => {
     const res = await call(
       '/v1/m/ai/chat/completions',
       {
@@ -628,7 +628,7 @@ describe.skipIf(!enabled)('AI module (H-2…H-9, gates M5 #1 #2 #3)', () => {
     expect(raw).not.toContain('tool_calls'); // the model's tool request never reaches the browser
     const parsed = frames.filter((f) => f !== '[DONE]').map((f) => JSON.parse(f));
     const toolFrames = parsed
-      .map((f) => (f as { dab?: { tool?: { name: string; status: string } } }).dab?.tool)
+      .map((f) => (f as { crk?: { tool?: { name: string; status: string } } }).crk?.tool)
       .filter((x): x is { name: string; status: string } => !!x);
     expect(toolFrames.map((t) => [t.name, t.status])).toEqual([
       ['dummy.ping', 'running'],

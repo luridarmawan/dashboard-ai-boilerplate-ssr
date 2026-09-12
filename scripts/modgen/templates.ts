@@ -572,7 +572,7 @@ const password = 'a generated module password';
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [\`dab_csrf=\${TOKEN}\`, ...cookies].join('; '));
+  headers.set('cookie', [\`crk_csrf=\${TOKEN}\`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', \`10.99.\${Math.floor(run / 1000) % 250}.\${run % 250}\`);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -586,7 +586,7 @@ describe.skipIf(!enabled)('${name} module CRUD', () => {
     if (!enabled) return;
     await runSeed(unsafeAcrossTenants(), { adminEmail: email, adminPassword: password });
     const res = await call('/v1/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    admin = res.headers.getSetCookie().find((c) => c.startsWith('dab_session='))?.split(';')[0] ?? '';
+    admin = res.headers.getSetCookie().find((c) => c.startsWith('crk_session='))?.split(';')[0] ?? '';
   });
   test('create → read → update → delete', async () => {
     const created = await call('/v1/m/${ns}/${plural}', { method: 'POST', body: JSON.stringify({ ${sample} }) }, [admin]);

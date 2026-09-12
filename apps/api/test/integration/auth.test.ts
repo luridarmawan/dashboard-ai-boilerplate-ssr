@@ -24,7 +24,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   // A per-run client IP: the login rate limit (A-2) is keyed by IP and lives in the shared dev
   // database for 15 minutes, so repeated local runs must not exhaust each other's budget.
@@ -36,7 +36,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 
 describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
@@ -53,7 +53,7 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
       body: JSON.stringify({ email, password, name: 'Integration' }),
     });
     expect(res.status).toBe(201);
-    const sc = res.headers.getSetCookie().find((c) => c.startsWith('dab_session='));
+    const sc = res.headers.getSetCookie().find((c) => c.startsWith('crk_session='));
     expect(sc).toMatch(/HttpOnly/i);
     expect(sc).toMatch(/SameSite=Lax/i);
     cookie = sessionCookie(res);

@@ -23,7 +23,7 @@ describe.skipIf(!enabled)('api preflight (Q-13)', () => {
     });
     const r = await runPreflight({
       ...process.env,
-      UPLOADS_DIR: mkdtempSync(join(tmpdir(), 'dab-up-')),
+      UPLOADS_DIR: mkdtempSync(join(tmpdir(), 'crk-up-')),
     });
     const text = formatPreflight(r);
     expect(r.ok, text).toBe(true);
@@ -79,7 +79,7 @@ describe.skipIf(!enabled)('api preflight (Q-13)', () => {
       NODE_ENV: 'production',
       BOOTSTRAP_ADMIN_PASSWORD: 'change-me-please-now',
       APP_ORIGIN: 'https://app.example.test',
-      UPLOADS_DIR: '/proc/dab-cannot-write-here',
+      UPLOADS_DIR: '/proc/crk-cannot-write-here',
     });
     expect(r.ok).toBe(false);
     expect(

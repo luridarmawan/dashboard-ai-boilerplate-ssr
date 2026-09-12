@@ -1,9 +1,9 @@
 # systemd unit for the API without Docker (PRD Q-11). Install:
-#   sh scripts/build-release.sh && sudo cp -r dist /opt/dab
-#   sudo useradd -r -s /usr/sbin/nologin dab && sudo mkdir -p /var/lib/dab/uploads && sudo chown -R dab:dab /var/lib/dab /opt/dab
-#   sudo cp deploy/systemd/api.env.example /etc/dab/api.env   # then edit; chmod 600
-#   sudo cp deploy/systemd/dab-api.service /etc/systemd/system/ && sudo systemctl enable --now dab-api
-# Migrations stay an explicit step (Q-4): `sudo -u dab /opt/dab/api migrate` before the first start
+#   sh scripts/build-release.sh && sudo cp -r dist /opt/crk
+#   sudo useradd -r -s /usr/sbin/nologin crk && sudo mkdir -p /var/lib/crk/uploads && sudo chown -R crk:crk /var/lib/crk /opt/crk
+#   sudo cp deploy/systemd/api.env.example /etc/crk/api.env   # then edit; chmod 600
+#   sudo cp deploy/systemd/crk-api.service /etc/systemd/system/ && sudo systemctl enable --now crk-api
+# Migrations stay an explicit step (Q-4): `sudo -u crk /opt/crk/api migrate` before the first start
 # and after every upgrade. ExecStartPre runs `preflight` (Q-13): a half-configured host never starts.
 [Unit]
 Description=Dashboard AI Boilerplate — API
@@ -13,12 +13,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=dab
-Group=dab
-EnvironmentFile=/etc/dab/api.env
-WorkingDirectory=/opt/dab
-ExecStartPre=/opt/dab/api preflight
-ExecStart=/opt/dab/api serve
+User=crk
+Group=crk
+EnvironmentFile=/etc/crk/api.env
+WorkingDirectory=/opt/crk
+ExecStartPre=/opt/crk/api preflight
+ExecStart=/opt/crk/api serve
 Restart=always
 RestartSec=3
 # serve() finishes in-flight requests and running jobs on SIGTERM
@@ -30,7 +30,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/dab/uploads
+ReadWritePaths=/var/lib/crk/uploads
 
 [Install]
 WantedBy=multi-user.target

@@ -33,8 +33,8 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  if (cookies.length) headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
-  else if (!headers.has('authorization')) headers.set('cookie', `dab_csrf=${TOKEN}`);
+  if (cookies.length) headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
+  else if (!headers.has('authorization')) headers.set('cookie', `crk_csrf=${TOKEN}`);
   headers.set('x-csrf-token', TOKEN);
   if (!headers.has('x-forwarded-for')) headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -44,7 +44,7 @@ const json = (r: Response) => r.json() as Promise<Envelope>;
 const sessionCookie = (r: Response) =>
   r.headers
     .getSetCookie()
-    .find((c) => c.startsWith('dab_session='))
+    .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
 const post = (
   path: string,
@@ -231,7 +231,7 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
     expect(bad.status).toBe(401);
   });
 
-  test('MCP: the official SDK client initializes, lists tools (wire names), calls one in the caller’s tenant, reads dab://me, gets the prompt (I-1, I-2, I-3)', async () => {
+  test('MCP: the official SDK client initializes, lists tools (wire names), calls one in the caller’s tenant, reads crk://me, gets the prompt (I-1, I-2, I-3)', async () => {
     const client = await mcpClient(adminToken);
     try {
       const tools = await client.listTools();
@@ -271,8 +271,8 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
       expect(unknown.isError).toBe(true);
 
       const resources = await client.listResources();
-      expect(resources.resources.map((r) => r.uri)).toEqual(['dab://me']);
-      const me = await client.readResource({ uri: 'dab://me' });
+      expect(resources.resources.map((r) => r.uri)).toEqual(['crk://me']);
+      const me = await client.readResource({ uri: 'crk://me' });
       const meJson = JSON.parse((me.contents[0] as { text: string }).text) as {
         via: string;
         clientId: string;

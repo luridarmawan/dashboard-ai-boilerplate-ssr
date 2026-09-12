@@ -9,12 +9,12 @@ import type { RequestEvent } from '@sveltejs/kit';
 import { cfgString, type PublicConfig } from './config.ts';
 
 /**
- * Language for ONE request (PRD K-2, K-3): user preference → `dab_lang` cookie →
+ * Language for ONE request (PRD K-2, K-3): user preference → `crk_lang` cookie →
  * Accept-Language → configured default (`app.default_locale`, per tenant with global fallback, K-3).
  * Decided before render, so the first HTML is already in the right language — never "always the
  * default first, then switch".
  */
-export const LANG_COOKIE = 'dab_lang';
+export const LANG_COOKIE = 'crk_lang';
 
 export function resolveRequestLocale(event: RequestEvent, config: PublicConfig): LocaleResolution {
   return resolveLocale({
@@ -26,10 +26,10 @@ export function resolveRequestLocale(event: RequestEvent, config: PublicConfig):
 }
 
 /**
- * K-9: the direction follows the locale; the `dab_dir` cookie forces `rtl` so themes and layouts
+ * K-9: the direction follows the locale; the `crk_dir` cookie forces `rtl` so themes and layouts
  * can be checked without a right-to-left translation installed (the picker's "RTL preview").
  */
-export const DIR_COOKIE = 'dab_dir';
+export const DIR_COOKIE = 'crk_dir';
 export function resolveRequestDirection(event: RequestEvent, locale: Locale): Direction {
   return event.cookies.get(DIR_COOKIE) === 'rtl' ? 'rtl' : directionOf(locale);
 }

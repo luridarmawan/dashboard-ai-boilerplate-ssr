@@ -42,7 +42,7 @@ receivers:
     #     send_resolved: true
     #     message: '{{ range .Alerts }}{{ .Labels.severity | toUpper }} {{ .Annotations.summary }}\n{{ end }}'
     # webhook_configs:
-    #   - url: https://hooks.example.com/dab-alerts
+    #   - url: https://hooks.example.com/crk-alerts
     #     send_resolved: true
 
 inhibit_rules:

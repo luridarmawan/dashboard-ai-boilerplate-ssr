@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
 # PRD §8 #25: the whole stack must idle under 1.5 GB RAM on a 2 vCPU / 4 GB VPS. Sums the memory of
-# every container of a compose project (default: the production stack, dab-prod) and fails above
+# every container of a compose project (default: the production stack, crk-prod) and fails above
 # the budget. Run after the stack has settled (CI: right after the scale proof, 3 api replicas).
 #
-#   sh scripts/ci/idle-memory.sh            # project dab-prod, budget 1500 MB
-#   PROJECT=dab-prod BUDGET_MB=1500 SETTLE_SECONDS=30 sh scripts/ci/idle-memory.sh
+#   sh scripts/ci/idle-memory.sh            # project crk-prod, budget 1500 MB
+#   PROJECT=crk-prod BUDGET_MB=1500 SETTLE_SECONDS=30 sh scripts/ci/idle-memory.sh
 set -eu
-PROJECT="${PROJECT:-dab-prod}"
+PROJECT="${PROJECT:-crk-prod}"
 BUDGET_MB="${BUDGET_MB:-1500}"
 sleep "${SETTLE_SECONDS:-15}"
 ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT")"

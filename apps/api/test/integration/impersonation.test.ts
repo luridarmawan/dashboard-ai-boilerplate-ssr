@@ -27,7 +27,7 @@ interface Envelope {
 const call = (path: string, init: RequestInit = {}, cookies: string[] = []) => {
   const headers = new Headers(init.headers);
   headers.set('origin', ORIGIN);
-  headers.set('cookie', [`dab_csrf=${TOKEN}`, ...cookies].join('; '));
+  headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', RUN_IP);
   if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
@@ -58,14 +58,14 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
     db = unsafeAcrossTenants();
     process.env.SIGNUP_ENABLED = 'true';
     await runSeed(db, { adminEmail, adminPassword });
-    admin = cookieOf(await login(adminEmail, adminPassword), 'dab_session');
+    admin = cookieOf(await login(adminEmail, adminPassword), 'crk_session');
     adminId = (await me([admin])).user.id;
     const reg = await call('/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email: memberEmail, password: memberPassword, name: 'Target' }),
     });
     expect(reg.status).toBe(201);
-    member = cookieOf(reg, 'dab_session');
+    member = cookieOf(reg, 'crk_session');
     memberId = (await me([member])).user.id;
   });
 
@@ -93,9 +93,9 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
     const d = (await json(r)).data as { user: { id: string }; expiresAt: string };
     expect(d.user.id).toBe(memberId);
     expect(new Date(d.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(3600_000 + 5000);
-    imp = cookieOf(r, 'dab_impersonate');
+    imp = cookieOf(r, 'crk_impersonate');
     expect(imp.length).toBeGreaterThan(20);
-    expect(cookieOf(r, 'dab_session')).toBe(''); // the admin's own cookie is not touched
+    expect(cookieOf(r, 'crk_session')).toBe(''); // the admin's own cookie is not touched
 
     const asTarget = await me([admin, imp]);
     expect(asTarget.user.id).toBe(memberId);
@@ -152,7 +152,7 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
       (await call(`/v1/users/${memberId}/impersonate`, { method: 'POST' }, [admin, imp])).status,
     ).toBe(403);
     // The target's password still works: nothing changed.
-    expect(cookieOf(await login(memberEmail, memberPassword), 'dab_session')).not.toBe('');
+    expect(cookieOf(await login(memberEmail, memberPassword), 'crk_session')).not.toBe('');
   });
 
   test('stop revokes the impersonated session, clears the cookie and audits; a stale cookie is ignored', async () => {
@@ -162,7 +162,7 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
     const r = await call('/v1/users/impersonate/stop', { method: 'POST' }, [admin, imp]);
     expect(r.status).toBe(200);
     expect(((await json(r)).data as { user: { id: string } }).user.id).toBe(adminId);
-    const cleared = r.headers.getSetCookie().find((c) => c.startsWith('dab_impersonate=')) ?? '';
+    const cleared = r.headers.getSetCookie().find((c) => c.startsWith('crk_impersonate=')) ?? '';
     expect(cleared.toLowerCase()).toContain('max-age=0');
     // Sending the old cookie again: the session is revoked → plain admin.
     const after = await me([admin, imp]);
@@ -184,11 +184,11 @@ describe.skipIf(!enabled)('impersonation by superadmin (D-6)', () => {
 
   test('logout drops both cookies', async () => {
     const r2 = await call(`/v1/users/${memberId}/impersonate`, { method: 'POST' }, [admin]);
-    const imp2 = cookieOf(r2, 'dab_impersonate');
+    const imp2 = cookieOf(r2, 'crk_impersonate');
     const out = await call('/v1/auth/logout', { method: 'POST' }, [admin, imp2]);
     expect(out.status).toBe(200);
     const names = out.headers.getSetCookie().map((c) => c.split('=')[0]);
-    expect(names).toContain('dab_session');
-    expect(names).toContain('dab_impersonate');
+    expect(names).toContain('crk_session');
+    expect(names).toContain('crk_impersonate');
   });
 });

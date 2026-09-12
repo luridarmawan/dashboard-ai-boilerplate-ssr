@@ -113,7 +113,7 @@ const admin = new Jar();
     r.status === 303 && r.location === '/dashboard',
     `${r.status} ${r.location} ${r.status === 303 ? '' : errorOf(r.html)}`,
   );
-  check('session cookie is HttpOnly', admin.cookies.has('dab_session'));
+  check('session cookie is HttpOnly', admin.cookies.has('crk_session'));
   const dash = await get(admin, '/dashboard');
   check(
     'dashboard renders server-side with superadmin *.*',
