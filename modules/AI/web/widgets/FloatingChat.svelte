@@ -280,7 +280,7 @@ async function send(e: SubmitEvent) {
       </section>
     {/if}
     {#if mounted}
-      <button type="button" onclick={toggle} class="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90" aria-label={t('ai.float.open')} aria-expanded={open} title={t('ai.float.open')} data-testid="floating-chat-button">
+      <button type="button" onclick={toggle} class="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90" aria-label={t('ai.float.open')} aria-expanded={open} title={t('ai.float.open')} data-testid="floating-chat-button">
         <Icon name={open ? 'x' : 'sparkles'} size={22} />
       </button>
     {:else}
