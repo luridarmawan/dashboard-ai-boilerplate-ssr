@@ -83,8 +83,9 @@ async function mfaStep(event: Parameters<NonNullable<Actions['default']>>[0], fo
   const r = unwrap(res);
   if (!r.ok) {
     // A wrong code keeps the same challenge (attempts are counted server-side); an expired or
-    // exhausted one sends the user back to the password form.
-    const keep = r.failure.status === 401 && /salah/.test(r.failure.message);
+    // exhausted one sends the user back to the password form. Which of the two it is comes from
+    // the API's `details.reason`, not from its wording.
+    const keep = (r.failure.details as { reason?: string } | undefined)?.reason === 'bad_code';
     return actionFailure(r.failure, {}, keep ? { mfa: { challenge, next } } : {});
   }
   forwardSetCookies(event, res.response);

@@ -392,20 +392,34 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         .from(schema.mfaChallenges)
         .where(eq(schema.mfaChallenges.token_hash, hashToken(body.challenge)))
         .limit(1);
+      /**
+       * `details.reason` separates a wrong code — the challenge survives, attempts are counted
+       * here — from a challenge that is gone, which sends the user back to the password step.
+       * Callers must not have to read the message to tell them apart: the web maps the reason to
+       * its own translated wording (K-4), on both the form-action and the fetch path.
+       */
       const refuse = (
         message: string,
+        reason: 'bad_code' | 'challenge_invalid' | 'too_many_attempts',
         code: 'invalid_credentials' | 'rate_limited' = 'invalid_credentials',
       ) => {
         set.status = code === 'rate_limited' ? 429 : 401;
-        return fail(code, message, requestId);
+        return fail(code, message, requestId, { reason });
       };
       if (!ch || ch.expires_at.getTime() < now.getTime()) {
         if (ch) await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse('Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi');
+        return refuse(
+          'Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi',
+          'challenge_invalid',
+        );
       }
       if (ch.attempts >= MFA_MAX_ATTEMPTS) {
         await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse('Terlalu banyak kode salah — masuk lagi', 'rate_limited');
+        return refuse(
+          'Terlalu banyak kode salah — masuk lagi',
+          'too_many_attempts',
+          'rate_limited',
+        );
       }
       const [user] = await db
         .select()
@@ -419,7 +433,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         .limit(1);
       if (!user || user.status_id !== STATUS.ACTIVE || !mfa?.enabled_at) {
         await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse('Tantangan 2FA tidak valid — masuk lagi');
+        return refuse('Tantangan 2FA tidak valid — masuk lagi', 'challenge_invalid');
       }
       // TOTP first (with replay protection), then a single-use recovery code.
       const step = await verifyTotp(mfa.secret, body.code, { now, lastStep: mfa.last_step });
@@ -456,7 +470,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
           ip,
           requestId,
         });
-        return refuse('Kode 2FA salah');
+        return refuse('Kode 2FA salah', 'bad_code');
       }
       await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
       const result = await issueSession({ db, user, ip, request, cookie, requestId, mfa: method });
