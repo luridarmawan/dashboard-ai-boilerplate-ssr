@@ -4,6 +4,10 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 
 | Dokumen | Isi |
 |---|---|
+| ![Home](docs/screenshot/home.png) | ![Settings](docs/screenshot/settings.png) |
+
+| Dokumen | Isi |
+|---|---|
 | [`docs/PRD.md`](./docs/PRD.md) | Kebutuhan produk, keputusan arsitektur, 16 titik perluasan modul, kriteria terima §8 |
 | [`docs/ROADMAP.md`](./docs/ROADMAP.md) | Urutan milestone M0–M7 dengan gate keluar |
 | [`docs/MODULES.md`](./docs/MODULES.md) | **Membangun modul** — `bun modgen`, kontrak tiap berkas, repositori terpisah, penjaga CI |
