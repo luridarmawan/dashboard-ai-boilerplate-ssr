@@ -1378,12 +1378,19 @@ export default defineApiRoutes(
       async ({ auth, query, tenantState }) => {
         const a = auth as AuthState;
         if (!tenantState?.tenant) return page([], pageMeta(1, 50, 0));
+        // The archive is a view of its own, not a longer list: `only` is what the sidebar filter
+        // asks for, `1` keeps the older "everything at once" meaning.
+        const archived = query.archived;
         const rows = await tenantState.tenant.select(
           schema.aiConversations,
           and(
             eq(schema.aiConversations.user_id, a.user.id),
             isNull(schema.aiConversations.deleted_at),
-            query.archived === '1' ? undefined : isNull(schema.aiConversations.archived_at),
+            archived === '1'
+              ? undefined
+              : archived === 'only'
+                ? isNotNull(schema.aiConversations.archived_at)
+                : isNull(schema.aiConversations.archived_at),
           ),
         );
         const q = query.q?.toLowerCase();
@@ -1405,7 +1412,7 @@ export default defineApiRoutes(
         response: { 200: PageSchema(Conversation), ...errorResponses },
         detail: {
           summary:
-            'My conversations, newest first; ?q= searches titles; ?archived=1 includes archived',
+            'My conversations, newest first; ?q= searches titles; ?archived=1 includes archived, ?archived=only lists just the archive',
         },
       },
     )

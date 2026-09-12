@@ -181,5 +181,10 @@
   "ai.mcps.delete_confirm_lead": "Server MCP {name} akan dihapus beserta tool yang berasal darinya.",
   "ai.chat.delete_confirm_lead": "Percakapan “{title}” beserta seluruh pesannya akan dihapus.",
   "ai.chat.archive_confirm": "Konfirmasi pengarsipan",
-  "ai.chat.archive_confirm_lead": "Percakapan “{title}” akan dipindahkan ke arsip dan hilang dari daftar. Anda bisa mengeluarkannya lagi dari arsip."
+  "ai.chat.archive_confirm_lead": "Percakapan “{title}” akan dipindahkan ke arsip dan hilang dari daftar. Anda bisa mengeluarkannya lagi dari arsip.",
+  "ai.chat.filter": "Tampilan daftar",
+  "ai.chat.filter_live": "Aktif",
+  "ai.chat.archive_tab": "Arsip",
+  "ai.chat.archive_empty": "Arsip masih kosong.",
+  "ai.chat.search_archive": "Cari di arsip"
 }

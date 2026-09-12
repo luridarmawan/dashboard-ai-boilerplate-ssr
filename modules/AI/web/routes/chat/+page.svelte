@@ -50,6 +50,12 @@ $effect(() => {
   // and yank the reader straight back down.
   untrack(() => scrollDown(true));
 });
+// Every link inside the sidebar keeps the view the user is in, so opening an archived
+// conversation does not silently drop them back on the live list.
+const viewParam = $derived(data.archived ? '&archived=1' : '');
+const listHref = $derived(
+  `/m/ai/chat?${data.archived ? 'archived=1' : ''}${data.q ? `${data.archived ? '&' : ''}q=${encodeURIComponent(data.q)}` : ''}`,
+);
 const versionOf = (id: string) => data.conversation?.siblings?.[id];
 const groups = $derived.by(() => {
   const now = Date.now();
@@ -325,9 +331,10 @@ function copy(text: string) {
   <!-- Narrow screens trade the whole sidebar for a combobox + a new-conversation button (H-7). -->
   <div class="flex items-center gap-2 lg:hidden">
     <form method="GET" action="/m/ai/chat" class="min-w-0 flex-1">
+      {#if data.archived}<input type="hidden" name="archived" value="1" />{/if}
       <label class="sr-only" for="conversation-picker">{t('ai.chat.pick')}</label>
       <select id="conversation-picker" name="c" value={data.conversation?.id ?? ''} class="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onchange={(e) => (e.currentTarget as HTMLSelectElement).form?.requestSubmit()}>
-        <option value="" disabled>{data.conversations.length ? t('ai.chat.pick') : t('ai.chat.empty')}</option>
+        <option value="" disabled>{data.conversations.length ? t('ai.chat.pick') : data.archived ? t('ai.chat.archive_empty') : t('ai.chat.empty')}</option>
         {#each [['today', t('ai.chat.today')], ['yesterday', t('ai.chat.yesterday')], ['week', t('ai.chat.week')], ['older', t('ai.chat.older')]] as [key, label] (key)}
           {@const items = groups[key as keyof typeof groups]}
           {#if items.length}
@@ -340,14 +347,22 @@ function copy(text: string) {
       <!-- Without JavaScript the same select is a plain GET filter, one submit away. -->
       <noscript><Button type="submit" variant="outline" size="sm" class="mt-2 w-full">{t('ai.chat.open')}</Button></noscript>
     </form>
+    <!-- The sidebar's archive tab is desktop-only, so the narrow bar keeps its own way in and out. -->
+    <Button href={data.archived ? '/m/ai/chat' : '/m/ai/chat?archived=1'} variant={data.archived ? 'secondary' : 'outline'} size="icon" class="shrink-0" title={data.archived ? t('ai.chat.filter_live') : t('ai.chat.archive_tab')} aria-label={data.archived ? t('ai.chat.filter_live') : t('ai.chat.archive_tab')}><Icon name={data.archived ? 'list' : 'archive'} size={18} /></Button>
     <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" size="icon" class="shrink-0" title={t('ai.chat.new')} aria-label={t('ai.chat.new')}><Icon name="plus" size={18} /></Button></form>
   </div>
 
   <!-- sidebar (H-7) -->
   <aside id="conversation-list-sidebar" class="hidden min-h-0 flex-col gap-3 rounded-lg border bg-card p-3 lg:flex">
     <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" class="w-full" size="sm"><Icon name="plus" size={16} />{t('ai.chat.new')}</Button></form>
+    <!-- Two views of the same list (H-6): live conversations, and the archive they came off. -->
+    <div class="flex gap-1" role="group" aria-label={t('ai.chat.filter')}>
+      <Button href={data.q ? `/m/ai/chat?q=${encodeURIComponent(data.q)}` : '/m/ai/chat'} variant={data.archived ? 'ghost' : 'secondary'} size="sm" class="flex-1" aria-current={data.archived ? undefined : 'page'}>{t('ai.chat.filter_live')}</Button>
+      <Button href={`/m/ai/chat?archived=1${data.q ? `&q=${encodeURIComponent(data.q)}` : ''}`} variant={data.archived ? 'secondary' : 'ghost'} size="sm" class="flex-1" aria-current={data.archived ? 'page' : undefined}><Icon name="archive" size={14} />{t('ai.chat.archive_tab')}</Button>
+    </div>
     <form method="GET" class="flex gap-1">
-      <input name="q" value={data.q} placeholder={t('ai.chat.search')} class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" />
+      {#if data.archived}<input type="hidden" name="archived" value="1" />{/if}
+      <input name="q" value={data.q} placeholder={data.archived ? t('ai.chat.search_archive') : t('ai.chat.search')} class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" />
       <Button type="submit" variant="outline" size="sm"><Icon name="search" size={14} /></Button>
     </form>
     <nav class="min-h-0 flex-1 overflow-y-auto text-sm" aria-label={t('ai.chat.title')}>
@@ -357,12 +372,12 @@ function copy(text: string) {
           <p class="mt-2 mb-1 px-2 text-xs font-medium text-muted-foreground">{label}</p>
           <ul class="grid gap-0.5">
             {#each items as c (c.id)}
-              <li><a href={`/m/ai/chat?c=${c.id}`} class={`block truncate rounded-md px-2 py-1.5 no-underline hover:bg-accent ${data.conversation?.id === c.id ? 'bg-accent font-medium' : ''}`}>{c.title}</a></li>
+              <li><a href={`/m/ai/chat?c=${c.id}${viewParam}`} class={`block truncate rounded-md px-2 py-1.5 no-underline hover:bg-accent ${data.conversation?.id === c.id ? 'bg-accent font-medium' : ''}`}>{c.title}</a></li>
             {/each}
           </ul>
         {/if}
       {/each}
-      {#if !data.conversations.length}<p class="px-2 text-muted-foreground">{t('ai.chat.empty')}</p>{/if}
+      {#if !data.conversations.length}<p class="px-2 text-muted-foreground">{data.archived ? t('ai.chat.archive_empty') : t('ai.chat.empty')}</p>{/if}
     </nav>
   </aside>
 
@@ -391,10 +406,16 @@ function copy(text: string) {
             {/if}
           {/if}
           <!-- The labels fold away on narrow screens; the title stays readable, the actions stay reachable. -->
-          <ConfirmDelete compact compactLabel csrf={data.csrf} confirm="archive" action="?/archive" icon="archive" confirmVariant="default" href={`/m/ai/chat?c=${data.conversation.id}&confirm=archive#confirm-archive`} cancelHref={`/m/ai/chat?c=${data.conversation.id}`} confirming={data.confirmArchive} variant="ghost" size="sm" label={t('ai.chat.archive')} title={t('ai.chat.archive_confirm')} confirmLabel={t('ai.chat.archive')} description={t('ai.chat.archive_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
-            {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" />{/snippet}
-          </ConfirmDelete>
-          <ConfirmDelete compact csrf={data.csrf} href={`/m/ai/chat?c=${data.conversation.id}&confirm=delete#confirm-delete`} cancelHref={`/m/ai/chat?c=${data.conversation.id}`} confirming={data.confirmDelete} variant="ghost" size="sm" class="text-destructive" label={t('ai.chat.delete')} title={t('ai.chat.delete')} description={t('ai.chat.delete_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
+          {#if data.conversation.archived}
+            <!-- Out of the archive is a plain POST: it undoes, and asking first would make the
+                 archive feel as final as a deletion — which is the whole difference between them. -->
+            <form method="POST" action="?/archive"><Csrf token={data.csrf} /><input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="0" /><Button id="btn-chat-unarchive" type="submit" variant="secondary" size="sm" title={t('ai.chat.unarchive')} aria-label={t('ai.chat.unarchive')}><Icon name="upload" size={14} /><span class="hidden sm:inline">{t('ai.chat.unarchive')}</span></Button></form>
+          {:else}
+            <ConfirmDelete compact compactLabel csrf={data.csrf} confirm="archive" action="?/archive" icon="archive" confirmVariant="default" href={`/m/ai/chat?c=${data.conversation.id}${viewParam}&confirm=archive#confirm-archive`} cancelHref={`/m/ai/chat?c=${data.conversation.id}${viewParam}`} confirming={data.confirmArchive} variant="ghost" size="sm" label={t('ai.chat.archive')} title={t('ai.chat.archive_confirm')} confirmLabel={t('ai.chat.archive')} description={t('ai.chat.archive_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
+              {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} /><input type="hidden" name="archived" value="1" />{/snippet}
+            </ConfirmDelete>
+          {/if}
+          <ConfirmDelete compact csrf={data.csrf} href={`/m/ai/chat?c=${data.conversation.id}${viewParam}&confirm=delete#confirm-delete`} cancelHref={`/m/ai/chat?c=${data.conversation.id}${viewParam}`} confirming={data.confirmDelete} variant="ghost" size="sm" class="text-destructive" label={t('ai.chat.delete')} title={t('ai.chat.delete')} description={t('ai.chat.delete_confirm_lead', { title: data.conversation.title ?? t('ai.chat.title') })}>
             {#snippet fields()}<input type="hidden" name="c" value={data.conversation.id} />{/snippet}
           </ConfirmDelete>
         </div>

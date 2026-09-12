@@ -22,10 +22,15 @@ export const _layoutVariant = 'wide';
 export const load: ServerLoad = async (event) => {
   const api = apiFor(event);
   const q = event.url.searchParams.get('q') ?? '';
+  // The archive is a separate view of the same sidebar (`?archived=1`), not a second page: the
+  // list swaps, everything else — search, opening a conversation — works the same way.
+  const archived = event.url.searchParams.get('archived') === '1';
   const selected = event.url.searchParams.get('c');
   // H-12: `?m=<id>` picks the leaf whose path (ancestors + newest descendants) is shown.
   const leaf = event.url.searchParams.get('m');
-  const list = await api.v1.m.ai.conversations.get({ query: q ? { q } : {} });
+  const list = await api.v1.m.ai.conversations.get({
+    query: { ...(q ? { q } : {}), ...(archived ? { archived: 'only' } : {}) },
+  });
   if (!list.data?.success)
     error(
       list.status,
@@ -67,6 +72,8 @@ export const load: ServerLoad = async (event) => {
     siblings: ReturnType<typeof siblingsAlong>;
     /** The last message shown — the parent of whatever is sent next. */
     leafId: string | null;
+    /** Archived conversations still open and read the same; only the header button changes. */
+    archived: boolean;
   } | null = null;
   if (selected) {
     const one = await api.v1.m.ai.conversations({ id: selected }).get();
@@ -91,12 +98,14 @@ export const load: ServerLoad = async (event) => {
         ),
         siblings: siblingsAlong(all, path),
         leafId: path.at(-1)?.id ?? null,
+        archived: c.archivedAt !== null,
       };
     }
   }
   const cfg = event.locals.config.values;
   return {
     q,
+    archived,
     conversations: list.data.data,
     conversation,
     providers,
@@ -276,15 +285,17 @@ export const actions: Actions = {
   archive: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail();
-    // Archiving takes the conversation off the list; it is undone from the archive, not from here,
-    // so it is asked about first (L-22) — and the guard, not the markup, is what enforces that.
-    if (!confirmed(event, 'archive'))
-      return confirmFail(event.locals.locale.locale, 'common.confirm_required');
     const id = str(form, 'c');
-    await apiFor(event)
-      .v1.m.ai.conversations({ id })
-      .patch({ archived: str(form, 'archived') === '1' });
-    redirect(303, '/m/ai/chat');
+    const archived = str(form, 'archived') === '1';
+    // Archiving takes the conversation off the list, so it is asked about first (L-22) — and the
+    // guard, not the markup, is what enforces that. Taking it back out is not: it undoes, and a
+    // confirmation on the way back only makes the archive feel as final as a deletion.
+    if (archived && !confirmed(event, 'archive'))
+      return confirmFail(event.locals.locale.locale, 'common.confirm_required');
+    await apiFor(event).v1.m.ai.conversations({ id }).patch({ archived });
+    // Archived: back to the live list, where it no longer is. Unarchived: it is on that list
+    // again, so stay in the conversation the user was reading.
+    redirect(303, archived ? '/m/ai/chat' : `/m/ai/chat?c=${id}`);
   },
   delete: async (event) => {
     const form = await event.request.formData();
