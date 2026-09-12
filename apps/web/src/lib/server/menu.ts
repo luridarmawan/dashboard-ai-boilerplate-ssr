@@ -23,6 +23,8 @@ export interface MenuItem {
   readonly icon: string;
   readonly order: number;
   readonly badge?: string | number;
+  /** Leaves the SvelteKit router (a page the API serves): navigate for real, do not route it. */
+  readonly external?: boolean;
   readonly children: MenuItem[];
   readonly active: boolean;
 }
@@ -37,6 +39,8 @@ interface Entry {
   parent?: string;
   /** undefined → the owning module's group; null → top level; string → a core group id. */
   group?: string | null;
+  /** Not a SvelteKit route: the shell renders it as a full navigation. */
+  external?: boolean;
 }
 
 interface GroupDef {
@@ -50,6 +54,17 @@ interface GroupDef {
 export const CORE_GROUPS: readonly GroupDef[] = [
   { id: 'settings', label: { id: 'Pengaturan', en: 'Settings' }, icon: 'settings', order: 10 },
   { id: 'integration', label: { id: 'Integrasi', en: 'Integration' }, icon: 'plug', order: 20 },
+  /**
+   * Reference material, not a place where anything is changed — so it sits after the module groups
+   * and before Monitoring. Its entries carry their own permissions; a reader who holds neither
+   * never sees the group at all (`buildMenu` does not build an empty one).
+   */
+  {
+    id: 'documentation',
+    label: { id: 'Dokumentasi', en: 'Documentation' },
+    icon: 'file',
+    order: 800,
+  },
   {
     id: 'monitoring',
     label: { id: 'Pemantauan', en: 'Monitoring' },
@@ -84,15 +99,6 @@ export const CORE_MENU: readonly Entry[] = [
     icon: 'shield',
     permission: 'group.read',
     order: 20,
-    group: 'settings',
-  },
-  {
-    id: 'core.permissions',
-    label: { id: 'Panduan izin', en: 'Permission guide' },
-    href: '/permissions',
-    icon: 'help',
-    permission: 'group.read',
-    order: 22,
     group: 'settings',
   },
   {
@@ -157,6 +163,32 @@ export const CORE_MENU: readonly Entry[] = [
     permission: 'mail.read',
     order: 47,
     group: 'monitoring',
+  },
+  {
+    id: 'core.permissions',
+    label: { id: 'Panduan izin', en: 'Permission guide' },
+    href: '/permissions',
+    icon: 'help',
+    permission: 'group.read',
+    order: 800,
+    group: 'documentation',
+  },
+  /**
+   * The API reference is served by the API itself (`/docs`, Scalar over the generated OpenAPI) and
+   * only LOOKS like a dashboard route — Caddy in production and the Vite proxy in development both
+   * resolve it on this origin. `external` is what stops the client router from trying to route it
+   * and 404-ing. Gated on `config.read`: it describes every endpoint of the installation, which is
+   * the same audience that may read its configuration.
+   */
+  {
+    id: 'core.apidocs',
+    label: { id: 'Dokumentasi API', en: 'API Docs' },
+    href: '/docs',
+    icon: 'external-link',
+    permission: 'config.read',
+    order: 802,
+    group: 'documentation',
+    external: true,
   },
   /**
    * The pattern showcase (L-19). It demonstrates the very module whose pages sit beside it, so it
@@ -225,6 +257,7 @@ export function buildMenu(
     href: e.href,
     icon: e.icon ?? 'puzzle',
     order: e.order ?? 100,
+    ...(e.external ? { external: true } : {}),
     children: [],
     active: isActive(e.href),
   });

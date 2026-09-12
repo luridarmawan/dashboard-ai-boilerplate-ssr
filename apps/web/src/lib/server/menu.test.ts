@@ -32,7 +32,6 @@ describe('buildMenu (F-3 groups)', () => {
     expect(labels(group(menu, 'settings')?.children ?? [])).toEqual([
       'Users',
       'Groups & permissions',
-      'Permission guide',
       'Tenants',
       'Custom themes',
       'Settings',
@@ -47,6 +46,26 @@ describe('buildMenu (F-3 groups)', () => {
       'Email outbox',
       'AI log',
     ]);
+  });
+
+  test('Documentation holds the reference pages; the API reference leaves the router', () => {
+    const docs = group(menu, 'documentation');
+    expect(labels(docs?.children ?? [])).toEqual(['Permission guide', 'API Docs']);
+    // `/docs` is served by the API on this origin, so the shell must navigate rather than route it.
+    expect(docs?.children.find((c) => c.id === 'core.apidocs')?.external).toBe(true);
+    expect(docs?.children.find((c) => c.id === 'core.permissions')?.external).toBeUndefined();
+    // It sits before Monitoring, which stays the last group.
+    const ids = menu.filter((i) => i.kind === 'group').map((i) => i.id);
+    expect(ids.indexOf('group.documentation')).toBe(ids.indexOf('group.monitoring') - 1);
+  });
+
+  test('a reader without the permissions never gets the group at all', () => {
+    const reader = {
+      ...admin,
+      permissions: ['user.read'],
+      can: (p: string) => p === 'user.read',
+    } as unknown as Session;
+    expect(group(buildMenu(reader, '/users', 'en'), 'documentation')).toBeUndefined();
   });
 
   test('module entries without a group land in the module’s own group, titled from module.json', () => {
