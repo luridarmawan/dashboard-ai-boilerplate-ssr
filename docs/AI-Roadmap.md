@@ -244,8 +244,33 @@ ai.providers.probe_responses  ai.providers.probe_stream  ai.providers.probe_reas
 | ~~**F2 — Chat runtime dual-endpoint**~~ **SELESAI 2026-09-10** | `modules/AI/api/responses.ts` (`toResponsesInput`/`toResponsesTools`/`parseResponsesEvent`/`readResponsesReply`/`normalizeUsage`), `callProvider` bercabang + fallback runtime 404/405, `ai_calls.upstream_endpoint` & `reasoning_tokens` terisi | Terbukti: 18 kasus unit (`responses.test.ts`) + 4 kasus integrasi (non-stream, stream dengan ringkasan reasoning disaring, tool round-trip `function_call`/`function_call_output`, fallback) + **uji langsung ke provider nyata** (§12.1). Sisi web tidak disentuh sama sekali |
 | ~~**F3 — Reasoning/tools**~~ **SELESAI 2026-09-10** | Setting `ai.reasoning_effort` (`provider` baku = tidak mengirim apa pun), ejaan param diambil dari hasil probe (`reasoning` nested vs `reasoning_effort` flat), Analitik memisahkan token reasoning. Aturan §5.1a sudah mendarat lebih awal di F2 | Terbukti: kasus integrasi — tanpa setelan tidak ada param terkirim, dengan `low` terkirim `reasoning: { effort: 'low' }`; Analitik menampilkan porsi reasoning. **`tool_choice` sengaja tidak dikerjakan** (§9) |
 | ~~**F4 — Polish & gate CI**~~ **SELESAI 2026-09-10** | Fake in-process diperluas: `providers.test.ts` melayani tiga bentuk penyedia (chat-only, responses-only, keduanya) dan `ai.test.ts` bercabang `/responses` dengan cek `url.pathname`. `scripts/ai-mock-provider.ts` untuk dev manual & `ai:test`, tidak dipakai CI | `INTEGRATION=1 bun test modules/AI/test/integration/` hijau tanpa key nyata. **Bukan** `proof:m5:gate4` — skrip itu gate "modul AI dicabut" dan tidak menyentuh provider |
+| ~~**F5 — Probe per model**~~ **SELESAI 2026-09-12** | Migrasi `0024` (aditif, mysql+pg: 7 kolom probe di `ai_models`), `POST /providers/:id/models/test`, `ModelView` membawa matriks + `recommended` per model, kolom **Kemampuan** dan tombol **Uji model** per baris daftar harga (fetch + jalur `?/testModel` tanpa JS) | Terbukti: `providers.test.ts` — satu penyedia dengan dua model yang **berbeda verdict** (reasoning ✓/✗, tools ✓/✗, rekomendasi ★/–) di balik satu base URL dan satu key; matriks bertahan melewati penyimpanan daftar harga; model di luar daftar → 404 |
 
 Total **~3 minggu** untuk 1 dev (12–20 hari kerja, termasuk CLI §10.5; paralel dengan P1 lain). F0 bisa di-merge tanpa F2 (probe dulu, pakai nanti).
+
+### 6.4 Catatan pelaksanaan F5 — probe per model (2026-09-12)
+
+Sampai F4 seluruh matriks melekat pada **profil penyedia**, padahal yang diprobe selalu satu model:
+`default_model`. Di balik satu base URL lazimnya ada model reasoning, model chat saja, dan model
+tanpa function calling — jadi satu jawaban tingkat penyedia salah untuk sebagian besar barisnya.
+
+- **Probe-nya tidak berubah sama sekali.** `probeCapabilities(baseUrl, key, model, opts)` sejak F0
+  sudah menerima id model sebagai argumen; F5 hanya memanggilnya dengan model lain dan menyimpan
+  hasilnya di baris `ai_models`. Tidak ada langkah probe baru, tidak ada anggaran waktu baru.
+- **Kolomnya cermin persis milik `ai_providers`** (`capabilities`, `capabilities_at`,
+  `preferred_endpoint`, `last_status`, `last_error`, `last_tested_at`, `last_probe_ms`), sehingga
+  `capabilitiesOf()` dan aturan "probe gagal tidak menghapus matriks" berlaku tanpa kode baru.
+- **`replaceModels` menyimpan matriks melewati penyimpanan.** Daftar harga ditulis ulang seluruhnya
+  (hapus lalu sisipkan) setiap kali profil disimpan; matriks melekat pada **id model**, bukan pada
+  baris yang kebetulan memuatnya, jadi baris ber-id model sama membawa hasil probenya menyeberang.
+  Tanpa ini, mengubah satu harga akan menghapus semua yang sudah dibuktikan.
+- **Uji tingkat penyedia ikut mengisi baris model bakunya.** Uji itu memang probe atas
+  `default_model`; tanpa penulisan ini model baku terbaca "belum diuji" tepat setelah admin
+  membuktikan sebaliknya.
+- **Model diambil dari daftar penyedia, tidak pernah dari request sebagai teks bebas** — probe
+  membelanjakan key milik tenant. Model di luar daftar dijawab 404.
+- Di UI hasil disimpan **per id model**, bukan satu slot "hasil terakhir": alasan menguji model
+  kedua adalah membandingkannya dengan yang pertama, dan satu slot akan menghapus pembandingnya.
 
 ### 6.3 Bukti lewat UI sungguhan (2026-09-10)
 

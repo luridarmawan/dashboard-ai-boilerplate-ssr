@@ -85,6 +85,36 @@ export const actions: Actions = {
     if (!r.ok) return actionFailure(r.failure);
     return { tested: r.data.data };
   },
+  /**
+   * The same probe for ONE model of the price list (a provider's models do not share one spec).
+   * The no-JavaScript path: `model-test/+server.ts` is the enhanced one, and both call the same
+   * API route, so the verdict and what gets stored are identical either way.
+   */
+  testModel: async (event) => {
+    const form = await event.request.formData();
+    const id = String(event.params.id ?? '');
+    if (!checkCsrf(event, form)) return csrfFail();
+    const r = unwrap<{
+      success: true;
+      data: {
+        model: string;
+        ok: boolean;
+        error: string | null;
+        ms: number;
+        capabilities: Omit<ProbeResult, 'ok' | 'error' | 'ms' | 'steps'>;
+        preferredEndpoint: string | null;
+        recommended: boolean;
+        testedAt: string;
+        steps: ProbeResult['steps'];
+      };
+    }>(
+      await apiFor(event)
+        .v1.m.ai.providers({ id })
+        .models.test.post({ model: str(form, 'model') }),
+    );
+    if (!r.ok) return actionFailure(r.failure);
+    return { testedModel: r.data.data };
+  },
   delete: async (event) => {
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');

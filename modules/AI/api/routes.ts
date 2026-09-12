@@ -42,7 +42,13 @@ import { defineApiRoutes, toolNameFromWire } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
 import { discoverRemoteTools, wireSuffix } from './mcp-client.ts';
 import { maskedHeaders, mcpToolSource, mergeHeaders, toolNameFor } from './mcp-tools.ts';
-import { capabilitiesOf, isRecommended, probeCapabilities, toStored } from './probe.ts';
+import {
+  capabilitiesOf,
+  isRecommended,
+  type ProbeResult,
+  probeCapabilities,
+  toStored,
+} from './probe.ts';
 import {
   costMicro,
   enabledProviders,
@@ -309,15 +315,6 @@ const mcpToolView = (code: string) => (r: McpToolRow) => ({
 });
 
 // ---- provider profiles (H-10) + analytics (H-15) ----
-const ModelView = t.Object({
-  id: t.String(),
-  model: t.String(),
-  label: t.Nullable(t.String()),
-  /** Currency units per 1M tokens (stored as micro-units). */
-  priceIn: t.Number(),
-  priceOut: t.Number(),
-  enabled: t.Boolean(),
-});
 /** Capability matrix from the probe (AI-Roadmap §3), as stored and exposed. */
 const CapabilitiesView = t.Object({
   endpoints: t.Object({ responses: t.Boolean(), chatCompletions: t.Boolean() }),
@@ -334,6 +331,29 @@ const CapabilitiesView = t.Object({
   }),
   modelsTested: t.Array(t.String()),
   preferredEndpoint: t.Nullable(t.String()),
+});
+const ModelView = t.Object({
+  id: t.String(),
+  model: t.String(),
+  label: t.Nullable(t.String()),
+  /** Currency units per 1M tokens (stored as micro-units). */
+  priceIn: t.Number(),
+  priceOut: t.Number(),
+  enabled: t.Boolean(),
+  /**
+   * The §4.1 matrix probed with THIS model id, null until someone tests it. Provider-level
+   * capabilities answer "what does this base URL speak"; these answer "what can this model do",
+   * which is the question an admin picking a model actually has.
+   */
+  capabilities: t.Nullable(CapabilitiesView),
+  capabilitiesAt: t.Nullable(t.String()),
+  preferredEndpoint: t.Nullable(t.String()),
+  lastStatus: t.Nullable(t.String()),
+  lastError: t.Nullable(t.String()),
+  lastTestedAt: t.Nullable(t.String()),
+  lastProbeMs: t.Nullable(t.Integer()),
+  /** Derived from this model's own matrix, never stored (§3 no. 2). */
+  recommended: t.Boolean(),
 });
 const ProviderView = t.Object({
   id: t.String(),
@@ -403,14 +423,25 @@ async function providerView(r: ProviderRow) {
     lastProbeError: r.last_probe_error,
     lastProbeMs: r.last_probe_ms,
     recommended: recommendedRow(r),
-    models: (await modelsOf(r.id)).map((m) => ({
-      id: m.id,
-      model: m.model,
-      label: m.label,
-      priceIn: Number(m.price_in_micro) / 1_000_000,
-      priceOut: Number(m.price_out_micro) / 1_000_000,
-      enabled: m.enabled,
-    })),
+    models: (await modelsOf(r.id)).map((m) => {
+      const caps = capabilitiesOf(m.capabilities);
+      return {
+        id: m.id,
+        model: m.model,
+        label: m.label,
+        priceIn: Number(m.price_in_micro) / 1_000_000,
+        priceOut: Number(m.price_out_micro) / 1_000_000,
+        enabled: m.enabled,
+        capabilities: caps,
+        capabilitiesAt: m.capabilities_at?.toISOString() ?? null,
+        preferredEndpoint: m.preferred_endpoint,
+        lastStatus: m.last_status,
+        lastError: m.last_error,
+        lastTestedAt: m.last_tested_at?.toISOString() ?? null,
+        lastProbeMs: m.last_probe_ms,
+        recommended: !!caps && isRecommended(caps),
+      };
+    }),
     createdAt: r.created_at.toISOString(),
   };
 }
@@ -425,6 +456,37 @@ async function findProvider(
     and(eq(schema.aiProviders.id, id), isNull(schema.aiProviders.deleted_at)),
   );
 }
+/**
+ * Record a probe on one price-list row. Mirrors what the provider-level test writes, including its
+ * rule that a FAILED probe keeps the last known matrix: an expired key or a provider having a bad
+ * minute should not erase what the model was proven to support. The failure is recorded beside it.
+ */
+async function writeModelProbe(
+  tenant: TenantDb,
+  providerId: string,
+  model: string,
+  r: ProbeResult,
+  now: Date,
+) {
+  await tenant.update(
+    schema.aiModels,
+    {
+      last_status: r.ok ? 'ok' : 'error',
+      last_error: r.error,
+      last_tested_at: now,
+      last_probe_ms: r.ms,
+      ...(r.ok
+        ? {
+            capabilities: toStored(r),
+            capabilities_at: now,
+            preferred_endpoint: r.preferredEndpoint,
+          }
+        : {}),
+    },
+    and(eq(schema.aiModels.provider_id, providerId), eq(schema.aiModels.model, model)),
+  );
+}
+
 /** Replace the price list; the default model is always present so the picker can offer it. */
 async function replaceModels(
   tenant: TenantDb,
@@ -434,6 +496,23 @@ async function replaceModels(
 ) {
   const list = [...(models ?? [])];
   if (!list.some((m) => m.model === defaultModel)) list.push({ model: defaultModel });
+  // The list is rewritten wholesale, but a model's probe belongs to the MODEL ID, not to the row
+  // that happened to hold it: editing a price would otherwise erase what the model was proven to
+  // support. Rows keyed by the same model id carry their matrix across the rewrite.
+  const probed = new Map(
+    (await modelsOf(providerId)).map((m) => [
+      m.model,
+      {
+        capabilities: m.capabilities,
+        capabilities_at: m.capabilities_at,
+        preferred_endpoint: m.preferred_endpoint,
+        last_status: m.last_status,
+        last_error: m.last_error,
+        last_tested_at: m.last_tested_at,
+        last_probe_ms: m.last_probe_ms,
+      },
+    ]),
+  );
   await tenant.delete(schema.aiModels, eq(schema.aiModels.provider_id, providerId));
   const seen = new Set<string>();
   for (const m of list) {
@@ -447,6 +526,7 @@ async function replaceModels(
       price_in_micro: toPriceMicro(m.priceIn),
       price_out_micro: toPriceMicro(m.priceOut),
       enabled: m.enabled ?? true,
+      ...probed.get(m.model),
     });
   }
 }
@@ -1991,6 +2071,10 @@ export default defineApiRoutes(
           signal: request.signal,
         });
         const now = new Date();
+        // The provider probe IS a probe of `default_model`, so the matching price-list row learns
+        // the same verdict — otherwise the default model reads "never tested" right after a
+        // successful provider test, which is the one thing an admin just disproved.
+        await writeModelProbe(tenant, row.id, row.default_model, r, now);
         await tenant.update(
           schema.aiProviders,
           {
@@ -2079,6 +2163,107 @@ export default defineApiRoutes(
         detail: {
           summary:
             'Capability probe with the stored key (AI-Roadmap §4.1): endpoints, stream, reasoning, tools + model ids to price (H-10)',
+        },
+      },
+    )
+
+    /**
+     * The same §4.1 probe, run against ONE model of the price list. Two models behind one base URL
+     * routinely disagree — a reasoning model and a chat-only one, a model with function calling and
+     * one without — and the provider-level answer describes only `default_model`. The verdict is
+     * stored on the model's own row, so the list keeps every model's matrix side by side.
+     */
+    .post(
+      '/providers/:id/models/test',
+      async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = await findProvider(tenantState, params.id);
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Penyedia AI tidak ditemukan', requestId);
+        }
+        // Only a model this provider actually lists: the probe spends the tenant's own key, so the
+        // model id is never taken from the request as free text.
+        const model = (await modelsOf(row.id)).find((m) => m.model === body.model);
+        if (!model) {
+          set.status = 404;
+          return fail('not_found', 'Model tidak ada di daftar penyedia ini', requestId);
+        }
+        const r = await probeCapabilities(row.base_url, row.api_key, model.model, {
+          signal: request.signal,
+        });
+        const now = new Date();
+        await writeModelProbe(tenant, row.id, model.model, r, now);
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.provider.model.test',
+          resource: 'ai.provider',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          after: {
+            model: model.model,
+            ok: r.ok,
+            ms: r.ms,
+            preferredEndpoint: r.preferredEndpoint,
+            responses: r.endpoints.responses,
+            stream: r.stream.supported,
+            reasoning: r.reasoning.supported,
+            tools: r.tools.supported,
+            recommended: isRecommended(r),
+          },
+        });
+        return ok({
+          model: model.model,
+          ok: r.ok,
+          error: r.error,
+          ms: r.ms,
+          capabilities: {
+            endpoints: r.endpoints,
+            stream: r.stream,
+            reasoning: r.reasoning,
+            tools: r.tools,
+            modelsTested: r.modelsTested,
+            preferredEndpoint: r.preferredEndpoint,
+          },
+          preferredEndpoint: r.preferredEndpoint,
+          recommended: isRecommended(r),
+          testedAt: now.toISOString(),
+          steps: r.steps,
+        });
+      },
+      {
+        beforeHandle: permission('ai.provider.manage'),
+        params: t.Object({ id: Id }),
+        body: t.Object({ model: t.String({ minLength: 1, maxLength: 120 }) }),
+        response: {
+          200: OkSchema(
+            t.Object({
+              model: t.String(),
+              ok: t.Boolean(),
+              error: t.Nullable(t.String()),
+              ms: t.Integer(),
+              capabilities: CapabilitiesView,
+              preferredEndpoint: t.Nullable(t.String()),
+              recommended: t.Boolean(),
+              testedAt: t.String(),
+              steps: t.Array(
+                t.Object({
+                  step: t.String(),
+                  status: t.String(),
+                  ms: t.Integer(),
+                  note: t.Nullable(t.String()),
+                }),
+              ),
+            }),
+          ),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'Capability probe for ONE model of a provider (AI-Roadmap §4.1): each model has its own reasoning / tools / endpoint verdict',
         },
       },
     )

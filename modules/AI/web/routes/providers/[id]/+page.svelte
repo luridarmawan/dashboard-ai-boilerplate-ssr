@@ -37,6 +37,69 @@ let testing = $state(false);
 let live = $state<Tested | null>(null);
 const tested = $derived(live ?? (form?.tested as Tested | undefined) ?? null);
 
+/**
+ * The same probe for ONE model. Kept per model id rather than as a single "last result", because
+ * the point of testing a second model is to compare it with the first — a shared slot would erase
+ * the answer the admin is comparing against. `?/testModel` returns one result with JavaScript off;
+ * it is folded in under the same key so both paths render through this map.
+ */
+type ModelTested = {
+  model: string;
+  ok: boolean;
+  error: string | null;
+  ms: number;
+  capabilities: Tested['capabilities'];
+  preferredEndpoint: string | null;
+  recommended: boolean;
+  testedAt: string;
+  steps: Tested['steps'];
+};
+let testingModel = $state<string | null>(null);
+let modelLive = $state<Record<string, ModelTested>>({});
+const modelResults = $derived.by(() => {
+  const out: Record<string, ModelTested> = { ...modelLive };
+  const posted = form?.testedModel as ModelTested | undefined;
+  if (posted && !out[posted.model]) out[posted.model] = posted;
+  return out;
+});
+
+function failedModel(model: string, error: string): ModelTested {
+  return {
+    model,
+    ok: false,
+    error,
+    ms: 0,
+    capabilities: null,
+    preferredEndpoint: null,
+    recommended: false,
+    testedAt: new Date().toISOString(),
+    steps: [],
+  };
+}
+
+async function runModelTest(e: SubmitEvent) {
+  e.preventDefault();
+  const el = e.currentTarget as HTMLFormElement;
+  const body = new FormData(el);
+  const model = String(body.get('model') ?? '');
+  testingModel = model;
+  try {
+    const res = await fetch(`/m/ai/providers/${p.id}/model-test`, { method: 'POST', body });
+    const json = (await res.json()) as ModelTested & { error?: string };
+    modelLive = {
+      ...modelLive,
+      [model]: res.ok ? json : failedModel(model, json.error ?? `HTTP ${res.status}`),
+    };
+  } catch (err) {
+    modelLive = {
+      ...modelLive,
+      [model]: failedModel(model, err instanceof Error ? err.message : String(err)),
+    };
+  } finally {
+    testingModel = null;
+  }
+}
+
 async function runTest(e: SubmitEvent) {
   e.preventDefault();
   const el = e.currentTarget as HTMLFormElement;
@@ -102,11 +165,42 @@ async function runTest(e: SubmitEvent) {
     <p class="mt-2 text-xs text-muted-foreground">{p.apiKeySet ? t('ai.providers.key_set') : t('ai.providers.no_key_hint')}</p>
   </Card>
   <Card title={t('ai.providers.price_list')}>
+    <p class="mb-3 text-xs text-muted-foreground">{t('ai.providers.model_test_hint')} {t('ai.providers.model_default_hint')}</p>
     <Table caption={t('ai.providers.price_list')}>
-      <thead><tr><th>Model</th><th>Label</th><th class="text-end">{t('ai.providers.price_in')}</th><th class="text-end">{t('ai.providers.price_out')}</th></tr></thead>
+      <thead><tr><th>Model</th><th>Label</th><th class="text-end">{t('ai.providers.price_in')}</th><th class="text-end">{t('ai.providers.price_out')}</th><th>{t('ai.providers.capabilities')}</th><th></th></tr></thead>
       <tbody>
         {#each p.models as m (m.id)}
-          <tr><td><code>{m.model}</code>{#if m.model === p.defaultModel} <Badge variant="outline">{t('ai.providers.default')}</Badge>{/if}</td><td class="text-muted-foreground">{m.label ?? '—'}</td><td class="text-end">{money(m.priceIn)}</td><td class="text-end">{money(m.priceOut)}</td></tr>
+          <!-- A fresh probe wins over the stored row; a FAILED one leaves the stored matrix
+               standing, exactly as the API does when it records the failure. -->
+          {@const r = modelResults[m.model]}
+          {@const caps = r?.ok ? r.capabilities : m.capabilities}
+          {@const testedAt = r?.testedAt ?? m.capabilitiesAt}
+          <tr data-testid="provider-model-row">
+            <td><code>{m.model}</code>{#if m.model === p.defaultModel} <Badge variant="outline">{t('ai.providers.default')}</Badge>{/if}</td>
+            <td class="text-muted-foreground">{m.label ?? '—'}</td>
+            <td class="text-end">{money(m.priceIn)}</td>
+            <td class="text-end">{money(m.priceOut)}</td>
+            <td>
+              <Capabilities capabilities={caps} recommended={r?.ok ? r.recommended : m.recommended} preferredEndpoint={r?.ok ? r.preferredEndpoint : m.preferredEndpoint} compact />
+              {#if r && !r.ok}
+                <span class="ms-1 text-xs text-destructive" data-testid="model-test-fail">{t('ai.providers.tested_fail')}: {r.error}</span>
+              {:else if !r && m.lastStatus === 'error' && m.lastError}
+                <span class="ms-1 text-xs text-destructive">{t('ai.providers.tested_fail')}: {m.lastError}</span>
+              {/if}
+              {#if testedAt}
+                <span class="ms-1 text-xs text-muted-foreground">{t('ai.providers.capabilities_at')} {fmt(testedAt)}{#if r?.ms || m.lastProbeMs} · {r?.ms ?? m.lastProbeMs} ms{/if}</span>
+              {/if}
+            </td>
+            <td class="text-end whitespace-nowrap">
+              {#if can('ai.provider.manage')}
+                <form method="POST" action="?/testModel" onsubmit={runModelTest} class="inline">
+                  <Csrf token={data.csrf} />
+                  <input type="hidden" name="model" value={m.model} />
+                  <Button type="submit" variant="outline" size="sm" disabled={testingModel !== null}><Icon name="refresh" size={16} />{testingModel === m.model ? t('common.running') : t('ai.providers.model_test')}</Button>
+                </form>
+              {/if}
+            </td>
+          </tr>
         {/each}
       </tbody>
     </Table>

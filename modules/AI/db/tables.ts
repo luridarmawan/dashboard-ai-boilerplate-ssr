@@ -52,6 +52,20 @@ export default defineTables('AI', [
       price_in_micro: col.bigint().default(0),
       price_out_micro: col.bigint().default(0),
       enabled: col.boolean().default(true),
+      /**
+       * Per-model probe (AI-Roadmap §4.1 run with THIS model id). The matrix belongs to the model,
+       * not the profile: one base URL commonly serves a reasoning model, a chat-only model and a
+       * model without function calling, so a single provider-level answer is wrong for most rows.
+       * Same shape and same meaning as the columns on `ai_providers`, read back by `capabilitiesOf`.
+       */
+      capabilities: col.json().nullable(),
+      capabilities_at: col.datetime().nullable(),
+      preferred_endpoint: col.identifier(16).nullable(),
+      /** ok | error | null (never tested) */
+      last_status: col.identifier(16).nullable(),
+      last_error: col.text().nullable(),
+      last_tested_at: col.datetime().nullable(),
+      last_probe_ms: col.int().nullable(),
     },
     indexes: [{ columns: ['client_id', 'provider_id', 'model'], unique: true }],
   }),

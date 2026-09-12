@@ -176,6 +176,66 @@ function responsesProvider(key: string, alsoChat = false) {
   return { server, url: `http://127.0.0.1:${server.port}/v1` };
 }
 
+/**
+ * A provider whose two MODELS disagree, which is the whole point of probing per model: `pm-reason`
+ * accounts for reasoning and takes tools, `pm-plain` does neither, behind one base URL and one key.
+ * Responses-only (no `/chat/completions`), so the preferred endpoint is the modern one and the
+ * recommendation has to come out different for the two models.
+ */
+function perModelProvider(key: string) {
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      if (req.headers.get('authorization') !== `Bearer ${key}`)
+        return new Response('{"error":{"message":"bad key"}}', { status: 401 });
+      const url = new URL(req.url);
+      if (url.pathname.endsWith('/models'))
+        return Response.json({
+          object: 'list',
+          data: [{ id: 'pm-reason' }, { id: 'pm-plain' }],
+        });
+      if (!url.pathname.endsWith('/responses'))
+        return new Response('{"error":{"message":"not found"}}', {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      const body = (await req.json()) as {
+        model?: string;
+        reasoning?: unknown;
+        tools?: unknown[];
+        stream?: boolean;
+      };
+      const smart = body.model === 'pm-reason';
+      if (body.stream)
+        return new Response(
+          'event: response.created\ndata: {"type":"response.created","response":{"id":"r1","error":null}}\n\n',
+          { headers: { 'content-type': 'text/event-stream' } },
+        );
+      if (body.tools?.length && !smart)
+        return new Response(
+          '{"error":{"message":"Unknown parameter: tools is not supported by this model"}}',
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        );
+      // Nothing below may spell "reasoning" unless it is meant: the probe reads the raw body, so
+      // echoing the request field back would make every model look like a reasoning model.
+      const output = body.tools?.length
+        ? [{ type: 'function_call', name: 'probe_noop', arguments: '{}' }]
+        : [
+            {
+              type: 'message',
+              role: 'assistant',
+              content: [{ type: 'output_text', text: 'pong' }],
+            },
+          ];
+      const usage = smart
+        ? { input_tokens: 1, output_tokens: 1, output_tokens_details: { reasoning_tokens: 4 } }
+        : { input_tokens: 1, output_tokens: 1 };
+      return Response.json({ id: 'r1', object: 'response', status: 'completed', output, usage });
+    },
+  });
+  return { server, url: `http://127.0.0.1:${server.port}/v1` };
+}
+
 describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
   let db: Db;
   let admin = '';
@@ -345,6 +405,125 @@ describe.skipIf(!enabled)('AI providers (H-10) + analytics (H-15)', () => {
       lastStatus: string;
     }[];
     expect(list.find((p) => p.code === B)?.lastStatus).toBe('ok');
+  });
+
+  test('the probe runs per model: two models of one provider get two different matrices, and a save keeps them', async () => {
+    const pm = perModelProvider('pm-key');
+    try {
+      const created = await call(
+        '/v1/m/ai/providers',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'PerModel',
+            code: `pm-${run % 100000}`,
+            baseUrl: pm.url,
+            apiKey: 'pm-key',
+            defaultModel: 'pm-plain',
+            models: [
+              { model: 'pm-plain', priceIn: 1, priceOut: 2 },
+              { model: 'pm-reason', priceIn: 3, priceOut: 9 },
+            ],
+          }),
+        },
+        [admin],
+      );
+      expect(created.status).toBe(201);
+      const pmId = ((await json(created)).data as ProviderView).id;
+
+      const probe = async (model: string) =>
+        (
+          await json(
+            await call(
+              `/v1/m/ai/providers/${pmId}/models/test`,
+              { method: 'POST', body: JSON.stringify({ model }) },
+              [admin],
+            ),
+          )
+        ).data as {
+          model: string;
+          ok: boolean;
+          recommended: boolean;
+          preferredEndpoint: string | null;
+          capabilities: { reasoning: { supported: boolean }; tools: { supported: boolean } };
+        };
+
+      const smart = await probe('pm-reason');
+      expect(smart.ok).toBe(true);
+      expect(smart.model).toBe('pm-reason');
+      expect(smart.preferredEndpoint).toBe('responses');
+      expect(smart.capabilities.reasoning.supported).toBe(true);
+      expect(smart.capabilities.tools.supported).toBe(true);
+      expect(smart.recommended).toBe(true);
+
+      const plain = await probe('pm-plain');
+      expect(plain.ok).toBe(true);
+      // Same base URL, same key, same probe — only the model id differs, and the verdict differs
+      // with it. This is exactly what a provider-level answer could not have told the admin.
+      expect(plain.capabilities.reasoning.supported).toBe(false);
+      expect(plain.capabilities.tools.supported).toBe(false);
+      expect(plain.recommended).toBe(false);
+
+      type Row = {
+        model: string;
+        lastStatus: string | null;
+        recommended: boolean;
+        capabilities: { reasoning: { supported: boolean }; tools: { supported: boolean } } | null;
+      };
+      const rowsOf = async () =>
+        (
+          (await json(await call(`/v1/m/ai/providers/${pmId}`, {}, [admin]))).data as {
+            models: Row[];
+          }
+        ).models;
+      const byModel = (rows: Row[], id: string) => rows.find((m) => m.model === id);
+      const listed = await rowsOf();
+      expect(byModel(listed, 'pm-reason')?.capabilities?.reasoning.supported).toBe(true);
+      expect(byModel(listed, 'pm-plain')?.capabilities?.reasoning.supported).toBe(false);
+      expect(byModel(listed, 'pm-reason')?.lastStatus).toBe('ok');
+
+      // Editing the price list rewrites every model row; a matrix is not a price, so it survives.
+      expect(
+        (
+          await call(
+            `/v1/m/ai/providers/${pmId}`,
+            {
+              method: 'PUT',
+              body: JSON.stringify({
+                models: [
+                  { model: 'pm-plain', priceIn: 1, priceOut: 2 },
+                  { model: 'pm-reason', priceIn: 4, priceOut: 12 },
+                ],
+              }),
+            },
+            [admin],
+          )
+        ).status,
+      ).toBe(200);
+      const afterSave = await rowsOf();
+      expect(byModel(afterSave, 'pm-reason')?.capabilities?.tools.supported).toBe(true);
+      expect(byModel(afterSave, 'pm-reason')?.recommended).toBe(true);
+      expect(byModel(afterSave, 'pm-plain')?.capabilities?.tools.supported).toBe(false);
+
+      // A model this provider does not list is never probed: the key is the tenant's to spend.
+      expect(
+        (
+          await call(
+            `/v1/m/ai/providers/${pmId}/models/test`,
+            { method: 'POST', body: JSON.stringify({ model: 'pm-nope' }) },
+            [admin],
+          )
+        ).status,
+      ).toBe(404);
+
+      // The provider-level test probes `default_model`, so that model's own row learns it too.
+      await call(`/v1/m/ai/providers/${pmId}/test`, { method: 'POST' }, [admin]);
+      expect(byModel(await rowsOf(), 'pm-plain')?.lastStatus).toBe('ok');
+      // This profile is scaffolding for one question; later tests assert the exact picker list.
+      await call(`/v1/m/ai/providers/${pmId}`, { method: 'DELETE' }, [admin]);
+    } finally {
+      pm.server.stop(true);
+    }
   });
 
   test('a conversation pins provider + model; the call is routed there and logged with provider and priced cost', async () => {

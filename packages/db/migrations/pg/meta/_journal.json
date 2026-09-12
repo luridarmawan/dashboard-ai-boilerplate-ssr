@@ -169,6 +169,13 @@
       "when": 1789125915875,
       "tag": "0023_optimal_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789199083781,
+      "tag": "0024_lyrical_harrier",
+      "breakpoints": true
     }
   ]
 }
