@@ -12,6 +12,8 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 
 [See Architecture)](docs\architecture.html)
 
+## Document
+
 | Dokumen | Isi |
 |---|---|
 | [`docs/PRD.md`](./docs/PRD.md) | Kebutuhan produk, keputusan arsitektur, 16 titik perluasan modul, kriteria terima §8 |
