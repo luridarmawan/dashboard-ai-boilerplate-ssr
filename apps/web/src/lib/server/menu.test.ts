@@ -32,6 +32,7 @@ describe('buildMenu (F-3 groups)', () => {
     expect(labels(group(menu, 'settings')?.children ?? [])).toEqual([
       'Users',
       'Groups & permissions',
+      'Permission guide',
       'Tenants',
       'Custom themes',
       'Settings',

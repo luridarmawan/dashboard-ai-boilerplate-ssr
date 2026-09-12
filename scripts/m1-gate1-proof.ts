@@ -375,7 +375,7 @@ const member = new Jar();
   await post(admin, `/groups/${groupId}?/delete`, { _csrf: token, code });
 }
 
-// ---- D-5 presence, without JavaScript ----
+// ---- D-5 presence + C-8 permission guide, both without JavaScript ----
 {
   const list = await get(admin, '/users');
   // The admin is signing these very requests, so they must be the one row that reads "online".
@@ -394,6 +394,31 @@ const member = new Jar();
     ),
   );
 
+  const guide = await get(admin, '/permissions');
+  check(
+    'C-8 the permission guide renders, with the live registry of this installation',
+    guide.res.status === 200 &&
+      guide.html.includes('data-testid="permission-registry"') &&
+      guide.html.includes('user.impersonate') &&
+      // module-contributed resources appear because the registry is read, not hard-coded (C-4)
+      guide.html.includes('example.product.edit'),
+    `${guide.res.status}`,
+  );
+  // The checker is a GET form: the verdict comes from the URL, so it works without JavaScript
+  // and a link to it is an explanation someone else can open.
+  const allowed = await get(admin, '/permissions?granted=user.*&required=user.edit');
+  const denied = await get(admin, '/permissions?granted=user.read&required=user.edit');
+  const loose = await get(admin, '/permissions?granted=user.*&required=user.*');
+  const verdict = (html: string) =>
+    /data-testid="permcheck-result"[^>]*>([^<]*)/.exec(html)?.[1]?.trim() ?? '';
+  check(
+    'C-8 the checker answers from the URL alone (no JavaScript): allow, deny, and "must be concrete"',
+    verdict(allowed.html) !== '' &&
+      verdict(allowed.html) !== verdict(denied.html) &&
+      verdict(loose.html) !== verdict(allowed.html) &&
+      verdict(loose.html) !== verdict(denied.html),
+    `${verdict(allowed.html)} | ${verdict(denied.html)} | ${verdict(loose.html)}`,
+  );
 }
 
 // 10. logout invalidates server-side

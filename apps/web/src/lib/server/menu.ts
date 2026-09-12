@@ -87,6 +87,15 @@ export const CORE_MENU: readonly Entry[] = [
     group: 'settings',
   },
   {
+    id: 'core.permissions',
+    label: { id: 'Panduan izin', en: 'Permission guide' },
+    href: '/permissions',
+    icon: 'help',
+    permission: 'group.read',
+    order: 22,
+    group: 'settings',
+  },
+  {
     id: 'core.tenants',
     label: { id: 'Tenant', en: 'Tenants' },
     href: '/tenants',

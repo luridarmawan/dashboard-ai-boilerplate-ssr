@@ -8,6 +8,9 @@ export function hasPermission(granted: Iterable<string>, required: string): bool
   if (dot < 1) return false;
   const res = required.slice(0, dot);
   const act = required.slice(dot + 1);
+  // A requirement is always concrete: `user.*` is something you GRANT, never something a page
+  // asks for. @core/auth refuses it too, and permissions.test.ts pins the two together.
+  if (res === '*' || act === '*') return false;
   for (const g of granted) {
     const d = g.lastIndexOf('.');
     if (d < 1) continue;
