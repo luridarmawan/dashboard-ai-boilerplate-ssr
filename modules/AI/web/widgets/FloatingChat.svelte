@@ -1,5 +1,5 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+import { onMount, tick } from 'svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -74,7 +74,11 @@ function toggle() {
     void safeRender('');
   }
   open = !open;
-  if (open) queueMicrotask(() => inputEl?.focus());
+  if (open) {
+    // Reopening keeps the transcript: land on the newest message, not on the top of the history.
+    void scrollDown();
+    queueMicrotask(() => inputEl?.focus());
+  }
 }
 function reset() {
   controller?.abort();
@@ -82,8 +86,14 @@ function reset() {
   conversationId = '';
   error = null;
 }
-function scrollDown() {
-  queueMicrotask(() => listEl?.scrollTo({ top: listEl.scrollHeight }));
+/**
+ * Jump to the newest message. `tick()` rather than a microtask because the list element can be
+ * rendered by the very update that asks for the scroll — opening the panel mounts it — and a
+ * microtask runs before Svelte has flushed that render.
+ */
+async function scrollDown() {
+  await tick();
+  listEl?.scrollTo({ top: listEl.scrollHeight });
 }
 
 /**
@@ -137,7 +147,7 @@ async function send(e: SubmitEvent) {
   // The files are in `fd` already; clear the picker so a second send does not repeat them.
   if (filesEl) filesEl.value = '';
   fileNames = [];
-  scrollDown();
+  void scrollDown();
   streaming = true;
   controller = new AbortController();
   try {
@@ -205,7 +215,7 @@ async function send(e: SubmitEvent) {
         const last = messages[messages.length - 1];
         if (last)
           messages[messages.length - 1] = { ...last, content: acc, html: await safeRender(acc) };
-        scrollDown();
+        await scrollDown();
       }
     }
   } catch (err) {

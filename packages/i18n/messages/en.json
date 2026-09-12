@@ -105,6 +105,8 @@
   "theme.mode_hint": "\"Follow system\" reads the device preference; without JavaScript it renders light.",
   "theme.layout": "layout",
   "theme.icons": "icons",
+  "theme.language": "Language",
+  "theme.language_hint": "The language is kept in this browser and, when you are signed in, follows your profile.",
   "lang.title": "Language",
   "lang.lead": "The language is decided on the server: profile preference, then cookie, then the browser header.",
   "lang.id": "Bahasa Indonesia",

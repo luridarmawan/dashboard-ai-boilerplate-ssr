@@ -105,6 +105,8 @@
   "theme.mode_hint": "Mode \"ikuti sistem\" membaca preferensi perangkat; tanpa JavaScript ia tampil terang.",
   "theme.layout": "layout",
   "theme.icons": "ikon",
+  "theme.language": "Bahasa",
+  "theme.language_hint": "Bahasa tersimpan di browser ini dan, bila Anda masuk, ikut ke profil Anda.",
   "lang.title": "Bahasa",
   "lang.lead": "Bahasa ditentukan di server: preferensi profil, lalu cookie, lalu header browser.",
   "lang.id": "Bahasa Indonesia",

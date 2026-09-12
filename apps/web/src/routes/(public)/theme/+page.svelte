@@ -1,5 +1,6 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
+import Flag from '$lib/components/Flag.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -12,6 +13,9 @@ const modes = [
   { value: 'dark', label: t('theme.mode.dark'), icon: 'moon' },
   { value: 'system', label: t('theme.mode.system'), icon: 'monitor' },
 ] as const;
+/** K-7: the language names are their own, never translated — a reader looking for "English"
+ * in an Indonesian page finds it. */
+const langName = (l: string) => (l === 'id' ? t('lang.id') : l === 'en' ? t('lang.en') : l);
 </script>
 
 <svelte:head><title>{t('theme.title')}</title></svelte:head>
@@ -44,6 +48,19 @@ const modes = [
           </label>
         {/each}
       </div>
+    </fieldset>
+
+    <fieldset class="grid gap-3 border-0 p-0">
+      <legend class="mb-2 text-sm font-medium">{t('theme.language')}</legend>
+      <div class="flex flex-wrap gap-3">
+        {#each data.locales as l (l)}
+          <label class="flex cursor-pointer items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm has-checked:border-primary has-checked:ring-2 has-checked:ring-ring/40">
+            <input type="radio" name="lang" value={l} checked={l === data.locale} class="h-4 w-4 accent-primary" />
+            <Flag locale={l} />{langName(l)}
+          </label>
+        {/each}
+      </div>
+      <p class="text-xs text-muted-foreground">{t('theme.language_hint')}</p>
     </fieldset>
 
     <fieldset class="grid gap-3 border-0 p-0">
