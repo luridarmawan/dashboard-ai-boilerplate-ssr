@@ -446,6 +446,7 @@
   "groups.manage": "Kelola",
   "groups.members": "Anggota",
   "groups.name": "Nama",
+  "groups.permission_guide_lead": "Bingung dengan arti sebuah izin? Bentuk sumberdaya.aksi, wildcard, dan asal izin seseorang dijelaskan di",
   "groups.new.code_hint": "huruf kecil, angka, - dan _; tetap setelah dibuat",
   "groups.new.lead": "Izin dan anggota diatur setelah grup dibuat.",
   "groups.permissions": "Izin",

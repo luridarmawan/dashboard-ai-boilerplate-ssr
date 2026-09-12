@@ -56,4 +56,14 @@ const columns: ColumnDef<Row>[] = [
       {/if}
     {/snippet}
   </DataTable>
+
+  <!--
+    C-8: a group page shows permissions as a grid of checkboxes, which says WHICH permissions a
+    group has but never what one MEANS. The guide is where that is explained, and it needs the
+    same `group.read` this page does, so the link is always reachable from here.
+  -->
+  <p class="text-sm text-muted-foreground">
+    {t('groups.permission_guide_lead')}
+    <a href="/permissions" class="inline-flex items-center gap-1"><Icon name="help" size={14} />{t('nav.permissions')}</a>
+  </p>
 </div>

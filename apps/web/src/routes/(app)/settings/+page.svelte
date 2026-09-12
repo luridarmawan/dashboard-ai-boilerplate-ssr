@@ -161,9 +161,19 @@ $effect(() => {
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('nav.settings')}</h1>
     {#if data.canGlobal}
+      <!--
+        Which scope is open decides what a save WRITES — the tenant's own value or the global
+        default every tenant inherits — so the switch cannot read as two equal tabs. The open one
+        is filled with the primary colour and carries `aria-current`; the other is muted.
+      -->
       <nav class="flex gap-1 rounded-md border p-1 text-sm" aria-label={t('settings.scope')}>
-        <a href="?scope=tenant" class={`rounded px-3 py-1 no-underline ${data.scope === 'tenant' ? 'bg-accent text-accent-foreground' : ''}`}>{t('settings.scope_tenant')}</a>
-        <a href="?scope=global" class={`rounded px-3 py-1 no-underline ${data.scope === 'global' ? 'bg-accent text-accent-foreground' : ''}`}>{t('settings.scope_global')}</a>
+        {#each [{ scope: 'tenant', label: t('settings.scope_tenant') }, { scope: 'global', label: t('settings.scope_global') }] as s (s.scope)}
+          <a
+            href={`?scope=${s.scope}`}
+            aria-current={data.scope === s.scope ? 'page' : undefined}
+            class={`rounded px-3 py-1 no-underline ${data.scope === s.scope ? 'bg-primary font-medium text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'}`}
+          >{s.label}</a>
+        {/each}
       </nav>
     {/if}
   </div>

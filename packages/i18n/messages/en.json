@@ -446,6 +446,7 @@
   "groups.manage": "Manage",
   "groups.members": "Members",
   "groups.name": "Name",
+  "groups.permission_guide_lead": "Not sure what a permission means? The resource.action shape, the wildcards and where someone's permissions come from are explained in the",
   "groups.new.code_hint": "lowercase letters, digits, - and _; fixed once created",
   "groups.new.lead": "Permissions and members are set after the group is created.",
   "groups.permissions": "Permissions",
