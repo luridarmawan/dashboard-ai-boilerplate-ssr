@@ -51,7 +51,12 @@ describe('buildMenu (F-3 groups)', () => {
   test('module entries without a group land in the module’s own group, titled from module.json', () => {
     expect(labels(group(menu, 'dummy')?.children ?? [])).toEqual(['Notes']);
     expect(group(menu, 'dummy')?.label).toBe('Dummy');
-    expect(labels(group(menu, 'example')?.children ?? [])).toEqual(['Products', 'Inquiries']);
+    // `/examples` is a CORE page that asks for the Example module's group (it demonstrates it).
+    expect(labels(group(menu, 'example')?.children ?? [])).toEqual([
+      'Products',
+      'Inquiries',
+      'Page Examples',
+    ]);
     expect(group(menu, 'ai')?.label).toBe('AI Platform');
     expect(labels(group(menu, 'ai')?.children ?? [])).toEqual(['AI providers', 'AI analytics']);
     // nothing module-owned leaks to the top level
@@ -76,5 +81,12 @@ describe('buildMenu (F-3 groups)', () => {
     const noDummy = buildMenu(admin, '/dashboard', 'en', new Set(['ai', 'example']));
     expect(group(noDummy, 'dummy')).toBeUndefined();
     expect(group(noDummy, 'example')).toBeDefined();
+  });
+
+  test('a core entry placed in a module group goes with the group (G-8)', () => {
+    const noExample = buildMenu(admin, '/dashboard', 'en', new Set(['ai', 'dummy']));
+    expect(group(noExample, 'example')).toBeUndefined();
+    // and it does not fall back to the top level either
+    expect(noExample.some((i) => i.id === 'core.examples')).toBe(false);
   });
 });

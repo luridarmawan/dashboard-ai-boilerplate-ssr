@@ -149,6 +149,20 @@ export const CORE_MENU: readonly Entry[] = [
     order: 47,
     group: 'monitoring',
   },
+  /**
+   * The pattern showcase (L-19). It demonstrates the very module whose pages sit beside it, so it
+   * asks for that module's group instead of a core one — and shares its fate (see `buildMenu`),
+   * including its permission: whoever cannot see the Example group has no group to hang it in.
+   */
+  {
+    id: 'core.examples',
+    label: { id: 'Contoh halaman', en: 'Page Examples' },
+    href: '/examples',
+    icon: 'grid',
+    permission: 'example.product.read',
+    order: 130,
+    group: 'example',
+  },
 ];
 
 /** Every group that can exist: the core ones plus one per installed module. */
@@ -177,7 +191,21 @@ export function buildMenu(
   const moduleEntries: Entry[] = moduleMenu.filter(
     (e) => !enabledModules || enabledModules.has(e.id.split('.')[0] ?? ''),
   );
-  const all: Entry[] = [...CORE_MENU, ...moduleEntries];
+  /**
+   * A core entry may name a MODULE's group rather than a core one (`/examples` lives next to the
+   * Example module it demonstrates). It then shares that group's fate: a module that is not
+   * installed, or is disabled for this tenant (G-8), takes the entry with it — otherwise disabling
+   * a module would leave its group standing with a lone core link inside.
+   */
+  const coreGroupIds = new Set(CORE_GROUPS.map((g) => g.id));
+  const installed = new Set<string>(modules.map((m) => m.ns));
+  const coreEntries: Entry[] = CORE_MENU.filter(
+    (e) =>
+      !e.group ||
+      coreGroupIds.has(e.group) ||
+      (installed.has(e.group) && (!enabledModules || enabledModules.has(e.group))),
+  );
+  const all: Entry[] = [...coreEntries, ...moduleEntries];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));
   const isActive = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
