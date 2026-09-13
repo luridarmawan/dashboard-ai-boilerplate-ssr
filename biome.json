@@ -6,7 +6,16 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/generated", "!**/migrations", "!**/node_modules", "!modules/Hello"]
+    "includes": [
+      "**",
+      "!**/generated",
+      "!**/migrations",
+      "!**/node_modules",
+      "!modules/Hello",
+      "!.agents",
+      "!.claude/skills",
+      "!docs/architecture"
+    ]
   },
   "formatter": {
     "enabled": true,
