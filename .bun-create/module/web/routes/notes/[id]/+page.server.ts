@@ -1,14 +1,26 @@
 import { formToObject, validateForm } from '@core/contracts';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  unwrap,
+} from '$lib/server/session';
 import { NoteUpdateBody } from '../../../../api/schemas.ts';
 
 export const load: ServerLoad = async (event) => {
   const id = String(event.params.id ?? '');
   const res = await apiFor(event).v1.m.hello.notes({ id }).get();
   if (!res.data?.success) error(res.status === 404 ? 404 : res.status, 'Note tidak ditemukan');
-  return { row: res.data.data, saved: event.url.searchParams.has('saved') };
+  /** `confirmDelete` opens the delete confirmation; the action below checks the same flag. */
+  return {
+    row: res.data.data,
+    saved: event.url.searchParams.has('saved'),
+    confirmDelete: confirmed(event),
+  };
 };
 
 export const actions: Actions = {
@@ -50,6 +62,8 @@ export const actions: Actions = {
         code: 'csrf_failed',
         message: 'Sesi formulir kedaluwarsa — muat ulang halaman',
       });
+    // Never one POST away: the confirmation (modal with JavaScript, a page step without it) is enforced here.
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.m.hello.notes({ id }).delete());
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, '/m/hello/notes?saved=deleted');
