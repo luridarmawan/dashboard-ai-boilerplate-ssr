@@ -57,7 +57,10 @@ test('login: lewat fetch ke API, tanpa muat ulang halaman', async ({ page }) => 
     expect(posts).toEqual(['/v1/auth/login']);
     expect(await page.evaluate(marked)).toBe(true);
   } else {
-    expect(posts).toEqual(['/auth/login']);
+    // The fetch layer has no way to know in advance: it asks the API, gets the web app's own
+    // 404 (not JSON), and hands the submit back to the browser — the same two POSTs the mocked
+    // topology below pins down, here produced by a real one.
+    expect(posts).toEqual(['/v1/auth/login', '/auth/login']);
   }
 });
 

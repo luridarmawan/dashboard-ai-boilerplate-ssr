@@ -2,11 +2,18 @@ import { expect, test } from '@playwright/test';
 
 /**
  * The back-to-top button (F-10) in a real browser — the only place it can be proved, because the
- * button exists only once JavaScript is running and only once the reader has scrolled. The short
- * viewport is what makes the page long enough to scroll on any dataset.
+ * button exists only once JavaScript is running and only once the reader has scrolled.
+ *
+ * What is under test is the component, not the dataset: the button earns its place only past
+ * `THRESHOLD` (ScrollTop.svelte), and how far a freshly seeded five-row product list scrolls at a
+ * 400px viewport lands right around that line — enough on one database, not on another (and
+ * mvp.e2e.ts adds and removes a row while this runs). A spacer under the real page gives every run
+ * the same room to scroll; the guard below then checks the room, not merely that there is some.
  */
 const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@example.test';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? 'bootstrap admin password';
+/** Mirrors `THRESHOLD` in apps/web/src/lib/components/ScrollTop.svelte. */
+const THRESHOLD = 400;
 
 test('back to top: appears after scrolling, and takes the page back up', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 400 });
@@ -20,9 +27,18 @@ test('back to top: appears after scrolling, and takes the page back up', async (
   const button = page.getByTestId('scroll-top');
   // At the top of the page there is nothing to go back to.
   await expect(button).toHaveCount(0);
-  // The page must actually be scrollable, or the rest of this proves nothing.
+  // Room to scroll well past the threshold, whatever the table holds today.
+  await page.evaluate((px) => {
+    const spacer = document.createElement('div');
+    spacer.style.height = `${px}px`;
+    document.body.append(spacer);
+  }, THRESHOLD * 3);
+  // The page must actually scroll past the threshold, or the rest of this proves nothing.
   expect(
-    await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight),
+    await page.evaluate(
+      (px) => document.documentElement.scrollHeight - window.innerHeight > px,
+      THRESHOLD,
+    ),
   ).toBe(true);
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
