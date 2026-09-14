@@ -798,7 +798,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | P-8 | **[P0]** Test: unit (util, RBAC matcher, tenant guard, resolver tema & route), integrasi API (dengan DB nyata via testcontainer), dan minimal satu E2E alur landing → login → CRUD → chat. |
 | P-9 | **[P0]** CI menjalankan matriks **tiga dialect tier-1: MySQL 8 + MariaDB 11 + PostgreSQL 16** — satu job per dialect, suite yang sama, tanpa test yang di-skip. Tanpa ini, klaim multi-DB tidak bisa dipercaya. MariaDB diuji terpisah karena perbedaannya dari MySQL nyata (§4.3), bukan kosmetik. |
 | P-10 | **[P0]** README + `docs/` yang menjelaskan: cara mulai, cara bikin modul (termasuk di repo terpisah), cara menambah tema, cara mengganti landing page, cara ganti provider AI, dan cara deploy. |
-| P-11 | **[P1]** Generator tambahan: tema, migrasi, seed. |
+| P-11 | **[P1]** Generator tambahan: tema, migrasi, seed. **Diputuskan 2026-09-14: generator seed tidak dibangun** — tema lewat `bun themegen` dan migrasi lewat `bun db:generate`; kerangka seed sudah ditulis `bun modgen` untuk tiap modul baru, sisanya isi data domain yang memang ditulis manusia. Alasan lengkap di [`ROADMAP.md`](./ROADMAP.md) §8 butir 17. |
 
 ### FR-Q · Deployment & Operasi (self-hosted)
 
