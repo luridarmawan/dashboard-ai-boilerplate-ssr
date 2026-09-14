@@ -149,8 +149,8 @@ const mfaError = $derived(
       {/if}
       <form method="POST" action="?/avatar" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2" use:enhance={avatarSubmit('upload')}>
         <Csrf token={data.csrf} />
-        <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required class="text-sm" />
-        <Button type="submit" size="sm" disabled={avatarBusy !== null}>
+        <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required class="cursor-pointer text-sm file:cursor-pointer" />
+        <Button type="submit" size="sm" class="cursor-pointer" disabled={avatarBusy !== null}>
           <Icon name={avatarBusy === 'upload' ? 'refresh' : 'upload'} size={14} class={avatarBusy === 'upload' ? 'animate-spin' : ''} />
           {avatarBusy === 'upload' ? t('common.running') : t('profile.avatar.upload')}
         </Button>
@@ -158,7 +158,7 @@ const mfaError = $derived(
       {#if data.user.avatarUrl}
         <form method="POST" action="?/avatarRemove" use:enhance={avatarSubmit('remove')}>
           <Csrf token={data.csrf} />
-          <Button type="submit" variant="ghost" size="sm" class="text-destructive" disabled={avatarBusy !== null}>
+          <Button type="submit" variant="ghost" size="sm" class="cursor-pointer text-destructive" disabled={avatarBusy !== null}>
             <Icon name={avatarBusy === 'remove' ? 'refresh' : 'trash'} size={14} class={avatarBusy === 'remove' ? 'animate-spin' : ''} />
             {avatarBusy === 'remove' ? t('common.running') : t('profile.avatar.remove')}
           </Button>
@@ -176,6 +176,7 @@ const mfaError = $derived(
       errors={form?.saved === 'password' ? {} : fieldErrors}
       csrf={data.csrf}
       action="?/profile"
+      class="[&_button]:cursor-pointer"
       columns={2}
       notice={form?.saved === 'profile' ? t('profile.saved') : null}
       error={form?.saved === undefined ? apiError : null}
@@ -221,13 +222,13 @@ const mfaError = $derived(
         {#if form?.saved === undefined && form?.error && !mfaError}<p class="error mt-2" role="alert">{form.error}</p>{/if}
       {:else}
         <p class="text-sm text-muted-foreground">{t('profile.mfa.off')}</p>
-        <form method="POST" action="?/mfaSetup" class="mt-3"><Csrf token={data.csrf} /><Button type="submit" size="sm"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
+        <form method="POST" action="?/mfaSetup" class="mt-3"><Csrf token={data.csrf} /><Button type="submit" size="sm" class="cursor-pointer"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
       {/if}
       {#if form?.saved === 'mfaDisabled'}<p class="notice mt-3">{t('profile.mfa.disabled_notice')}</p>{/if}
     </div>
   </Card>
   <Card title={t('profile.password.title')} description={t('profile.password.desc')}>
-    <FormBuilder fields={passwordFields} errors={form?.saved === undefined && form?.code ? {} : fieldErrors} csrf={data.csrf} action="?/password" submitLabel={t('profile.password.title')} notice={form?.saved === 'password' ? t('profile.password.changed') : null} error={null} />
+    <FormBuilder fields={passwordFields} errors={form?.saved === undefined && form?.code ? {} : fieldErrors} csrf={data.csrf} action="?/password" class="[&_button]:cursor-pointer" submitLabel={t('profile.password.title')} notice={form?.saved === 'password' ? t('profile.password.changed') : null} error={null} />
   </Card>
   {#if data.canTokens}
   <!-- MCP integration (I-4): only for someone allowed to use MCP tools; the actions check it too. -->
@@ -261,7 +262,7 @@ const mfaError = $derived(
       <p class="mb-3 text-sm text-muted-foreground">{t('profile.tokens.empty')}</p>
     {/if}
     <div class="mt-4">
-      <FormBuilder fields={tokenFields} values={{ expiresInDays: '90' }} errors={form?.code === 'validation_failed' && form?.saved === undefined ? fieldErrors : {}} csrf={data.csrf} action="?/createToken" submitLabel={t('profile.tokens.create')} columns={2} notice={null} error={form?.saved === undefined && form?.values && 'name' in (form.values as object) ? apiError : null} />
+      <FormBuilder fields={tokenFields} values={{ expiresInDays: '90' }} errors={form?.code === 'validation_failed' && form?.saved === undefined ? fieldErrors : {}} csrf={data.csrf} action="?/createToken" class="[&_button]:cursor-pointer" submitLabel={t('profile.tokens.create')} columns={2} notice={null} error={form?.saved === undefined && form?.values && 'name' in (form.values as object) ? apiError : null} />
     </div>
   </Card>
   {/if}
