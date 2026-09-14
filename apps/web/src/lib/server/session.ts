@@ -292,6 +292,18 @@ export async function loadSession(event: RequestEvent): Promise<Session | null> 
   };
 }
 
+/**
+ * Re-read who is logged in, in the middle of a request. `hooks.server.ts` resolves the session
+ * BEFORE a form action runs, and the page that renders afterwards is the SAME request — so an
+ * action that changes the caller's own user row (avatar, name, theme) would otherwise render from
+ * the pre-action snapshot: the shell and the profile card keep the old values until the operator
+ * navigates again, and an avatar that was just replaced still points at the file the upload has
+ * already deleted, which answers 404. Call this right after such an action succeeds.
+ */
+export async function refreshSession(event: RequestEvent): Promise<void> {
+  if (event.locals.session) event.locals.session = await loadSession(event);
+}
+
 /** Shape of the API failure envelope as Eden hands it back. */
 export interface ApiFailure {
   status: number;

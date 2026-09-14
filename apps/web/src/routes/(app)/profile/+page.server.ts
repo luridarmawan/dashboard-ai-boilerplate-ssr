@@ -2,7 +2,15 @@ import { formToObject, PasswordChangeBody, ProfileBody, validateForm } from '@co
 import { createTranslator, type Locale } from '@core/i18n';
 import { themes } from '@core/ui-theme';
 import QRCode from 'qrcode';
-import { actionFailure, apiFor, checkCsrf, optStr, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  optStr,
+  refreshSession,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 
 /**
@@ -83,9 +91,12 @@ export const actions: Actions = {
       );
     const r = unwrap(await apiFor(event).v1.users.profile.me.put(v.value));
     if (!r.ok) return actionFailure(r.failure, input);
+    // The shell and the card below re-render in THIS request, from a session resolved before the
+    // action ran — re-read it or they show what the profile looked like a moment ago.
+    await refreshSession(event);
     return { saved: 'profile' as const };
   },
-  /** Avatar upload (Q-16): multipart `avatar` → PUT /v1/users/profile/avatar; the session user refreshes on next load. */
+  /** Avatar upload (Q-16): multipart `avatar` → PUT /v1/users/profile/avatar; replaces the previous file. */
   avatar: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
@@ -100,6 +111,9 @@ export const actions: Actions = {
       });
     const r = unwrap(await apiFor(event).v1.users.profile.avatar.put({ file }));
     if (!r.ok) return actionFailure(r.failure);
+    // Without this the page would render the PREVIOUS avatar URL — whose file the upload has just
+    // deleted, so the image 404s instead of showing what was uploaded.
+    await refreshSession(event);
     return { saved: 'avatar' as const };
   },
   avatarRemove: async (event) => {
@@ -107,6 +121,7 @@ export const actions: Actions = {
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.users.profile.avatar.delete());
     if (!r.ok) return actionFailure(r.failure);
+    await refreshSession(event);
     return { saved: 'avatar' as const };
   },
   password: async (event) => {
