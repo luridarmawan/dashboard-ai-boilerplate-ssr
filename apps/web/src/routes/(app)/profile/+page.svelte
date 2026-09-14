@@ -1,14 +1,32 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../$types';
-import type { ActionData, PageData } from './$types';
+import type { ActionData, PageData, SubmitFunction } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+
+/**
+ * Avatar changes without leaving the page. The plain POST stays the base layer — this only swaps
+ * the document reload for `update()`, which applies the action result and re-runs the loads, so
+ * the card here AND the account menu in the shell pick up the new URL in place. The server action
+ * re-reads the session for the same reason, which is what the no-JavaScript path relies on.
+ */
+let avatarBusy = $state<'upload' | 'remove' | null>(null);
+const avatarSubmit =
+  (which: 'upload' | 'remove'): SubmitFunction =>
+  () => {
+    avatarBusy = which;
+    return async ({ update }) => {
+      await update();
+      avatarBusy = null;
+    };
+  };
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const profileFields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('profile.name'), required: true, maxlength: 191 },
@@ -129,13 +147,22 @@ const mfaError = $derived(
       {:else}
         <span class="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground">{initials}</span>
       {/if}
-      <form method="POST" action="?/avatar" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2">
+      <form method="POST" action="?/avatar" enctype="multipart/form-data" class="flex flex-wrap items-center gap-2" use:enhance={avatarSubmit('upload')}>
         <Csrf token={data.csrf} />
         <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp,image/gif" required class="text-sm" />
-        <Button type="submit" size="sm"><Icon name="upload" size={14} />{t('profile.avatar.upload')}</Button>
+        <Button type="submit" size="sm" disabled={avatarBusy !== null}>
+          <Icon name={avatarBusy === 'upload' ? 'refresh' : 'upload'} size={14} class={avatarBusy === 'upload' ? 'animate-spin' : ''} />
+          {avatarBusy === 'upload' ? t('common.running') : t('profile.avatar.upload')}
+        </Button>
       </form>
       {#if data.user.avatarUrl}
-        <form method="POST" action="?/avatarRemove"><Csrf token={data.csrf} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('profile.avatar.remove')}</Button></form>
+        <form method="POST" action="?/avatarRemove" use:enhance={avatarSubmit('remove')}>
+          <Csrf token={data.csrf} />
+          <Button type="submit" variant="ghost" size="sm" class="text-destructive" disabled={avatarBusy !== null}>
+            <Icon name={avatarBusy === 'remove' ? 'refresh' : 'trash'} size={14} class={avatarBusy === 'remove' ? 'animate-spin' : ''} />
+            {avatarBusy === 'remove' ? t('common.running') : t('profile.avatar.remove')}
+          </Button>
+        </form>
       {/if}
     </div>
     {#if form?.saved === 'avatar'}<p class="notice mt-3">{t('profile.avatar.saved')}</p>{/if}
