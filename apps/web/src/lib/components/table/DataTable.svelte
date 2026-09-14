@@ -46,6 +46,7 @@ const defaultLabels = {
   actions: t('common.actions'),
   selectAll: t('table.select_all'),
   select: t('table.select'),
+  selectNone: t('table.select_none'),
   prev: t('table.prev'),
   next: t('table.next'),
   of: t('table.of'),
@@ -90,9 +91,34 @@ const align = (c: ColumnDef<Row>) =>
   c.align === 'right' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start';
 const hasBulk = $derived(bulkActions.length > 0 && csrf !== '');
 const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * A bulk action acts on the ticked rows, so with nothing ticked it must not fire — it would
+ * otherwise post an empty `ids` list and "succeed" on nothing. Two layers, plus the server:
+ * the `:has()` rule at the bottom greys the buttons out and swallows clicks with no JavaScript
+ * at all, and `disabled` below takes over once this runs — that is what a keyboard submit obeys.
+ * Neither is a guarantee, so the page's action is still expected to refuse an empty list.
+ * (`disabled` is set on the element rather than bound: `state` is a prop here, which makes the
+ * `$state` rune ambiguous in this component.)
+ */
+let root: HTMLElement | undefined;
+const syncSelected = () => {
+  if (!root) return;
+  const none = root.querySelectorAll('input[name="ids"]:checked').length === 0;
+  for (const btn of root.querySelectorAll<HTMLButtonElement>('.dt-bulk-action')) {
+    btn.disabled = none;
+    if (none) btn.title = L.selectNone;
+    else btn.removeAttribute('title');
+  }
+};
+// Re-reads `rows` so a new page of (unticked) rows blocks the buttons again.
+$effect(() => {
+  void rows;
+  syncSelected();
+});
 </script>
 
-<div class={cn('grid gap-3', className)}>
+<div bind:this={root} class={cn('dt grid gap-3', className)}>
   <!-- toolbar: search + column picker, both plain GET forms -->
   <div class="flex flex-wrap items-center gap-2">
     <form method="GET" class="flex items-center gap-2" role="search">
@@ -167,7 +193,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
           {:else}
             {#each rows as row (row.id)}
               <tr class="border-b last:border-0 hover:bg-muted/50">
-                {#if hasBulk}<td class="px-3 py-2"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 accent-primary" aria-label={L.select} /></td>{/if}
+                {#if hasBulk}<td class="px-3 py-2"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 cursor-pointer accent-primary" aria-label={L.select} onchange={syncSelected} /></td>{/if}
                 {#each visible as c (c.key)}
                   <td class={cn('px-3 py-2 align-middle', align(c), c.class)}>
                     {#if cell}{@render cell(row, c)}{:else}{c.value ? (c.value(row) ?? '—') : '—'}{/if}
@@ -203,7 +229,7 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
         <div class="flex items-center gap-2">
           <span>{L.withSelected}:</span>
           {#each bulkActions as b (b.action)}
-            <Button type="submit" form={formId} formaction={b.action} variant={b.destructive ? 'destructive' : 'outline'} size="sm">{#if b.icon}<Icon name={b.icon} size={14} />{/if}{b.label}</Button>
+            <Button type="submit" form={formId} formaction={b.action} variant={b.destructive ? 'destructive' : 'outline'} size="sm" class="dt-bulk-action">{#if b.icon}<Icon name={b.icon} size={14} />{/if}{b.label}</Button>
           {/each}
         </div>
       {:else}<span></span>{/if}
@@ -224,3 +250,11 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
     </div>
   {/if}
 </div>
+
+<style>
+  /* No-JavaScript layer for the rule above: same look as `:disabled` on the button itself. */
+  .dt:not(:has(input[name='ids']:checked)) :global(.dt-bulk-action) {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+</style>

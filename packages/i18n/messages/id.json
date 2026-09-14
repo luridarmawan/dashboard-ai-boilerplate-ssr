@@ -218,6 +218,7 @@
   "table.rows": "baris",
   "table.select": "Pilih",
   "table.select_all": "Pilih semua",
+  "table.select_none": "Pilih minimal satu baris dulu.",
   "table.with_selected": "Dengan yang dipilih",
   "modules.catalog.bundled": "bawaan core",
   "modules.catalog.error": "Katalog tidak bisa dimuat: {error}",

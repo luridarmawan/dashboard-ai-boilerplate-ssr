@@ -218,6 +218,7 @@
   "table.rows": "rows",
   "table.select": "Select",
   "table.select_all": "Select all",
+  "table.select_none": "Select at least one row first.",
   "table.with_selected": "With selected",
   "modules.catalog.bundled": "bundled with core",
   "modules.catalog.error": "The catalog could not be loaded: {error}",

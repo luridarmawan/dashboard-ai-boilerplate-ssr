@@ -136,6 +136,10 @@ export const actions: Actions = {
         message: t('common.form_expired'),
       });
     const ids = form.getAll('ids').filter((v): v is string => typeof v === 'string');
+    // Nothing ticked: the table already blocks the button, so this only catches a hand-made POST —
+    // but it must say so rather than redirect with "0 users deactivated", which reads like success.
+    if (ids.length === 0)
+      return fail(400, { error: t('table.select_none'), code: 'no_selection', deactivate: true });
     const client = apiFor(event);
     let done = 0;
     for (const id of ids) {

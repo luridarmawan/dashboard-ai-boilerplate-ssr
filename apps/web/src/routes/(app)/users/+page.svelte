@@ -83,9 +83,11 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
   {#if deactivated}<p class="notice">{t('users.deactivated', { n: deactivated })}</p>{/if}
   <!-- A refused impersonation belongs above the table, not inside the invite card below it. -->
   {#if form?.impersonate && form?.error}<p class="error" role="alert" data-testid="impersonate-error">{form.error}</p>{/if}
+  {#if form?.deactivate && form?.error}<p class="error" role="alert" data-testid="deactivate-error">{form.error}</p>{/if}
 
   <DataTable
     rows={data.users}
+    class="[&_button]:cursor-pointer"
     {columns}
     state={data.state}
     csrf={data.csrf}
@@ -123,11 +125,11 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
           <p class="text-xs">{t('users.invite.link_hint')} <code class="select-all break-all">{form.invited.link}</code></p>
         </div>
       {/if}
-      {#if form?.error && !form?.invited && !form?.impersonate}<p class="error" role="alert">{form.error}</p>{/if}
+      {#if form?.error && !form?.invited && !form?.impersonate && !form?.deactivate}<p class="error" role="alert">{form.error}</p>{/if}
       <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form">
         <Csrf token={data.csrf} />
         <label class="grid gap-1 text-sm">{t('users.invite.email')} <input name="email" type="email" required autocomplete="off" class="h-9 w-72 rounded-md border border-input bg-background px-2 text-sm" value={form?.values?.email ?? ''} /></label>
-        <Button type="submit" size="sm"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
+        <Button type="submit" size="sm" class="cursor-pointer"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
       </form>
       {#if data.invitations.length}
         <table class="mt-4 w-full text-sm" data-testid="invitations">
@@ -139,7 +141,7 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
                 <td class="py-1.5"><Badge variant={inv.status === 'pending' ? 'secondary' : 'destructive'}>{inv.status === 'pending' ? t('users.invite.status_pending') : t('users.invite.status_expired')}</Badge></td>
                 <td class="py-1.5 text-muted-foreground">{new Date(inv.expiresAt).toLocaleString(dateLocale)}</td>
                 <td class="py-1.5 text-muted-foreground">{inv.invitedBy ?? '—'}</td>
-                <td class="py-1.5 text-end"><form method="POST" action="?/revoke"><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm">{t('users.invite.revoke')}</Button></form></td>
+                <td class="py-1.5 text-end"><form method="POST" action="?/revoke"><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm" class="cursor-pointer">{t('users.invite.revoke')}</Button></form></td>
               </tr>
             {/each}
           </tbody>
