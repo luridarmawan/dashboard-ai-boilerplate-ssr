@@ -49,7 +49,9 @@ const ld = $derived(
 <article class="mx-auto grid max-w-6xl gap-12 px-4 py-12 md:grid-cols-2 md:items-start">
   <div class="relative aspect-[4/5] w-full overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/30 via-primary/10 to-accent shadow-sm">
     {#if p.imageUrl}
-      <img src={p.imageUrl} alt={p.name} class="h-full w-full object-cover" />
+      <!-- The one image above the fold here, so it stays eager and asks to be fetched early:
+           `loading="lazy"` on the LCP element delays the very thing the page is judged on. -->
+      <img src={p.imageUrl} alt={p.name} decoding="async" fetchpriority="high" width="800" height="1000" class="h-full w-full object-cover" />
     {:else}
       <span class="absolute -bottom-10 -end-4 select-none text-[16rem] font-semibold leading-none text-primary/15" aria-hidden="true">{p.name.trim().charAt(0).toUpperCase()}</span>
     {/if}

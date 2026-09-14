@@ -179,7 +179,9 @@ const hero = $derived(data.products.slice(0, 3));
             <article class="flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:shadow-md">
               <div class={`relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br ${artOf(i)}`}>
                 {#if p.imageUrl}
-                  <img src={p.imageUrl} alt={p.name} loading="lazy" class="h-full w-full object-cover" />
+                  <!-- Far below the fold: never fetched until the grid is scrolled near. `width`/`height`
+                       match the 4/5 box so the slot is reserved even before the stylesheet lands. -->
+                  <img src={p.imageUrl} alt={p.name} loading="lazy" decoding="async" width="800" height="1000" class="h-full w-full object-cover" />
                 {:else}
                   <span class="absolute -bottom-6 -end-2 select-none text-[11rem] font-semibold leading-none text-primary/15" aria-hidden="true">{initial(p.name)}</span>
                 {/if}
