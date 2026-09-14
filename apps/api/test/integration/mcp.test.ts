@@ -212,7 +212,9 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
     const memberTools = (await json(await bearer(memberToken, '/v1/tools'))).data as {
       name: string;
     }[];
-    expect(memberTools.map((t) => t.name)).toEqual(['dummy.ping']);
+    // The core's internal tools (core-tools.ts) need no permission and no module, so a bare
+    // member token sees them alongside the one free module tool.
+    expect(memberTools.map((t) => t.name)).toEqual(['core.get_current_datetime', 'dummy.ping']);
   });
 
   test('MCP: no bearer → 401 before any JSON-RPC (I-6)', async () => {
@@ -296,7 +298,7 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
     const asMember = await mcpClient(memberToken);
     try {
       const tools = await asMember.listTools();
-      expect(tools.tools.map((t) => t.name)).toEqual(['dummy_ping']);
+      expect(tools.tools.map((t) => t.name)).toEqual(['core_get_current_datetime', 'dummy_ping']);
       const denied = await asMember.callTool({ name: 'dummy_count_notes', arguments: {} });
       expect(denied.isError).toBe(true);
       expect((denied.content as { text: string }[])[0]?.text).toContain('dummy.note.read');

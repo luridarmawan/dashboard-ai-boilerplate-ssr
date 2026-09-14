@@ -11,6 +11,7 @@ import {
   toolWireName,
 } from '@core/module-kit';
 import { Value } from '@sinclair/typebox/value';
+import { coreTools } from './core-tools.ts';
 import { moduleTools } from './generated/tools.ts';
 import { moduleState } from './services.ts';
 
@@ -25,6 +26,10 @@ import { moduleState } from './services.ts';
  *   scoped    ⇔ `run` gets `forTenant(clientId)` — never a raw connection
  *
  * Every call is audited (`tool.call`), success or failure, with the tool name as resource.
+ *
+ * Besides module tools, the core contributes **internal tools** of its own (`core-tools.ts`):
+ * capabilities that belong to no module — the wall clock — and therefore skip the
+ * module-enabled gate, and only that gate. Every other guarantee above still holds for them.
  *
  * Besides the static tools from `api/tools.ts`, a module may register a **tool source** (I-4):
  * tools resolved per caller at request time — the AI module's external MCP servers. They flow
@@ -70,8 +75,15 @@ export type ToolCallResult =
       readonly ms: number;
     };
 
-/** A registered tool; `external` marks tools whose schema lives on a remote server (I-4). */
-export type RegistryTool = RegisteredTool & { readonly external?: boolean };
+/**
+ * A registered tool. `external` marks tools whose schema lives on a remote server (I-4);
+ * `core` marks the internal tools the core itself declares — no module owns them, so there is
+ * no module to enable or disable.
+ */
+export type RegistryTool = RegisteredTool & {
+  readonly external?: boolean;
+  readonly core?: boolean;
+};
 
 /** Per-caller tool provider (I-4). Registered once per process by the module that owns it. */
 export interface ToolSource {
@@ -82,9 +94,12 @@ export interface ToolSource {
   find(nameOrWire: string, caller: ToolCaller): Promise<RegistryTool | undefined>;
 }
 
-const all: readonly RegisteredTool[] = moduleTools.flatMap((m) =>
-  m.tools.map((tool: ToolDef) => ({ ...tool, module: m.module, ns: m.ns })),
-);
+const all: readonly RegistryTool[] = [
+  ...coreTools.map((tool) => ({ ...tool, core: true })),
+  ...moduleTools.flatMap((m) =>
+    m.tools.map((tool: ToolDef) => ({ ...tool, module: m.module, ns: m.ns })),
+  ),
+];
 const byName = new Map(all.map((tool) => [tool.name, tool]));
 const sources = new Map<string, ToolSource>();
 
@@ -98,7 +113,7 @@ export function registerToolSource(source: ToolSource): void {
   sources.set(source.id, source);
 }
 
-function resolveStatic(nameOrWire: string): RegisteredTool | undefined {
+function resolveStatic(nameOrWire: string): RegistryTool | undefined {
   return byName.get(nameOrWire) ?? byName.get(toolNameFromWire(nameOrWire) ?? '');
 }
 
@@ -136,7 +151,8 @@ export async function listTools(caller: ToolCaller): Promise<readonly RegistryTo
   if (!all.length && !sources.size) return [];
   const enabled = await moduleState.enabledFor(caller.clientId);
   const visible = (tool: RegistryTool) =>
-    enabled.has(tool.module) && (!tool.permission || caller.can(tool.permission));
+    (tool.core === true || enabled.has(tool.module)) &&
+    (!tool.permission || caller.can(tool.permission));
   const out: RegistryTool[] = all.filter(visible);
   for (const source of sources.values()) {
     try {
@@ -200,7 +216,7 @@ export async function callTool(
   };
   if (!tool) return refuse('not_found', `Tool "${nameOrWire}" tidak ada`);
   if (!caller.clientId) return refuse('no_tenant', 'Tidak ada tenant aktif');
-  if (!(await moduleState.isEnabled(caller.clientId, tool.module)))
+  if (tool.core !== true && !(await moduleState.isEnabled(caller.clientId, tool.module)))
     return refuse('module_disabled', `Modul ${tool.module} nonaktif untuk tenant ini`);
   if (tool.permission && !caller.can(tool.permission))
     return refuse('forbidden', `Anda tidak punya izin ${tool.permission}`);

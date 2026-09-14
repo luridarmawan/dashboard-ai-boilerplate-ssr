@@ -84,8 +84,10 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
     ).user.id;
   });
 
-  test('the registry holds the built-in modules’ tools, with wire names the model can use', () => {
+  test('the registry holds the core’s internal tools and the built-in modules’ tools', () => {
     const all = allTools().map((t) => t.name);
+    // Internal tools (core-tools.ts) belong to no module and are always in the registry.
+    expect(all).toContain('core.get_current_datetime');
     expect(all).toContain('dummy.ping');
     expect(all).toContain('dummy.count_notes');
     expect(all).toContain('example.list_products');
@@ -103,6 +105,7 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
       expect.arrayContaining(['dummy.ping', 'dummy.count_notes', 'example.list_products']),
     );
     const forMember = names(await json(await call('/v1/tools', {}, [member])));
+    expect(forMember).toContain('core.get_current_datetime');
     expect(forMember).toContain('dummy.ping');
     expect(forMember).not.toContain('dummy.count_notes');
     expect(forMember).not.toContain('example.list_products');
@@ -210,9 +213,58 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
     expect(names(await json(await call('/v1/tools', {}, [admin])))).toContain('dummy.ping');
   });
 
+  test('an internal tool needs no module and no permission, and survives a disabled module (extension point 8)', async () => {
+    const asMember = { clientId: tenantId, userId: memberId, can: () => false };
+    // A bare member holds nothing at all; the wall clock is still readable.
+    const r = await callTool('core.get_current_datetime', { timezone: 'Asia/Jakarta' }, asMember);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const now = r.result as {
+      iso: string;
+      utc: string;
+      timezone: string;
+      utc_offset: string;
+      date: string;
+      ranges: Record<string, { from: string; to: string } | undefined>;
+    };
+    const range = (key: string) => {
+      const r = now.ranges[key];
+      if (!r) throw new Error(`rentang "${key}" tidak ada`);
+      return r;
+    };
+    expect(now.timezone).toBe('Asia/Jakarta');
+    expect(now.utc_offset).toBe('+07:00');
+    expect(now.iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+07:00$/);
+    // The clock is the real one, not a fixture: within a minute of this process's own.
+    expect(Math.abs(Date.parse(now.utc) - Date.now())).toBeLessThan(60_000);
+    // Ranges are half-open and anchored to Jakarta midnight — usable as a report filter as-is.
+    expect(range('today').from).toBe(`${now.date}T00:00:00+07:00`);
+    expect(Date.parse(range('this_month').from)).toBeLessThanOrEqual(Date.parse(now.iso));
+    expect(Date.parse(range('today').to)).toBeGreaterThan(Date.parse(now.iso));
+
+    // An unknown zone is a tool failure with a usable message, not a crash.
+    const bad = await callTool('core.get_current_datetime', { timezone: 'Mars/Olympus' }, asMember);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.code).toBe('failed');
+
+    // Arguments are validated exactly like a module tool's.
+    const wrong = await post(
+      '/v1/tools/call',
+      {
+        name: 'core_get_current_datetime',
+        input: { timezone: 5 },
+      },
+      [member],
+    );
+    expect(wrong.status).toBe(422);
+  });
+
   test('the in-process API (used by the AI chat) enforces the same rules, and every call is audited', async () => {
     const asMember = { clientId: tenantId, userId: memberId, can: () => false };
-    expect((await listTools(asMember)).map((t) => t.name)).toEqual(['dummy.ping']);
+    expect((await listTools(asMember)).map((t) => t.name)).toEqual([
+      'core.get_current_datetime',
+      'dummy.ping',
+    ]);
     const denied = await callTool('dummy.count_notes', {}, asMember);
     expect(denied.ok).toBe(false);
     if (!denied.ok) expect(denied.code).toBe('forbidden');

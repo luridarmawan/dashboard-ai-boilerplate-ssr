@@ -68,7 +68,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 5 | Izin | `permissions.ts` (`definePermissions`, `CORE_ACTIONS`) | `modules/Example/permissions.ts` | m6 proof: 403 di API & halaman |
 | 6 | Konfigurasi | `config.ts` (`defineConfig`) → section di `/settings`, `settings.get()` | `modules/AI/config.ts` | `scripts/m3-gate-proof.ts` |
 | 7 | i18n | `i18n/<locale>.json`, kunci `<ns>.*`, `t('<ns>.x')` di halaman | `modules/Example/i18n/` | m6 proof: halaman berganti bahasa lewat `/lang` |
-| 8 | Tool AI / MCP | `api/tools.ts` (`defineTools`) → ditawarkan ke asisten AI (function calling) dan `GET/POST /v1/tools`; izin + tenant ditegakkan registry core (I-3, I-6) | `modules/Example/api/tools.ts`, `modules/Dummy/api/tools.ts` | `apps/api/test/integration/tools.test.ts` (I-6), tes modul AI (loop tool stream & non-stream), m6 proof: tool tidak ditawarkan bagi user tanpa izin |
+| 8 | Tool AI / MCP | `api/tools.ts` (`defineTools`) → ditawarkan ke asisten AI (function calling) dan `GET/POST /v1/tools`; izin + tenant ditegakkan registry core (I-3, I-6). Core sendiri menyumbang **tool internal** (`core.*`) yang tidak terikat modul | `modules/Example/api/tools.ts`, `modules/Dummy/api/tools.ts` | `apps/api/test/integration/tools.test.ts` (I-6), tes modul AI (loop tool stream & non-stream), m6 proof: tool tidak ditawarkan bagi user tanpa izin |
 | 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled`, `job.started`, `job.finished` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
 | 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
@@ -544,6 +544,18 @@ Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (cha
 Tool yang sama tersaji ke klien MCP eksternal lewat `/v1/mcp` ([`MCP.md`](./MCP.md)). Di chat AI, tool ditawarkan ke provider sebagai OpenAI `tools`; balasan `tool_calls` dijalankan lewat registry lalu dikirim balik sebagai pesan `tool`, maksimal 5 putaran per giliran; saat streaming, UI mendapat frame `crk.tool` untuk menampilkan tool yang berjalan. Admin bisa mematikannya dengan `ai.tools_enable = false`, klien per request dengan `tools: false`. Untuk API klien: `GET /v1/tools` (yang boleh dipanggil user ini) dan `POST /v1/tools/call { name, input }`.
 
 Aturan: `name` diawali namespace dan ≤ 64 karakter dalam bentuk kawat (`<ns>_<nama>`); `permission` milik modul sendiri harus dideklarasikan di `permissions.ts` (sync menolak yang tidak ada); `input` harus skema objek. Modul **tidak boleh** memanggil tool modul lain lewat internal — pakai `POST /v1/tools/call` atau tunggu MCP.
+
+#### Tool internal (milik core)
+
+Selain tool modul, **core** menyumbang tool sendiri dari `apps/api/src/core-tools.ts` — untuk kemampuan yang bukan milik modul mana pun dan tidak boleh hilang: modul bisa dinonaktifkan per tenant (G-8) dan sebuah instalasi boleh tidak punya modul sama sekali, tetapi "sekarang jam berapa" harus tetap terjawab. Tool internal ditandai `core: true` di registry sehingga **melewati satu gerbang saja**: pemeriksaan modul-aktif. Sisanya identik dengan tool modul — butuh sesi dan tenant aktif, `permission` (bila dideklarasikan) tetap ditegakkan, argumen tetap divalidasi, dan setiap panggilan tetap tercatat `tool.call`. Namespace-nya `core.`, jadi namanya tidak pernah bentrok dengan namespace modul.
+
+| Tool | Kawat | Izin | Isi |
+|---|---|---|---|
+| `core.get_current_datetime` | `core_get_current_datetime` | — (semua anggota) | Tanggal & jam sekarang di zona waktu aplikasi + rentang siap pakai |
+
+`core.get_current_datetime` menjawab `{ iso, utc, epoch_ms, timezone, utc_offset, date, time, weekday, text, ranges }`. Zonanya dari konfigurasi **Aplikasi → Zona waktu** (`app.timezone`, per tenant; baku = zona server/`TZ`), dan argumen opsional `timezone` (nama IANA) membacanya di zona lain. `ranges` berisi `today`, `yesterday`, `this_week`, `last_week`, `this_month`, `last_month`, `this_year`, `last_7_days`, `last_30_days` — masing-masing `{ from, to }` ISO-8601 **setengah terbuka** (`from` termasuk, `to` tidak), dihitung dari tengah malam di zona itu, bukan dari tengah malam UTC. Itulah gunanya: baris disimpan dalam UTC, jadi "bulan ini" bagi pembaca di Asia/Jakarta mulai tujuh jam sebelum bulan UTC mulai — model tinggal memakai `from`/`to` sebagai filter laporan alih-alih menebak tanggal hari ini dari ingatannya. Minggu dimulai **Senin** (ISO-8601); `last_7_days`/`last_30_days` adalah hari kalender berjalan yang berakhir hari ini. Zona ber-DST ditangani: setiap batas membawa offset yang berlaku **pada batas itu** (`2026-03-01T00:00:00-05:00` … `2026-04-01T00:00:00-04:00`). Bukti: `apps/api/test/datetime.test.ts` (unit) dan `apps/api/test/integration/tools.test.ts`.
+
+Menambah tool internal: tulis entrinya di `core-tools.ts` — validasinya persis `defineTools` (nama `core.<nama>`, deskripsi dwibahasa, `input` skema objek). Kemampuan yang **milik** sebuah domain tetap ditulis sebagai tool modul; `core-tools.ts` hanya untuk yang tidak punya pemilik.
 
 ---
 

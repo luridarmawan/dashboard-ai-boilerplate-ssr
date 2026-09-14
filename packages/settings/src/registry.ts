@@ -13,6 +13,19 @@ function landingFallback(): string {
 }
 
 /**
+ * The zone the application reads its own clock in (`core.get_current_datetime`, date-range
+ * reports). Rows are stored in UTC; this only decides when "hari ini" begins. With no row in
+ * `configurations` the zone the process runs in applies — `Intl` resolves that from `TZ`.
+ */
+function timezoneFallback(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+/**
  * Built-in configuration sections (PRD E-8). Everything an admin may change at runtime lives
  * here, never in .env (E-6). Modules add their own through `config.ts` (extension point 6);
  * the settings form is GENERATED from this registry (E-3).
@@ -105,6 +118,19 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: 'id',
         public: true,
         order: 6,
+      },
+      {
+        key: 'app.timezone',
+        type: 'string',
+        title: { id: 'Zona waktu', en: 'Timezone' },
+        note: {
+          id: 'Nama IANA, mis. Asia/Jakarta. Data tetap disimpan dalam UTC; ini yang menentukan kapan "hari ini" dimulai bagi asisten AI dan laporan berentang tanggal. Kosongkan untuk memakai zona waktu server (TZ).',
+          en: 'IANA name, e.g. Asia/Jakarta. Data is still stored in UTC; this decides when “today” begins for the AI assistant and for date-range reports. Leave empty to use the server’s own zone (TZ).',
+        },
+        default: timezoneFallback(),
+        public: true,
+        max: 64,
+        order: 7,
       },
     ],
   },

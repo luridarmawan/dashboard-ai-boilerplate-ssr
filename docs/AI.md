@@ -88,13 +88,15 @@ Widget shell `ai.floating_chat` (izin `ai.chat.create`) menaruh tombol di pojok 
 
 Tanpa JavaScript, form chat tetap bekerja: jawaban diambil utuh lalu halaman dirender ulang dengan riwayat.
 
-## Tool modul (titik perluasan 8, I-3)
+## Tool modul & tool internal (titik perluasan 8, I-3)
 
-Asisten bisa **memanggil tool** yang disumbangkan modul lewat `api/tools.ts` (`defineTools`, lihat [`MODULES.md` §3](./MODULES.md)). Modul AI sendiri tidak tahu tool apa yang ada — ia bertanya ke registry core:
+Asisten bisa **memanggil tool** yang disumbangkan modul lewat `api/tools.ts` (`defineTools`, lihat [`MODULES.md` §3](./MODULES.md)) dan **tool internal** milik core (`core.*`). Modul AI sendiri tidak tahu tool apa yang ada — ia bertanya ke registry core:
 
 1. Sebelum memanggil provider, API mengambil tool yang **boleh dipakai user ini di tenant aktif** (modul aktif + izin dipegang) dan mengirimnya sebagai OpenAI `tools`, dengan nama kawat `<ns>_<nama>` (mis. `example_list_products`).
 2. Bila model menjawab `tool_calls`, setiap panggilan dijalankan lewat `callTool` registry — izin, tenant (`forTenant`), dan skema argumen ditegakkan **di sana**, lalu diaudit (`tool.call`) — hasilnya dikirim balik sebagai pesan `tool`, dan provider dipanggil lagi. Maksimal 5 putaran per giliran; putaran terakhir tanpa `tools` sehingga model harus menjawab dengan teks.
 3. Saat streaming, frame `tool_calls` provider **tidak** diteruskan ke browser; sebagai gantinya API menyisipkan frame `crk.tool` (`running` → `ok`/`error`) yang ditampilkan UI sebagai chip di bawah gelembung jawaban. Hanya ada satu `[DONE]`, di ujung. Tanpa streaming, respons JSON membawa `x_tools` (nama, sukses, durasi).
+
+**Tool internal** selalu ada, bahkan pada instalasi tanpa modul, karena tidak terikat modul mana pun (lihat [`MODULES.md`](./MODULES.md) → Tool internal). Yang terpenting untuk asisten: **`core_get_current_datetime`** — tanggal dan jam sekarang di zona waktu aplikasi (`app.timezone`, Pengaturan → Aplikasi) beserta rentang siap pakai `today`/`yesterday`/`this_week`/`last_week`/`this_month`/`last_month`/`this_year`/`last_7_days`/`last_30_days` dalam ISO-8601 setengah terbuka. Model bahasa tidak punya jam dan tanggal pelatihannya sudah basi, jadi tanpa tool ini setiap pertanyaan "berapa penjualan bulan ini?" dijawab dengan tanggal karangan; deskripsi tool-nya menyuruh model memanggilnya lebih dulu setiap kali jawaban menyentuh waktu relatif, lalu memakai `from`/`to` sebagai filter laporan. Tidak butuh izin apa pun — jam dinding bukan data tenant — tetapi tetap butuh sesi + tenant aktif dan tetap tercatat di audit.
 
 Tool yang sama juga disajikan ke klien MCP eksternal (Claude Desktop, Claude Code) lewat `/v1/mcp`, dan sebaliknya server MCP eksternal yang didaftarkan admin di **Server MCP** ikut menyumbang tool ke asisten bagi pemegang `ai.mcp.use` — lihat [`MCP.md`](./MCP.md). Mematikan: `ai.tools_enable = false` (Pengaturan → AI) untuk semua, atau `tools: false` pada request. Request **tidak boleh** membawa `tools` sendiri — tool adalah deklarasi modul, bukan input klien. Setiap putaran provider tercatat sebagai satu baris `ai_calls`. Bukti: `modules/AI/test/integration/ai.test.ts` (loop tool stream & non-stream terhadap provider tiruan yang meminta `dummy_ping`) dan `apps/api/test/integration/tools.test.ts` (I-6: 401 tanpa sesi, 403 tanpa izin, isolasi tenant, modul nonaktif, audit).
 
