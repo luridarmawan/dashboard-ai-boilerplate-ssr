@@ -344,7 +344,7 @@ bun --env-file=.env.prod run db:migrate              # eksplisit (Q-4)
 bun --env-file=.env.prod run db:seed                 # idempoten (O-3)
 bun run build                                        # registri modul + build SvelteKit
 bun --env-file=.env.prod start                       # → http://127.0.0.1:3000
-#   → "[start] siap — http://127.0.0.1:3000 (satu port: web + /v1 + /docs)"
+#   → banner: nama aplikasi, "mode: production", versi, "listening on http://127.0.0.1:3000"
 ```
 
 `bun start` menyalakan **dua proses yang sama seperti compose** (api + web, `NODE_ENV=production` dipaksa) lalu memasang *gateway* satu port di depan keduanya, dengan tabel rute yang sama seperti [`deploy/Caddyfile`](../deploy/Caddyfile): `/v1/*` `/docs` `/docs/*` `/openapi.json` → api, sisanya → web. Origin tetap satu, jadi cookie dan CSRF berperilaku persis seperti di §2. Reverse proxy Anda cukup satu blok:

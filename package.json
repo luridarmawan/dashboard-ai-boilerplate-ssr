@@ -2,7 +2,7 @@
   "name": "dashboard-ai-boilerplate",
   "private": true,
   "license": "MIT",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Boilerplate dashboard admin ber-AI \u2014 API-first, SSR, modular, database-agnostic, self-hosted",
   "workspaces": [
     "apps/*",
@@ -69,6 +69,10 @@
     "modules:search": "bun run scripts/modules-catalog.ts search",
     "modules:install": "bun run scripts/modules-catalog.ts install",
     "modules:remove": "bun run scripts/modules-remove.ts"
+  },
+  "dependencies": {
+    "cfonts": "^3.3.1",
+    "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.0",

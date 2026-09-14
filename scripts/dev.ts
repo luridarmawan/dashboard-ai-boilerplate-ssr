@@ -7,8 +7,16 @@
  * is stopped too — a half-running dev stack hides errors.
  */
 import { fileURLToPath } from 'node:url';
+import { printBanner } from './banner.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+
+// Alamat dev server web — sumbernya sama dengan apps/web/vite.config.ts (root .env), supaya
+// banner di bawah menyebut port yang benar-benar dipakai.
+const webHost = process.env.WEB_HOST ?? '127.0.0.1';
+const webPort = Number(process.env.WEB_PORT ?? 5173);
+const webUrl = `http://${webHost === '0.0.0.0' || webHost === '::' ? '127.0.0.1' : webHost}:${webPort}`;
+const apiUrl = `http://${process.env.API_HOST ?? '127.0.0.1'}:${process.env.API_PORT ?? 3001}`;
 
 const procs = [
   { name: 'api', color: '\x1b[36m', cwd: `${root}apps/api`, cmd: ['bun', 'run', 'dev'] },
@@ -70,3 +78,22 @@ for (const p of procs) {
 
 process.on('SIGINT', () => stopAll(0));
 process.on('SIGTERM', () => stopAll(0));
+
+/**
+ * Banner menyusul setelah Vite benar-benar menjawab, bukan saat proses baru di-spawn: kalau
+ * portnya ternyata dipakai proses lain, alamat yang dicetak akan bohong. /favicon.ico adalah
+ * berkas statis — tidak memicu kompilasi SSR hanya untuk sebuah probe.
+ */
+const deadline = Date.now() + 90_000;
+while (!stopping && Date.now() < deadline) {
+  try {
+    const res = await fetch(`${webUrl}/favicon.ico`, { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      printBanner(webUrl, 'development', `api ${apiUrl} (juga di ${webUrl}/v1 lewat proxy Vite)`);
+      break;
+    }
+  } catch {
+    /* belum menyala */
+  }
+  await Bun.sleep(250);
+}

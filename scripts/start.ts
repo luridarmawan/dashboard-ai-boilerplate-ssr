@@ -33,6 +33,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseOrigins } from '@core/config';
+import { printBanner } from './banner.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const proxied = !process.argv.includes('--no-proxy');
@@ -290,11 +291,17 @@ async function waitReady(): Promise<boolean> {
 
 if (await waitReady()) {
   const shown = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-  console.log(
-    proxied
-      ? `\x1b[32m[start]\x1b[0m siap — http://${shown}:${port} (satu port: web + /v1 + /docs). ` +
-          `Arahkan nginx/apache ke sini; /metrics tetap privat di http://${localApiHost}:${apiPort}/metrics`
-      : `\x1b[32m[start]\x1b[0m siap — web http://${shown}:${webPort}, api http://${localApiHost}:${apiPort} ` +
-          '(proxy: / → web, /v1 /docs /openapi.json → api)',
+  printBanner(
+    `http://${shown}:${proxied ? port : webPort}`,
+    'production',
+    ...(proxied
+      ? [
+          'siap — satu port: web + /v1 + /docs. Arahkan nginx/apache ke sini;',
+          `/metrics tetap privat di http://${localApiHost}:${apiPort}/metrics`,
+        ]
+      : [
+          `siap — web di atas, api http://${localApiHost}:${apiPort}`,
+          'proxy: / → web, /v1 /docs /openapi.json → api',
+        ]),
   );
 }
