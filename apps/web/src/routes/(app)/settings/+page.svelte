@@ -359,7 +359,7 @@ $effect(() => {
                 </label>
               {/if}
               <Button type="button" variant="outline" disabled={running === id} title={L(a.note) || undefined} onclick={() => runAction(s.section, a.key, a.input?.key)}>
-                <Icon name="refresh" size={16} />{running === id ? t('common.running') : L(a.label)}
+                <Icon name="refresh" size={16} class={running === id ? 'animate-spin' : ''} />{running === id ? t('common.running') : L(a.label)}
               </Button>
             {/each}
           </div>
