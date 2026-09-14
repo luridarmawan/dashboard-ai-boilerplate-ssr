@@ -152,6 +152,7 @@
   "ai.quota.spent": "Spent overall",
   "ai.quota.status": "Status",
   "ai.quota.settings_hint": "Token quotas live in Settings → AI; the balance is managed below.",
+  "ai.settings.test_profile_active": "This tenant uses the \"{code}\" profile in AI Providers — test its connection on that page",
   "ai.quota.amount": "Amount (currency)",
   "ai.quota.note": "Note",
   "ai.quota.make_unlimited": "remove balance limit",

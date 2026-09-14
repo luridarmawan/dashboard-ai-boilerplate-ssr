@@ -1,4 +1,5 @@
 <script lang="ts">
+import type { MessageKey } from '@core/i18n';
 import { onMount } from 'svelte';
 import { enhance } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
@@ -34,7 +35,27 @@ const locales = [
  * result is always one message plus optional detail lines, and an action that needs one value
  * from the operator (where to send a test e-mail) declares that input in the same metadata.
  */
-type ActionResult = { ok: boolean; message: string; details?: string[] };
+type ActionResult = {
+  ok: boolean;
+  message: string;
+  details?: string[];
+  /** Set on failures: the message key to render instead of `message`, with `params` filled in. */
+  i18n?: string;
+  params?: Record<string, string>;
+};
+
+/**
+ * What the operator reads. API messages are Indonesian by contract, so a failure that declared a
+ * message key is rendered from the catalogue instead; a key this build does not know (a module
+ * that ships no translation for it) falls back to the message the API wrote.
+ */
+function actionText(r: ActionResult): string {
+  if (!r.i18n) return r.message;
+  const key = r.i18n as MessageKey;
+  const text = t(key, r.params);
+  return text === key ? r.message : text;
+}
+
 let running = $state<string | null>(null);
 let results = $state<Record<string, ActionResult>>({});
 const can = (p: string | null) =>
@@ -367,7 +388,7 @@ $effect(() => {
             {@const r = results[`${s.section}:${a.key}`]}
             {#if r}
               <div class="sm:col-span-2" data-testid={`action-result-${s.section}-${a.key}`}>
-                <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{r.message}</p>
+                <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{actionText(r)}</p>
                 {#if r.details?.length}
                   <ul class="mt-1 text-xs text-muted-foreground">
                     {#each r.details as d, i (i)}<li>{d}</li>{/each}

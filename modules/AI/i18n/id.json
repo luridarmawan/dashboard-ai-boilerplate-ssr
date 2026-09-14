@@ -152,6 +152,7 @@
   "ai.quota.spent": "Terpakai seluruhnya",
   "ai.quota.status": "Status",
   "ai.quota.settings_hint": "Kuota token diatur di Pengaturan → AI; saldo lewat form di bawah.",
+  "ai.settings.test_profile_active": "Tenant ini memakai profil \"{code}\" di Penyedia AI — uji koneksinya di halaman itu",
   "ai.quota.amount": "Jumlah (mata uang)",
   "ai.quota.note": "Catatan",
   "ai.quota.make_unlimited": "hapus batas saldo",

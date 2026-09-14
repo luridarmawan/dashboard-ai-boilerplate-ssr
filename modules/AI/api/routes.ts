@@ -2003,10 +2003,17 @@ export default defineApiRoutes(
         if (p.id) {
           // A profile exists and wins; testing the settings here would mislead.
           set.status = 409;
+          // The wording travels as a key + params too: the settings page renders action failures
+          // in the operator's language, while the envelope's own `message` stays Indonesian (K-*).
           return fail(
             'conflict',
             `Tenant ini memakai profil "${p.code}" di Penyedia AI — uji koneksinya di halaman itu`,
             requestId,
+            {
+              reason: 'provider_profile_active',
+              i18n: 'ai.settings.test_profile_active',
+              code: p.code,
+            },
           );
         }
         const r = await probeCapabilities(p.baseurl, p.key, p.model, { signal: request.signal });

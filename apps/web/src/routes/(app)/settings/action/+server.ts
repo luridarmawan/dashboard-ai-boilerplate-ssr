@@ -2,6 +2,33 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { apiFor, apiPostData, checkCsrf } from '$lib/server/session';
 
 /**
+ * A failure this endpoint itself decided: the page renders `i18n` from its catalogue, and
+ * `message` only survives as what a build without that key would show.
+ */
+const refused = (message: string, i18n: string) => ({ ok: false as const, message, i18n });
+
+/**
+ * A failure the API returned. Its `message` is Indonesian by contract (K-*), so a route that wants
+ * the operator's language declares `details.i18n` — a message key — and the remaining string
+ * fields of `details` become its `{placeholders}`. Without such a key the API's own message
+ * stands: it is more specific than anything generic this endpoint could put in its place.
+ */
+function fromApi(message: string | null, details: unknown) {
+  const d = (details ?? null) as Record<string, unknown> | null;
+  const params: Record<string, string> = {};
+  for (const [k, v] of Object.entries(d ?? {})) {
+    if (k !== 'i18n' && k !== 'reason' && typeof v === 'string') params[k] = v;
+  }
+  const declared = typeof d?.i18n === 'string' ? d.i18n : null;
+  return {
+    ok: false as const,
+    message: message ?? '',
+    i18n: declared ?? (message ? undefined : 'settings.action_failed'),
+    params,
+  };
+}
+
+/**
  * Runs a config section's action (extension point 6) without leaving the page — "test connection",
  * "send a test e-mail" and their kin. The browser sends only the SECTION, the ACTION KEY and, when
  * the action declares one, the single INPUT value; the endpoint to call is looked up from the
@@ -15,10 +42,9 @@ import { apiFor, apiPostData, checkCsrf } from '$lib/server/session';
 export const POST: RequestHandler = async (event) => {
   const form = await event.request.formData();
   if (!checkCsrf(event, form)) {
-    return json(
-      { ok: false, message: 'Sesi formulir kedaluwarsa — muat ulang halaman' },
-      { status: 403 },
-    );
+    return json(refused('Sesi formulir kedaluwarsa — muat ulang halaman', 'common.form_expired'), {
+      status: 403,
+    });
   }
   const section = String(form.get('section') ?? '');
   const key = String(form.get('action') ?? '');
@@ -28,13 +54,15 @@ export const POST: RequestHandler = async (event) => {
     query: scope === 'global' ? { scope: 'global' } : {},
   });
   if (!res.data?.success) {
-    return json({ ok: false, message: 'Pengaturan tidak bisa dibaca' }, { status: res.status });
+    return json(refused('Pengaturan tidak bisa dibaca', 'settings.action_config_unreadable'), {
+      status: res.status,
+    });
   }
   const declared = res.data.data.sections
     .find((s) => s.section === section)
     ?.actions.find((a) => a.key === key);
   if (!declared) {
-    return json({ ok: false, message: 'Aksi tidak dikenal' }, { status: 404 });
+    return json(refused('Aksi tidak dikenal', 'settings.action_unknown'), { status: 404 });
   }
 
   // The scope travels with the action: a global-scope button must test the global configuration,
@@ -50,7 +78,9 @@ export const POST: RequestHandler = async (event) => {
     body,
   );
   if (!r.data) {
-    return json({ ok: false, message: r.error ?? 'Aksi gagal' }, { status: r.status });
+    return json(fromApi(r.error, r.details), {
+      status: r.status,
+    });
   }
   return json({ ok: r.data.ok, message: r.data.message, details: r.data.details ?? [] });
 };

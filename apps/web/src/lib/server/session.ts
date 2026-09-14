@@ -148,6 +148,14 @@ function forwardHeaders(event: RequestEvent, clientId?: string | null): Record<s
   return headers;
 }
 
+/** What `apiPostData` hands back: the envelope's two halves, plus the failure's `details`. */
+export interface PostResult<T> {
+  status: number;
+  data: T | null;
+  error: string | null;
+  details: unknown;
+}
+
 /**
  * POST to an API path known only at runtime — a config section's action endpoint (extension
  * point 6). Unlike `apiFetchData` the caller needs the failure too, so the envelope is returned
@@ -158,8 +166,9 @@ export async function apiPostData<T = unknown>(
   path: string,
   body: unknown = {},
   clientId?: string | null,
-): Promise<{ status: number; data: T | null; error: string | null }> {
-  if (!path.startsWith('/v1/')) return { status: 400, data: null, error: 'path tidak valid' };
+): Promise<PostResult<T>> {
+  if (!path.startsWith('/v1/'))
+    return { status: 400, data: null, error: 'path tidak valid', details: null };
   try {
     const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, {
       method: 'POST',
@@ -169,21 +178,25 @@ export async function apiPostData<T = unknown>(
     const envelope = (await res.json().catch(() => null)) as {
       success?: boolean;
       data?: T;
-      error?: { message?: string };
+      error?: { message?: string; details?: unknown };
     } | null;
     if (res.ok && envelope?.success) {
-      return { status: res.status, data: envelope.data ?? null, error: null };
+      return { status: res.status, data: envelope.data ?? null, error: null, details: null };
     }
     return {
       status: res.status,
       data: null,
       error: envelope?.error?.message ?? `HTTP ${res.status}`,
+      // The failure's machine-readable half: the caller localises from `details.reason`/`i18n`
+      // rather than from the Indonesian `message` the API always writes.
+      details: envelope?.error?.details ?? null,
     };
   } catch (err) {
     return {
       status: 502,
       data: null,
       error: err instanceof Error ? err.message : String(err),
+      details: null,
     };
   }
 }
