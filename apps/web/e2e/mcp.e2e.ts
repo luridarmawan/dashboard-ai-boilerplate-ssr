@@ -48,10 +48,29 @@ test('mcp: testing a server and reloading its tools run over fetch, not page loa
   }, mark);
   const survived = () => page.evaluate(() => window.__mcpMark);
 
+  // Watch what the click actually does: a form POST would navigate the main frame and arrive as a
+  // `document` request. The enhanced layer must produce neither — only a `fetch`.
+  const navigations: string[] = [];
+  page.on('framenavigated', (f) => {
+    if (f === page.mainFrame()) navigations.push(f.url());
+  });
+  const posts: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST') posts.push(`${r.resourceType()} ${new URL(r.url()).pathname}`);
+  });
+
   // Test: the connection is made and the table fills in, in place.
   await page.getByTestId('mcp-test').click();
+  // While it runs the button says so: disabled, labelled, and the icon spins (the mock is slow on
+  // purpose, see scripts/ci/m1-proof.sh). A still icon next to "Running…" reads like a hung page.
+  await expect(page.getByTestId('mcp-test')).toBeDisabled();
+  await expect(page.getByTestId('mcp-test').locator('svg')).toHaveClass(/animate-spin/);
   await expect(page.getByTestId('mcp-test-ok')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('mcp-test')).toBeEnabled();
   expect(await survived()).toBe(mark);
+  expect(navigations).toEqual([]);
+  expect(posts).toHaveLength(1);
+  expect(posts[0]).toMatch(/^fetch \/m\/ai\/mcps\/[0-9a-f-]+\/test$/);
   await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
   await expect(page.getByTestId('mcp-tool-row').first()).toContainText('echo');
   await expect(page.locator('main').getByText('ok', { exact: true }).first()).toBeVisible();
@@ -60,6 +79,18 @@ test('mcp: testing a server and reloading its tools run over fetch, not page loa
   await expect(page.getByTestId('mcp-test')).toContainText(/Uji ulang|Re-test/);
   await page.getByTestId('mcp-test').click();
   await expect(page.getByTestId('mcp-test-ok')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
+  expect(await survived()).toBe(mark);
+
+  // The search box narrows the table as it is typed — no request, the rows are already here.
+  await page.fill('[data-testid="mcp-tool-search"]', 'ping');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+  await expect(page.getByTestId('mcp-tools-count')).toContainText(/1 dari 2|1 of 2/);
+  expect(await survived()).toBe(mark);
+  await page.fill('[data-testid="mcp-tool-search"]', 'nothing-matches-this');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(0);
+  await expect(page.locator('tbody')).toContainText(/Tidak ada tool yang cocok|No tool matches/);
+  await page.fill('[data-testid="mcp-tool-search"]', '');
   await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
   expect(await survived()).toBe(mark);
 
@@ -108,6 +139,12 @@ test.describe('no JavaScript', () => {
     await page.getByTestId('mcp-test').click();
     await expect(page.getByTestId('mcp-test-ok')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
+
+    // The search box is a plain GET field: submitting reloads the page as `?q=`, already narrowed.
+    const detail = page.url().split('?')[0];
+    await page.goto(`${detail}?q=ping`);
+    await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+    await expect(page.locator('[data-testid="mcp-tool-search"]')).toHaveValue('ping');
 
     // Without JavaScript the trigger is a real link to the confirmation the server renders.
     await page.goto(`${page.url().split('?')[0]}?confirm=delete`);

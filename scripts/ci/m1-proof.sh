@@ -17,7 +17,9 @@ echo "== start mock AI provider + mock MCP server + api + web"
 (PORT=4010 exec bun run scripts/ai-mock-provider.ts >"$LOG/m1-mock.log" 2>&1) &
 MOCK_PID=$!
 # A real remote MCP server for the E2E pass: testing the connection must actually discover tools.
-(PORT=4020 exec bun run modules/AI/scripts/mcp-mock-server.ts >"$LOG/m1-mcp-mock.log" 2>&1) &
+# It answers deliberately slowly — a server that replies in 3 ms would make the button's running
+# state unobservable, and that state is exactly what the E2E has to prove is drawn.
+(PORT=4020 MOCK_MCP_DELAY_MS=400 exec bun run modules/AI/scripts/mcp-mock-server.ts >"$LOG/m1-mcp-mock.log" 2>&1) &
 MCP_MOCK_PID=$!
 (cd apps/api && exec bun src/index.ts >"$LOG/m1-api.log" 2>&1) &
 API_PID=$!

@@ -26,6 +26,8 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 const port = Number(process.env.PORT ?? 4020);
 /** How many of the tools below to offer; a smaller number on a re-test proves the list is replaced. */
 const count = Number(process.env.MOCK_MCP_TOOLS ?? 2);
+/** Answer slowly, so the button's running state is observable by hand and in a screenshot. */
+const delayMs = Number(process.env.MOCK_MCP_DELAY_MS ?? 0);
 
 const TOOLS = [
   {
@@ -50,6 +52,7 @@ const server = Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === '/ready') return new Response('ok');
+    if (delayMs > 0) await Bun.sleep(delayMs);
     const mcp = new Server({ name: 'mock-mcp', version: '0.0.0' }, { capabilities: { tools: {} } });
     mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: TOOLS.slice(0, Math.max(0, count)),
