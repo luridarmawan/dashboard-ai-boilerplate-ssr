@@ -1103,6 +1103,22 @@ export default defineApiRoutes(
           async start(controller) {
             const raw = (line: string) => controller.enqueue(encoder.encode(`${line}\n\n`));
             const frame = (obj: unknown) => raw(`data: ${JSON.stringify(obj)}`);
+            // A provider that thinks before its first token — or a tool round that takes a while —
+            // leaves this connection with nothing on it, and an idle socket is closed by Bun and by
+            // any proxy in front of it; the browser then loses the turn. An SSE comment keeps it
+            // warm and costs nothing: every reader here ignores lines that do not start with `data:`.
+            let beat: ReturnType<typeof setInterval> | null = null;
+            const stopBeat = () => {
+              if (beat) clearInterval(beat);
+              beat = null;
+            };
+            beat = setInterval(() => {
+              try {
+                raw(': keep-alive');
+              } catch {
+                stopBeat(); // the stream is already closed
+              }
+            }, 5_000);
             let transcript = '';
             let transcriptTokens: number | null = null;
             try {
@@ -1285,6 +1301,7 @@ export default defineApiRoutes(
                 error: { code: 'service_unavailable', message: 'Aliran dari penyedia AI terputus' },
               });
             } finally {
+              stopBeat();
               // Before close(): when the client sees the stream end, the reply is already stored.
               await persist(transcript, transcriptTokens ?? estimateTokens(transcript));
               try {

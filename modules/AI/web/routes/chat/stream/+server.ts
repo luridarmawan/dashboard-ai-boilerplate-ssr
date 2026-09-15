@@ -1,4 +1,4 @@
-import type { RequestHandler } from '@sveltejs/kit';
+import type { RequestEvent, RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
 import { CSRF_COOKIE, checkCsrf, IMPERSONATE_COOKIE, SESSION_COOKIE } from '$lib/server/session';
 
@@ -50,11 +50,16 @@ export const POST: RequestHandler = async (event) => {
     const fd = new FormData();
     fd.set('file', f);
     const { 'content-type': _ct, ...rest } = headers;
-    const up = await fetch(`${base}/v1/m/ai/attachments`, {
-      method: 'POST',
-      headers: rest,
-      body: fd,
-    });
+    let up: Response;
+    try {
+      up = await fetch(`${base}/v1/m/ai/attachments`, {
+        method: 'POST',
+        headers: rest,
+        body: fd,
+      });
+    } catch (err) {
+      return bridgeDown(event, 'attachments', err);
+    }
     if (!up.ok) {
       return new Response(await up.text(), {
         status: up.status,
@@ -68,30 +73,40 @@ export const POST: RequestHandler = async (event) => {
   // exactly like the no-JS path does; the id goes back in a header so the page can land on it.
   let conversationId = String(form.get('c') ?? '');
   if (!conversationId) {
-    const created = await fetch(`${base}/v1/m/ai/conversations`, {
-      method: 'POST',
-      headers,
-      body: '{}',
-    });
+    let created: Response;
+    try {
+      created = await fetch(`${base}/v1/m/ai/conversations`, {
+        method: 'POST',
+        headers,
+        body: '{}',
+      });
+    } catch (err) {
+      return bridgeDown(event, 'conversations', err);
+    }
     if (created.ok) {
       const body = (await created.json()) as { data?: { id?: string } };
       conversationId = body.data?.id ?? '';
     }
   }
-  const upstream = await fetch(`${base}/v1/m/ai/chat/completions`, {
-    method: 'POST',
-    headers: { ...headers, accept: 'text/event-stream' },
-    body: JSON.stringify({
-      messages: [...prior, { role: 'user', content }],
-      stream: true,
-      conversation_id: conversationId || undefined,
-      ...(context ? { context } : {}),
-      ...(conversationId && parentId !== undefined ? { parent_id: parentId } : {}),
-      ...(conversationId && regenerate ? { regenerate: true } : {}),
-      ...(attachments.length ? { attachments } : {}),
-    }),
-    signal: event.request.signal,
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${base}/v1/m/ai/chat/completions`, {
+      method: 'POST',
+      headers: { ...headers, accept: 'text/event-stream' },
+      body: JSON.stringify({
+        messages: [...prior, { role: 'user', content }],
+        stream: true,
+        conversation_id: conversationId || undefined,
+        ...(context ? { context } : {}),
+        ...(conversationId && parentId !== undefined ? { parent_id: parentId } : {}),
+        ...(conversationId && regenerate ? { regenerate: true } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      }),
+      signal: event.request.signal,
+    });
+  } catch (err) {
+    return bridgeDown(event, 'completions', err);
+  }
   if (!upstream.ok || !upstream.body) {
     return new Response(await upstream.text(), {
       status: upstream.status,
@@ -107,3 +122,36 @@ export const POST: RequestHandler = async (event) => {
     },
   });
 };
+
+/**
+ * A hop that dies mid-flight used to throw out of the handler, and the browser got a bare 500 with
+ * nothing to show and nothing in the log but `TypeError: fetch failed` — the reason sits in
+ * `cause`. Log that, and answer in the API's own envelope so the page shows a real message.
+ */
+function bridgeDown(event: RequestEvent, where: string, err: unknown): Response {
+  if (event.request.signal.aborted) return new Response(null, { status: 499 }); // stop button, tab closed
+  const cause = (err as { cause?: unknown }).cause;
+  console.warn(
+    JSON.stringify({
+      t: new Date().toISOString(),
+      level: 'warn',
+      msg: 'ai chat: API tidak terjangkau',
+      where,
+      error: String(err),
+      cause: cause === undefined ? undefined : String(cause),
+      requestId: event.locals.requestId,
+    }),
+  );
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: {
+        code: 'service_unavailable',
+        message: 'API tidak dapat dihubungi',
+        details: { reason: 'api_unreachable' },
+      },
+      requestId: event.locals.requestId,
+    }),
+    { status: 502, headers: { 'content-type': 'application/json' } },
+  );
+}
