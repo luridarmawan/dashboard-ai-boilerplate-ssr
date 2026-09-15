@@ -3,19 +3,83 @@ import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
-import { useT } from '$lib/i18n';
+import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { headerLines, mcpFields } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
+const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const m = $derived(data.mcp);
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
-// After a test the freshest list is in the action result; otherwise what the page loaded.
-const tools = $derived(form?.tested?.tools ?? m.tools);
+const fmt = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'id-ID') : '—';
+
+/**
+ * Testing over fetch: the connection is retried and the tool table refilled without a page load.
+ * Progressive enhancement only (L-20 over L-22) — the form below still posts to `?/test`, and with
+ * JavaScript off the action renders through `form.tested`; `tested` simply prefers whatever the
+ * fetch produced. Both paths call the same `POST /v1/m/ai/mcps/:id/test`, which is what actually
+ * replaces the stored tool list, so what the table shows after a test is what the assistant sees.
+ */
+type Tool = {
+  id: string;
+  name: string;
+  wire: string;
+  wireName: string;
+  description: string | null;
+  enabled: boolean;
+};
+type Tested = { ok: boolean; error: string | null; ms: number; tools: Tool[]; at?: string };
+let testing = $state(false);
+let live = $state<Tested | null>(null);
+const tested = $derived(live ?? (form?.tested as Tested | undefined) ?? null);
+/**
+ * A successful test is the freshest truth about what this server offers. A FAILED one leaves the
+ * previously discovered tools standing — exactly as the API does, which only rewrites the rows
+ * when the connection worked; erasing the table on a timeout would claim a server has no tools
+ * when all we know is that we could not reach it just now.
+ */
+const tools = $derived<Tool[]>(tested?.ok ? tested.tools : m.tools);
+const status = $derived(tested ? (tested.ok ? 'ok' : 'error') : m.lastStatus);
+/** Connected already? Then the button re-tests and reloads the list rather than introducing it. */
+const connected = $derived(status === 'ok');
+const syncedAt = $derived(tested?.at ?? (m.lastSyncedAt as string | null));
+const failure = $derived(
+  tested && !tested.ok ? tested.error : !tested && m.lastStatus === 'error' ? m.lastError : null,
+);
+
+async function runTest(event: SubmitEvent) {
+  event.preventDefault();
+  const el = event.currentTarget as HTMLFormElement;
+  testing = true;
+  try {
+    const res = await fetch(`/m/ai/mcps/${m.id}/test`, { method: 'POST', body: new FormData(el) });
+    const body = (await res.json()) as Tested & { error?: string };
+    live = res.ok
+      ? { ...body, at: new Date().toISOString() }
+      : {
+          ok: false,
+          error: body.error ?? `HTTP ${res.status}`,
+          ms: 0,
+          tools: [],
+          at: new Date().toISOString(),
+        };
+  } catch (err) {
+    live = {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      ms: 0,
+      tools: [],
+      at: new Date().toISOString(),
+    };
+  } finally {
+    testing = false;
+  }
+}
 </script>
 
 <svelte:head><title>{m.name}</title></svelte:head>
@@ -24,7 +88,7 @@ const tools = $derived(form?.tested?.tools ?? m.tools);
   <div class="flex flex-wrap items-center gap-3">
     <h1>{m.name}</h1>
     <code class="text-sm">{m.code}</code>
-    {#if m.lastStatus === 'ok'}<Badge variant="success">ok</Badge>{:else if m.lastStatus === 'error'}<Badge variant="destructive">error</Badge>{/if}
+    {#if status === 'ok'}<Badge variant="success">ok</Badge>{:else if status === 'error'}<Badge variant="destructive">error</Badge>{/if}
   </div>
   <Card>
     <FormBuilder
@@ -42,25 +106,39 @@ const tools = $derived(form?.tested?.tools ?? m.tools);
     />
   </Card>
   <Card title={t('ai.mcps.tools')}>
-    {#if can('ai.mcp.manage')}
-      <form method="POST" action="?/test" class="mb-3"><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm"><Icon name="refresh" size={16} />{t('ai.mcps.test')}</Button></form>
-    {/if}
-    {#if form?.tested}
-      {#if form.tested.ok}
-        <p class="notice" data-testid="mcp-test-ok">{t('ai.mcps.tested_ok')} {form.tested.tools.length} · {form.tested.ms} ms</p>
-      {:else}
-        <p class="error" role="alert" data-testid="mcp-test-fail">{t('ai.mcps.tested_fail')}: {form.tested.error}</p>
+    <div class="mb-3 flex flex-wrap items-center gap-3">
+      {#if can('ai.mcp.manage')}
+        <!-- Base: a POST to `?/test`. Enhanced: the same request over fetch, same endpoint. -->
+        <form method="POST" action="?/test" onsubmit={runTest}>
+          <Csrf token={data.csrf} />
+          <Button type="submit" variant="outline" size="sm" disabled={testing} data-testid="mcp-test">
+            <Icon name="refresh" size={16} class={testing ? 'animate-spin' : ''} />
+            {testing ? t('common.running') : connected ? t('ai.mcps.retest') : t('ai.mcps.test')}
+          </Button>
+        </form>
       {/if}
-    {:else if m.lastStatus === 'error' && m.lastError}
-      <p class="error" role="alert">{t('ai.mcps.tested_fail')}: {m.lastError}</p>
+      <p class="text-sm text-muted-foreground" data-testid="mcp-tools-count">
+        {t('ai.mcps.tools_available', { count: tools.length })}
+        {#if syncedAt}<span class="ms-1">· {fmt(syncedAt)}</span>{/if}
+        {#if tested?.ok}<span class="ms-1">· {tested.ms} ms</span>{/if}
+      </p>
+    </div>
+    {#if tested?.ok}
+      <p class="notice" data-testid="mcp-test-ok">{t('ai.mcps.tested_ok')} {tested.tools.length} · {tested.ms} ms</p>
+    {:else if failure}
+      <p class="error" role="alert" data-testid="mcp-test-fail">{t('ai.mcps.tested_fail')}: {failure}</p>
     {/if}
     <Table caption={t('ai.mcps.tools')}>
       <thead><tr><th>{t('ai.mcps.tool')}</th><th>{t('ai.mcps.wire_hint')}</th><th>{t('ai.mcps.description')}</th></tr></thead>
       <tbody>
         {#each tools as tl (tl.id)}
-          <tr><td class="font-medium">{tl.name}</td><td><code>{tl.wireName}</code></td><td class="text-muted-foreground">{tl.description ?? '—'}</td></tr>
+          <tr data-testid="mcp-tool-row">
+            <td class="font-medium">{tl.name}{#if !tl.enabled} <Badge variant="secondary">{t('ai.mcps.disabled')}</Badge>{/if}</td>
+            <td><code>{tl.wireName}</code></td>
+            <td class="text-muted-foreground">{tl.description ?? '—'}</td>
+          </tr>
         {:else}
-          <tr><td colspan="3" class="py-6 text-center text-muted-foreground">{t('ai.mcps.never')}</td></tr>
+          <tr><td colspan="3" class="py-6 text-center text-muted-foreground">{status ? t('ai.mcps.tools_empty') : t('ai.mcps.never')}</td></tr>
         {/each}
       </tbody>
     </Table>

@@ -40,6 +40,7 @@
     "layout:variants": "bun run scripts/layout-variants.ts",
     "lint": "biome check .",
     "mail:test": "bun run packages/mail/scripts/smtp-test.ts",
+    "mcp:mock": "bun run modules/AI/scripts/mcp-mock-server.ts",
     "modgen": "bun run scripts/modgen.ts",
     "modgen:ci": "bun run scripts/modgen.ts CiProbe --resource widget --fields \"name:string!,qty:number,active:boolean,notes:text,kind:select(a|b|c),due:date\" --public",
     "modgen:ci:clean": "sh scripts/ci/modgen-cleanup.sh",

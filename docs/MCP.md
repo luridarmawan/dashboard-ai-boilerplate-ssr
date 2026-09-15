@@ -59,7 +59,7 @@ Modul AI juga bisa **menjadi klien** MCP: admin tenant mendaftarkan server MCP e
 
 | | |
 |---|---|
-| **UI** | **Asisten AI → Server MCP** (`/m/ai/mcps`): tambah server (nama, kode, transport, URL, header rahasia), **Uji & muat tool**, aktif/nonaktif, hapus. Butuh `ai.mcp.read` untuk melihat, `ai.mcp.manage` untuk mengubah |
+| **UI** | **Asisten AI → Server MCP** (`/m/ai/mcps`): tambah server (nama, kode, transport, URL, header rahasia), **Uji & muat tool**, aktif/nonaktif, hapus. Butuh `ai.mcp.read` untuk melihat, `ai.mcp.manage` untuk mengubah. Tombol ujinya berjalan lewat `fetch` (route `POST /m/ai/mcps/:id/test` di web) sehingga status, jumlah tool, dan tabelnya berganti **tanpa muat ulang** — pada server yang sudah `ok` ia berbunyi **Uji ulang & muat ulang tool**; form action `?/test` tetap ada dan tetap jalan tanpa JavaScript (L-22) |
 | **API** | `GET/POST /v1/m/ai/mcps` · `GET/PUT/DELETE /v1/m/ai/mcps/:id` · `POST /v1/m/ai/mcps/:id/test` (terhubung, memuat `tools/list`, menyimpannya ke `ai_mcp_tools`, mencatat status) |
 | **Transport** | `http` (Streamable HTTP, spesifikasi terkini) dan `sse` (lama). **Bukan `stdio`**: API berjalan sebagai satu binary di kontainer dan tidak boleh menjalankan proses sembarang atas permintaan admin tenant; `websocket` menunggu dukungan SDK yang stabil |
 | **Tabel** | `ai_mcps` (per tenant, kode unik per tenant, header disimpan sebagai rahasia dan selalu ditampilkan `***`) dan `ai_mcp_tools` (tool hasil discovery, skema argumen mentah dari server) |
@@ -68,7 +68,9 @@ Modul AI juga bisa **menjadi klien** MCP: admin tenant mendaftarkan server MCP e
 
 Cara kerjanya: `modules/AI/api/mcp-tools.ts` mendaftarkan sebuah **tool source** ke registry core (`registerToolSource`). Registry memanggilnya per request untuk melengkapi daftar tool statis dari `api/tools.ts`, sehingga izin, tenant, dan audit (`tool.call`) berlaku persis sama. Argumen tool eksternal **tidak** divalidasi di sini (skemanya milik server jauh; ia yang memvalidasi). Setiap panggilan membuka koneksi baru dan menutupnya — tidak ada state antar-instance, dan server yang mati terasa pada panggilan berikutnya, bukan mengendap di cache. Batas waktu 20 detik per operasi.
 
-Bukti: `modules/AI/test/integration/mcp-client.test.ts` — server MCP nyata (SDK resmi) di dalam proses yang menuntut header `x-api-key`: registrasi → uji → tool tersimpan dengan nama kawat yang sah; tool muncul di `/v1/tools` hanya bagi pemegang `ai.mcp.use` dan hanya di tenant pemilik; `POST /v1/tools/call` meneruskan ke server jauh dengan header rahasia; loop chat AI memanggil tool eksternal seperti tool modul; nonaktif menyembunyikan, hapus melupakan.
+Untuk mencoba tanpa server pihak ketiga: `bun run mcp:mock` (`modules/AI/scripts/mcp-mock-server.ts`, SDK resmi, Streamable HTTP stateless) menyajikan dua tool di `http://127.0.0.1:4020/mcp` — daftarkan URL itu seperti server biasa. `MOCK_MCP_TOOLS=1` membuatnya menawarkan satu tool saja, sehingga uji kedua memperlihatkan daftar tool **diganti**, bukan ditambah.
+
+Bukti: `modules/AI/test/integration/mcp-client.test.ts` — server MCP nyata (SDK resmi) di dalam proses yang menuntut header `x-api-key`: registrasi → uji → tool tersimpan dengan nama kawat yang sah; tool muncul di `/v1/tools` hanya bagi pemegang `ai.mcp.use` dan hanya di tenant pemilik; `POST /v1/tools/call` meneruskan ke server jauh dengan header rahasia; loop chat AI memanggil tool eksternal seperti tool modul; nonaktif menyembunyikan, hapus melupakan. Sisi webnya di peramban sungguhan: `apps/web/e2e/mcp.e2e.ts`, melawan mock di atas yang dijalankan `scripts/ci/m1-proof.sh` — dengan JavaScript (tidak ada muat ulang di seluruh uji, uji ulang, dan uji gagal) dan tanpa JavaScript (form action yang sama tetap menghubungkan dan menyimpan).
 
 ## Yang sengaja tidak ada
 
