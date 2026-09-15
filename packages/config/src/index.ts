@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
 
 /**
@@ -60,8 +62,14 @@ const envSchema = z
     /** Stable identity of this process in lease rows and logs; defaults to hostname:pid. */
     INSTANCE_ID: z.string().min(1).optional(),
 
-    /** Upload storage root — a mapped volume in production (Q-9); used by STORAGE_DRIVER=local. */
-    UPLOADS_DIR: z.string().min(1).default('./data/uploads'),
+    /**
+     * Upload storage root — a mapped volume in production (Q-9); used by STORAGE_DRIVER=local.
+     * A relative value is anchored at the project root, never at the working directory: `bun dev`
+     * runs the api with cwd `apps/api` while `bun start` (and the image) run it from the root, and
+     * a relative path would make those two write to different directories — an avatar uploaded in
+     * development would then 404 with "Isi berkas tidak ada di penyimpanan" in production.
+     */
+    UPLOADS_DIR: z.string().min(1).default('./data/uploads').transform(fromProjectRoot),
     /** Where uploaded bytes live (Q-16): the local volume, or any S3-compatible bucket (S3_*). */
     STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
     S3_ENDPOINT: z.url().optional(),
@@ -239,6 +247,37 @@ const envSchema = z
       APP_ORIGIN_PRIMARY: APP_ORIGINS.find((o) => o.startsWith('https://')) ?? APP_ORIGINS[0],
     };
   });
+
+/**
+ * A path from the environment as an absolute one: relative values resolve against the project root
+ * (the nearest directory at or above cwd holding `bun.lock` or a package.json with `workspaces`),
+ * so every process of the same installation means the same directory whatever its cwd is. Falls
+ * back to cwd when no root marker is found — a single-directory deployment behaves as before.
+ */
+export function fromProjectRoot(path: string): string {
+  return isAbsolute(path) ? path : resolve(projectRoot(), path);
+}
+
+function projectRoot(): string {
+  let dir = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    if (existsSync(join(dir, 'bun.lock')) || hasWorkspaces(join(dir, 'package.json'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
+
+function hasWorkspaces(packageJson: string): boolean {
+  try {
+    return Array.isArray(
+      (JSON.parse(readFileSync(packageJson, 'utf8')) as { workspaces?: unknown }).workspaces,
+    );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * `APP_ORIGIN` → normalised origin list. Entries with a scheme keep it; bare hosts expand to
