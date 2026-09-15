@@ -632,7 +632,7 @@ Yang ada di repo modul selain kode modul itu sendiri:
 
 | Berkas | Guna |
 |---|---|
-| `harness.ts` | **Satu-satunya cara build/lint/test tanpa meng-clone core secara manual** (§4.9 poin 2). Menyalin modul ke `<core>/modules/<Nama>`, mendaftarkannya, `bun install`, `modules:sync`, `tsc`, `biome check`, `db:generate`, lalu `bun test modules/<Nama>/test`. Dengan `DATABASE_URL`: migrasi + tes integrasi. `--web`: + svelte-check halaman |
+| `harness.ts` | **Satu-satunya cara build/lint/test tanpa meng-clone core secara manual** (§4.9 poin 2). Menyalin modul ke `<core>/modules/<Nama>`, mendaftarkannya, `bun install`, `modules:sync`, `tsc`, format (hasilnya ditulis balik ke repo modul), `biome check`, `db:generate` (tanpa `TABLE_PREFIX`, supaya drizzle-kit tidak melihat semua tabel berganti nama), lalu `bun test modules/<Nama>/test`. Dengan `DATABASE_URL`: migrasi + tes integrasi. `--web`: + svelte-check halaman |
 | `rename.ts` | Mengganti nama modul di semua berkas & nama berkas |
 | `.github/workflows/ci.yml` | CI repo modul: MySQL service + `bun run harness --web` |
 | `package.json` → `"core": { "repo", "ref" }` | Core yang dipakai harness. Ganti `ref` ke tag core saat merilis, selaras dengan `engines.core` di `module.json` |

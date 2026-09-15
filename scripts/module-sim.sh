@@ -97,37 +97,52 @@ say 'TABLE_PREFIX memisahkan tabel simulasi dari tabel Anda sendiri di database 
 # Does that database actually answer? Everything DB-dependent below hangs off this one answer.
 DB_OK=0
 if [ -n "$DB_URL" ]; then
-  cat >core/.sim-db.ts <<'TS'
-// Throwaway helper: probe the database, then drop the simulation's own tables when it is over.
-import { sql } from 'drizzle-orm';
-import { activeDialect, getDb } from '@core/db';
+  # The helper lives in packages/db: that is where drizzle-orm and @core/db resolve, and where
+  # the repo's own scripts read ../../.env from.
+  cat >core/packages/db/.sim-db.ts <<'TS'
+// Throwaway helper of the simulation: answer whether the database is reachable, and drop the
+// tables the simulation created when it is over. Talks to the driver directly on purpose — a
+// fresh clone has no generated schema yet, so @core/db cannot be imported this early.
+const url = process.env.DATABASE_URL ?? '';
 const [op, prefix = ''] = process.argv.slice(2);
-const db = getDb();
-if (op === 'probe') {
-  await db.execute(sql`select 1`);
-  console.log('ok');
-} else if (op === 'drop') {
-  if (!prefix) throw new Error('drop needs a table prefix');
-  const pg = activeDialect === 'postgres';
-  const rows = (await db.execute(
-    pg
-      ? sql`select tablename as name from pg_tables where schemaname = 'public' and tablename like ${`${prefix}%`}`
-      : sql`select table_name as name from information_schema.tables where table_schema = database() and table_name like ${`${prefix}%`}`,
-  )) as unknown as { name?: string }[] | [{ name?: string }[]];
-  const list = (Array.isArray(rows[0]) ? rows[0] : rows) as { name?: string }[];
-  const names = list.map((r) => r.name).filter((n): n is string => Boolean(n));
-  if (!pg) await db.execute(sql`SET FOREIGN_KEY_CHECKS = 0`);
-  for (const name of names) {
-    await db.execute(sql.raw(`DROP TABLE IF EXISTS ${pg ? `"${name}" CASCADE` : `\`${name}\``}`));
+const pg = url.startsWith('postgres');
+const list = pg
+  ? `select tablename as name from pg_tables where schemaname = 'public' and tablename like '${prefix}%'`
+  : `select table_name as name from information_schema.tables where table_schema = database() and table_name like '${prefix}%'`;
+
+if (pg) {
+  const postgres = (await import('postgres')).default;
+  const sql = postgres(url, { max: 1 });
+  if (op === 'probe') await sql`select 1`;
+  else if (op === 'drop') {
+    const rows = (await sql.unsafe(list)) as unknown as { name: string }[];
+    for (const r of rows) await sql.unsafe(`DROP TABLE IF EXISTS "${r.name}" CASCADE`);
+    console.log(String(rows.length));
   }
-  if (!pg) await db.execute(sql`SET FOREIGN_KEY_CHECKS = 1`);
-  console.log(`${names.length}`);
+  await sql.end();
+} else {
+  const mysql = (await import('mysql2/promise')).default;
+  const c = await mysql.createConnection(url);
+  if (op === 'probe') await c.query('select 1');
+  else if (op === 'drop') {
+    const [rows] = await c.query(list);
+    const names = (rows as { name: string }[]).map((r) => r.name);
+    await c.query('SET FOREIGN_KEY_CHECKS = 0');
+    for (const name of names) await c.query(`DROP TABLE IF EXISTS \`${name}\``);
+    await c.query('SET FOREIGN_KEY_CHECKS = 1');
+    console.log(String(names.length));
+  }
+  await c.end();
 }
-process.exit(0);
+if (op === 'probe') console.log('ok');
 TS
-  if (cd core && bun run .sim-db.ts probe) >"$LOG" 2>&1; then
+  if (cd core/packages/db && bun --env-file=../../.env run .sim-db.ts probe) >"$LOG" 2>&1; then
     DB_OK=1
     ok "database menjawab — migrasi, seed dan tes integrasi ikut dijalankan"
+    # A simulation that died half-way leaves its tables behind; start from a clean slate so the
+    # next run is not blocked by its predecessor's CREATE TABLE.
+    stale="$( (cd core/packages/db && bun --env-file=../../.env run .sim-db.ts drop "$PREFIX") 2>/dev/null | tail -1 || echo 0)"
+    [ "${stale:-0}" -gt 0 ] 2>/dev/null && say "sisa simulasi sebelumnya dihapus: $stale tabel berawalan $PREFIX"
   else
     say '⚠ database tidak menjawab — langkah DB dilewati (perintahnya tetap dicetak)'
     say "   $(tail -3 "$LOG" | head -1)"
@@ -138,11 +153,10 @@ fi
 cleanup_db() {
   [ "$DB_OK" = 1 ] || return 0
   [ -z "${SIM_KEEP_DB:-}" ] || return 0
-  dropped="$( (cd core && bun run .sim-db.ts drop "$PREFIX") 2>/dev/null || echo '?')"
-  rm -f core/.sim-db.ts
+  dropped="$( (cd core/packages/db && bun --env-file=../../.env run .sim-db.ts drop "$PREFIX") 2>/dev/null | tail -1 || echo '?')"
+  rm -f core/packages/db/.sim-db.ts
   say "tabel simulasi dihapus dari database: $dropped tabel berawalan $PREFIX"
 }
-rm -f core/.sim-db.ts
 
 # ---- 1. the module's own repository -----------------------------------------------------------
 step "§1 · Bikin repo modul $NAME — bersebelahan dengan core, bukan di dalamnya"
@@ -196,7 +210,13 @@ ok "shim halaman ada: apps/web/src/routes/(app)/m/$NS/notes/+page.svelte"
 # ---- 6. the host installs it from a git URL ----------------------------------------------------
 step "§6 · Host memasang modul dari git URL, terkunci di tag"
 say 'sisa kerja harness dibersihkan dulu supaya host memasang dari nol, seperti instalasi lain'
-run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- modules.json && git clean -fdq packages/db/migrations && bun install"
+if [ "$DB_OK" = 1 ]; then
+  # In real life the author's core and the host are two different installations with two different
+  # databases; here they share one, so empty it and let the host migrate from scratch.
+  (cd core/packages/db && bun --env-file=../../.env run .sim-db.ts drop "$PREFIX") >/dev/null 2>&1 || true
+  say "database dikosongkan (tabel $PREFIX*) — host berangkat sebagai instalasi baru"
+fi
+run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- modules.json packages/db/migrations && git clean -fdq packages/db/migrations && bun install"
 cmd "bun modules:add git@github.com:<akun-anda>/mod-$NS.git --ref v0.1.0"
 run 'modules:add gagal' sh -c "cd '$WORK/core' && bun run modules:add 'file://$WORK/mod-$NS' --ref v0.1.0"
 grep -q "\"name\": \"$NAME\"" core/modules.json || die 'modules.json tidak mencatat modul'
@@ -225,7 +245,8 @@ step "§6 · Mencabut — host harus kembali bersih"
 cmd "bun modules:remove $NAME --yes"
 run 'modules:remove gagal' sh -c "cd '$WORK/core' && bun run modules:remove $NAME --yes"
 (cd core && git checkout -- bun.lock 2>/dev/null || true)
-LEFT="$(cd core && git status --porcelain --untracked-files=all | grep -v '^?? \.env$' || true)"
+# .env and the throwaway database helper are the simulation's own files, not the module's trace.
+LEFT="$(cd core && git status --porcelain --untracked-files=all | grep -vE '^\?\? (\.env|packages/db/\.sim-db\.ts)$' || true)"
 [ -z "$LEFT" ] || die "sisa setelah uninstall: $(echo "$LEFT" | tr '\n' ' ')"
 ok 'pohon core identik dengan HEAD lagi — tidak ada berkas core yang tersentuh (G-6, G-15)'
 
