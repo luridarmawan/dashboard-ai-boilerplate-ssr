@@ -216,7 +216,11 @@ if [ "$DB_OK" = 1 ]; then
   (cd core/packages/db && bun --env-file=../../.env run .sim-db.ts drop "$PREFIX") >/dev/null 2>&1 || true
   say "database dikosongkan (tabel $PREFIX*) — host berangkat sebagai instalasi baru"
 fi
-run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- modules.json packages/db/migrations && git clean -fdq packages/db/migrations && bun install"
+# Back to HEAD, all of it: the harness left the module copy, its entry in modules.json, its
+# workspace in bun.lock and a generated migration behind. bun.lock matters most — a lockfile that
+# still names a workspace no longer on disk makes `bun install` refuse outright (Bun 1.4.0).
+# `git clean` without -x so the gitignored generated registries and node_modules stay put.
+run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- . && git clean -fdq -e .env -e packages/db/.sim-db.ts && bun install"
 cmd "bun modules:add git@github.com:<akun-anda>/mod-$NS.git --ref v0.1.0"
 run 'modules:add gagal' sh -c "cd '$WORK/core' && bun run modules:add 'file://$WORK/mod-$NS' --ref v0.1.0"
 grep -q "\"name\": \"$NAME\"" core/modules.json || die 'modules.json tidak mencatat modul'
