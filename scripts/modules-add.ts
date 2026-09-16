@@ -10,10 +10,12 @@
  * Nothing in core changes: the only files touched are modules.json, .gitmodules and the
  * new modules/<Name> directory (G-6).
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MODULE_NAME_RE, modulesFileSchema } from '@core/module-kit';
+import { removeDir } from './lib/remove-dir.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 
@@ -54,17 +56,30 @@ const gitBase =
     : ['git'];
 
 // ---- 1. discover the module name when not given: read module.json from a throwaway clone ----
+// The clone goes to the system temp dir, not into the repo: this runs before anything is
+// installed, so a checkout the host could not delete afterwards must not be left in its tree.
 if (!name) {
-  const tmp = join(root, '.tmp-modules-add');
-  sh(['rm', '-rf', tmp]);
-  sh([...gitBase, 'clone', '--quiet', '--depth', '1', '--branch', ref, url, tmp]);
-  const manifestPath = join(tmp, 'module.json');
-  if (!existsSync(manifestPath)) {
-    sh(['rm', '-rf', tmp]);
-    usage(`repo tidak punya module.json di root pada ref ${ref}`);
+  const tmp = mkdtempSync(join(tmpdir(), 'modules-add-'));
+  let failure = '';
+  try {
+    sh([...gitBase, 'clone', '--quiet', '--depth', '1', '--branch', ref, url, tmp]);
+    const manifestPath = join(tmp, 'module.json');
+    if (existsSync(manifestPath)) {
+      name = String(JSON.parse(readFileSync(manifestPath, 'utf8')).name ?? '');
+    } else {
+      failure = `repo tidak punya module.json di root pada ref ${ref}`;
+    }
+  } catch (err) {
+    failure = `tidak bisa meng-clone ${url} pada ref ${ref} — pastikan ref itu tag atau commit yang ada di remote, dan Anda punya akses baca\n${err}`;
+  } finally {
+    // Cleaning up must not become the error the user sees: the clone is outside the repo.
+    try {
+      removeDir(tmp);
+    } catch (err) {
+      console.warn(`modules:add: sisa klon sementara di ${tmp} tidak bisa dihapus — ${err}`);
+    }
   }
-  name = String(JSON.parse(readFileSync(manifestPath, 'utf8')).name ?? '');
-  sh(['rm', '-rf', tmp]);
+  if (failure) usage(failure);
 }
 if (!MODULE_NAME_RE.test(name)) usage(`nama modul "${name}" tidak valid`);
 

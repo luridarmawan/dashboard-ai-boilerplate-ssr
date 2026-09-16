@@ -319,7 +319,8 @@ cleanup_db
 step 'Selesai'
 say "9 langkah dokumen terbukti: direktori kerja → clone core → .env → repo modul → rename $NAME → tag → harness → modules:add terkunci tag → modules:remove"
 if [ -n "${SIM_CLEAN:-}" ]; then
-  cd "$ROOT" && rm -rf "$WORK"
+  # Git marks pack files read-only; on Windows `rm -rf` then refuses to delete the clones.
+  cd "$ROOT" && chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"
   say 'direktori kerja dihapus (SIM_CLEAN=1)'
 else
   say "direktori kerja ditinggalkan untuk diperiksa: $WORK"

@@ -32,6 +32,7 @@ import {
   renderRemovalMigration,
   unrelatedStatements,
 } from '@core/module-kit';
+import { removeDir } from './lib/remove-dir.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 const args = process.argv.slice(2);
@@ -206,8 +207,9 @@ if (source === 'submodule') {
   console.log(`→ git submodule deinit + rm ${path}`);
   sh(['git', 'submodule', 'deinit', '-f', '-q', '--', path], { ok: true });
   sh(['git', 'rm', '-f', '-q', '--', path], { ok: true });
-  rmSync(join(root, '.git/modules', path), { recursive: true, force: true });
-  rmSync(absPath, { recursive: true, force: true });
+  // Both hold a git checkout: on Windows its pack files are read-only, so a plain rm fails.
+  removeDir(join(root, '.git/modules', path));
+  removeDir(absPath);
   // .gitmodules: `git rm` drops the section; an empty file goes back to HEAD's version, or away.
   const gm = join(root, '.gitmodules');
   if (existsSync(gm) && !/\[submodule /.test(readFileSync(gm, 'utf8'))) {
@@ -226,7 +228,7 @@ if (source === 'submodule') {
     console.log(`→ git rm -r ${path}`);
     sh(['git', 'rm', '-r', '-q', '-f', '--', path]);
   }
-  rmSync(absPath, { recursive: true, force: true });
+  removeDir(absPath);
   console.log(`→ ${path} dihapus`);
 }
 // biome.json: the exclusion modules:add wrote for foreign code
