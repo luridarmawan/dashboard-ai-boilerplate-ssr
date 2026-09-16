@@ -364,7 +364,7 @@ function errorFor(code: unknown): string {
             <label class="grid gap-1.5 text-sm font-medium">{t('example.contact.email')}<input name="email" type="email" required maxlength="191" value={form?.values?.email ?? ''} class="h-11 rounded-xl border border-input bg-background px-3 font-normal" /></label>
           </div>
           <label class="grid gap-1.5 text-sm font-medium">{t('example.contact.message')}<textarea name="message" required minlength="10" maxlength="5000" rows="5" class="rounded-xl border border-input bg-background px-3 py-2 font-normal">{form?.values?.message ?? ''}</textarea></label>
-          <div><Button type="submit" size="lg" class="rounded-full px-6" disabled={sending} data-testid="contact-send"><Icon name={sending ? 'refresh' : 'send'} size={16} class={sending ? 'animate-spin' : ''} />{sending ? t('example.contact.sending') : t('example.contact.send')}</Button></div>
+          <div><Button type="submit" size="lg" class="cursor-pointer rounded-full px-6" disabled={sending} data-testid="contact-send"><Icon name={sending ? 'refresh' : 'send'} size={16} class={sending ? 'animate-spin' : ''} />{sending ? t('example.contact.sending') : t('example.contact.send')}</Button></div>
         </form>
       {/if}
     </div>
