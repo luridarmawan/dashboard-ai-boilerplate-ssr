@@ -31,6 +31,17 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     ).toBe(false);
     expect(validateValue(f({ type: 'locale' }), 'fr').ok).toBe(false);
   });
+  test('timezone must be a zone Intl knows; empty means "inherit"', () => {
+    expect(validateValue(f({ type: 'timezone' }), 'Asia/Jakarta')).toEqual({
+      ok: true,
+      stored: 'Asia/Jakarta',
+    });
+    expect(validateValue(f({ type: 'timezone' }), ' UTC ')).toEqual({ ok: true, stored: 'UTC' });
+    expect(validateValue(f({ type: 'timezone' }), 'Mars/Olympus').ok).toBe(false);
+    expect(validateValue(f({ type: 'timezone' }), 'WIB').ok).toBe(false);
+    // Nothing typed is not an error: the value falls back to global, then to the server's zone.
+    expect(validateValue(f({ type: 'timezone' }), '')).toEqual({ ok: true, stored: null });
+  });
   test('numbers respect bounds and booleans normalise', () => {
     expect(validateValue(f({ type: 'number', min: 1, max: 10 }), '11').ok).toBe(false);
     expect(validateValue(f({ type: 'number', min: 1 }), '3')).toEqual({ ok: true, stored: '3' });

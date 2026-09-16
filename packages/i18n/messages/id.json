@@ -295,6 +295,8 @@
   "settings.source_default": "baku",
   "settings.source_global": "global",
   "settings.source_tenant": "tenant",
+  "settings.timezone_now": "Waktu saat ini",
+  "settings.timezone_unknown": "Zona waktu tidak dikenal — pakai nama IANA, mis. Asia/Jakarta.",
   "themes.base": "Turunan",
   "themes.default_badge": "baku",
   "themes.edit.delete": "Hapus tema",

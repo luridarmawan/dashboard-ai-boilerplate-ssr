@@ -121,7 +121,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'app.timezone',
-        type: 'string',
+        type: 'timezone',
         title: { id: 'Zona waktu', en: 'Timezone' },
         note: {
           id: 'Nama IANA, mis. Asia/Jakarta. Data tetap disimpan dalam UTC; ini yang menentukan kapan "hari ini" dimulai bagi asisten AI dan laporan berentang tanggal. Kosongkan untuk memakai zona waktu server (TZ).',
