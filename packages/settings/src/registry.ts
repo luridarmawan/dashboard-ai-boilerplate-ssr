@@ -45,8 +45,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'string',
         title: { id: 'Nama aplikasi', en: 'Application name' },
         note: {
-          id: 'Tampil di kiri atas setiap halaman, judul tab halaman depan, dan email keluar.',
-          en: 'Shown top-left on every page, in the landing page tab title, and in outgoing e-mail.',
+          id: 'Tampil di kiri atas setiap halaman, judul tab halaman depan, dan email keluar. APP_LANDING_TITLE di .env menimpanya untuk email.',
+          en: 'Shown top-left on every page, in the landing page tab title, and in outgoing e-mail. APP_LANDING_TITLE in .env overrides it for e-mail.',
         },
         default: 'Dashboard',
         public: true,

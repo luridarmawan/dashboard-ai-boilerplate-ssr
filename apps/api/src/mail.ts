@@ -46,10 +46,28 @@ export async function mailLocale(input: {
   );
 }
 
+/**
+ * The product name an e-mail is signed with — its header, its footer line and every subject that
+ * names the app. `APP_LANDING_TITLE` is the deployment's own name: set once in `.env`, never
+ * translated, already the headline of the landing page and the title of the OpenAPI document
+ * (F-6, N-2). E-mail carries the same name, so a message cannot read as a different product from
+ * the site that sent it. Blank or unset falls through to `app.name` from Settings, which is where
+ * a tenant brands itself when the deployment does not.
+ */
+export function resolveAppName(src: {
+  readonly envTitle?: string | null | undefined;
+  readonly setting?: string | null | undefined;
+}): string {
+  return src.envTitle?.trim() || src.setting?.trim() || 'Dashboard';
+}
+
 export async function brandFor(clientId: string | null): Promise<Brand> {
   const e = env();
   return {
-    appName: (await settings.get<string | null>(clientId, 'app.name')) ?? 'Dashboard',
+    appName: resolveAppName({
+      envTitle: e.APP_LANDING_TITLE,
+      setting: await settings.get<string | null>(clientId, 'app.name'),
+    }),
     logoUrl: (await settings.get<string | null>(clientId, 'app.logo_url')) ?? null,
     primary: (await settings.get<string | null>(clientId, 'app.brand_color')) ?? '#2563eb',
     origin: e.APP_ORIGIN_PRIMARY ?? 'http://127.0.0.1:5173',
@@ -113,7 +131,12 @@ export async function smtpFor(clientId: string | null): Promise<SmtpConfig | nul
       fromAddress: await settings.get<string | null>(clientId, 'mail.from_address'),
     },
     env: e,
-    appName: (await settings.get<string | null>(clientId, 'app.name')) ?? 'Dashboard',
+    // Only used when neither `mail.from_name` nor MAIL_FROM_NAME is set: the sender name a
+    // recipient reads must be the same product the mail is branded with.
+    appName: resolveAppName({
+      envTitle: e.APP_LANDING_TITLE,
+      setting: await settings.get<string | null>(clientId, 'app.name'),
+    }),
   });
 }
 

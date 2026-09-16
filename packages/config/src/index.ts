@@ -181,7 +181,8 @@ const envSchema = z
      * and the line in every footer. These are BRANDING, not runtime settings — they must be right
      * in the very first HTML a visitor sees, before any database exists, so they live here and not
      * in `configurations`. Unset = the translated defaults (`landing.title`, `landing.lead`,
-     * `shell.footer`). `APP_LANDING_TITLE` also titles the OpenAPI document (N-2).
+     * `shell.footer`). `APP_LANDING_TITLE` also titles the OpenAPI document (N-2) and is the name outgoing
+     * e-mail is branded with — header, footer and subjects — over `app.name` from Settings (J-3).
      */
     APP_LANDING_TITLE: z.string().max(200).optional(),
     APP_LANDING_LEAD: z.string().max(500).optional(),
