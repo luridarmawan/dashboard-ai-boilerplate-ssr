@@ -28,6 +28,9 @@ function unlock(path: string): void {
   } catch {
     return; // Gone already, or unreadable — the delete below will report what matters.
   }
+  // Never chmod through a symlink: `chmod` follows it, and a module folder is full of links into
+  // the shared node_modules store. Unlinking the link itself never needs the target to be writable.
+  if (stat.isSymbolicLink()) return;
   try {
     chmodSync(path, 0o700);
   } catch {

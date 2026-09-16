@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { removeDir } from './remove-dir.ts';
@@ -25,6 +34,25 @@ describe('removeDir', () => {
     removeDir(root);
 
     expect(existsSync(root)).toBe(false);
+  });
+
+  test('a symlink is unlinked without touching what it points at', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'remove-dir-target-'));
+    const target = join(outside, 'shared.txt');
+    writeFileSync(target, 'x');
+    chmodSync(target, 0o444);
+    const root = mkdtempSync(join(tmpdir(), 'remove-dir-'));
+    const inner = join(root, 'node_modules');
+    mkdirSync(inner, { recursive: true });
+    symlinkSync(target, join(inner, 'linked.txt'));
+    chmodSync(inner, 0o555);
+
+    removeDir(root);
+
+    expect(existsSync(root)).toBe(false);
+    // chmod follows symlinks, so a careless unlock would have made the shared file writable.
+    expect(statSync(target).mode & 0o777).toBe(0o444);
+    rmSync(outside, { recursive: true, force: true });
   });
 
   test('a directory that is not there is not an error', () => {
