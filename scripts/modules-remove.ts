@@ -32,7 +32,7 @@ import {
   renderRemovalMigration,
   unrelatedStatements,
 } from '@core/module-kit';
-import { removeDir } from './lib/remove-dir.ts';
+import { removeDir, removeLinks } from './lib/remove-dir.ts';
 
 const root = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]$/, '');
 const args = process.argv.slice(2);
@@ -203,6 +203,9 @@ writeFileSync(modulesFile, `${JSON.stringify(raw, null, 2)}\n`);
 console.log(`→ modules.json -= ${name}`);
 
 // ---- 7. git / files ----------------------------------------------------------------------------
+// git deletes this tree with its own recursive walk, and on Windows that walk follows the junctions
+// `bun install` left in modules/<Name>/node_modules — straight into packages/* (see removeLinks).
+removeLinks(absPath);
 if (source === 'submodule') {
   console.log(`→ git submodule deinit + rm ${path}`);
   sh(['git', 'submodule', 'deinit', '-f', '-q', '--', path], { ok: true });

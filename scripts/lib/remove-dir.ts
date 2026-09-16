@@ -1,4 +1,4 @@
-import { chmodSync, lstatSync, readdirSync, rmSync } from 'node:fs';
+import { chmodSync, type Dirent, lstatSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -35,5 +35,28 @@ function unlock(path: string): void {
   }
   if (stat.isDirectory()) {
     for (const entry of readdirSync(path)) unlock(join(path, entry));
+  }
+}
+
+/**
+ * Unlink every symlink and junction inside a tree, without following a single one.
+ *
+ * Hand a directory to git — `git submodule deinit -f`, `git rm -r` — and git deletes it with its
+ * own recursive walk. On Windows that walk goes straight *through* a junction: `bun install` links
+ * workspace dependencies as junctions (`modules/Contact/node_modules/@core/db` → `packages/db`), so
+ * uninstalling a module that way empties the core packages it happened to point at. `fs.rm` gets
+ * this right, so clear the links out first and leave git a tree of plain files.
+ */
+export function removeLinks(dir: string): void {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return; // Not there, or unreadable: nothing to unlink.
+  }
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isSymbolicLink()) rmSync(path, { force: true, recursive: true });
+    else if (entry.isDirectory()) removeLinks(path);
   }
 }
