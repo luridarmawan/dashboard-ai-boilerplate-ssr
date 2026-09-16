@@ -7,9 +7,15 @@
 # running it, and every step is checked, so a documented promise that stops being true fails here
 # rather than in someone's afternoon.
 #
-#   bun run sim:module                       # work dir under /tmp, core cloned from this checkout
+# On a terminal it first asks two things: which work directory, and whether to clone this local
+# checkout (fast, offline, HEAD) or the repository on GitHub (then: which branch). Both answers can
+# be given in advance — a set variable is never asked about, and SIM_YES=1 asks nothing at all.
+#
+#   bun run sim:module                       # asks; defaults to a work dir under /tmp + this checkout
 #   SIM_DIR=~/kerja bun run sim:module       # somewhere you can keep looking at afterwards
-#   CORE_REPO=https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git bun run sim:module
+#   SIM_YES=1 bun run sim:module             # no questions (CI)
+#   CORE_REPO=https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git CORE_REF=main \
+#     bun run sim:module                     # straight from GitHub, no questions
 #   SIM_DATABASE_URL=mysql://… bun run sim:module     # database steps (default: this repo's .env)
 #   SIM_NO_DB=1 bun run sim:module           # skip everything that needs a database
 #   SIM_WEB=1 bun run sim:module             # + svelte-check of the module's pages (slow)
@@ -21,9 +27,13 @@ ROOT="$PWD"
 NAME=Contact
 NS=contact
 PREFIX="${SIM_TABLE_PREFIX:-sim_}"
-WORK="${SIM_DIR:-$(mktemp -d)/kerja}"
-CORE_REPO="${CORE_REPO:-file://$ROOT}"
-CORE_REF="${CORE_REF:-$(git -C "$ROOT" rev-parse HEAD)}"
+UPSTREAM='https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git'
+# Empty means "not decided yet": the questions below fill these in, and an env var set by the
+# caller answers the matching question in advance (so CI and scripts never see a prompt).
+WORK="${SIM_DIR:-}"
+CORE_REPO="${CORE_REPO:-}"
+CORE_REF="${CORE_REF:-}"
+CORE_BRANCH="${CORE_BRANCH:-}"
 LOG="$(mktemp -d)/sim.log"
 export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-sim}" GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-sim@example.test}"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
@@ -46,11 +56,49 @@ run() {
   if ! "$@" >"$LOG" 2>&1; then die "$what"; fi
 }
 
+# ---- 0. two questions, then everything else runs by itself -------------------------------------
+# Only asked on a terminal, and only for what the caller has not already decided with SIM_DIR /
+# CORE_REPO / CORE_REF. SIM_YES=1 takes the defaults without asking.
+answer=''
+ask() {
+  printf '   \033[1m%s\033[0m [%s]: ' "$1" "$2"
+  answer=''
+  read -r answer || answer=''
+  [ -n "$answer" ] || answer="$2"
+  case "$answer" in '~'*) answer="$HOME${answer#\~}" ;; esac
+}
+
+DEFAULT_WORK="$(mktemp -d)/kerja"
+if [ -t 0 ] && [ -z "${SIM_YES:-}" ]; then
+  step 'Pilihan simulasi'
+  if [ -z "$WORK" ]; then
+    say 'Di mana simulasi ini dibuat? Isinya: klon core + repo modul Contact.'
+    ask 'Direktori kerja' "$DEFAULT_WORK"
+    WORK="$answer"
+  fi
+  if [ -z "$CORE_REPO" ]; then
+    say 'Core-nya diambil dari mana?'
+    say "  1) klon repo lokal ini — $(git -C "$ROOT" rev-parse --short HEAD) (cepat, tanpa jaringan, memakai HEAD)"
+    say "  2) klon dari GitHub — $UPSTREAM"
+    ask 'Pilih' '1'
+    if [ "$answer" = '2' ]; then
+      CORE_REPO="$UPSTREAM"
+      ask 'Branch (main / development)' 'development'
+      CORE_BRANCH="$answer"
+    fi
+  fi
+fi
+[ -n "$WORK" ] || WORK="$DEFAULT_WORK"
+[ -n "$CORE_REPO" ] || CORE_REPO="file://$ROOT"
+if [ -z "$CORE_REF" ] && [ -z "$CORE_BRANCH" ] && [ "$CORE_REPO" = "file://$ROOT" ]; then
+  CORE_REF="$(git -C "$ROOT" rev-parse HEAD)"
+fi
+
 # ---- 0. prerequisites ------------------------------------------------------------------------
 step "§0 · Prasyarat dan direktori kerja"
 command -v bun >/dev/null || die 'bun tidak ada di PATH (butuh Bun 1.4+)'
 say "bun $(bun --version), git $(git --version | awk '{print $3}')"
-if [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
+if [ "$CORE_REPO" = "file://$ROOT" ] && [ -n "$(git -C "$ROOT" status --porcelain)" ]; then
   say '⚠ pohon kerja core ini kotor — klon di bawah memakai HEAD, bukan perubahan yang belum di-commit'
 fi
 cmd "mkdir -p $WORK && cd $WORK"
@@ -61,10 +109,22 @@ cd "$WORK"
 ok "direktori kerja: $WORK"
 
 step "§0 · Clone boilerplate — dipakai sebagai alat, bukan di-fork"
-cmd 'git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core'
-[ "$CORE_REPO" = "file://$ROOT" ] && say "(simulasi ini meng-clone checkout lokal: $CORE_REPO @ $(echo "$CORE_REF" | cut -c1-12))"
-run 'clone core gagal' git -c protocol.file.allow=always clone --quiet "$CORE_REPO" core
-run 'checkout ref core gagal' git -C core checkout --quiet --detach "$CORE_REF"
+cmd "git clone ${CORE_BRANCH:+--branch $CORE_BRANCH }$UPSTREAM core"
+if [ "$CORE_REPO" = "file://$ROOT" ]; then
+  say "(simulasi ini meng-clone checkout lokal: $CORE_REPO @ $(echo "$CORE_REF" | cut -c1-12) — bukan salinan folder: git clone, jadi hanya yang sudah di-commit)"
+else
+  say "(klon sungguhan dari $CORE_REPO${CORE_BRANCH:+ @ $CORE_BRANCH})"
+fi
+if [ -n "$CORE_BRANCH" ]; then
+  run "clone core gagal (branch $CORE_BRANCH ada di remote?)" git -c protocol.file.allow=always clone --quiet --branch "$CORE_BRANCH" "$CORE_REPO" core
+else
+  run 'clone core gagal' git -c protocol.file.allow=always clone --quiet "$CORE_REPO" core
+  # A CORE_REF given by hand may be a commit, a tag, or a branch that only exists as a remote
+  # branch in the fresh clone — try it as written, then as origin/<ref>.
+  if [ -n "$CORE_REF" ] && ! git -C core checkout --quiet --detach "$CORE_REF" >"$LOG" 2>&1; then
+    run "checkout ref core gagal: $CORE_REF" git -C core checkout --quiet --detach "origin/$CORE_REF"
+  fi
+fi
 cmd 'cd core && bun install'
 run 'bun install di core gagal' bun install --cwd core
 ok "core siap di $WORK/core ($(git -C core rev-parse --short HEAD))"

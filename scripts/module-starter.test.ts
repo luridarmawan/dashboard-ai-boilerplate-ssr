@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -140,6 +148,24 @@ describe('bun run rename <Name> — namespace rewrite in place (§1)', () => {
     expect(bad.code).toBe(1);
     expect(bad.out).toContain('PascalCase');
     expect(readJson(join(dir, 'module.json')).name).toBe('Billing');
+  });
+});
+
+describe('bun run rename — repairing what `bun create` overwrites (§1)', () => {
+  test('the folder name bun create writes into package.json is put back to @modules/<ns>', () => {
+    // `bun create module ../mod-billing` sets package.json's name to the destination folder,
+    // destroying the `@modules/hello` the rename would otherwise have rewritten.
+    const dir = mkdtempSync(join(tmpdir(), 'module-created-'));
+    cpSync(template, join(dir, 'mod-billing'), { recursive: true });
+    const mod = join(dir, 'mod-billing');
+    const pkgFile = join(mod, 'package.json');
+    writeFileSync(pkgFile, JSON.stringify({ ...readJson(pkgFile), name: 'mod-billing' }, null, 2));
+
+    expect(run(mod, ['rename.ts', 'Billing']).code).toBe(0);
+
+    expect(readJson(pkgFile).name).toBe('@modules/billing');
+    expect(readJson(join(mod, 'module.json')).name).toBe('Billing');
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 
