@@ -657,7 +657,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | R-2 | **[P0]** `Example` menyediakan **landing page komersil publik** dengan seluruh bagian pada §4.6, dan menjadi isi baku dari `/` pada instalasi bersih. |
 | R-3 | **[P0]** Etalase produk/portofolio pada landing page mengambil data dari **tabel milik modul**, ter-SSR, dengan halaman detail `/product/:slug`. |
 | R-4 | **[P0]** SEO: metadata per halaman (title, description, canonical, Open Graph, JSON-LD), sitemap, dan `robots.txt`. Halaman publik terindeks tanpa JavaScript. |
-| R-5 | **[P0]** Form kontak/inquiry berfungsi **tanpa JavaScript** (form action), menulis ke tabel modul, mengirim email lewat outbox, dan terlindung rate limit + proteksi spam sederhana. |
+| R-5 | **[P0]** Form kontak/inquiry berfungsi **tanpa JavaScript** (form action), menulis ke tabel modul, mengirim email lewat outbox, dan terlindung rate limit + proteksi spam sederhana. Dua email keluar per kiriman: pemberitahuan ke alamat kontak tenant (`example.contact_email`, bila diisi) dan **tanda terima ke pengirimnya** (template `contact-ack`, berisi salinan pesannya) — keduanya lewat outbox, dalam bahasa permintaan yang mengirim form. |
 | R-6 | **[P0]** `Example` juga menyediakan sisi dashboard: CRUD atas datanya sendiri, entri menu, izin `example.*`, section konfigurasi, dan terjemahan `id`/`en`. Ini bagian "referensi kontrak"-nya. |
 | R-7 | **[P0]** Seluruh warna landing page lewat token tema, dan seluruh teksnya lewat i18n — mengganti tema atau bahasa tidak menyentuh kode `Example`. |
 | R-8 | **[P0]** `Example` bisa dihapus atau dinonaktifkan seluruhnya; aplikasi tetap berfungsi dan `/` jatuh ke fallback (F-6). |
