@@ -185,7 +185,7 @@ Ini risiko teknis terbesar dari rencana ini dan harus diputuskan di awal.
 | Konsep | MySQL / MariaDB | PostgreSQL | Catatan |
 |---|---|---|---|
 | Primary key | `char(36) CHARACTER SET ascii COLLATE ascii_bin` | `uuid` | **UUIDv7 (RFC 9562) di-generate aplikasi**, bukan DB — lihat §4.3.1 |
-| Timestamp | `datetime(3)` | `timestamptz(3)` | **Selalu simpan UTC.** Konversi zona waktu di lapisan presentasi |
+| Timestamp | `datetime(3)` | `timestamptz(3)` | **Selalu simpan UTC.** Konversi zona waktu di lapisan presentasi. Untuk MySQL/MariaDB, `datetime` tidak menyimpan zona dan default `CURRENT_TIMESTAMP(3)` dievaluasi **server** — jadi setiap koneksi dari pool dipaku `SET time_zone = '+00:00'` (`packages/db/src/dialect/mysql-client.ts`), supaya server yang berjalan di zona lain tidak menulis jam lokal yang lalu dibaca sebagai UTC |
 | JSON | `json` | `jsonb` | Di MariaDB `json` hanyalah alias `longtext` + `json_valid()`, bukan tipe biner seperti MySQL 8. Karena itu: **jangan pernah query ke dalam JSON** di kode portabel, dan jangan mengindeks path JSON |
 | Decimal uang | `decimal(18,4)` | `numeric(18,4)` | Jangan pernah float |
 | Boolean | `tinyint(1)` | `boolean` | Drizzle menormalkan |
