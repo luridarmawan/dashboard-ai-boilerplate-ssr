@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -131,12 +132,17 @@ describe('bun run rename <Name> — namespace rewrite in place (§1)', () => {
   });
 
   test('nothing of the old name survives anywhere but rename.ts itself', () => {
-    const grep = Bun.spawnSync(['grep', '-ril', '--exclude=rename.ts', 'hello', '.'], {
-      cwd: dir,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    expect(grep.stdout.toString().trim()).toBe('');
+    const left: string[] = [];
+    const scan = (d: string): void => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        if (entry.name === 'rename.ts' || entry.name === 'node_modules') continue;
+        const p = join(d, entry.name);
+        if (entry.isDirectory()) scan(p);
+        else if (readFileSync(p, 'utf8').toLowerCase().includes('hello')) left.push(p);
+      }
+    };
+    scan(dir);
+    expect(left).toEqual([]);
   });
 
   test('running it again is a no-op, and a non-PascalCase name is refused', () => {
