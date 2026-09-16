@@ -279,8 +279,14 @@ fi
 # Back to HEAD, all of it: the harness left the module copy, its entry in modules.json, its
 # workspace in bun.lock and a generated migration behind. bun.lock matters most — a lockfile that
 # still names a workspace no longer on disk makes `bun install` refuse outright (Bun 1.4.0).
-# `git clean` without -x so the gitignored generated registries and node_modules stay put.
-run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- . && git clean -fdq -e .env -e packages/db/.sim-db.ts && bun install"
+# `git clean` without -x so node_modules and the generated registries stay put — and then
+# `bun run bootstrap` anyway, because the registries are gitignored and nothing here may depend on
+# untracked leftovers surviving a reset: `packages/db/src/generated/` in particular went missing on
+# Windows now and then (a delete that walked a node_modules junction into packages/db took it,
+# while `git checkout` put the tracked files back), and modules:add then died inside modules:sync
+# with "Cannot find module './generated/active.ts'". A real host assembles before it installs a
+# module; so does this one.
+run 'reset core gagal' sh -c "cd '$WORK/core' && rm -rf 'modules/$NAME' && git checkout -- . && git clean -fdq -e .env -e packages/db/.sim-db.ts && bun install && bun run bootstrap"
 cmd "bun modules:add git@github.com:<akun-anda>/mod-$NS.git --ref v0.1.0"
 run 'modules:add gagal' sh -c "cd '$WORK/core' && bun run modules:add 'file://$WORK/mod-$NS' --ref v0.1.0"
 grep -q "\"name\": \"$NAME\"" core/modules.json || die 'modules.json tidak mencatat modul'
