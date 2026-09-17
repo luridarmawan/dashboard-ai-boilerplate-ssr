@@ -1,0 +1,36 @@
+# Template unit systemd *user* untuk menjalankan satu checkout dengan `bun run start`
+# (DEPLOY.md §8e: api + web + gateway satu port). JANGAN edit hasil generate-nya di
+# ~/.config/systemd/user/ — edit berkas ini lalu jalankan `bun run systemd:install` lagi.
+#
+# Placeholder ber-garis-bawah-ganda di bawah diisi scripts/install-systemd.sh: nama unit,
+# path checkout, path bun, argumen `--env-file=…` (boleh kosong), dan PATH service.
+[Unit]
+Description=__SERVICE_NAME__ — Dashboard AI Boilerplate (api + web, `bun start`) di __REPO_DIR__
+Documentation=https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr/blob/main/docs/DEPLOY.md
+# Unit user tidak punya network-online.target yang berarti; database yang belum siap
+# ditangani Restart=always di bawah (api keluar, systemd menyalakannya lagi).
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO_DIR__
+Environment=NODE_ENV=production
+Environment=PATH=__PATH__
+ExecStart=__BUN_BIN__ __ENV_ARG__ run start
+Restart=always
+RestartSec=3
+# `bun start` meneruskan SIGTERM ke kedua anaknya dan menunggu request/job selesai ≤ 25 s
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=35
+LimitNOFILE=65536
+# Log: baku `append:<checkout>/logs/<nama-unit>.log` — ada host yang tidak mengizinkan akun
+# biasa membaca journal-nya sendiri, dan berkas selalu bisa dibaca pemiliknya. Rotasi bukan
+# urusan systemd: lihat deploy/systemd/logrotate.example. `LOG_FILE=journal` saat install
+# mengembalikan keduanya ke journald.
+StandardOutput=__STDOUT__
+StandardError=__STDERR__
+SyslogIdentifier=__SERVICE_NAME__
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

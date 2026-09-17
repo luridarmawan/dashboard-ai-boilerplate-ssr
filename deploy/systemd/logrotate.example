@@ -1,0 +1,24 @@
+# Rotasi berkas log yang ditulis systemd user service dari `bun run systemd:install`
+# (DEPLOY.md §8f). `StandardOutput=append:` hanya menambah baris — systemd tidak
+# merotasinya, dan satu baris JSON per request tumbuh cepat.
+#
+#   sudo cp deploy/systemd/logrotate.example /etc/logrotate.d/crk
+#   sudo nano /etc/logrotate.d/crk          # ganti path + nama user di bawah
+#   sudo logrotate -d /etc/logrotate.d/crk  # uji dulu (-d = dry run, tidak mengubah apa pun)
+#
+# `copytruncate` WAJIB: prosesnya memegang berkas yang sama sepanjang hidupnya, jadi
+# berkas yang di-rename hanya membuat log menghilang ke inode lama sampai service
+# di-restart. Dengan copytruncate berkasnya disalin lalu dikosongkan di tempat.
+
+/home/USER/dashboard-ai-boilerplate-ssr/logs/crk.log {
+    daily
+    rotate 14
+    size 50M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su USER USER
+    create 0640 USER USER
+}

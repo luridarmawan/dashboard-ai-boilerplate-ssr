@@ -4,11 +4,11 @@ Tutorial untuk membangun modul yang **hidup di repo Anda sendiri**, punya siklus
 
 Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, pakai [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md).
 
-## Model mentalnya dulu — supaya tidak salah jalan
+## Konsep model — supaya tidak salah jalan
 
 Tiga hal yang sering ditebak salah:
 
-- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber template modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Kontraknya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
+- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber template modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Ketentuannya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
 - **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core; ia punya remote, tag, dan CI-nya sendiri.
 - **Submodule adalah cara HOST memasang, bukan cara Anda bekerja.** Anda mengembangkan di repo biasa; saat dipasang, host menaruhnya sebagai submodule terkunci pada tag.
 
@@ -22,7 +22,7 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 └── harness.ts
 ```
 
-## Peta perjalanannya
+## Tahapan
 
 Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
 
@@ -38,7 +38,7 @@ bun modules:add <url> --ref v1.4.2   → §6   host memasang, terkunci di tag
 git push (di repo host)              → §6   host meng-commit pemasangannya
 ```
 
-### Melihatnya jalan dulu: `bun run sim:module`
+### Mau lihat test demo? `bun run sim:module`
 
 Dari dalam checkout core, satu perintah menjalankan seluruh sembilan langkah di atas untuk sebuah modul contoh bernama `Contact` — direktori kerja sementara, clone core, `.env`, repo modul, `rename`, tag, harness (termasuk migrasi dan tes integrasi bila database Anda hidup), pemasangan lewat `modules:add` yang terkunci di tag, lalu pencabutannya:
 
@@ -49,12 +49,12 @@ SIM_NO_DB=1 bun run sim:module      # tanpa database
 SIM_YES=1 bun run sim:module        # tanpa pertanyaan sama sekali (CI)
 ```
 
-Di terminal ia menanyakan dua hal lebih dulu:
+Ada 2 pertanyaan di terminal:
 
-1. **Direktori kerja** — tempat klon core dan repo modul `Contact` dibuat (baku: folder sementara di `/tmp`).
-2. **Core-nya dari mana** — (1) **klon repo lokal ini** pada HEAD: cepat, tanpa jaringan, dan **hanya memuat yang sudah di-commit** (ini `git clone file://…`, bukan salin folder — perubahan yang belum di-commit tidak ikut); atau (2) **klon dari GitHub**, lalu Anda pilih branch `main` atau `development`.
-
-Pilihan kedua itu berguna justru karena bisa merah: menjalankannya terhadap `main` memberi tahu Anda apakah pembaca yang meng-clone branch itu hari ini akan berhasil mengikuti dokumen ini.
+1. **Direktori kerja** — tempat klon core dan repo modul `Contact` dibuat (default: folder sementara di `/tmp`).
+2. **Core-nya dari mana**
+   - (a) **klon repo lokal ini**: cepat, tanpa jaringan, dan **hanya memuat yang sudah di-commit** (ini `git clone file://…`, bukan salin folder — perubahan yang belum di-commit tidak ikut); atau 
+   - (b) **klon dari GitHub**, lalu Anda pilih branch `main` atau `development`.
 
 Tabel simulasi dipisahkan dengan `TABLE_PREFIX=sim_` dan dihapus lagi di akhir, jadi database Anda tidak ikut terpakai. Kalau simulasi itu merah, dokumen inilah yang salah — bukan Anda.
 
@@ -67,18 +67,18 @@ git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core
 cd core && bun install
 ```
 
-Core ini publik dan URL-nya HTTPS, jadi clone di atas tidak meminta kredensial apa pun — tidak perlu kunci SSH, tidak perlu token. (SSH baru berguna kalau Anda memang punya akses tulis dan ingin mendorong ke core, atau kalau Anda memakai mirror privat — §7a.)
+Clone ini dipakai untuk dua hal saja:
 
-Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkout core buatan tangan untuk setiap build. Clone itu dipakai untuk dua hal saja:
-
-1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
+1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam core.
 2. **Menjalankan aplikasinya saat Anda mengembangkan** (`bun dev`), supaya modul Anda bisa dilihat di browser.
 
-Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda — dan bila suatu saat modul Anda menuntutnya, itu cacat kontrak yang perlu dilaporkan, bukan diizinkan.
+Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda.
 
 Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
 
-Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
+Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi.
+
+Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kebijakan modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
@@ -109,9 +109,9 @@ Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-cor
 
 Template ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
 
-### 1a. Dorong ke repositori Anda sendiri
+### 1a. Push ke repositori Anda sendiri
 
-Repo modul butuh remote-nya sendiri — bukan remote core. Buat repo kosong di GitHub (atau GitLab, atau git server Anda), lalu:
+Buat repo kosong di GitHub (atau GitLab, atau git server Anda), lalu:
 
 ```bash
 cd ~/kerja/mod-billing
@@ -183,7 +183,7 @@ Yang Anda commit tetap hanya repo modul; `core/modules/Billing` dan `core/module
 
 Template sudah membawa `.github/workflows/ci.yml`: MySQL sebagai service, lalu satu langkah `bun run harness --web`. Itu memberi Anda typecheck, lint, migrasi, dan tes integrasi modul di setiap push — tanpa perlu core checkout buatan tangan.
 
-## 5. Merilis
+## 5. Rilis
 
 ```bash
 # 1. selaraskan versi core yang Anda dukung

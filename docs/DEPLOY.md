@@ -384,4 +384,38 @@ Yang perlu diketahui:
 - **Kompresi** diminta *identity* ke upstream (aset prakompres `.br`/`.gz` tidak terpakai); kompresi publik urusan nginx/apache (`gzip on`, `mod_deflate`).
 - **Tidak ada `--scale api=N` dan tidak ada rollout tanpa downtime**: restart berarti jeda beberapa detik. Kalau itu penting, pakai §8a (Docker) atau §8c (dua unit systemd + Caddy).
 - **Form 403 "Cross-site POST form submissions are forbidden" / "Permintaan ditolak oleh proteksi CSRF"**: origin yang dikirim browser tidak ada di `APP_ORIGIN`. Gejalanya khas — tema, bahasa, login dan reset kata sandi (form POST biasa) gagal sementara tombol ber-AJAX jalan. Tambahkan origin publik Anda ke `APP_ORIGIN` (mis. `APP_ORIGIN=https://app.example.com`) lalu jalankan ulang; log web menuliskan satu baris `warn` berisi `seen`, `allowed` dan `derived` sehingga jelas origin mana yang ditolak. Dengan **satu** entri di `APP_ORIGIN`, `bun start` sekalian menyetel `ORIGIN` untuk proses web — tautan absolut (redirect_uri Google, e-mail) ikut benar tanpa mengandalkan header proxy. Proxy depan tetap sebaiknya mengirim `X-Forwarded-Proto` dan `X-Forwarded-Host` (contoh di atas).
-- **Proses induk harus dijaga**: `pm2 start bun --name crk -- start`, `screen`, atau satu unit systemd (`WorkingDirectory=` checkout Anda, `ExecStart=/usr/local/bin/bun start`, `EnvironmentFile=/etc/crk/api.env`). `SIGTERM` ke `bun start` menghentikan kedua anak dengan rapi (SIGTERM, tunggu ≤ 25 s), dan bila salah satu anak mati sendiri seluruh perintah keluar — supaya supervisor menyalakannya ulang.
+- **Proses induk harus dijaga**: `bun start` adalah proses biasa — tutup SSH-nya dan aplikasi ikut mati. Perintahnya sudah ada di repo ini: **`bun run systemd:install`** (§8f). `SIGTERM` ke `bun start` menghentikan kedua anak dengan rapi (SIGTERM, tunggu ≤ 25 s), dan bila salah satu anak mati sendiri seluruh perintah keluar — supaya supervisor menyalakannya ulang.
+
+### 8f. Menjaga `bun start` hidup: systemd *user* service
+
+Langkah terakhir dari §8e — mengubah `bun run start` yang Anda ketik dengan tangan menjadi sesuatu yang bertahan setelah SSH ditutup dan menyala lagi sesudah reboot, **tanpa root**:
+
+```bash
+bun run systemd:install       # tulis unit, enable, start, lalu ketuk HOST:PORT sampai menjawab
+systemctl --user status  crk
+tail -f logs/crk.log          # log ke berkas, bukan journal — lihat catatan di bawah
+bun run systemd:uninstall     # copot lagi (aplikasi berhenti; checkout, log & database tidak disentuh)
+```
+
+Alur deploy manual Anda tidak berubah, hanya baris terakhirnya:
+
+```bash
+git pull && bun run build && systemctl --user restart crk
+```
+
+Unitnya di-generate dari [`deploy/systemd/user-app.service.template`](../deploy/systemd/user-app.service.template) ke `~/.config/systemd/user/crk.service`, jadi memperbaiki templatenya lalu memasang ulang selalu aman — berkas hasil generate tidak untuk diedit. Isinya persis perintah yang Anda ketik sendiri: `ExecStart=<bun absolut> --env-file=<berkas env> run start` dengan `WorkingDirectory=` checkout ini, `Restart=always`, dan `TimeoutStopSec=35` (cukup untuk 25 s yang `bun start` beri ke kedua anaknya).
+
+Yang dikerjakan skrip pemasangnya selain menulis unit:
+
+- **Memakai env yang sama dengan yang Anda pakai manual.** `.env` menang (itu yang dimuat `bun run start` sendiri), `.env.prod` dipakai bila hanya itu yang ada (§8e), `ENV_FILE=.env.prod bun run systemd:install` mengalahkan keduanya. Berkasnya selalu diteruskan eksplisit sebagai `--env-file=` supaya service tidak bergantung pada tebakan direktori.
+- **Build bila belum ada.** Tanpa `apps/web/build` atau `dist/web`, `bun start` menolak jalan; skripnya menjalankan `bun run build` lebih dulu (`BUILD=1` memaksanya).
+- **Preflight (§8b) sebagai laporan**, bukan gerbang: env, database, migrasi, volume, modul. Migrasi tetap langkah eksplisit (Q-4) — `bun run db:migrate` sebelum start pertama dan sesudah tiap upgrade.
+- **Menolak port yang sudah dipakai orang lain.** Ketiga port (`PORT`, `API_PORT`, `WEB_PORT_INTERNAL`) diketuk sebelum apa pun ditulis, dan yang diperiksa bukan sekadar "terpakai" melainkan **terpakai oleh siapa** (`ss` + cgroup unit): port yang dipegang unit ini sendiri berarti re-install biasa. Ini bukan kehati-hatian berlebihan — bentrokannya tidak selalu berbunyi keras: gateway-nya memang gagal bind lalu crash-loop, tetapi proses api-nya **berbagi** port dengan instance tetangga (SO_REUSEPORT) sehingga dua instance menjawab bergantian dan yang terlihat hanya "aneh separuh waktu".
+- **Menunggu aplikasinya benar-benar menjawab.** `systemctl restart` pulang begitu prosesnya dijalankan; skripnya mengetuk `HOST:PORT/v1/health` (dibaca dari env yang sama) sampai 45 detik, menahannya 3 detik lagi, lalu memeriksa unitnya masih hidup dan `NRestarts` tidak naik — jawaban pertama bisa datang dari gateway yang sudah mengangkat telepon sementara prosesnya sebentar lagi mati. Hasilnya "menjawab di http://…", atau "MATI SENDIRI" berikut 20 baris log terakhir.
+
+Catatan operasional:
+
+- **Linger.** Sekali saja per akun: `sudo loginctl enable-linger $USER`. Tanpa itu, systemd mematikan service Anda saat sesi login terakhir tertutup dan tidak menyalakannya lagi saat boot; skripnya memeriksa dan mengingatkan.
+- **Log ke berkas, bukan journal.** Baku: `logs/<nama-unit>.log` di dalam checkout (`StandardOutput=append:` + `StandardError=append:`), jadi `tail -f logs/crk.log` selalu bekerja. Alasannya praktis: ada host yang tidak memberi akun biasa akses baca ke journal-nya sendiri — `journalctl --user` menjawab *insufficient permissions* dan log aplikasi praktis hilang — sedangkan berkas selalu bisa dibaca pemiliknya. Yang memang punya akses journal bisa memilih `LOG_FILE=journal bun run systemd:install` (skripnya tetap memeriksa dan memperingatkan bila journal ternyata tidak terbaca), dan `LOG_FILE=/path/lain.log` memindahkan berkasnya. **Rotasi bukan urusan systemd**: `append:` hanya menambah baris, sedangkan satu baris JSON per request tumbuh cepat — contoh siap pakai (dengan `copytruncate`, wajib karena prosesnya memegang berkas yang sama sepanjang hidupnya) ada di [`deploy/systemd/logrotate.example`](../deploy/systemd/logrotate.example). `*.log` sudah ada di `.gitignore`, dan `bun run systemd:uninstall` sengaja **tidak** menghapus lognya.
+- **Beberapa checkout di satu server.** `SERVICE_NAME=staging bun run systemd:install` memberi unit kedua dengan nama sendiri; pastikan `PORT`/`API_PORT`/`WEB_PORT_INTERNAL` di env masing-masing berbeda.
+- **Bukan pengganti §8c.** Ini menjalankan **sumber** dari checkout Anda sebagai satu unit di akun biasa. Instalasi ber-root dengan binary terkompilasi, dua unit terpisah, dan `ProtectSystem=strict` tetap [`deploy/systemd/crk-api.service`](../deploy/systemd/crk-api.service) + [`crk-web.service`](../deploy/systemd/crk-web.service).
