@@ -76,7 +76,7 @@ Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core
 
 Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
 
-Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi.
+Selebihnya: Bun 1.4+ (sama dengan `engines` core), dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi.
 
 Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kebijakan modul tidak terikat lisensi core.
 
@@ -149,6 +149,7 @@ CORE_DIR=../core bun run harness
 bun run harness                                     # clone ke .core/ (sekali; berikutnya dipakai ulang)
 bun run harness --web                               # + svelte-check untuk halaman modul
 DATABASE_URL=mysql://app:app@127.0.0.1:3306/app bun run harness   # + migrasi & tes integrasi
+#   ^ database Anda sendiri; kalau memakai `docker compose` milik core, portnya 33306
 ```
 
 Apa pun caranya, yang dilakukan harness sama: menyalin folder modul ke `<core>/modules/<Nama>`, mendaftarkannya di `modules.json` core itu, `bun install`, `bootstrap`, `tsc`, `biome check --write` (hasil formatnya ditulis balik ke repo modul — repo modul tidak punya Biome sendiri, sedangkan `rename` menggeser panjang baris), `biome check`, `db:generate`, lalu tes modul. Core-nya sekali pakai — tidak ada yang perlu Anda commit dari sana.

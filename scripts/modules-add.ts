@@ -7,8 +7,9 @@
  * `modules:sync`. The ref is mandatory and must be a tag or commit — never a branch —
  * so a build is reproducible from modules.json alone (Q-5).
  *
- * Nothing in core changes: the only files touched are modules.json, .gitmodules and the
- * new modules/<Name> directory (G-6).
+ * No core source changes: the only files touched are modules.json, .gitmodules, biome.json
+ * (the exclusion that keeps foreign code out of the host's lint), bun.lock and the new
+ * modules/<Name> directory (G-6) — the same list scripts/ci/cross-repo-proof.sh enforces.
  */
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,6 +55,29 @@ const gitBase =
   url.startsWith('file://') || url.startsWith('/')
     ? ['git', '-c', 'protocol.file.allow=always']
     : ['git'];
+
+// ---- 0. the ref must name a tag or a commit, never a branch (Decision L, Q-5) ----
+// Until here this was only a sentence in the docs: the pin below is `git checkout --detach`,
+// which accepts a branch name just as happily as a tag and records it in modules.json — where
+// it silently stops describing one build, because the branch moves on. The remote itself is
+// the only authority on what a name is, so ask it. A name that is a branch there is rejected
+// even when a tag of the same name also exists: ambiguous is not pinned.
+let heads = '';
+try {
+  heads = sh([...gitBase, 'ls-remote', '--heads', '--', url, ref]);
+} catch (err) {
+  console.error(
+    `modules:add: tidak bisa membaca ref dari ${url} — periksa URL dan akses baca\n${err}`,
+  );
+  process.exit(1);
+}
+if (heads) {
+  usage(
+    `--ref ${ref} adalah nama branch di ${url}, bukan tag atau commit (Keputusan L).\n` +
+      '  Branch berpindah, sehingga modules.json berhenti menggambarkan satu build tertentu (Q-5).\n' +
+      `  Pakai tag (mis. --ref v1.4.2) atau commit: git ls-remote --tags ${url}`,
+  );
+}
 
 // ---- 1. discover the module name when not given: read module.json from a throwaway clone ----
 // The clone goes to the system temp dir, not into the repo: this runs before anything is
