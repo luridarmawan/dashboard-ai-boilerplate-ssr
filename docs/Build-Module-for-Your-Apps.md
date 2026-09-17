@@ -109,9 +109,9 @@ Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-cor
 
 Template ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
 
-### 1a. Dorong ke repositori Anda sendiri
+### 1a. Push ke repositori Anda sendiri
 
-Repo modul butuh remote-nya sendiri — bukan remote core. Buat repo kosong di GitHub (atau GitLab, atau git server Anda), lalu:
+Buat repo kosong di GitHub (atau GitLab, atau git server Anda), lalu:
 
 ```bash
 cd ~/kerja/mod-billing
@@ -183,7 +183,7 @@ Yang Anda commit tetap hanya repo modul; `core/modules/Billing` dan `core/module
 
 Template sudah membawa `.github/workflows/ci.yml`: MySQL sebagai service, lalu satu langkah `bun run harness --web`. Itu memberi Anda typecheck, lint, migrasi, dan tes integrasi modul di setiap push — tanpa perlu core checkout buatan tangan.
 
-## 5. Merilis
+## 5. Rilis
 
 ```bash
 # 1. selaraskan versi core yang Anda dukung
