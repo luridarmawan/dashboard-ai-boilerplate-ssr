@@ -22,7 +22,7 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 └── harness.ts
 ```
 
-## Roadmap
+## Tahapan
 
 Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
 
@@ -38,7 +38,7 @@ bun modules:add <url> --ref v1.4.2   → §6   host memasang, terkunci di tag
 git push (di repo host)              → §6   host meng-commit pemasangannya
 ```
 
-### Melihatnya jalan dulu: `bun run sim:module`
+### Mau lihat test demo? `bun run sim:module`
 
 Dari dalam checkout core, satu perintah menjalankan seluruh sembilan langkah di atas untuk sebuah modul contoh bernama `Contact` — direktori kerja sementara, clone core, `.env`, repo modul, `rename`, tag, harness (termasuk migrasi dan tes integrasi bila database Anda hidup), pemasangan lewat `modules:add` yang terkunci di tag, lalu pencabutannya:
 
@@ -49,12 +49,12 @@ SIM_NO_DB=1 bun run sim:module      # tanpa database
 SIM_YES=1 bun run sim:module        # tanpa pertanyaan sama sekali (CI)
 ```
 
-Di terminal ia menanyakan dua hal lebih dulu:
+Ada 2 pertanyaan di terminal:
 
-1. **Direktori kerja** — tempat klon core dan repo modul `Contact` dibuat (baku: folder sementara di `/tmp`).
-2. **Core-nya dari mana** — (1) **klon repo lokal ini** pada HEAD: cepat, tanpa jaringan, dan **hanya memuat yang sudah di-commit** (ini `git clone file://…`, bukan salin folder — perubahan yang belum di-commit tidak ikut); atau (2) **klon dari GitHub**, lalu Anda pilih branch `main` atau `development`.
-
-Pilihan kedua itu berguna justru karena bisa merah: menjalankannya terhadap `main` memberi tahu Anda apakah pembaca yang meng-clone branch itu hari ini akan berhasil mengikuti dokumen ini.
+1. **Direktori kerja** — tempat klon core dan repo modul `Contact` dibuat (default: folder sementara di `/tmp`).
+2. **Core-nya dari mana**
+   - (a) **klon repo lokal ini**: cepat, tanpa jaringan, dan **hanya memuat yang sudah di-commit** (ini `git clone file://…`, bukan salin folder — perubahan yang belum di-commit tidak ikut); atau 
+   - (b) **klon dari GitHub**, lalu Anda pilih branch `main` atau `development`.
 
 Tabel simulasi dipisahkan dengan `TABLE_PREFIX=sim_` dan dihapus lagi di akhir, jadi database Anda tidak ikut terpakai. Kalau simulasi itu merah, dokumen inilah yang salah — bukan Anda.
 
@@ -67,18 +67,18 @@ git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core
 cd core && bun install
 ```
 
-Core ini publik dan URL-nya HTTPS, jadi clone di atas tidak meminta kredensial apa pun — tidak perlu kunci SSH, tidak perlu token. (SSH baru berguna kalau Anda memang punya akses tulis dan ingin mendorong ke core, atau kalau Anda memakai mirror privat — §7a.)
+Clone ini dipakai untuk dua hal saja:
 
-Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkout core buatan tangan untuk setiap build. Clone itu dipakai untuk dua hal saja:
-
-1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
+1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam core.
 2. **Menjalankan aplikasinya saat Anda mengembangkan** (`bun dev`), supaya modul Anda bisa dilihat di browser.
 
 Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda.
 
 Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
 
-Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kebijakan modul tidak terikat lisensi core.
+Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi.
+
+Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kebijakan modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
