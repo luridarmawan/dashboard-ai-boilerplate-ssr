@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type LazyTarget, planLazy } from './lazy.ts';
+import { cssUrl, type LazyTarget, planLazy } from './lazy.ts';
 
 /**
  * The decision `class="lazy"` makes per element, kept pure so it can be tested without a DOM.
@@ -51,5 +51,17 @@ describe('planLazy', () => {
     const plan = planLazy(target({ tag: 'DIV' }));
     expect(plan.nativeOnly).toBe(true);
     expect(plan.advice).toContain('data-bg');
+  });
+});
+
+/** Shared by the observer and by `<Img placeholder="…">`, which is how a blur-up gets in. */
+describe('cssUrl', () => {
+  test('leaves an ordinary url alone', () => {
+    expect(cssUrl('/uploads/hero.jpg?v=2')).toBe('url("/uploads/hero.jpg?v=2")');
+  });
+
+  test('keeps a data: URI usable — its commas and slashes must survive', () => {
+    const uri = 'data:image/svg+xml,%3Csvg xmlns="x"%3E%3C/svg%3E';
+    expect(cssUrl(uri)).toBe('url("data:image/svg+xml,%3Csvg xmlns=%22x%22%3E%3C/svg%3E")');
   });
 });

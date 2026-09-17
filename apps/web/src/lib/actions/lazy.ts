@@ -24,6 +24,10 @@
  * `use:lazy` is the same thing for one element, for the rare case where the element is not in the
  * document the root layout watches, or where a page wants it armed the moment it renders rather
  * than on the next mutation tick.
+ *
+ * Every element walks the same four states in `data-lazy`, which is what `app.css` styles so that
+ * a slot is never just empty: `pending` (waiting for the viewport) → `fetching` (bytes on their
+ * way, placeholder still up) → `loaded`, or `error` if it never came.
  */
 
 /**
@@ -70,6 +74,16 @@ export type LazyPlan = {
 const pct = (c: string) => `%${c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`;
 
 /**
+ * A URL as a CSS `url("…")` value. The URL lands inside a CSS value, where a quote, a paren or a
+ * newline in the filename would end it early and let the rest be read as CSS, so those characters
+ * are percent-encoded — the fetch decodes them back. (`encodeURIComponent` is not enough: it
+ * leaves `'`, `(` and `)` as they are, and it would also mangle a `data:` URI's own commas.)
+ */
+export function cssUrl(url: string): string {
+  return `url("${url.replace(/["'()\\\n]/g, pct)}")`;
+}
+
+/**
  * Decide what a `.lazy` element needs, without touching the DOM.
  *
  * The one case worth spelling out is `<img class="lazy" src="…">`: by the time any script runs the
@@ -86,10 +100,7 @@ export function planLazy(t: LazyTarget): LazyPlan {
 
   if (t.dataSrc) deferred.src = t.dataSrc;
   if (t.dataSrcset) deferred.srcset = t.dataSrcset;
-  // The URL lands inside a CSS value, where a quote, a paren or a newline in the filename would
-  // end it early and let the rest be read as CSS. Percent-encode exactly those characters — the
-  // fetch decodes them back. (`encodeURIComponent` is not enough: it leaves ' ( ) as they are.)
-  if (t.dataBg) backgroundImage = `url("${t.dataBg.replace(/["'()\\\n]/g, pct)}")`;
+  if (t.dataBg) backgroundImage = cssUrl(t.dataBg);
 
   if (NATIVE_TAGS.has(tag)) {
     native.loading = 'lazy';
@@ -116,14 +127,45 @@ function readTarget(el: Element): LazyTarget {
   };
 }
 
-/** Start the deferred fetch. Idempotent: a second call on the same element does nothing. */
+/**
+ * Start the deferred fetch. Idempotent: a second call on the same element does nothing.
+ *
+ * The state does not jump straight to `loaded`: `fetching` keeps the placeholder in place while
+ * the bytes are on their way, and only the element's own `load` ends it. Otherwise the slot goes
+ * blank for exactly as long as the download takes — the emptiness the placeholder is there for.
+ */
 export function reveal(el: Element): void {
   const node = el as HTMLElement;
-  if (node.dataset.lazy === 'loaded') return;
-  const plan = planLazy(readTarget(el));
-  for (const [name, value] of Object.entries(plan.deferred)) el.setAttribute(name, value);
-  if (plan.backgroundImage) node.style.backgroundImage = plan.backgroundImage;
-  node.dataset.lazy = 'loaded';
+  if (node.dataset.lazy === 'fetching' || node.dataset.lazy === 'loaded') return;
+  const target = readTarget(el);
+  const plan = planLazy(target);
+  node.dataset.lazy = 'fetching';
+  const settle = (ok: boolean) => {
+    node.dataset.lazy = ok ? 'loaded' : 'error';
+  };
+
+  if (plan.backgroundImage && target.dataBg) {
+    // A background image has no load event of its own, so it goes through an `Image()` first and
+    // reaches CSS only once it is here: the placeholder stays put until there is something to
+    // show, and a half-arrived image is never painted over it.
+    const probe = new Image();
+    probe.onload = () => {
+      node.style.backgroundImage = plan.backgroundImage as string;
+      settle(true);
+    };
+    probe.onerror = () => settle(false);
+    probe.src = target.dataBg;
+  }
+
+  const deferred = Object.entries(plan.deferred);
+  if (deferred.length) {
+    // Listeners before the src, or a cached image can be done before anyone is listening.
+    el.addEventListener('load', () => settle(true), { once: true });
+    el.addEventListener('error', () => settle(false), { once: true });
+    for (const [name, value] of deferred) el.setAttribute(name, value);
+  } else if (!plan.backgroundImage) {
+    settle(true);
+  }
 }
 
 let observer: IntersectionObserver | null = null;

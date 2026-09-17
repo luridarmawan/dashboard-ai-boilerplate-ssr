@@ -304,6 +304,27 @@ Berlaku **global**: dipasang sekali di shell core (`apps/web/src/routes/+layout.
 - `priority` → `loading="eager"` + `fetchpriority="high"`. Wajib untuk satu gambar di atas fold; `loading="lazy"` di elemen LCP justru memperlambat metrik yang sedang diukur (§8: LCP < 2,5 detik). Aturannya: **satu** gambar `priority` per halaman, sisanya biarkan lazy.
 - `<img loading="lazy">` polos juga benar dan tidak dilarang — `<Img>` hanya membuatnya jadi baku plus menjaga width/height.
 
+**Placeholder: slot yang dicadangkan tidak pernah terlihat kosong.** Selama gambar belum mendarat, `<Img>` mengisi kotaknya sendiri: frame `bg-muted` berdenyut (`animate-pulse`, sama seperti `<Skeleton>`) **plus** glyph gambar kecil di tengah — `--muted` hanya dua tingkat dari putih, jadi di atas card terang frame saja praktis tidak terlihat dan kotaknya tetap terbaca kosong. Kalau gambarnya gagal datang, frame itu tetap ada dengan glyph yang dicoret dan denyutnya berhenti; bukan ikon "broken image" browser, dan ruang yang sudah dicadangkan tidak hilang.
+
+```svelte
+<Img src={url} alt="" width={800} height={1000} />                       <!-- skeleton (baku) -->
+<Img src={logo} alt="" width={120} height={40} placeholder="none" />     <!-- logo transparan / object-contain -->
+<Img src={url} alt="" width={800} height={1000} placeholder={tinyDataUri} /> <!-- blur-up (LQIP), statis -->
+```
+
+`placeholder="none"` untuk gambar transparan atau `object-contain`: di situ kotak berisi justru terbaca sebagai bagian dari gambarnya. `placeholder="<url|data:…>"` menampilkan thumbnail itu cover-filled dan **tidak** berdenyut — tidak ada yang men-generate LQIP untuk Anda, isi hanya kalau Anda memang punya.
+
+Keduanya berjalan lewat status yang sama, dan `app.css` yang menatanya:
+
+| status | `<Img>` (`data-img`) | `class="lazy"` (`data-lazy`) |
+|---|---|---|
+| menunggu viewport | — (browser yang mengatur) | `pending` |
+| byte sedang jalan, placeholder masih tampil | `loading` | `fetching` |
+| piksel sudah ada (fade 200 ms) | `loaded` | `loaded` |
+| tidak pernah datang (frame + glyph) | `error` | `error` |
+
+Untuk `data-bg`, gambarnya diambil lewat `Image()` lebih dulu dan baru diserahkan ke CSS setelah tiba — placeholder tidak hilang sebelum ada yang menggantikannya, dan gambar setengah jalan tidak pernah ikut tergambar.
+
 **`class="lazy"` hanya untuk yang tidak bisa ditunda browser**: `background-image` di `<div>`, dan embed berat yang tidak boleh diambil sebelum didekati. URL-nya ditaruh di `data-bg`/`data-src`, dan satu IntersectionObserver di seluruh dokumen yang memasangnya saat elemen mendekati viewport (≈300 px sebelum masuk layar). Butuh JavaScript, jadi **jangan menaruh isi yang wajib terlihat di belakangnya**.
 
 ```svelte
@@ -311,7 +332,7 @@ Berlaku **global**: dipasang sekali di shell core (`apps/web/src/routes/+layout.
 <iframe class="lazy" data-src="https://…" title="Peta lokasi" width="600" height="400"></iframe>
 ```
 
-Selama menunggu, elemen memakai `data-lazy="pending"` (slot `bg-muted`) lalu `data-lazy="loaded"` (fade singkat, dilewati bila `prefers-reduced-motion`). Halaman yang dirender belakangan — hasil navigasi klien, blok `{#if}` — ikut terpasang otomatis lewat MutationObserver; `use:lazy` dari `$lib/actions/lazy` hanya perlu untuk elemen di luar dokumen itu.
+Halaman yang dirender belakangan — hasil navigasi klien, blok `{#if}` — ikut terpasang otomatis lewat MutationObserver; `use:lazy` dari `$lib/actions/lazy` hanya perlu untuk elemen di luar dokumen itu.
 
 > **Jangan** `<img class="lazy" src="…">`. Saat skrip berjalan, `src` sudah dibaca browser dan tidak ada lagi yang bisa ditunda — dev menyebutkannya di console. Tulis `loading="lazy"` di markup, atau pindahkan URL-nya ke `data-src`.
 
