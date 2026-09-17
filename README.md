@@ -58,21 +58,35 @@ scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
 
 ## Perintah yang sering dipakai
 
-| Perintah | Guna |
+### Perintah Rutin
+
+| Perintah | Fungsi |
 |---|---|
 | `bun dev` | API + web dengan reload, `modules:sync` otomatis |
 | `bun run build` lalu `bun start` | jalankan build produksi di host ini tanpa Docker, **satu port** (baku `127.0.0.1:3000`) — nginx/apache cukup satu `proxy_pass`; `--no-proxy` untuk dua port ([DEPLOY §8e](./docs/DEPLOY.md)) |
-| `bun run systemd:install` · `bun run systemd:uninstall` | jadikan `bun start` di checkout ini systemd *user* service (`systemctl --user restart crk`, log ke `logs/crk.log`) supaya tetap hidup sesudah SSH ditutup dan menyala lagi sesudah reboot, tanpa root ([DEPLOY §8f](./docs/DEPLOY.md)) |
-| `bun run check` | lint (Biome) + typecheck semua paket, kedua dialect |
-| `bun run test:unit` · `bun run test:integration:docker` | unit tanpa `.env`; integrasi dengan MySQL di Docker |
-| `bun run proof:m1:docker` | seluruh bukti gate M1–M6 lewat HTTP tanpa browser (`PROOF_ONLY=M4` untuk satu saja) |
-| `bun run proof:e2e:docker` | E2E Playwright (landing → login → CRUD → chat) di container |
 | `bun modgen <Nama> --fields "name:string!,qty:number"` | modul CRUD lengkap yang langsung jalan |
 | `bun create module ../mod-x` | repositori modul standalone dengan harness sendiri |
 | `bun modules:add <git-url> --ref <tag>` | pasang modul dari repositori lain |
 | `bun modules:remove <Nama>` | uninstall bersih: lepas registrasi, hapus folder/submodule, migrasi turun untuk tabelnya (G-15) |
 | `bun run db:generate` | migrasi baru (mysql + pg) setelah mengubah tabel |
 | `bun run db:matrix:docker` | migrasi + smoke di MySQL 8, MariaDB 11, PostgreSQL 16 |
+
+### Perintah untuk Test
+
+| Perintah | Fungsi |
+|---|---|
+| `bun run check` | lint (Biome) + typecheck semua paket, kedua dialect |
+| `bun run test:unit` · `bun run test:integration:docker` | unit tanpa `.env`; integrasi dengan MySQL di Docker |
+| `bun run proof:m1:docker` | seluruh bukti gate M1–M6 lewat HTTP tanpa browser (`PROOF_ONLY=M4` untuk satu saja) |
+| `bun run proof:e2e:docker` | E2E Playwright (landing → login → CRUD → chat) di container |
+
+
+### Perintah untuk Deploy
+
+| Perintah | Fungsi |
+|---|---|
+| `bun run systemd:install` · `bun run systemd:uninstall` | jadikan `bun start` di checkout ini systemd *user* service (`systemctl --user restart crk`, log ke `logs/crk.log`) supaya tetap hidup sesudah SSH ditutup dan menyala lagi sesudah reboot, tanpa root ([DEPLOY §8f](./docs/DEPLOY.md)) |
+
 
 ## Cara mengubah hal-hal yang paling sering ditanyakan
 
