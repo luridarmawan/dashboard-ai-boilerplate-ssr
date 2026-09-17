@@ -2,6 +2,7 @@
 import { applyAction, enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
+import Img from '$lib/components/Img.svelte';
 import { Button } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 
@@ -212,9 +213,10 @@ function errorFor(code: unknown): string {
             <article class="flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:shadow-md">
               <div class={`relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br ${artOf(i)}`}>
                 {#if p.imageUrl}
-                  <!-- Far below the fold: never fetched until the grid is scrolled near. `width`/`height`
-                       match the 4/5 box so the slot is reserved even before the stylesheet lands. -->
-                  <img src={p.imageUrl} alt={p.name} loading="lazy" decoding="async" width="800" height="1000" class="h-full w-full object-cover" />
+                  <!-- Far below the fold: never fetched until the grid is scrolled near. `<Img>` is
+                       lazy by default (browser-level, no script), and `width`/`height` match the 4/5
+                       box so the slot is reserved even before the stylesheet lands. -->
+                  <Img src={p.imageUrl} alt={p.name} width={800} height={1000} class="h-full w-full object-cover" />
                 {:else}
                   <span class="absolute -bottom-6 -end-2 select-none text-[11rem] font-semibold leading-none text-primary/15" aria-hidden="true">{initial(p.name)}</span>
                 {/if}

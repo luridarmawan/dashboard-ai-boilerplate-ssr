@@ -1,6 +1,7 @@
 <script lang="ts">
 import '../app.css';
-import { setContext } from 'svelte';
+import { onMount, setContext } from 'svelte';
+import { initLazy } from '$lib/actions/lazy';
 import ScrollTop from '$lib/components/ScrollTop.svelte';
 import Toaster from '$lib/components/ui/Toaster.svelte';
 import { provideI18n } from '$lib/i18n';
@@ -10,6 +11,10 @@ import type { LayoutData } from './$types';
  * Root shell: loads the token stylesheet and exposes the active theme to components
  * (`<Icon>` reads the icon set from here). Shell LAYOUTS (sidebar, top nav, …) are resolved per
  * page kind and variant in the (app) / auth / public layouts (M2 S2), not here.
+ *
+ * It also starts the one lazy-load observer for the whole app, so `class="lazy"` works in any
+ * page of any module without that module importing anything — see `$lib/actions/lazy.ts`. Images
+ * do not need it: `<Img>` (and plain `loading="lazy"`) is browser-level and needs no script.
  */
 let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
 // Getters keep the context live: a theme switch re-renders icons without a full reload.
@@ -32,6 +37,8 @@ provideI18n({
     return data.messages;
   },
 });
+// Client only, and once per document: the observers live for as long as the tab does.
+onMount(() => initLazy());
 </script>
 
 <svelte:head>
