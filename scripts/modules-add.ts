@@ -56,7 +56,29 @@ const gitBase =
     ? ['git', '-c', 'protocol.file.allow=always']
     : ['git'];
 
-// ---- 0. the ref must name a tag or a commit, never a branch (Decision L, Q-5) ----
+// ---- 0. every refusal that can be decided here, before the first network call ----
+const modulesFile = join(root, 'modules.json');
+const installed = modulesFileSchema.parse(JSON.parse(readFileSync(modulesFile, 'utf8')));
+
+/**
+ * Refuse on the name alone: wrong casing, already installed, or a directory already in the way.
+ *
+ * A caller who passed `--name` gets this verdict before anything is asked of the remote. Asking
+ * a remote about a module the host already has is a slow way to say no, and when the remote is
+ * unreachable it says the wrong thing entirely — "tidak bisa membaca ref" about a name that was
+ * never going to be accepted. Without `--name` there is nothing to check yet: the name lives in
+ * the module's own manifest, which is why the clone below has to happen first.
+ */
+function refuseByName(candidate: string): void {
+  if (!MODULE_NAME_RE.test(candidate)) usage(`nama modul "${candidate}" tidak valid`);
+  if (installed.modules.some((m) => m.name === candidate))
+    usage(`modul "${candidate}" sudah terdaftar di modules.json`);
+  const candidatePath = opt('path') ?? `modules/${candidate}`;
+  if (existsSync(join(root, candidatePath))) usage(`${candidatePath} sudah ada`);
+}
+if (name) refuseByName(name);
+
+// ---- 1. the ref must name a tag or a commit, never a branch (Decision L, Q-5) ----
 // Until here this was only a sentence in the docs: the pin below is `git checkout --detach`,
 // which accepts a branch name just as happily as a tag and records it in modules.json — where
 // it silently stops describing one build, because the branch moves on. The remote itself is
@@ -79,7 +101,7 @@ if (heads) {
   );
 }
 
-// ---- 1. discover the module name when not given: read module.json from a throwaway clone ----
+// ---- 2. discover the module name when not given: read module.json from a throwaway clone ----
 // The clone goes to the system temp dir, not into the repo: this runs before anything is
 // installed, so a checkout the host could not delete afterwards must not be left in its tree.
 if (!name) {
@@ -105,17 +127,12 @@ if (!name) {
   }
   if (failure) usage(failure);
 }
-if (!MODULE_NAME_RE.test(name)) usage(`nama modul "${name}" tidak valid`);
+// The same refusals again, now for the name the clone reported. Cheap, and it keeps one place
+// that decides what an acceptable name is.
+refuseByName(name);
 
 const path = opt('path') ?? `modules/${name}`;
 const absPath = join(root, path);
-
-// ---- 2. guard against duplicates ----
-const modulesFile = join(root, 'modules.json');
-const parsed = modulesFileSchema.parse(JSON.parse(readFileSync(modulesFile, 'utf8')));
-if (parsed.modules.some((m) => m.name === name))
-  usage(`modul "${name}" sudah terdaftar di modules.json`);
-if (existsSync(absPath)) usage(`${path} sudah ada`);
 
 // ---- 3. add the submodule and pin it ----
 console.log(`modules:add: menambahkan submodule ${url} → ${path}`);
