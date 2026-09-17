@@ -4,11 +4,11 @@ Tutorial untuk membangun modul yang **hidup di repo Anda sendiri**, punya siklus
 
 Kalau modulnya justru bagian dari produk ini dan tinggal di dalam repo ini, pakai [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md).
 
-## Model mentalnya dulu — supaya tidak salah jalan
+## Konsep model — supaya tidak salah jalan
 
 Tiga hal yang sering ditebak salah:
 
-- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber template modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Kontraknya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
+- **Clone core: ya. Fork core: tidak.** Anda tetap meng-clone repo ini seperti biasa — itu sumber template modul dan tempat `bun dev` berjalan saat Anda mencoba. Yang tidak dilakukan adalah mem-fork-nya lalu menaruh modul di dalamnya sebagai kode Anda sendiri: yang di-fork berhenti bisa diperbarui, padahal justru itu yang harus tetap mengalir. Ketentuannya memang kebalikan dari fork — modul **tidak menyentuh berkas core sama sekali**, dan itu dijaga penjaga CI (G-6).
 - **Repo modul Anda berdiri sendiri.** Ia bukan turunan core dan tidak menyalin core; ia punya remote, tag, dan CI-nya sendiri.
 - **Submodule adalah cara HOST memasang, bukan cara Anda bekerja.** Anda mengembangkan di repo biasa; saat dipasang, host menaruhnya sebagai submodule terkunci pada tag.
 
@@ -22,7 +22,7 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 └── harness.ts
 ```
 
-## Peta perjalanannya
+## Roadmap
 
 Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
 
@@ -74,11 +74,11 @@ Yang **tidak** perlu adalah mem-fork-nya, menyuntingnya, atau memelihara checkou
 1. **Mengambil template modul.** `bun create module` membaca template dari `.bun-create/module` di dalam checkout core — jadi checkout itu harus ada dulu. Tidak ada versi jarak jauhnya.
 2. **Menjalankan aplikasinya saat Anda mengembangkan** (`bun dev`), supaya modul Anda bisa dilihat di browser.
 
-Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda — dan bila suatu saat modul Anda menuntutnya, itu cacat kontrak yang perlu dilaporkan, bukan diizinkan.
+Sesudah itu, satu-satunya repo yang Anda commit adalah **repo modul Anda**. Core tidak pernah menerima commit dari Anda.
 
 Untuk build/lint/test, harness bisa mengurus core-nya sendiri (§2) — itulah yang dimaksud "tanpa menyiapkan core secara manual". Di mesin Anda, arahkan saja ke clone yang sudah ada.
 
-Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kontrak modul tidak terikat lisensi core.
+Selebihnya: Bun 1.4.x, dan MySQL/PostgreSQL bila Anda mau menjalankan tes integrasi. Core ini berlisensi MIT — bila repositorinya publik, tidak ada kredensial yang perlu disiapkan; untuk core privat (fork atau mirror internal) lihat §7a. Lisensi modul Anda sendiri terserah Anda: template modul tidak menuliskan field `license`, dan modul yang hanya bergantung pada `@core/*` lewat kebijakan modul tidak terikat lisensi core.
 
 ## 1. Bikin repo modulnya
 
