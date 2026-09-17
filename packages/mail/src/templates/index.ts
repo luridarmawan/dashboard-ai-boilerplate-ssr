@@ -23,7 +23,8 @@ export type TemplateId =
   | 'set-password'
   | 'invite'
   | 'invite-existing'
-  | 'contact';
+  | 'contact'
+  | 'contact-ack';
 
 type Dict = Record<string, string>;
 const T: Record<'id' | 'en', Dict> = {
@@ -52,6 +53,12 @@ const T: Record<'id' | 'en', Dict> = {
     'contact.subject': 'Pesan baru dari {name} — {app}',
     'contact.body': 'Pesan masuk lewat formulir kontak:',
     'contact.reply': 'Balas ke',
+    'contact_ack.subject': 'Terima kasih, pesan Anda sudah kami terima',
+    'contact_ack.body':
+      'Terima kasih sudah menghubungi kami. Pesan Anda sudah masuk dan tim kami akan membalas ke alamat email ini.',
+    'contact_ack.copy': 'Salinan pesan Anda:',
+    'contact_ack.noreply':
+      'Email ini dikirim otomatis sebagai tanda terima — Anda tidak perlu membalasnya.',
     ignore: 'Jika Anda tidak meminta ini, abaikan email ini.',
     footer: 'Email ini dikirim oleh {app}.',
     'link.fallback': 'Bila tombol tidak berfungsi, salin tautan ini ke peramban:',
@@ -80,6 +87,12 @@ const T: Record<'id' | 'en', Dict> = {
     'contact.subject': 'New message from {name} — {app}',
     'contact.body': 'A message arrived through the contact form:',
     'contact.reply': 'Reply to',
+    'contact_ack.subject': 'Thank you, we have your message',
+    'contact_ack.body':
+      'Thanks for getting in touch. Your message reached us and our team will reply to this address.',
+    'contact_ack.copy': 'A copy of your message:',
+    'contact_ack.noreply':
+      'This is an automatic acknowledgement — there is no need to reply to it.',
     ignore: 'If you did not request this, you can ignore this email.',
     footer: 'This email was sent by {app}.',
     'link.fallback': 'If the button does not work, paste this link into your browser:',
@@ -180,6 +193,18 @@ export function renderTemplate(
         subject,
         html: shell(brand, locale, subject, body),
         text: `${tr(locale, 'invite_existing.body', vars)}\n\n${link}`,
+      };
+    }
+    case 'contact-ack': {
+      // To the VISITOR, not to the inbox behind the form: everything here is either brand copy or
+      // the visitor's own words quoted back, so they can see exactly what arrived.
+      const subject = `${tr(locale, 'contact_ack.subject')} — ${app}`;
+      const msg = escapeHtml(String(data.message ?? '')).replace(/\n/g, '<br>');
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'contact_ack.body')}</p><p style="color:#71717a;font-size:13px;margin-bottom:4px">${tr(locale, 'contact_ack.copy')}</p><blockquote style="margin:4px 0 24px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${msg}</blockquote><p style="color:#71717a;font-size:12px">${tr(locale, 'contact_ack.noreply')}</p>`;
+      return {
+        subject,
+        html: shell(brand, locale, subject, body),
+        text: `${tr(locale, 'contact_ack.body')}\n\n${tr(locale, 'contact_ack.copy')}\n${String(data.message ?? '')}\n\n${tr(locale, 'contact_ack.noreply')}`,
       };
     }
     case 'contact': {

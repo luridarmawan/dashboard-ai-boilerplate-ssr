@@ -300,7 +300,7 @@ export default defineConfig('Billing', [
 ]);
 ```
 
-Tipe: `string · text · number · boolean · select · secret · markdown · route · theme · locale · list`. `route` divalidasi terhadap registry route saat disimpan; `theme` terhadap registry tema; `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+Tipe: `string · text · number · boolean · select · secret · markdown · route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan; `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di bawah field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
 
@@ -632,7 +632,7 @@ Yang ada di repo modul selain kode modul itu sendiri:
 
 | Berkas | Guna |
 |---|---|
-| `harness.ts` | **Satu-satunya cara build/lint/test tanpa meng-clone core secara manual** (§4.9 poin 2). Menyalin modul ke `<core>/modules/<Nama>`, mendaftarkannya, `bun install`, `modules:sync`, `tsc`, `biome check`, `db:generate`, lalu `bun test modules/<Nama>/test`. Dengan `DATABASE_URL`: migrasi + tes integrasi. `--web`: + svelte-check halaman |
+| `harness.ts` | **Satu-satunya cara build/lint/test tanpa meng-clone core secara manual** (§4.9 poin 2). Menyalin modul ke `<core>/modules/<Nama>`, mendaftarkannya, `bun install`, `modules:sync`, `tsc`, format (hasilnya ditulis balik ke repo modul), `biome check`, `db:generate` (tanpa `TABLE_PREFIX`, supaya drizzle-kit tidak melihat semua tabel berganti nama), lalu `bun test modules/<Nama>/test`. Dengan `DATABASE_URL`: migrasi + tes integrasi. `--web`: + svelte-check halaman |
 | `rename.ts` | Mengganti nama modul di semua berkas & nama berkas |
 | `.github/workflows/ci.yml` | CI repo modul: MySQL service + `bun run harness --web` |
 | `package.json` → `"core": { "repo", "ref" }` | Core yang dipakai harness. Ganti `ref` ke tag core saat merilis, selaras dengan `engines.core` di `module.json` |

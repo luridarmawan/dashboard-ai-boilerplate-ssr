@@ -5,6 +5,7 @@ import { enhance } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
+import TimezoneClock from '$lib/components/TimezoneClock.svelte';
 import { Badge, Button, Card, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -55,6 +56,13 @@ function actionText(r: ActionResult): string {
   const text = t(key, r.params);
   return text === key ? r.message : text;
 }
+
+/**
+ * What a `timezone` field holds right now, per scope. The clock below the field reads THIS, not
+ * the saved value, so the operator sees the zone they are typing before they press Save.
+ */
+let zones = $state<Record<string, string>>({});
+const zoneId = (section: string, key: string) => `${data.scope}:${section}:${key}`;
 
 let running = $state<string | null>(null);
 let results = $state<Record<string, ActionResult>>({});
@@ -341,6 +349,8 @@ $effect(() => {
                     <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
                   {:else}<span class="text-muted-foreground">—</span>{/each}
                 </div>
+              {:else if f.type === 'timezone'}
+                <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} placeholder="Asia/Jakarta" autocomplete="off" oninput={(e) => (zones[zoneId(s.section, f.key)] = e.currentTarget.value)} />
               {:else if f.type === 'text' || f.type === 'markdown'}
                 <Textarea {id} name={f.key} rows={f.type === 'markdown' ? 6 : 3} value={strVal} maxlength={f.max ?? undefined} />
               {:else if f.type === 'number'}
@@ -349,6 +359,17 @@ $effect(() => {
                 <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
               {/if}
             </Field>
+            {#if f.type === 'timezone'}
+              <!-- Extension point 6 stays honest: this hangs off the field TYPE, not off `app.timezone`. -->
+              <TimezoneClock
+                class="sm:col-span-2"
+                timezone={zones[zoneId(s.section, f.key)] ?? strVal}
+                fallback={strVal}
+                {locale}
+                label={t('settings.timezone_now')}
+                invalidText={t('settings.timezone_unknown')}
+              />
+            {/if}
           {/each}
           <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
             <Button type="submit" disabled={saving === s.section}>

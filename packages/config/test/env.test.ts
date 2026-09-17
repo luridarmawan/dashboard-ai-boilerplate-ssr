@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { EnvError, loadEnv, parseOrigins } from '../src/index.ts';
 
 const valid = {
@@ -95,5 +97,22 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     expect(env.APP_ORIGIN_PRIMARY).toBe('https://localhost');
     expect(loadEnv(valid).APP_ORIGINS).toEqual([]);
     expect(() => loadEnv({ ...valid, APP_ORIGIN: 'not a url' })).toThrow(EnvError);
+  });
+
+  test('UPLOADS_DIR relatif berlabuh di akar proyek, bukan di cwd (Q-9)', () => {
+    // `bun dev` menjalankan api dengan cwd apps/api, `bun start` dari akar: berkas yang ditulis
+    // salah satunya harus terbaca oleh yang lain, jadi keduanya wajib menunjuk direktori yang sama.
+    const cwd = process.cwd();
+    const fromRoot = loadEnv(valid).UPLOADS_DIR;
+    expect(isAbsolute(fromRoot)).toBe(true);
+    expect(fromRoot.endsWith('/data/uploads')).toBe(true);
+    try {
+      process.chdir(fileURLToPath(new URL('../../../apps/api', import.meta.url)));
+      expect(loadEnv(valid).UPLOADS_DIR).toBe(fromRoot);
+    } finally {
+      process.chdir(cwd);
+    }
+    // Nilai absolut (compose, systemd) dibiarkan apa adanya.
+    expect(loadEnv({ ...valid, UPLOADS_DIR: '/data/uploads' }).UPLOADS_DIR).toBe('/data/uploads');
   });
 });

@@ -305,6 +305,7 @@ export type ConfigFieldType =
   | 'route'
   | 'theme'
   | 'locale'
+  | 'timezone'
   | 'list';
 
 export interface ConfigFieldDef {

@@ -114,6 +114,7 @@ async function runTest(event: SubmitEvent) {
   </div>
   <Card>
     <FormBuilder
+      class="[&_button]:cursor-pointer"
       fields={mcpFields(t)}
       values={{ name: m.name, code: m.code, transport: m.transport, url: m.url, headers: headerLines(m.headers), enabled: m.enabled }}
       errors={fieldErrors}
@@ -133,7 +134,7 @@ async function runTest(event: SubmitEvent) {
         <!-- Base: a POST to `?/test`. Enhanced: the same request over fetch, same endpoint. -->
         <form method="POST" action="?/test" onsubmit={runTest}>
           <Csrf token={data.csrf} />
-          <Button type="submit" variant="outline" size="sm" disabled={testing} aria-busy={testing} data-testid="mcp-test">
+          <Button type="submit" variant="outline" size="sm" class="cursor-pointer" disabled={testing} aria-busy={testing} data-testid="mcp-test">
             <Icon name="refresh" size={16} class={testing ? 'animate-spin' : ''} />
             {testing ? t('common.running') : connected ? t('ai.mcps.retest') : t('ai.mcps.test')}
           </Button>
@@ -159,7 +160,7 @@ async function runTest(event: SubmitEvent) {
         />
         <!-- Only the no-JavaScript path needs it; with JavaScript the list is already narrowed. -->
         <noscript>
-          <Button type="submit" variant="outline" size="sm"><Icon name="search" size={16} />{t('common.apply')}</Button>
+          <Button type="submit" variant="outline" size="sm" class="cursor-pointer"><Icon name="search" size={16} />{t('common.apply')}</Button>
         </noscript>
       </form>
       <p class="text-sm text-muted-foreground" data-testid="mcp-tools-count">
@@ -191,7 +192,17 @@ async function runTest(event: SubmitEvent) {
   </Card>
   {#if can('ai.mcp.manage')}
     <Card>
-      <ConfirmDelete csrf={data.csrf} href={`/m/ai/mcps/${m.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/mcps/${m.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.mcps.delete_confirm_lead', { name: m.name })} />
+      <ConfirmDelete class="cursor-pointer" csrf={data.csrf} href={`/m/ai/mcps/${m.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/mcps/${m.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.mcps.delete_confirm_lead', { name: m.name })} />
     </Card>
   {/if}
 </div>
+
+<style>
+  /*
+   * Tombol konfirmasi hapus tak bisa dicapai kelas utilitas di atas: pada jalur tanpa JavaScript
+   * ia dirender di dalam ConfirmDelete, dan pada jalur dialog bits-ui memasangnya lewat portal ke
+   * <body> — di luar pohon `.page` ini.
+   */
+  :global([data-dialog-content] button),
+  :global(#confirm-delete button) { cursor: pointer; }
+</style>

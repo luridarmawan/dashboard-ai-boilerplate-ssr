@@ -5,8 +5,9 @@ import { webRoutes } from './generated/routes.ts';
 /**
  * Typed validation of a configuration value (E-3): a `route` must exist in the route registry
  * built by `modules:sync`/`layout:variants` (§4.7 rule 1), a `theme` must be registered, a
- * `select` must be one of its options, numbers respect bounds. Values are stored as strings;
- * `normalize` produces the canonical string, `parse` turns it back into a typed value.
+ * `timezone` must be a zone `Intl` knows, a `select` must be one of its options, numbers respect
+ * bounds. Values are stored as strings; `normalize` produces the canonical string, `parse` turns
+ * it back into a typed value.
  */
 export type ConfigValue = string | number | boolean | string[] | null;
 
@@ -20,6 +21,20 @@ export interface ValidationFail {
 }
 
 const LOCALES = ['id', 'en'];
+
+/**
+ * An IANA zone name is valid when `Intl` accepts it — the same test the API clock helpers use;
+ * duplicated here because `packages/settings` may not reach into `apps/api`.
+ */
+function isValidTimeZone(zone: string): boolean {
+  if (!zone || zone.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function validateValue(
   field: ConfigFieldDef,
@@ -85,6 +100,12 @@ export function validateValue(
       const custom =
         s.startsWith(CUSTOM_PREFIX) && CUSTOM_SLUG_RE.test(s.slice(CUSTOM_PREFIX.length));
       if (!themeById(s) && !custom) return { ok: false, message: `tema "${s}" tidak terdaftar` };
+      return { ok: true, stored: s };
+    }
+    case 'timezone': {
+      if (empty) return { ok: true, stored: null };
+      const s = String(raw).trim();
+      if (!isValidTimeZone(s)) return { ok: false, message: `zona waktu "${s}" tidak dikenal` };
       return { ok: true, stored: s };
     }
     case 'locale': {

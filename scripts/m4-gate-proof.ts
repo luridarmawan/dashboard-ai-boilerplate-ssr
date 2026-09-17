@@ -216,6 +216,11 @@ const admin = new Jar();
     rows.some((x) => x.template === 'contact' && x.to === 'sales@example.test'),
     `${ob.status} ${rows.length} rows`,
   );
+  check(
+    '#3 the visitor is thanked too (template contact-ack → the address they submitted)',
+    rows.some((x) => x.template === 'contact-ack' && x.to === email),
+    `${ob.status} ${rows.length} rows`,
+  );
 }
 
 // ---- R-9: a SECOND public arrangement from the same module, and `/` may point at it ----

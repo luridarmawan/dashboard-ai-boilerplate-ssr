@@ -45,8 +45,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'string',
         title: { id: 'Nama aplikasi', en: 'Application name' },
         note: {
-          id: 'Tampil di kiri atas setiap halaman, judul tab halaman depan, dan email keluar.',
-          en: 'Shown top-left on every page, in the landing page tab title, and in outgoing e-mail.',
+          id: 'Tampil di kiri atas setiap halaman, judul tab halaman depan, dan email keluar. APP_LANDING_TITLE di .env menimpanya untuk email.',
+          en: 'Shown top-left on every page, in the landing page tab title, and in outgoing e-mail. APP_LANDING_TITLE in .env overrides it for e-mail.',
         },
         default: 'Dashboard',
         public: true,
@@ -121,7 +121,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'app.timezone',
-        type: 'string',
+        type: 'timezone',
         title: { id: 'Zona waktu', en: 'Timezone' },
         note: {
           id: 'Nama IANA, mis. Asia/Jakarta. Data tetap disimpan dalam UTC; ini yang menentukan kapan "hari ini" dimulai bagi asisten AI dan laporan berentang tanggal. Kosongkan untuk memakai zona waktu server (TZ).',

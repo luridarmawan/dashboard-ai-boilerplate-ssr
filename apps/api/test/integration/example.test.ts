@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { and, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 
 /** Integration: the Example module's PUBLIC API answers anonymously (R-2, R-3). */
@@ -41,5 +42,71 @@ describe.skipIf(!enabled)('Example public API', () => {
     // Unsorted stays the admin's merchandising order, exactly as the storefront had it.
     expect(all.data.length).toBe(asc.data.length);
     expect((await list('?featured=1')).data.every((p) => p.featured)).toBe(true);
+  });
+
+  /**
+   * R-5: the contact form answers the visitor twice — on the page, and in their inbox. The
+   * acknowledgement is queued in the outbox like any other mail (J-1), addressed to the address
+   * that was just submitted, and it does not depend on `example.contact_email` (that setting only
+   * says where the inquiry is READ).
+   */
+  test('a contact inquiry queues a thank-you to the sender', async () => {
+    const db = unsafeAcrossTenants();
+    const stamp = Date.now();
+    const email = `ack-${stamp}@example.test`;
+    // Public, but state-changing: the CSRF pair travels like it does from the browser (§1.3 rule 6).
+    const token = 'E'.repeat(43);
+    const submit = (body: Record<string, unknown>, ip: string, locale?: string) =>
+      app.handle(
+        new Request('http://api.test/v1/m/example/inquiries', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'http://api.test',
+            cookie: `crk_csrf=${token}`,
+            'x-csrf-token': token,
+            // Own IP per call: the form is rate limited 5/hour per address (R-5).
+            'x-forwarded-for': ip,
+            ...(locale ? { 'accept-language': locale } : {}),
+          },
+          body: JSON.stringify(body),
+        }),
+      );
+    const res = await submit(
+      { name: 'Siti', email, message: 'Halo, saya ingin memesan 10 kg untuk kantor kami.' },
+      `10.73.${Math.floor(stamp / 1000) % 250}.${stamp % 250}`,
+      'en',
+    );
+    expect([200, 201]).toContain(res.status);
+    const [row] = await db
+      .select()
+      .from(schema.outboxEmail)
+      .where(
+        and(
+          eq(schema.outboxEmail.to_address, email),
+          eq(schema.outboxEmail.template, 'contact-ack'),
+        ),
+      );
+    expect(row).toBeDefined();
+    expect(row?.to_name).toBe('Siti');
+    // Written in the language the form was submitted in, with the visitor's own words to quote back.
+    expect(row?.locale).toBe('en');
+    expect((row?.payload as { message?: string })?.message).toContain('10 kg');
+    // The honeypot answers "received" and stores nothing — that includes the thank-you.
+    const bot = `ack-bot-${stamp}@example.test`;
+    await submit(
+      {
+        name: 'Bot',
+        email: bot,
+        message: 'buy cheap things now please click here',
+        website: 'http://spam.example',
+      },
+      `10.74.${Math.floor(stamp / 1000) % 250}.${stamp % 250}`,
+    );
+    const botRows = await db
+      .select()
+      .from(schema.outboxEmail)
+      .where(eq(schema.outboxEmail.to_address, bot));
+    expect(botRows).toHaveLength(0);
   });
 });

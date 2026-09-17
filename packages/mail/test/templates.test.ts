@@ -57,6 +57,25 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(r.html).toContain('&lt;img src=x');
     expect(r.html).toContain('hi &lt;b&gt;there&lt;/b&gt;');
   });
+  /** The acknowledgement goes to the VISITOR, so it quotes their own words — escaped like any other. */
+  test('contact-ack: thanks the sender in their language and quotes the message back', () => {
+    const data = { name: 'Siti', message: 'Halo, saya ingin memesan 10 kg.\nTerima kasih.' };
+    const id = renderTemplate('contact-ack', 'id', data, brand);
+    const en = renderTemplate('contact-ack', 'en', data, brand);
+    expect(id.subject).toBe('Terima kasih, pesan Anda sudah kami terima — Acme Dash');
+    expect(en.subject).toBe('Thank you, we have your message — Acme Dash');
+    expect(id.html).toContain('Halo Siti,');
+    expect(id.html).toContain('Halo, saya ingin memesan 10 kg.<br>Terima kasih.');
+    expect(id.text).toContain('Salinan pesan Anda:');
+    const evil = renderTemplate(
+      'contact-ack',
+      'id',
+      { name: 'X', message: '<script>alert(1)</script>' },
+      brand,
+    );
+    expect(evil.html).not.toContain('<script>alert(1)');
+    expect(evil.html).toContain('&lt;script&gt;');
+  });
   test('unknown locale falls back to id, never to an empty string', () => {
     const r = renderTemplate('verify-email', 'fr', { name: 'X', link: 'https://x/y' }, brand);
     expect(r.subject).toContain('Verifikasi');

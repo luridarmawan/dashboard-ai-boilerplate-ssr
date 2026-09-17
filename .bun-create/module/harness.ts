@@ -22,7 +22,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 const here = resolve(import.meta.dir);
 const pkg = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8')) as {
@@ -96,13 +96,57 @@ if (!modules.modules.some((m) => m.name === NAME)) {
   console.log(`harness: ${NAME} ditambahkan ke ${modulesFile}`);
 }
 
+/**
+ * Format the module where Biome actually lives. `bun run rename` changes identifier lengths, so
+ * the formatter's line breaks drift from the ones the template was generated with, and the module
+ * repo has no Biome of its own — its dependencies only resolve inside a core. `bun modgen` formats
+ * what it generates for the same reason; this is that step for a standalone module. The result is
+ * written back here, so what the author commits is what the check right after this accepts.
+ */
+function formatModule(): void {
+  // `--write` exits non-zero when something is left that it cannot fix: that is the checker's job
+  // to report, with its own message, right after this.
+  Bun.spawnSync(['bunx', 'biome', 'check', '--write', `modules/${NAME}`], {
+    cwd: coreDir,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const rewritten: string[] = [];
+  const back = (src: string, dst: string): void => {
+    for (const entry of readdirSync(src)) {
+      // `bun install` in core links workspace dependencies into the copy: never bring those back.
+      if (/^(\.git|node_modules|\.core)$/.test(entry)) continue;
+      const from = join(src, entry);
+      const to = join(dst, entry);
+      if (statSync(from).isDirectory()) {
+        back(from, to);
+        continue;
+      }
+      if (!existsSync(to) || readFileSync(from, 'utf8') !== readFileSync(to, 'utf8')) {
+        copyFileSync(from, to);
+        rewritten.push(relative(here, to));
+      }
+    }
+  };
+  back(target, here);
+  if (rewritten.length > 0) {
+    console.log(`\nharness: diformat ulang di repo ini — ${rewritten.join(', ')}`);
+  }
+}
+
 // ---- 3. assemble, check, test ----
 const env: Record<string, string> = {};
 sh(['bun', 'install'], coreDir);
 sh(['bun', 'run', 'bootstrap'], coreDir); // db codegen → modules:sync → codegen (fresh clone has no generated files)
 sh(['bunx', 'tsc', '-p', 'tsconfig.json'], target);
+formatModule();
 sh(['bunx', 'biome', 'check', `modules/${NAME}`], coreDir);
-sh(['bun', 'run', 'db:generate'], coreDir);
+// `db:generate` diffs the generated schema against the committed snapshots. The generated schema
+// applies TABLE_PREFIX (O-2) while the snapshots never carry it, so with a prefix set drizzle-kit
+// sees every table renamed and stops for an interactive answer nobody is there to give — and the
+// module's migration is silently never written. `bun modgen` strips it for the same reason; the
+// migration below is applied WITH the prefix, which is where it belongs.
+sh(['bun', 'run', 'db:generate'], coreDir, { TABLE_PREFIX: '' });
 if (args.has('--web')) {
   sh(['bunx', 'svelte-kit', 'sync'], join(coreDir, 'apps/web'));
   sh(

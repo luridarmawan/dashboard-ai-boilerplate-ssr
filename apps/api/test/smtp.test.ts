@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { resolveSmtp } from '../src/mail.ts';
+import { resolveAppName, resolveSmtp } from '../src/mail.ts';
 
 /** J-1 / E-6: .env bootstraps SMTP; a filled setting wins field by field. */
 const empty = {
@@ -82,5 +82,27 @@ describe('resolveSmtp', () => {
         appName: 'x',
       })?.fromAddress,
     ).toBe('a@b.c');
+  });
+});
+
+/**
+ * The name e-mail is signed with (header, footer and every subject that says {app}). The
+ * deployment's own `APP_LANDING_TITLE` — the same value that titles the landing page and the
+ * OpenAPI document — wins, so a message never reads as a different product from the site.
+ */
+describe('resolveAppName', () => {
+  test('APP_LANDING_TITLE wins over the tenant setting', () => {
+    expect(resolveAppName({ envTitle: 'Super App Dashboard', setting: 'Dashboard' })).toBe(
+      'Super App Dashboard',
+    );
+  });
+  test('blank or unset falls through to app.name, then to the default', () => {
+    expect(resolveAppName({ envTitle: '   ', setting: 'Kopi Nusantara' })).toBe('Kopi Nusantara');
+    expect(resolveAppName({ setting: 'Kopi Nusantara' })).toBe('Kopi Nusantara');
+    expect(resolveAppName({ envTitle: null, setting: null })).toBe('Dashboard');
+    expect(resolveAppName({})).toBe('Dashboard');
+  });
+  test('surrounding whitespace never reaches the e-mail', () => {
+    expect(resolveAppName({ envTitle: '  Super App Dashboard  ' })).toBe('Super App Dashboard');
   });
 });

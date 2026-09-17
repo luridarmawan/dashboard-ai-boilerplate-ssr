@@ -295,6 +295,8 @@
   "settings.source_default": "default",
   "settings.source_global": "global",
   "settings.source_tenant": "tenant",
+  "settings.timezone_now": "Current time",
+  "settings.timezone_unknown": "Unknown timezone — use an IANA name, e.g. Asia/Jakarta.",
   "themes.base": "Based on",
   "themes.default_badge": "default",
   "themes.edit.delete": "Delete theme",

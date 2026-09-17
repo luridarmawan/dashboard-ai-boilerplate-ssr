@@ -55,6 +55,7 @@
     "proof:m5:gate4": "sh scripts/ci/m5-gate4.sh",
     "proof:m6:docker": "docker compose up -d --wait mysql && docker compose exec -T mysql mysql -uapp -papp app -e \"DROP TABLE IF EXISTS ciprobe_widgets\" && bun run modgen:ci && (bun run proof:m1:docker; rc=$?; bun run modgen:ci:clean; exit $rc)",
     "proof:rollout": "sh scripts/ci/rollout-proof.sh",
+    "sim:module": "sh scripts/module-sim.sh",
     "scheduler:proof": "bun run scripts/scheduler-proof.ts",
     "scheduler:proof:docker": "docker compose up -d --wait mysql && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e DB_DIALECT=mysql -e DATABASE_URL=mysql://app:app@mysql:3306/app oven/bun:1.4 bun run scripts/scheduler-proof.ts",
     "start": "bun run scripts/start.ts",

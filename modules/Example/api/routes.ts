@@ -254,12 +254,15 @@ export default defineApiRoutes(
           source: body.source ?? null,
           ip,
         });
+        // Both e-mails are written in the language of the request that sent the form (K-2): the
+        // web forwards the locale it resolved for the visitor, and the tenant's default backs it up.
+        const locale = await mailLocale({ request, clientId: tid });
         const to = await settings.get<string | null>(tid, 'example.contact_email');
         if (to) {
           await sendTemplate(db, {
             to,
             template: 'contact',
-            locale: await mailLocale({ request, clientId: tid }),
+            locale,
             clientId: tid,
             data: {
               name: body.name.trim(),
@@ -269,6 +272,19 @@ export default defineApiRoutes(
             },
           });
         }
+        // …and a thank-you to the visitor themselves, with their own message quoted back. It does
+        // not depend on `example.contact_email`: that setting says where the inquiry is READ, and a
+        // storefront with nobody reading it still owes the visitor a receipt. Only ever sent to the
+        // address that was just submitted, and the form's own rate limit (5/hour per IP) is what
+        // keeps this from becoming a way to mail strangers.
+        await sendTemplate(db, {
+          to: body.email.trim(),
+          toName: body.name.trim(),
+          template: 'contact-ack',
+          locale,
+          clientId: tid,
+          data: { name: body.name.trim(), message: body.message.trim() },
+        });
         // J-4: whoever may read inquiries in this tenant gets a bell notification (no email needed).
         await notify({
           clientId: tid,

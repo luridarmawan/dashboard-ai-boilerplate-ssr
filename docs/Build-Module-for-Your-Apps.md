@@ -38,6 +38,26 @@ bun modules:add <url> --ref v1.4.2   → §6   host memasang, terkunci di tag
 git push (di repo host)              → §6   host meng-commit pemasangannya
 ```
 
+### Melihatnya jalan dulu: `bun run sim:module`
+
+Dari dalam checkout core, satu perintah menjalankan seluruh sembilan langkah di atas untuk sebuah modul contoh bernama `Contact` — direktori kerja sementara, clone core, `.env`, repo modul, `rename`, tag, harness (termasuk migrasi dan tes integrasi bila database Anda hidup), pemasangan lewat `modules:add` yang terkunci di tag, lalu pencabutannya:
+
+```bash
+bun run sim:module                  # ± 20 detik; tiap langkah mencetak perintah yang Anda ketik
+SIM_DIR=~/kerja bun run sim:module  # jawab pertanyaan direktori kerja di muka
+SIM_NO_DB=1 bun run sim:module      # tanpa database
+SIM_YES=1 bun run sim:module        # tanpa pertanyaan sama sekali (CI)
+```
+
+Di terminal ia menanyakan dua hal lebih dulu:
+
+1. **Direktori kerja** — tempat klon core dan repo modul `Contact` dibuat (baku: folder sementara di `/tmp`).
+2. **Core-nya dari mana** — (1) **klon repo lokal ini** pada HEAD: cepat, tanpa jaringan, dan **hanya memuat yang sudah di-commit** (ini `git clone file://…`, bukan salin folder — perubahan yang belum di-commit tidak ikut); atau (2) **klon dari GitHub**, lalu Anda pilih branch `main` atau `development`.
+
+Pilihan kedua itu berguna justru karena bisa merah: menjalankannya terhadap `main` memberi tahu Anda apakah pembaca yang meng-clone branch itu hari ini akan berhasil mengikuti dokumen ini.
+
+Tabel simulasi dipisahkan dengan `TABLE_PREFIX=sim_` dan dihapus lagi di akhir, jadi database Anda tidak ikut terpakai. Kalau simulasi itu merah, dokumen inilah yang salah — bukan Anda.
+
 ## 0. Prasyarat, dan pertanyaan pertama: apakah saya perlu clone core?
 
 **Ya — clone dulu.** Sekali, di awal, seperti kebiasaan Anda:
@@ -72,6 +92,8 @@ bun run rename Billing                    # sekali saja: Hello → Billing (name
 git init -b main
 git add -A && git commit -m "modul Billing dari template"
 ```
+
+**Nama foldernya tidak menentukan nama modul.** `bun create module` hanyalah penyalin template — Bun tidak meneruskan nama apa pun ke dalamnya, jadi `bun create module ../Contact` pun menghasilkan modul yang masih bernama `Hello` (tabel `hello_*`, route `/m/hello/…`). Yang mengubahnya cuma `bun run rename <Nama>`, yang menulis ulang nama itu di ±25 berkas sekaligus: `module.json`, nama paket, tabel, izin, id menu, route, kunci i18n, dan nama berkas tes. Satu-satunya jejak folder adalah `package.json` → `name`, yang memang ditimpa Bun dengan nama folder tujuan; `rename` mengembalikannya ke `@modules/<namespace>`. Karena itu urutannya selalu **create → rename**, dan rename dijalankan **sekali, sebelum Anda menulis kode sendiri**: ia mengganti kata `Hello`/`hello` di seluruh berkas teks, termasuk yang nanti Anda tulis sendiri.
 
 Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
 
@@ -129,7 +151,7 @@ bun run harness --web                               # + svelte-check untuk halam
 DATABASE_URL=mysql://app:app@127.0.0.1:3306/app bun run harness   # + migrasi & tes integrasi
 ```
 
-Apa pun caranya, yang dilakukan harness sama: menyalin folder modul ke `<core>/modules/<Nama>`, mendaftarkannya di `modules.json` core itu, `bun install`, `bootstrap`, `tsc`, `biome check`, `db:generate`, lalu tes modul. Core-nya sekali pakai — tidak ada yang perlu Anda commit dari sana.
+Apa pun caranya, yang dilakukan harness sama: menyalin folder modul ke `<core>/modules/<Nama>`, mendaftarkannya di `modules.json` core itu, `bun install`, `bootstrap`, `tsc`, `biome check --write` (hasil formatnya ditulis balik ke repo modul — repo modul tidak punya Biome sendiri, sedangkan `rename` menggeser panjang baris), `biome check`, `db:generate`, lalu tes modul. Core-nya sekali pakai — tidak ada yang perlu Anda commit dari sana.
 
 **`bun install` langsung di repo modul tidak berguna** — dependensinya `workspace:*` dan `tsconfig.json`-nya mengacu `../../tsconfig.base.json`; keduanya baru benar ketika modul berada di dalam core. Itulah alasan harness ada. Kalau Anda melihat galat resolusi paket, hampir pasti karena melewatkan harness.
 

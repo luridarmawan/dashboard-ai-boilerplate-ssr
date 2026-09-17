@@ -1,4 +1,5 @@
 <script lang="ts">
+import { applyAction, enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
@@ -63,6 +64,38 @@ const art = [
 const artOf = (i: number) => art[i % art.length];
 const initial = (name: string) => name.trim().charAt(0).toUpperCase();
 const hero = $derived(data.products.slice(0, 3));
+
+/**
+ * The contact form keeps its form action — without JavaScript it still posts, still re-renders
+ * with the confirmation, still works (R-5). `use:enhance` only takes the same round trip over
+ * fetch when the browser can: no reload, the button says it is sending, and the confirmation
+ * slides in where the form stood. Nothing new on the server; the two paths share one action.
+ */
+let sending = $state(false);
+/**
+ * Flipped on mount: a click that lands before hydration posts the form the ordinary way, which is
+ * correct but is the OTHER layer. It marks the form in the DOM so a test can tell which answered.
+ */
+let enhanced = $state(false);
+$effect(() => {
+  enhanced = true;
+});
+let sentHere = $state(false);
+let errorText = $state<string | null>(null);
+const sent = $derived(sentHere || form?.sent || data.sent);
+/** The server-rendered error (no-JS round trip) until the enhanced submit produces its own. */
+const shownError = $derived(
+  errorText ??
+    (form?.error
+      ? form.error === 'rate_limited'
+        ? t('example.contact.rate_limited')
+        : t('example.contact.error')
+      : null),
+);
+
+function errorFor(code: unknown): string {
+  return code === 'rate_limited' ? t('example.contact.rate_limited') : t('example.contact.error');
+}
 </script>
 
 <svelte:head>
@@ -281,7 +314,7 @@ const hero = $derived(data.products.slice(0, 3));
   </section>
 {/if}
 
-<!-- contact (no JavaScript needed) -->
+<!-- contact (works without JavaScript; enhanced into a fetch when there is some) -->
 <section id="contact" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20">
   <div class="grid gap-10 rounded-3xl border bg-card p-6 shadow-sm md:grid-cols-2 md:p-10">
     <div>
@@ -291,11 +324,38 @@ const hero = $derived(data.products.slice(0, 3));
       <p class="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground"><Icon name="clock" size={16} />{t('example.contact.hours')}</p>
     </div>
     <div>
-      {#if form?.sent || data.sent}
-        <p class="notice" role="status" data-testid="contact-sent">{t('example.contact.sent')}</p>
+      {#if sent}
+        <div class="contact-done flex flex-col items-center rounded-2xl border border-success/30 bg-success/5 px-6 py-10 text-center" role="status" data-testid="contact-sent">
+          <span class="flex h-14 w-14 items-center justify-center rounded-full bg-success/15 text-success"><Icon name="check" size={28} /></span>
+          <p class="mt-4 text-lg font-semibold text-foreground">{t('example.contact.sent_title')}</p>
+          <p class="mt-1 max-w-sm text-muted-foreground">{t('example.contact.sent')}</p>
+          <!-- A plain link, so this way back exists with or without JavaScript. -->
+          <Button href="/example#contact" variant="outline" class="mt-6 rounded-full px-6" onclick={(e) => { if (sentHere) { e.preventDefault(); sentHere = false; } }}>{t('example.contact.again')}</Button>
+        </div>
       {:else}
-        {#if form?.error}<p class="error mb-4" role="alert">{form.error === 'rate_limited' ? t('example.contact.rate_limited') : t('example.contact.error')}</p>{/if}
-        <form method="POST" action="/example?/contact#contact" class="grid gap-4">
+        {#if shownError}<p class="error mb-4" role="alert" data-testid="contact-error">{shownError}</p>{/if}
+        <form
+          method="POST"
+          action="/example?/contact#contact"
+          class="grid gap-4"
+          data-testid="contact-form"
+          data-enhanced={enhanced ? 'true' : null}
+          use:enhance={() => {
+            sending = true;
+            errorText = null;
+            return async ({ result, formElement }) => {
+              sending = false;
+              if (result.type === 'success') {
+                sentHere = true;
+                formElement.reset();
+              } else if (result.type === 'failure') {
+                errorText = errorFor((result.data as { error?: string } | undefined)?.error);
+              } else {
+                await applyAction(result);
+              }
+            };
+          }}
+        >
           <Csrf token={data.csrf} />
           <!-- honeypot: hidden from people, irresistible to bots -->
           <div class="hidden" aria-hidden="true"><label>Website <input name="website" tabindex="-1" autocomplete="off" /></label></div>
@@ -304,7 +364,7 @@ const hero = $derived(data.products.slice(0, 3));
             <label class="grid gap-1.5 text-sm font-medium">{t('example.contact.email')}<input name="email" type="email" required maxlength="191" value={form?.values?.email ?? ''} class="h-11 rounded-xl border border-input bg-background px-3 font-normal" /></label>
           </div>
           <label class="grid gap-1.5 text-sm font-medium">{t('example.contact.message')}<textarea name="message" required minlength="10" maxlength="5000" rows="5" class="rounded-xl border border-input bg-background px-3 py-2 font-normal">{form?.values?.message ?? ''}</textarea></label>
-          <div><Button type="submit" size="lg" class="rounded-full px-6"><Icon name="send" size={16} />{t('example.contact.send')}</Button></div>
+          <div><Button type="submit" size="lg" class="cursor-pointer rounded-full px-6" disabled={sending} data-testid="contact-send"><Icon name={sending ? 'refresh' : 'send'} size={16} class={sending ? 'animate-spin' : ''} />{sending ? t('example.contact.sending') : t('example.contact.send')}</Button></div>
         </form>
       {/if}
     </div>
@@ -312,3 +372,25 @@ const hero = $derived(data.products.slice(0, 3));
 </section>
 
 <p class="mx-auto max-w-6xl px-4 pb-10 text-xs text-muted-foreground">{t('example.footer.text')}</p>
+
+<style>
+  /* The confirmation replaces the form in place; a short rise makes the swap readable. */
+  .contact-done {
+    animation: contact-done-in 240ms ease-out both;
+  }
+  @keyframes contact-done-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .contact-done {
+      animation: none;
+    }
+  }
+</style>
