@@ -39,7 +39,7 @@ cp .env.example .env                 # nilai bawaan sudah cocok dengan compose.y
 docker compose up -d                 # MySQL 8 di port 33306
 bun run --cwd packages/db migrate    # migrasi ter-versi — jalur yang sama dengan produksi
 bun run db:seed                      # tenant default, grup sistem, superadmin dari BOOTSTRAP_ADMIN_*
-bun dev                              # http://127.0.0.1:5173  (API di :3001, OpenAPI di /docs)
+bun dev                              # http://127.0.0.1:5170  (API di :5001, OpenAPI di /docs)
 ```
 
 Masuk dengan `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` dari `.env`. Halaman `/` menyajikan landing modul `Example`; dashboard ada di `/dashboard`.
@@ -51,32 +51,48 @@ apps/api        Elysia — auth, tenancy, RBAC, konfigurasi, outbox email, OpenA
 apps/web        SvelteKit — SSR, layout & tema, FormBuilder/DataTable, halaman core; shim modul di-generate
 packages/       db (deskriptor netral → 3 dialect), auth, contracts, settings, ui-theme, i18n, mail, logger, module-kit, runtime
 modules/        Example (landing + CRUD), AI (chat, log, job), Dummy (tema/layout/ikon) — semuanya lewat kontrak modul
-modules.json    Satu-satunya berkas core yang disentuh saat menambah modul
+modules.json    Satu-satunya berkas core yang Anda sunting saat menambah modul
+                (modul dari repo lain juga menyentuh .gitmodules, biome.json, bun.lock, migrasi)
 deploy/         Caddyfile, nginx.conf.example, backup.sh / restore.sh
-scripts/        modgen, modules:add, proof gate M1–M6, penjaga CI
+scripts/        modgen, modules:add, sim:module, proof gate M1–M6, penjaga CI
 ```
 
 ## Perintah yang sering dipakai
 
-| Perintah | Guna |
+### Perintah Rutin
+
+| Perintah | Fungsi |
 |---|---|
 | `bun dev` | API + web dengan reload, `modules:sync` otomatis |
 | `bun run build` lalu `bun start` | jalankan build produksi di host ini tanpa Docker, **satu port** (baku `127.0.0.1:3000`) — nginx/apache cukup satu `proxy_pass`; `--no-proxy` untuk dua port ([DEPLOY §8e](./docs/DEPLOY.md)) |
-| `bun run systemd:install` · `bun run systemd:uninstall` | jadikan `bun start` di checkout ini systemd *user* service (`systemctl --user restart crk`, log ke `logs/crk.log`) supaya tetap hidup sesudah SSH ditutup dan menyala lagi sesudah reboot, tanpa root ([DEPLOY §8f](./docs/DEPLOY.md)) |
-| `bun run check` | lint (Biome) + typecheck semua paket, kedua dialect |
-| `bun run test:unit` · `bun run test:integration:docker` | unit tanpa `.env`; integrasi dengan MySQL di Docker |
-| `bun run proof:m1:docker` | seluruh bukti gate M1–M6 lewat HTTP tanpa browser (`PROOF_ONLY=M4` untuk satu saja) |
-| `bun run proof:e2e:docker` | E2E Playwright (landing → login → CRUD → chat) di container |
 | `bun modgen <Nama> --fields "name:string!,qty:number"` | modul CRUD lengkap yang langsung jalan |
-| `bun create module ../mod-x` | repositori modul standalone dengan harness sendiri |
+| `bun create module ../mod-x` lalu `bun run rename <Nama>` | repositori modul standalone dengan harness sendiri; nama folder **tidak** menamai modulnya — `rename` yang melakukannya, sekali, sebelum Anda menulis kode |
 | `bun modules:add <git-url> --ref <tag>` | pasang modul dari repositori lain |
 | `bun modules:remove <Nama>` | uninstall bersih: lepas registrasi, hapus folder/submodule, migrasi turun untuk tabelnya (G-15) |
 | `bun run db:generate` | migrasi baru (mysql + pg) setelah mengubah tabel |
 | `bun run db:matrix:docker` | migrasi + smoke di MySQL 8, MariaDB 11, PostgreSQL 16 |
 
+### Perintah untuk Test
+
+| Perintah | Fungsi |
+|---|---|
+| `bun run check` | lint (Biome) + typecheck semua paket, kedua dialect |
+| `bun run test:unit` · `bun run test:integration:docker` | unit tanpa `.env`; integrasi dengan MySQL di Docker |
+| `bun run proof:m1:docker` | seluruh bukti gate M1–M6 lewat HTTP tanpa browser (`PROOF_ONLY=M4` untuk satu saja) |
+| `bun run proof:e2e:docker` | E2E Playwright (landing → login → CRUD → chat) di container |
+| `bun run sim:module` | simulasi sembilan langkah [Build-Module-for-Your-Apps](./docs/Build-Module-for-Your-Apps.md) untuk modul contoh `Contact`: create → rename → harness → `modules:add` → remove |
+
+
+### Perintah untuk Deploy
+
+| Perintah | Fungsi |
+|---|---|
+| `bun run systemd:install` · `bun run systemd:uninstall` | jadikan `bun start` di checkout ini systemd *user* service (`systemctl --user restart crk`, log ke `logs/crk.log`) supaya tetap hidup sesudah SSH ditutup dan menyala lagi sesudah reboot, tanpa root ([DEPLOY §8f](./docs/DEPLOY.md)) |
+
+
 ## Cara mengubah hal-hal yang paling sering ditanyakan
 
-- **Membuat modul** — mulai dari tutorialnya: [di dalam repo ini](./docs/Build-Module-for-Boilerplate.md) (`bun modgen`) atau [di repositori sendiri](./docs/Build-Module-for-Your-Apps.md) (`bun create module`, dipasang sebagai submodule terkunci). Kontrak lengkap tiap berkas: [`docs/MODULES.md`](./docs/MODULES.md).
+- **Membuat modul** — mulai dari tutorialnya: [di dalam repo ini](./docs/Build-Module-for-Boilerplate.md) (`bun modgen`) atau [di repositori sendiri](./docs/Build-Module-for-Your-Apps.md) (`bun create module` → `bun run rename <Nama>`, dipasang sebagai submodule terkunci). Kontrak lengkap tiap berkas: [`docs/MODULES.md`](./docs/MODULES.md).
 - **Menambah tema / layout / set ikon** — dari modul (`themes/<id>/`, `layouts.ts`, `icons.ts`), tanpa menyentuh core: [`docs/THEMES.md`](./docs/THEMES.md) dan `modules/Dummy`. Tema **kustom tanpa deploy**: admin merakitnya di **Tema kustom** (`/themes`) dari token, set ikon, dan layout terdaftar; wajib lolos kontras AA. Tema baku dan allowlist diatur di **Pengaturan → Aplikasi**.
 - **Mengganti landing page** — **Pengaturan → Aplikasi → Halaman depan (anonim)** (`app.landing_route`), berlaku seketika tanpa restart; route yang tidak ada ditolak saat disimpan. Kosongkan kolomnya untuk kembali ke `LANDING_ROUTE` di `.env` (fallback bootstrap, baku `/example`). Bila `/` tetap menampilkan halaman depan bawaan, route pilihan itu tidak bisa dirender — modulnya nonaktif untuk tenant itu, atau routenya sudah tidak ada; alasannya tercatat sebagai peringatan di log web, dan `curl -I /` menunjukkan header `x-landing-route` saat forwarding berhasil. Modul mana pun boleh menyumbang halaman publik (`public.ts`).
 - **Mengganti judul & footer** — `APP_LANDING_TITLE`, `APP_LANDING_LEAD`, dan `APP_FOOTER_TITLE` di `.env` / `.env.prod` menimpa `landing.title`, `landing.lead`, dan `shell.footer` di semua bahasa; `APP_LANDING_TITLE` sekaligus menjadi judul dokumen OpenAPI di `/docs` **dan nama merek di email keluar** (header, baris footer, dan subjek) — di situ ia menimpa `app.name` dari Pengaturan. Nama dan logo per tenant tetap di **Pengaturan → Aplikasi**. Panel kanan layout masuk `split-hero` juga memakai dua nilai itu: `APP_LANDING_LEAD` sebagai judul besar, `APP_FOOTER_TITLE` sebagai baris di bawahnya.
@@ -117,7 +133,7 @@ bun install
 bun run bootstrap                 # codegen skema untuk dialect di .env + rakit modul
 bun run db:migrate                # migrasi ter-versi
 bun run db:seed                   # tenant, grup, superadmin dari BOOTSTRAP_ADMIN_*
-bun dev                           # http://127.0.0.1:5173 (API :3001)
+bun dev                           # http://127.0.0.1:5170 (API :5001)
 ```
 
 Pengujian, semuanya tanpa container:
