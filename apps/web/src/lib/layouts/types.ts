@@ -37,4 +37,11 @@ export interface AuthRegions {
   brand: Snippet;
   content: Snippet;
   footer: Snippet;
+  /**
+   * Decorative backdrop for layouts that HAVE a brand panel (`split-hero`), from
+   * `LOGIN_PAGE_BACKGROUND` in `.env`. A layout without such a panel ignores it, exactly as
+   * `centered-card` does — the value arrives from the shell like every other prop, because a
+   * layout never reads the environment itself.
+   */
+  background?: string | null;
 }

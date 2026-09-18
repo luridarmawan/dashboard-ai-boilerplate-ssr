@@ -21,4 +21,4 @@ const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
   <span>© {t('shell.footer')} · <a href="/theme">{t('nav.theme')}</a> · <a href="/lang">{t('nav.language')}</a></span>
 {/snippet}
 
-<Layout {brand} {content} {footer} />
+<Layout {brand} {content} {footer} background={data.background} />
