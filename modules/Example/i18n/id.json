@@ -115,5 +115,14 @@
   "example.catalog.sort_default": "Pilihan toko",
   "example.catalog.sort_name": "Nama",
   "example.catalog.sort_price": "Harga",
-  "example.catalog.no_match": "Tidak ada produk yang cocok dengan pencarian ini."
+  "example.catalog.no_match": "Tidak ada produk yang cocok dengan pencarian ini.",
+  "example.admin.not_found": "Produk tidak ditemukan",
+  "example.admin.form.name": "Nama",
+  "example.admin.form.price": "Harga (IDR, satuan terkecil)",
+  "example.admin.form.sort": "Urutan",
+  "example.admin.form.featured": "Tampilkan di beranda (unggulan)",
+  "example.admin.form.image_url": "URL gambar",
+  "example.admin.form.summary": "Ringkasan",
+  "example.admin.form.description": "Deskripsi",
+  "example.admin.form.slug_hint": "URL: /product/<slug>"
 }

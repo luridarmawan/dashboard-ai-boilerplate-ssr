@@ -115,5 +115,14 @@
   "example.catalog.sort_default": "Shop order",
   "example.catalog.sort_name": "Name",
   "example.catalog.sort_price": "Price",
-  "example.catalog.no_match": "No product matches this search."
+  "example.catalog.no_match": "No product matches this search.",
+  "example.admin.not_found": "Product not found",
+  "example.admin.form.name": "Name",
+  "example.admin.form.price": "Price (IDR, smallest unit)",
+  "example.admin.form.sort": "Order",
+  "example.admin.form.featured": "Show on the landing page (featured)",
+  "example.admin.form.image_url": "Image URL",
+  "example.admin.form.summary": "Summary",
+  "example.admin.form.description": "Description",
+  "example.admin.form.slug_hint": "URL: /product/<slug>"
 }
