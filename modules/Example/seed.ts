@@ -13,7 +13,7 @@ const PRODUCTS = [
     price: 85000,
     featured: true,
     sort: 10,
-    image_url: null as string | null,
+    image_url: 'https://picsum.photos/id/225/400/500',
   },
   {
     slug: 'toraja-sapan',
@@ -22,7 +22,7 @@ const PRODUCTS = [
     price: 92000,
     featured: true,
     sort: 20,
-    image_url: null,
+    image_url: 'https://picsum.photos/id/220/400/500',
   },
   {
     slug: 'kintamani-natural',
@@ -31,7 +31,7 @@ const PRODUCTS = [
     price: 98000,
     featured: true,
     sort: 30,
-    image_url: null,
+    image_url: 'https://picsum.photos/id/292/400/500?blur=2',
   },
   {
     slug: 'flores-bajawa',
@@ -40,7 +40,7 @@ const PRODUCTS = [
     price: 88000,
     featured: false,
     sort: 40,
-    image_url: null,
+    image_url: 'https://picsum.photos/id/316/400/500',
   },
   {
     slug: 'house-blend',

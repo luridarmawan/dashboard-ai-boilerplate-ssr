@@ -46,7 +46,7 @@ export async function enqueueEmail(db: Db, input: EnqueueInput): Promise<string>
     to_name: input.toName ?? null,
     subject: input.subject ?? `[${input.template}]`,
     template: input.template,
-    locale: input.locale ?? 'id',
+    locale: input.locale ?? 'en',
     payload: input.data,
     status: 'pending',
     attempts: 0,

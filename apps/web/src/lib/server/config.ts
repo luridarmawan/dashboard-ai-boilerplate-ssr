@@ -37,7 +37,7 @@ function defaults(): Record<string, unknown> {
     'app.home_route': '/dashboard',
     'app.default_theme': 'base',
     'app.allowed_themes': [],
-    'app.default_locale': 'id',
+    'app.default_locale': 'en',
   };
 }
 

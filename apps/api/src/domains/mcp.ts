@@ -48,7 +48,7 @@ function callerOf(
     clientId: tenantState?.clientId ?? null,
     userId: a.user.id,
     can: (p) => tenantState?.can(p) ?? false,
-    locale: a.user.locale ?? 'id',
+    locale: a.user.locale ?? 'en',
     requestId,
     signal: request.signal,
     ip: clientIp(request, server),

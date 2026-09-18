@@ -495,7 +495,10 @@ function copy(text: string) {
                   {#each m.attachments as att (att.id)}
                     <li>
                       {#if att.mime.startsWith('image/')}
-                        <a href={att.url} target="_blank" rel="noopener"><img src={att.url} alt={att.name} class="max-h-32 rounded-md border border-primary-foreground/30" /></a>
+                        <!-- A long thread scrolls far out of view: lazy, the browser's way. No
+                             width/height to give — these are whatever the user uploaded — so the
+                             box is capped by `max-h-32` instead, and `<Img>` would only warn. -->
+                        <a href={att.url} target="_blank" rel="noopener"><img src={att.url} alt={att.name} loading="lazy" decoding="async" class="max-h-32 rounded-md border border-primary-foreground/30" /></a>
                       {:else}
                         <a href={att.url} class="inline-flex items-center gap-1 rounded-md border border-primary-foreground/30 px-2 py-1 text-xs no-underline hover:bg-primary-foreground/10"><Icon name="file" size={12} />{att.name} <span class="opacity-70">({Math.ceil(att.size / 1024)} KB)</span></a>
                       {/if}

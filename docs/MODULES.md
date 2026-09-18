@@ -70,7 +70,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 7 | i18n | `i18n/<locale>.json`, kunci `<ns>.*`, `t('<ns>.x')` di halaman | `modules/Example/i18n/` | m6 proof: halaman berganti bahasa lewat `/lang` |
 | 8 | Tool AI / MCP | `api/tools.ts` (`defineTools`) → ditawarkan ke asisten AI (function calling) dan `GET/POST /v1/tools`; izin + tenant ditegakkan registry core (I-3, I-6). Core sendiri menyumbang **tool internal** (`core.*`) yang tidak terikat modul | `modules/Example/api/tools.ts`, `modules/Dummy/api/tools.ts` | `apps/api/test/integration/tools.test.ts` (I-6), tes modul AI (loop tool stream & non-stream), m6 proof: tool tidak ditawarkan bagi user tanpa izin |
 | 9 | Event hook | `hooks.ts` (`defineHooks`) — `user.created`, `user.deleted`, `tenant.switched`, `config.saved`, `module.toggled`, `job.started`, `job.finished` | `modules/Dummy/hooks.ts`, hasil modgen | m6 proof: hook modgen tercatat saat admin membuat user |
-| 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
+| 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon, Img } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya; setiap gambar memakai `Img` (lazy bawaan browser, `priority` untuk LCP — lihat §3 "Gambar & lazy load") | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
 | 12 | Job terjadwal | `jobs.ts` (`defineJobs`) — sekali per interval di semua instance | `modules/AI/jobs.ts` | `bun scheduler:proof` (M0 #6), m6 proof: terdaftar saat boot |
 | 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap | `modules/Example/public.ts` | `scripts/m4-gate-proof.ts`, m6 proof |
@@ -283,6 +283,58 @@ export default definePublicRoutes('Example', [
 Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data yang sama (R-9): modul `Example` mengapalkan `/example` (gaya toko: hero, cerita, paket harga) **dan** `/catalog` (gaya katalog: masthead tipis, bilah filter, daftar padat, form kontak satu baris). Keduanya route publik biasa, keduanya masuk `sitemap`, dan keduanya bisa dipilih sebagai landing — jadi bentuk halaman depan adalah keputusan admin, bukan deploy.
 
 Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7). `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
+
+### Gambar & lazy load — `<Img>` dan `class="lazy"`
+
+Berlaku **global**: dipasang sekali di shell core (`apps/web/src/routes/+layout.svelte`), jadi modul tidak mendaftar apa pun dan tidak mengimpor apa pun untuk mendapatkannya.
+
+**Untuk gambar, pakai `<Img>` dari `@core/ui`.** Komponen ini menulis `loading="lazy"` + `decoding="async"` ke HTML hasil SSR — jadi lazy-nya **lazy bawaan browser**: tidak butuh JavaScript, sudah bekerja sebelum hidrasi dan tetap bekerja saat JavaScript mati (L-22), dan ambang jaraknya dipilih browser sesuai koneksi & perangkat.
+
+```svelte
+<script lang="ts">import { Img } from '@core/ui';</script>
+
+<!-- di bawah fold: lazy, itu bakunya -->
+<Img src={p.imageUrl} alt={p.name} width={800} height={1000} class="h-full w-full object-cover" />
+
+<!-- hero / foto produk di atas fold — kandidat LCP: JANGAN lazy -->
+<Img src={p.imageUrl} alt={p.name} priority width={800} height={1000} />
+```
+
+- `width`/`height` adalah ukuran **intrinsik** (yang penting rasionya, bukan ukuran CSS-nya): dengan itu browser mencadangkan ruang sebelum stylesheet mendarat sehingga tata letak tidak melompat (CLS). Tanpa itu, dev memberi peringatan di console.
+- `priority` → `loading="eager"` + `fetchpriority="high"`. Wajib untuk satu gambar di atas fold; `loading="lazy"` di elemen LCP justru memperlambat metrik yang sedang diukur (§8: LCP < 2,5 detik). Aturannya: **satu** gambar `priority` per halaman, sisanya biarkan lazy.
+- `<img loading="lazy">` polos juga benar dan tidak dilarang — `<Img>` hanya membuatnya jadi baku plus menjaga width/height.
+
+**Placeholder: slot yang dicadangkan tidak pernah terlihat kosong.** Selama gambar belum mendarat, `<Img>` mengisi kotaknya sendiri: frame `bg-muted` berdenyut (`animate-pulse`, sama seperti `<Skeleton>`) **plus** glyph gambar kecil di tengah — `--muted` hanya dua tingkat dari putih, jadi di atas card terang frame saja praktis tidak terlihat dan kotaknya tetap terbaca kosong. Kalau gambarnya gagal datang, frame itu tetap ada dengan glyph yang dicoret dan denyutnya berhenti; bukan ikon "broken image" browser, dan ruang yang sudah dicadangkan tidak hilang.
+
+```svelte
+<Img src={url} alt="" width={800} height={1000} />                       <!-- skeleton (baku) -->
+<Img src={logo} alt="" width={120} height={40} placeholder="none" />     <!-- logo transparan / object-contain -->
+<Img src={url} alt="" width={800} height={1000} placeholder={tinyDataUri} /> <!-- blur-up (LQIP), statis -->
+```
+
+`placeholder="none"` untuk gambar transparan atau `object-contain`: di situ kotak berisi justru terbaca sebagai bagian dari gambarnya. `placeholder="<url|data:…>"` menampilkan thumbnail itu cover-filled dan **tidak** berdenyut — tidak ada yang men-generate LQIP untuk Anda, isi hanya kalau Anda memang punya.
+
+Keduanya berjalan lewat status yang sama, dan `app.css` yang menatanya:
+
+| status | `<Img>` (`data-img`) | `class="lazy"` (`data-lazy`) |
+|---|---|---|
+| menunggu viewport | — (browser yang mengatur) | `pending` |
+| byte sedang jalan, placeholder masih tampil | `loading` | `fetching` |
+| piksel sudah ada (fade 200 ms) | `loaded` | `loaded` |
+| tidak pernah datang (frame + glyph) | `error` | `error` |
+
+Untuk `data-bg`, gambarnya diambil lewat `Image()` lebih dulu dan baru diserahkan ke CSS setelah tiba — placeholder tidak hilang sebelum ada yang menggantikannya, dan gambar setengah jalan tidak pernah ikut tergambar.
+
+**`class="lazy"` hanya untuk yang tidak bisa ditunda browser**: `background-image` di `<div>`, dan embed berat yang tidak boleh diambil sebelum didekati. URL-nya ditaruh di `data-bg`/`data-src`, dan satu IntersectionObserver di seluruh dokumen yang memasangnya saat elemen mendekati viewport (≈300 px sebelum masuk layar). Butuh JavaScript, jadi **jangan menaruh isi yang wajib terlihat di belakangnya**.
+
+```svelte
+<div class="lazy" data-bg="/uploads/hero.jpg" style="aspect-ratio: 16/9"></div>
+<iframe class="lazy" data-src="https://…" title="Peta lokasi" width="600" height="400"></iframe>
+```
+
+Halaman yang dirender belakangan — hasil navigasi klien, blok `{#if}` — ikut terpasang otomatis lewat MutationObserver; `use:lazy` dari `$lib/actions/lazy` hanya perlu untuk elemen di luar dokumen itu.
+
+> **Jangan** `<img class="lazy" src="…">`. Saat skrip berjalan, `src` sudah dibaca browser dan tidak ada lagi yang bisa ditunda — dev menyebutkannya di console. Tulis `loading="lazy"` di markup, atau pindahkan URL-nya ke `data-src`.
 
 ### `config.ts` — konfigurasi runtime (titik perluasan 6)
 

@@ -16,7 +16,12 @@ export const users = defineTable({
     /** Optional contact number, free-form E.164-ish, max 32 chars (application-validated). */
     phone: col.varchar(32).nullable(),
     avatar_url: col.varchar(512).nullable(),
-    locale: col.identifier(8).default('id'),
+    /**
+     * The language the user CHOSE (K-2). NULL = never chosen: the request then falls through to
+     * the `crk_lang` cookie, `Accept-Language` and `app.default_locale`, so an account keeps the
+     * language it was reading the site in instead of jumping to a hard-coded one on login.
+     */
+    locale: col.identifier(8).nullable(),
     theme: col.identifier(64).nullable(),
     /** Sidebar rail state (F-8): follows the user across devices, like `theme`. */
     sidebar_collapsed: col.boolean().default(false),

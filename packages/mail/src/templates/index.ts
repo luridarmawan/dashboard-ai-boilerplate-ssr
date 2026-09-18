@@ -100,7 +100,7 @@ const T: Record<'id' | 'en', Dict> = {
 };
 
 function tr(locale: string, key: string, params: Record<string, unknown> = {}): string {
-  const dict = T[locale === 'en' ? 'en' : 'id'];
+  const dict = T[locale === 'id' ? 'id' : 'en'];
   const s = dict[key] ?? T.id[key] ?? key;
   return s.replace(/\{(\w+)\}/g, (m, k: string) =>
     k in params ? escapeHtml(String(params[k])) : m,

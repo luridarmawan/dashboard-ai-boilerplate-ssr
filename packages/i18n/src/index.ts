@@ -8,7 +8,7 @@ import { LOCALES, type Locale, type MessageKey, messages } from './generated/mes
  */
 export { LOCALES, type Locale, type MessageKey, messages };
 
-export const DEFAULT_LOCALE: Locale = 'id';
+export const DEFAULT_LOCALE: Locale = 'en';
 
 export function isLocale(v: unknown): v is Locale {
   return typeof v === 'string' && (LOCALES as readonly string[]).includes(v);

@@ -26,7 +26,8 @@ export interface SessionUser {
   email: string;
   name: string;
   avatarUrl: string | null;
-  locale: string;
+  /** The language the user PICKED; null until they do — the request then resolves it (K-2). */
+  locale: string | null;
   theme: string | null;
   /** Sidebar rail collapsed (F-8) — a preference of the user, not of the browser. */
   sidebarCollapsed: boolean;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isAbsolute } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EnvError, loadEnv, parseOrigins } from '../src/index.ts';
 
@@ -105,7 +105,9 @@ describe('loadEnv (P-4, E-6, Keputusan M)', () => {
     const cwd = process.cwd();
     const fromRoot = loadEnv(valid).UPLOADS_DIR;
     expect(isAbsolute(fromRoot)).toBe(true);
-    expect(fromRoot.endsWith('/data/uploads')).toBe(true);
+    // `join` and not a literal '/data/uploads': the value is resolved with the platform's
+    // separator, so a hard-coded slash asserts POSIX and fails on Windows for the right answer.
+    expect(fromRoot.endsWith(join('data', 'uploads'))).toBe(true);
     try {
       process.chdir(fileURLToPath(new URL('../../../apps/api', import.meta.url)));
       expect(loadEnv(valid).UPLOADS_DIR).toBe(fromRoot);

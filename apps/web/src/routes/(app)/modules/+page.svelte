@@ -16,9 +16,10 @@ import type { ActionData, PageData } from './$types';
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-const locale = $derived(data.user.locale === 'en' ? 'en' : 'id');
+// The language RESOLVED for this request (K-2) — `user.locale` is null until the user picks one.
+const locale = $derived(data.locale === 'id' ? 'id' : 'en');
 const fmt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString(data.user.locale === 'en' ? 'en-US' : 'id-ID') : '—';
+  iso ? new Date(iso).toLocaleString(locale === 'id' ? 'id-ID' : 'en-US') : '—';
 type Mod = (typeof data.modules)[number];
 const chips = (c: Mod['contributes']): [string, number, string][] =>
   (

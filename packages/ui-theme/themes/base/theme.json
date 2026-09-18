@@ -1,6 +1,6 @@
 {
   "id": "base",
-  "name": { "id": "Netral", "en": "Base" },
+  "name": { "id": "Base", "en": "Base" },
   "description": {
     "id": "Netral dan tidak berpendapat. Titik awal untuk tema turunan.",
     "en": "Neutral and unopinionated. The starting point for derived themes."
@@ -14,7 +14,7 @@
       "focused": "centered-narrow"
     },
     "public": { "default": "marketing-wide" },
-    "auth": { "default": "centered-card" }
+    "auth": { "default": "split-hero" }
   },
   "assets": { "logo": "./logo.svg", "favicon": "./favicon.svg" },
   "preview": "./preview.png"

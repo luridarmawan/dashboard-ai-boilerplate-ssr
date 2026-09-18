@@ -176,6 +176,13 @@
       "when": 1789199083781,
       "tag": "0024_lyrical_harrier",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789687385491,
+      "tag": "0025_hot_guardian",
+      "breakpoints": true
     }
   ]
 }

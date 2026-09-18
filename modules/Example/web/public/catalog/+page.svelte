@@ -3,6 +3,7 @@ import { goto } from '$app/navigation';
 import { navigating } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
+import Img from '$lib/components/Img.svelte';
 import { Button } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 
@@ -187,7 +188,7 @@ function submitFilters(event: SubmitEvent) {
         <li>
           <a href={`/product/${p.slug}`} class="group flex items-center gap-4 rounded-2xl border bg-card p-3 no-underline transition-colors hover:bg-accent/40 hover:no-underline sm:p-4">
             <span class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br from-primary/20 via-accent to-secondary text-2xl font-semibold text-primary/60">
-              {#if p.imageUrl}<img src={p.imageUrl} alt="" loading="lazy" class="h-full w-full object-cover" />{:else}{initial(p.name)}{/if}
+              {#if p.imageUrl}<Img src={p.imageUrl} alt="" width={64} height={64} class="h-full w-full object-cover" />{:else}{initial(p.name)}{/if}
             </span>
             <span class="min-w-0 flex-1">
               <span class="flex flex-wrap items-center gap-2">

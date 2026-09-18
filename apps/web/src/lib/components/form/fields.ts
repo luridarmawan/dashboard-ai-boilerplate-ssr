@@ -45,8 +45,11 @@ export interface FieldDef {
   /** Render `multiselect` as a checkbox grid (default) or a multiple <select>. */
   multiselectAs?: 'checkboxes' | 'select';
   accept?: string;
-  /** Column span in a 2-column layout (1 = half, 2 = full). Default: text/markdown 2, others 1. */
-  span?: 1 | 2;
+  /**
+   * Column span, clamped to the form's own `columns`: `2` is full width in a two-column form and
+   * two thirds in a three-column one. Default: text/markdown full width, everything else 1.
+   */
+  span?: 1 | 2 | 3;
 }
 
 export type FormValues = Record<string, unknown>;

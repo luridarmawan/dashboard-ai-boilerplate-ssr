@@ -16,7 +16,7 @@ export const outboxEmail = defineTable({
     subject: col.varchar(255),
     /** Template id (`verify-email`, `reset-password`, `invite`, `contact`) — rendering happens at send time. */
     template: col.identifier(64),
-    locale: col.identifier(8).default('id'),
+    locale: col.identifier(8).default('en'),
     /** Template data; never contains secrets other than one-time tokens that are useless after use. */
     payload: col.json().nullable(),
     status: col.identifier(16).default('pending'),

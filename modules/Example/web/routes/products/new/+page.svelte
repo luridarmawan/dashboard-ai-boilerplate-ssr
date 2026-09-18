@@ -14,5 +14,5 @@ const fieldErrors = $derived(
 
 <div class="page">
   <h1>{t('example.admin.new_product')}</h1>
-  <FormBuilder fields={productFields} values={(form?.values as Record<string, unknown> | undefined) ?? { sort: 100, price: 0 }} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/example/products" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+  <FormBuilder fields={productFields(t)} values={(form?.values as Record<string, unknown> | undefined) ?? { sort: 100, price: 0 }} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/example/products" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
 </div>
