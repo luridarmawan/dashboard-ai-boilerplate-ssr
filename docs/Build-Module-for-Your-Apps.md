@@ -24,11 +24,14 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 
 ## Tahapan
 
-Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
+Dua repositori, dan satu clone core yang dipakai sebagai alat:
 
 ```
-git clone <core>                               → §0   core, dipakai sebagai alat (tidak di-commit)
+git clone https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr.git core   → §0   core, dipakai sebagai alat (tidak di-commit)
+cd core && bun install
 bun create module ../mod-billing --no-install  → §1   buat module billing
+cd ../mod-billing
+bun run rename Billing
 git remote add origin … && git push            → §1a  ke repositori ANDA sendiri
 CORE_DIR=../core bun run harness               → §2   build, lint, typecheck, migrasi, tes
 bun dev di core                                → §3   lihat halamannya di browser
