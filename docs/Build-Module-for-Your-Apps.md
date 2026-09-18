@@ -28,7 +28,7 @@ Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
 
 ```
 git clone <core>                               → §0   core, dipakai sebagai alat (tidak di-commit)
-bun create module ../mod-billing --no-install  → §1   repo modul Anda lahir
+bun create module ../mod-billing --no-install  → §1   buat module billing
 git remote add origin … && git push            → §1a  ke repositori ANDA sendiri
 CORE_DIR=../core bun run harness               → §2   build, lint, typecheck, migrasi, tes
 bun dev di core                                → §3   lihat halamannya di browser
