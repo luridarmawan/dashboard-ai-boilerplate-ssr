@@ -672,13 +672,13 @@ Tim lain boleh mengembangkan modul di repositorinya sendiri dengan siklus rilisn
 
 ```bash
 # dari checkout core mana pun (templat ada di .bun-create/module; Bun membacanya otomatis)
-bun create module ../mod-billing
+bun create module ../mod-billing --no-install   # --no-install: dependensinya workspace:*, baru resolve di dalam core
 cd ../mod-billing
 bun run rename Billing        # sekali: Hello → Billing (namespace, tabel, izin, route, tes)
 bun run harness               # clone core ke .core/ pada ref di package.json → "core", tautkan modul, sync, tsc, lint, migrasi, tes
 ```
 
-Di luar checkout core: `BUN_CREATE_DIR=<checkout>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module`. Templat ini **dibangun dari generator yang sama** dengan `bun modgen` (`bun run starter:build`; CI menolak bila keduanya berbeda), jadi modul standalone dan modul lokal identik isinya.
+Di luar checkout core: `BUN_CREATE_DIR=<checkout>/.bun-create bun create module ../mod-billing --no-install`, atau salin folder `.bun-create/module`. Templat ini **dibangun dari generator yang sama** dengan `bun modgen` (`bun run starter:build`; CI menolak bila keduanya berbeda), jadi modul standalone dan modul lokal identik isinya.
 
 Yang ada di repo modul selain kode modul itu sendiri:
 
@@ -695,7 +695,7 @@ Siklus dev di browser: arahkan harness ke checkout core yang sudah ada — modul
 CORE_DIR=../dashboard-ai-boilerplate-ssr bun run harness   # lalu di core: bun dev → /m/billing/…
 ```
 
-`tsconfig.json` modul mengacu `../../tsconfig.base.json` dan dependensinya `workspace:*` — keduanya **benar saat modul berada di dalam core** (yang selalu terjadi lewat harness atau `modules:add`). Karena itu `bun install` langsung di repo modul tidak berguna; pakai harness.
+`tsconfig.json` modul mengacu `../../tsconfig.base.json` dan dependensinya `workspace:*` — keduanya **benar saat modul berada di dalam core** (yang selalu terjadi lewat harness atau `modules:add`). Karena itu `bun install` langsung di repo modul tidak berguna; pakai harness. Itu juga alasan `bun create module` dijalankan dengan `--no-install`: install bawaannya pasti gagal di `@app/api` dan `@core/*`, tanpa akibat apa pun selain enam blok galat yang menyesatkan.
 
 ### 7b. Memasang di host — `bun modules:add`
 

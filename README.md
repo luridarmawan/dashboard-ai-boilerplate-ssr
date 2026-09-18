@@ -66,7 +66,7 @@ scripts/        modgen, modules:add, sim:module, proof gate M1–M6, penjaga CI
 | `bun dev` | API + web dengan reload, `modules:sync` otomatis |
 | `bun run build` lalu `bun start` | jalankan build produksi di host ini tanpa Docker, **satu port** (baku `127.0.0.1:3000`) — nginx/apache cukup satu `proxy_pass`; `--no-proxy` untuk dua port ([DEPLOY §8e](./docs/DEPLOY.md)) |
 | `bun modgen <Nama> --fields "name:string!,qty:number"` | modul CRUD lengkap yang langsung jalan |
-| `bun create module ../mod-x` lalu `bun run rename <Nama>` | repositori modul standalone dengan harness sendiri; nama folder **tidak** menamai modulnya — `rename` yang melakukannya, sekali, sebelum Anda menulis kode |
+| `bun create module ../mod-x --no-install` lalu `bun run rename <Nama>` | repositori modul standalone dengan harness sendiri; nama folder **tidak** menamai modulnya — `rename` yang melakukannya, sekali, sebelum Anda menulis kode |
 | `bun modules:add <git-url> --ref <tag>` | pasang modul dari repositori lain |
 | `bun modules:remove <Nama>` | uninstall bersih: lepas registrasi, hapus folder/submodule, migrasi turun untuk tabelnya (G-15) |
 | `bun run db:generate` | migrasi baru (mysql + pg) setelah mengubah tabel |

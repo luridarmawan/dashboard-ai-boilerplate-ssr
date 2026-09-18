@@ -220,9 +220,10 @@ cleanup_db() {
 
 # ---- 1. the module's own repository -----------------------------------------------------------
 step "§1 · Bikin repo modul $NAME — bersebelahan dengan core, bukan di dalamnya"
-cmd "bun create module ../mod-$NS"
-run 'bun create module gagal' sh -c "cd '$WORK/core' && bun create module '../mod-$NS'"
+cmd "bun create module ../mod-$NS --no-install"
+run 'bun create module gagal' sh -c "cd '$WORK/core' && bun create module '../mod-$NS' --no-install"
 [ -f "mod-$NS/module.json" ] || die 'template tidak tersalin (module.json tidak ada)'
+say '(--no-install: install bawaan bun create pasti gagal di @app/api dan @core/* — dependensi workspace:* baru resolve di dalam core, lihat §2)'
 say '(saran penutup "cd … && bun dev" dari bun create diabaikan — repo modul tidak punya skrip dev)'
 cmd "cd ../mod-$NS && bun run rename $NAME"
 run 'rename gagal' sh -c "cd '$WORK/mod-$NS' && bun run rename $NAME"
