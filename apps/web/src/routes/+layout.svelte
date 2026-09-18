@@ -37,6 +37,21 @@ provideI18n({
     return data.messages;
   },
 });
+/**
+ * K-2, K-9 on the client. `<html lang>` and `<html dir>` are stamped by the server
+ * (hooks.server.ts → app.html), and a client-side navigation never re-renders that shell —
+ * but signing in IS one (`goto(next, { invalidateAll: true })` on the login page), and it is
+ * precisely when the language can change: an account with a saved preference, or simply one
+ * whose language differs from the anonymous visitor's. The body already re-renders from the
+ * new catalogue, so without this the dashboard reads Indonesian under `lang="en"` until the
+ * next full load — wrong for screen readers, hyphenation and `:lang()`, and in RTL the whole
+ * layout stays the wrong way round.
+ */
+$effect(() => {
+  const html = document.documentElement;
+  if (html.lang !== data.locale) html.lang = data.locale;
+  if (html.dir !== data.dir) html.dir = data.dir;
+});
 // Client only, and once per document: the observers live for as long as the tab does.
 onMount(() => initLazy());
 </script>
