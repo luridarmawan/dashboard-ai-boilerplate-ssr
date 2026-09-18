@@ -10,7 +10,9 @@ import { useLocale, useT } from '$lib/i18n';
  * Landing page of the Example module — a modern storefront. Rules it lives by (R-7): no literal
  * colours, only theme tokens (so all four themes and every module theme restyle it); no literal
  * copy, only i18n keys; everything server-rendered, nothing on the render path needs JavaScript
- * or an image request (the product "art" is drawn from tokens; a real image_url is used when set).
+ * or an image request to be LAID OUT (the product "art" is drawn from tokens; a real image_url is
+ * used when set, and every slot that can hold one reserves its space up front so the arriving
+ * photo never pushes the page around).
  */
 let { data, form } = $props();
 const t = useT();
@@ -140,26 +142,49 @@ function errorFor(code: unknown): string {
       </dl>
     </div>
 
-    <!-- product mosaic: the three featured products, drawn from tokens -->
+    <!-- product mosaic: the three featured products — their own photo where they have one, token art where they do not -->
     <div class="hero-right product-featured-list relative mx-auto grid w-full max-w-md grid-cols-6 grid-rows-6 gap-3" style="aspect-ratio: 1 / 1.05" aria-hidden="true">
       {#if hero[0]}
-        <div class={`col-span-4 row-span-4 rounded-3xl border bg-gradient-to-br ${artOf(0)} p-5 shadow-sm`}>
-          <div class="flex h-full flex-col justify-between">
-            <span class="text-7xl font-semibold leading-none text-primary/25">{initial(hero[0].name)}</span>
-            <div><p class="font-semibold text-foreground">{hero[0].name}</p><p class="text-sm text-muted-foreground">{money(hero[0].price, hero[0].currency)}</p></div>
+        <div class={`relative col-span-4 row-span-4 overflow-hidden rounded-3xl border bg-gradient-to-br ${artOf(0)} shadow-sm`}>
+          {#if hero[0].imageUrl}
+            <!-- The biggest thing in the hero, so this is what LCP measures: eager and high
+                 priority, never lazy. `width`/`height` are the tile's own proportions (4x4 of a
+                 6x6 grid at aspect 1/1.05), so the slot is reserved before the stylesheet lands. -->
+            <Img src={hero[0].imageUrl} alt="" priority width={400} height={420} class="absolute inset-0 h-full w-full object-cover" />
+            <!-- Scrim from theme tokens only (R-7): `background` is what `foreground` is guaranteed
+                 to be readable on, in light and dark alike, so the name and price survive any photo. -->
+            <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
+          {/if}
+          <div class="relative flex h-full flex-col p-5">
+            {#if !hero[0].imageUrl}
+              <span class="text-7xl font-semibold leading-none text-primary/25">{initial(hero[0].name)}</span>
+            {/if}
+            <div class="mt-auto"><p class="font-semibold text-foreground">{hero[0].name}</p><p class="text-sm text-muted-foreground">{money(hero[0].price, hero[0].currency)}</p></div>
           </div>
         </div>
       {/if}
       {#if hero[1]}
-        <div class={`col-span-2 row-span-3 rounded-3xl border bg-gradient-to-b ${artOf(1)} p-4 shadow-sm`}>
-          <span class="text-4xl font-semibold text-primary/30">{initial(hero[1].name)}</span>
-          <p class="mt-6 text-xs font-medium text-foreground">{hero[1].name}</p>
+        <div class={`relative col-span-2 row-span-3 overflow-hidden rounded-3xl border bg-gradient-to-b ${artOf(1)} shadow-sm`}>
+          {#if hero[1].imageUrl}
+            <Img src={hero[1].imageUrl} alt="" width={300} height={485} class="absolute inset-0 h-full w-full object-cover" />
+            <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
+          {/if}
+          <div class="relative flex h-full flex-col p-4">
+            {#if !hero[1].imageUrl}<span class="text-4xl font-semibold text-primary/30">{initial(hero[1].name)}</span>{/if}
+            <p class={`text-xs font-medium text-foreground ${hero[1].imageUrl ? 'mt-auto' : 'mt-6'}`}>{hero[1].name}</p>
+          </div>
         </div>
       {/if}
       {#if hero[2]}
-        <div class={`col-span-2 row-span-3 rounded-3xl border bg-gradient-to-t ${artOf(2)} p-4 shadow-sm`}>
-          <span class="text-4xl font-semibold text-primary/30">{initial(hero[2].name)}</span>
-          <p class="mt-6 text-xs font-medium text-foreground">{hero[2].name}</p>
+        <div class={`relative col-span-2 row-span-3 overflow-hidden rounded-3xl border bg-gradient-to-t ${artOf(2)} shadow-sm`}>
+          {#if hero[2].imageUrl}
+            <Img src={hero[2].imageUrl} alt="" width={300} height={485} class="absolute inset-0 h-full w-full object-cover" />
+            <div class="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
+          {/if}
+          <div class="relative flex h-full flex-col p-4">
+            {#if !hero[2].imageUrl}<span class="text-4xl font-semibold text-primary/30">{initial(hero[2].name)}</span>{/if}
+            <p class={`text-xs font-medium text-foreground ${hero[2].imageUrl ? 'mt-auto' : 'mt-6'}`}>{hero[2].name}</p>
+          </div>
         </div>
       {/if}
       <div class="col-span-4 row-span-2 flex items-center gap-3 rounded-3xl border bg-card p-4 shadow-sm">
