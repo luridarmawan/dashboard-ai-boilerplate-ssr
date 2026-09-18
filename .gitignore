@@ -25,6 +25,8 @@ backups/
 test-results/
 playwright-report/
 
+*.bat
+
 # Unggahan lokal saat pengembangan (UPLOADS_DIR bawaan, Q-9/Q-16). UPLOADS_DIR relatif kini
 # selalu berlabuh di akar proyek (packages/config), jadi semuanya mendarat di /data/ — baik
 # `bun dev` (cwd apps/api) maupun `bun start` (cwd akar). Baris kedua untuk sisa checkout lama.
