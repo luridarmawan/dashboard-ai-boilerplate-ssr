@@ -233,8 +233,14 @@ ok "namespace $NS: tabel ${NS}_*, izin $NS.*, route /m/$NS/*"
 say 'kata sumber daya (note/notes) tetap bawaan template — menggantinya urusan editor Anda (§1)'
 
 step "§1a · Repo modul punya remote dan tag sendiri"
-cmd 'git init -b main && git add -A && git commit -m "modul Contact dari template"'
-run 'git init/commit di repo modul gagal' sh -c "cd '$WORK/mod-$NS' && { git init -q -b main 2>/dev/null || true; } && git add -A && git commit -qm 'modul $NAME dari template'"
+cmd 'git add -A && git commit -m "modul Contact dari template" && git branch -M main'
+# `bun create` sudah meng-init repo dan membuat commit pertama, jadi `git init -b main` di sini
+# hanya mencetak `warning: re-init: ignored --initial-branch=main` dan meninggalkan branch default
+# git mesin ini — sering `master`, yang membuat `git push -u origin main` di §1a gagal. `git branch -M`
+# yang menentukan namanya; `git init -q` di depan hanya jaga-jaga bila `bun create` berhenti meng-init.
+run 'git init/commit di repo modul gagal' sh -c "cd '$WORK/mod-$NS' && { git rev-parse --git-dir >/dev/null 2>&1 || git init -q; } && git add -A && git commit -qm 'modul $NAME dari template' && git branch -M main"
+[ "$(git -C "$WORK/mod-$NS" symbolic-ref --short HEAD 2>/dev/null)" = main ] ||
+  die "branch repo modul bukan 'main' — §1a memakai 'git push -u origin main'"
 cmd 'git remote add origin git@github.com:<akun-anda>/mod-contact.git && git push -u origin main'
 say '(simulasi tidak punya remote; di kehidupan nyata inilah repo ANDA — bukan remote core)'
 cmd 'git tag v0.1.0 && git push origin v0.1.0'
