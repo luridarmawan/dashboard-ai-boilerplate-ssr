@@ -76,8 +76,8 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(evil.html).not.toContain('<script>alert(1)');
     expect(evil.html).toContain('&lt;script&gt;');
   });
-  test('unknown locale falls back to id, never to an empty string', () => {
+  test('unknown locale falls back to en, never to an empty string', () => {
     const r = renderTemplate('verify-email', 'fr', { name: 'X', link: 'https://x/y' }, brand);
-    expect(r.subject).toContain('Verifikasi');
+    expect(r.subject).toContain('Verify');
   });
 });

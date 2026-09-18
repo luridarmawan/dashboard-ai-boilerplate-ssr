@@ -98,7 +98,8 @@ const PublicUser = t.Object({
   name: t.String(),
   phone: t.Nullable(t.String()),
   avatarUrl: t.Nullable(t.String()),
-  locale: t.String(),
+  /** NULL until the user picks a language themselves (K-2). */
+  locale: t.Nullable(t.String()),
   theme: t.Nullable(t.String()),
   sidebarCollapsed: t.Boolean(),
   isSuperadmin: t.Boolean(),
@@ -991,7 +992,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
           name: body.name.trim(),
           phone: normalizePhone(body.phone),
           password_hash: body.password ? await hashPassword(body.password) : null,
-          locale: body.locale ?? 'id',
+          locale: body.locale ?? null,
         };
         if (user) {
           // Nothing of the deleted account survives except its id and e-mail: it comes back with

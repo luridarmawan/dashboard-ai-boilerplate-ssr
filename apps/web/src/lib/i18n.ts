@@ -26,5 +26,5 @@ export function useT(): (key: MessageKey, params?: Params) => string {
 }
 
 export function useLocale(): string {
-  return getContext<I18nContext | undefined>(KEY)?.locale ?? 'id';
+  return getContext<I18nContext | undefined>(KEY)?.locale ?? 'en';
 }

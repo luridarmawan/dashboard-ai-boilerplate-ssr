@@ -8,8 +8,8 @@ import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString(data.user.locale === 'en' ? 'en-US' : 'id-ID');
+// The language RESOLVED for this request (K-2) — `user.locale` is null until the user picks one.
+const fmt = (iso: string) => new Date(iso).toLocaleString(data.locale === 'id' ? 'id-ID' : 'en-US');
 const iconFor = (type: string) =>
   type.startsWith('token')
     ? 'key'

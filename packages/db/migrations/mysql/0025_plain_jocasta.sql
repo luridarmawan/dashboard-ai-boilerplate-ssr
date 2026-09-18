@@ -1,0 +1,2 @@
+ALTER TABLE `outbox_email` MODIFY COLUMN `locale` varchar(8) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'en';--> statement-breakpoint
+ALTER TABLE `users` MODIFY COLUMN `locale` varchar(8) CHARACTER SET ascii COLLATE ascii_bin;

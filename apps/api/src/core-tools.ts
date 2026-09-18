@@ -40,7 +40,7 @@ function defineCoreTools(tools: readonly ToolDef[]): readonly RegisteredTool[] {
 }
 
 /** `Intl` wants a full tag; the app's locales are the short forms. */
-const intlLocale = (locale: string) => (locale === 'en' ? 'en-US' : 'id-ID');
+const intlLocale = (locale: string) => (locale === 'id' ? 'id-ID' : 'en-US');
 
 export const coreTools: readonly RegisteredTool[] = defineCoreTools([
   {

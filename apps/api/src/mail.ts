@@ -29,7 +29,7 @@ function asLocale(value: string | null | undefined): MailLocale | null {
 /**
  * Which language to write an e-mail in (K-2, K-3): the language of the request that asked for it —
  * the web forwards the locale it already resolved for the visitor (preference → `crk_lang` cookie →
- * Accept-Language) as `Accept-Language` — then the tenant's `app.default_locale`, then `id`.
+ * Accept-Language) as `Accept-Language` — then the tenant's `app.default_locale`, then `en`.
  *
  * That is the rule for mail the recipient asked for themselves (register, password reset). When an
  * admin sends mail to someone else, that someone's saved `users.locale` comes first; the caller
@@ -42,7 +42,7 @@ export async function mailLocale(input: {
   return (
     asLocale(input.request?.headers.get('accept-language')) ??
     asLocale(await settings.get<string | null>(input.clientId ?? null, 'app.default_locale')) ??
-    'id'
+    'en'
   );
 }
 

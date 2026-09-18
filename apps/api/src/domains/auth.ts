@@ -55,7 +55,8 @@ export const PublicUser = t.Object({
   name: t.String(),
   phone: t.Nullable(t.String()),
   avatarUrl: t.Nullable(t.String()),
-  locale: t.String(),
+  /** NULL until the user picks a language themselves (K-2). */
+  locale: t.Nullable(t.String()),
   theme: t.Nullable(t.String()),
   sidebarCollapsed: t.Boolean(),
   isSuperadmin: t.Boolean(),

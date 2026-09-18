@@ -115,7 +115,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'app.default_locale',
         type: 'locale',
         title: { id: 'Bahasa baku', en: 'Default language' },
-        default: 'id',
+        default: 'en',
         public: true,
         order: 6,
       },
