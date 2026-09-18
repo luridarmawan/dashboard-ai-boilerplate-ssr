@@ -121,8 +121,8 @@ function errorFor(code: unknown): string {
 <section class="relative overflow-hidden">
   <div class="pointer-events-none absolute -end-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" aria-hidden="true"></div>
   <div class="pointer-events-none absolute -bottom-24 -start-24 h-80 w-80 rounded-full bg-warning/15 blur-3xl" aria-hidden="true"></div>
-  <div class="relative mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-14 md:grid-cols-[1.1fr_1fr] md:items-center md:pt-24">
-    <div>
+  <div class="hero relative mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-14 md:grid-cols-[1.1fr_1fr] md:items-center md:pt-24">
+    <div class="hero-left">
       <p class="mb-5 inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground backdrop-blur"><span class="h-1.5 w-1.5 rounded-full bg-primary"></span>{t('example.hero.eyebrow')}</p>
       <h1 class="text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">{t('example.hero.title')}</h1>
       <p class="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">{data.tagline ?? t('example.hero.subtitle')}</p>
@@ -141,7 +141,7 @@ function errorFor(code: unknown): string {
     </div>
 
     <!-- product mosaic: the three featured products, drawn from tokens -->
-    <div class="relative mx-auto grid w-full max-w-md grid-cols-6 grid-rows-6 gap-3" style="aspect-ratio: 1 / 1.05" aria-hidden="true">
+    <div class="hero-right product-featured-list relative mx-auto grid w-full max-w-md grid-cols-6 grid-rows-6 gap-3" style="aspect-ratio: 1 / 1.05" aria-hidden="true">
       {#if hero[0]}
         <div class={`col-span-4 row-span-4 rounded-3xl border bg-gradient-to-br ${artOf(0)} p-5 shadow-sm`}>
           <div class="flex h-full flex-col justify-between">
