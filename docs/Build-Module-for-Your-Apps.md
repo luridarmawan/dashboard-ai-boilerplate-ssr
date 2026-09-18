@@ -27,15 +27,15 @@ repo-modul-anda/            core (clone sekali pakai di .core/, atau CORE_DIR)
 Sembilan langkah, dua repositori, dan satu clone core yang dipakai sebagai alat:
 
 ```
-git clone <core>                     → §0   core, dipakai sebagai alat (tidak di-commit)
-bun create module ../mod-billing     → §1   repo modul Anda lahir
-git remote add origin … && git push  → §1a  ke repositori ANDA sendiri
-CORE_DIR=../core bun run harness     → §2   build, lint, typecheck, migrasi, tes
-bun dev di core                      → §3   lihat halamannya di browser
-CI repo modul                        → §4   harness yang sama, di setiap push
-git tag v1.4.2 && git push origin …  → §5   rilis
-bun modules:add <url> --ref v1.4.2   → §6   host memasang, terkunci di tag
-git push (di repo host)              → §6   host meng-commit pemasangannya
+git clone <core>                               → §0   core, dipakai sebagai alat (tidak di-commit)
+bun create module ../mod-billing --no-install  → §1   repo modul Anda lahir
+git remote add origin … && git push            → §1a  ke repositori ANDA sendiri
+CORE_DIR=../core bun run harness               → §2   build, lint, typecheck, migrasi, tes
+bun dev di core                                → §3   lihat halamannya di browser
+CI repo modul                                  → §4   harness yang sama, di setiap push
+git tag v1.4.2 && git push origin …            → §5   rilis
+bun modules:add <url> --ref v1.4.2             → §6   host memasang, terkunci di tag
+git push (di repo host)                        → §6   host meng-commit pemasangannya
 ```
 
 ### Mau lihat test demo? `bun run sim:module`
@@ -86,7 +86,7 @@ Dari dalam checkout core tadi:
 
 ```bash
 cd core
-bun create module ../mod-billing          # templatenya dari .bun-create/module di core ini
+bun create module ../mod-billing --no-install   # templatenya dari .bun-create/module di core ini
 cd ../mod-billing
 bun run rename Billing                    # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
 git init -b main
@@ -94,6 +94,8 @@ git add -A && git commit -m "modul Billing dari template"
 ```
 
 **Nama foldernya tidak menentukan nama modul.** `bun create module` hanyalah penyalin template — Bun tidak meneruskan nama apa pun ke dalamnya, jadi `bun create module ../Contact` pun menghasilkan modul yang masih bernama `Hello` (tabel `hello_*`, route `/m/hello/…`). Yang mengubahnya cuma `bun run rename <Nama>`, yang menulis ulang nama itu di ±25 berkas sekaligus: `module.json`, nama paket, tabel, izin, id menu, route, kunci i18n, dan nama berkas tes. Satu-satunya jejak folder adalah `package.json` → `name`, yang memang ditimpa Bun dengan nama folder tujuan; `rename` mengembalikannya ke `@modules/<namespace>`. Karena itu urutannya selalu **create → rename**, dan rename dijalankan **sekali, sebelum Anda menulis kode sendiri**: ia mengganti kata `Hello`/`hello` di seluruh berkas teks, termasuk yang nanti Anda tulis sendiri.
+
+**`--no-install` itu wajar, bukan kelalaian.** Tanpa flag itu `bun create` menjalankan `bun install` di dalam folder baru, dan install itu selalu gagal dengan enam blok `error: Workspace dependency "@app/api" not found` (juga `@core/auth`, `@core/contracts`, `@core/db`, `@core/logger`, `@core/module-kit`). Penyebabnya yang dijelaskan di §2: dependensi modul `workspace:*` dan paket itu hanya ada di dalam core, sedangkan repo modul berdiri sendiri. Templatnya tetap tersalin utuh dan `bun create` tetap keluar dengan kode 0 — modul tidak butuh `node_modules` sendiri, harness yang mengurusnya. `--no-install` hanya membuang galat yang menyesatkan itu.
 
 Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
 
@@ -105,7 +107,7 @@ Peta direktorinya sekarang — dua repo bersebelahan, tidak bersarang:
 └── mod-billing/     ← repo modul ANDA (git init sendiri, remote sendiri)
 ```
 
-Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
+Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing --no-install`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
 
 Template ini dibangun dari generator yang sama dengan `bun modgen` (CI core menolak bila keduanya berbeda), jadi isi modul standalone dan modul lokal identik — termasuk contoh hook, job, widget, tool, dan tes integrasi yang sudah jalan.
 
