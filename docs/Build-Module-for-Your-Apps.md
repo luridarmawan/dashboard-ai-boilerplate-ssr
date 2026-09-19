@@ -182,7 +182,7 @@ Sebagai jaring pengaman, `git status` core harus tetap bersih sesudahnya — kal
 
 ```bash
 bun run harness                                     # clone ke .core/ (sekali; berikutnya dipakai ulang)
-bun run harness --web                               # + svelte-check untuk halaman modul
+bun run harness --web                               # + svelte-check untuk halaman modul Anda sendiri
 DATABASE_URL=mysql://app:app@127.0.0.1:3306/app bun run harness   # + migrasi & tes integrasi
 #   ^ database Anda sendiri; kalau memakai `docker compose` milik core, portnya 33306
 ```

@@ -97,6 +97,18 @@
   body {
     @apply min-h-dvh;
   }
+  /*
+   * Tailwind v4's preflight follows the CSS spec and leaves buttons at `cursor: default`, which
+   * reads as "nothing happens here". Everything the app draws as a button points back: <button>,
+   * anything given role="button" by a theme or a module, and the <summary> of a disclosure.
+   * Disabled controls keep the default cursor — the pointer is a promise that a click does
+   * something. Anchors already get the pointer from the browser, buttons rendered as <a> included.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }

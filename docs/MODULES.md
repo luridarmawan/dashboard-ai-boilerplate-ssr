@@ -34,10 +34,10 @@ Satu perintah menghasilkan **modul utuh** di `modules/Billing/` dan mendaftarkan
 |---|---|
 | `db/tables.ts` | tabel `billing_invoices` (tenant-scoped, soft delete) dari daftar field |
 | `permissions.ts` · `menu.ts` | `billing.invoice.read/create/edit/manage`; entri menu `/m/billing/invoices` yang tampil hanya bila izin ada |
-| `config.ts` · `i18n/{id,en}.json` | section "Billing" di Pengaturan (form otomatis); kunci `billing.*` untuk kedua bahasa |
+| `config.ts` · `i18n/{id,en}.json` | section "Billing" di Pengaturan (form otomatis); kunci `billing.*` untuk kedua bahasa — termasuk **label tiap field form dan tiap pilihan `select`**, jadi tidak ada satu pun teks yang terpaku di kode (K-6) |
 | `api/schemas.ts` · `api/routes.ts` | skema TypeBox bersama + CRUD `/v1/m/billing/invoices` lewat facade tenant, teraudit, dengan pencarian & paginasi |
 | `api/tools.ts` | tool AI/MCP `billing.list_invoices` — ditawarkan ke asisten AI hanya bagi user yang punya `billing.invoice.read`, berjalan di tenant aktif |
-| `web/routes/invoices/**` | halaman daftar, buat, ubah/hapus — `FormBuilder` memakai skema API yang sama (L-17), jalan tanpa JavaScript |
+| `web/routes/invoices/**` | halaman daftar, buat, ubah/hapus — `FormBuilder` memakai skema API yang sama (L-17), jalan tanpa JavaScript. Pencarian & paginasi dua lapis (L-20 di atas L-22): form GET biasa tanpa JavaScript, dan dengan JavaScript permintaan yang sama dijalankan lewat fetch — mengetik mencari sendiri setelah jeda 300 ms, URL tetap menggambarkan apa yang tampil |
 | `widgets.ts` · `web/widgets/` | widget dasbor terfilter izin |
 | `hooks.ts` · `jobs.ts` | contoh langganan `user.created` dan job `billing.heartbeat` setiap jam |
 | `seed.ts` | satu baris contoh, idempoten |
@@ -696,6 +696,11 @@ CORE_DIR=../dashboard-ai-boilerplate-ssr bun run harness   # lalu di core: bun d
 ```
 
 `tsconfig.json` modul mengacu `../../tsconfig.base.json` dan dependensinya `workspace:*` — keduanya **benar saat modul berada di dalam core** (yang selalu terjadi lewat harness atau `modules:add`). Karena itu `bun install` langsung di repo modul tidak berguna; pakai harness. Itu juga alasan `bun create module` dijalankan dengan `--no-install`: install bawaannya pasti gagal di `@app/api` dan `@core/*`, tanpa akibat apa pun selain enam blok galat yang menyesatkan.
+
+Tipe modul diperiksa oleh **dua** langkah yang saling melengkapi, dan keduanya wajib:
+
+- `tsc -p tsconfig.json` di folder modul — sisi server (`api/`, `db/`, `hooks.ts`, `jobs.ts`, `seed.ts`). Ia **mengecualikan `web/**`** dengan sengaja: `$lib/*` dan `@core/ui` adalah alias milik `apps/web`, tidak bisa diresolusi dari sini.
+- `svelte-check` di `apps/web` (`bun run typecheck` di core, `bun run harness --web` dari repo modul) — sisi halaman. Yang ada di `apps/web/src/routes` hanyalah shim hasil generate yang me-re-export halaman Anda, jadi supaya berkas aslinya ikut terperiksa, `apps/web/svelte.config.js` menambahkan `modules/**/web/**` ke `include` tsconfig lewat kait `kit.typescript.config`. Konsekuensinya menguntungkan Anda: kunci i18n yang salah ketik di halaman modul gagal di `bun check`, sama seperti di halaman core (K-5).
 
 ### 7b. Memasang di host — `bun modules:add`
 

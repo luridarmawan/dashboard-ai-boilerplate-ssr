@@ -3,5 +3,18 @@
   "hello.notes.new": "New Note",
   "hello.notes.empty": "No notes yet.",
   "hello.notes.saved": "Saved.",
-  "hello.widget.title": "Notes"
+  "hello.notes.deleted": "Note deleted.",
+  "hello.notes.search_hint": "Search notes…",
+  "hello.notes.clear": "Clear",
+  "hello.notes.count": "{total} notes",
+  "hello.notes.forbidden": "You may not view notes",
+  "hello.notes.load_failed": "Notes could not be loaded",
+  "hello.notes.not_found": "Note not found",
+  "hello.note.field.title": "Title",
+  "hello.note.field.body": "Body",
+  "hello.note.field.pinned": "Pinned",
+  "hello.widget.title": "Notes",
+  "hello.widget.manage": "Manage notes",
+  "hello.public.title": "Hello",
+  "hello.public.lead": "Public page of the Hello module, server-rendered in the active theme's public layout."
 }
