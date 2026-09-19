@@ -158,6 +158,13 @@ if (process.env.DATABASE_URL) {
   sh(['bun', 'run', '--cwd', 'packages/db', 'migrate'], coreDir);
   env.INTEGRATION = '1';
 }
+// The generated integration tests speak to the app as `http://api.test` (modgen templates.ts).
+// When the core's .env sets APP_ORIGIN, that list becomes the CSRF allow-list (apps/api csrf.ts,
+// `allowedOrigins`) and the request origin is no longer trusted: every mutation in the test —
+// the login first — comes back 403 origin_mismatch, which reads like a permission bug and is not.
+// So the test step names its own origin, the way db:generate above names its own TABLE_PREFIX.
+// An author testing against a different origin sets APP_ORIGIN and keeps it.
+if (!process.env.APP_ORIGIN) env.APP_ORIGIN = 'http://api.test';
 sh(['bun', 'test', `modules/${NAME}/test`], coreDir, env);
 console.log(
   `\nharness: ${NAME} OK${process.env.DATABASE_URL ? ' (termasuk tes integrasi)' : ' (tanpa DATABASE_URL: tes integrasi dilewati)'}`,
