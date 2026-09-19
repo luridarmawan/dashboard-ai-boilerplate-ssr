@@ -157,6 +157,33 @@ echo 'CORE_DIR=../core' > .env    # Bun memuat .env otomatis; harness.ts membaca
 bun run harness
 ```
 
+**Satu shell saja untuk `bun install` core.** Harness menjalankan `bun install` di dalam core, jadi kalau core Anda pernah di-install dari PowerShell lalu harness dijalankan dari Git Bash — atau sebaliknya — install kedua gagal dengan satu blok per workspace:
+
+```
+EEXIST: File exists: failed to symlink dependencies for package: @core/auth@workspace:packages\auth
+```
+
+Sebabnya bukan izin atau Developer Mode: bun dari Git Bash menulis link gaya MSYS yang **tidak terbaca Windows** (`Get-Item` memberi `LinkType` dan `Target` kosong), sedangkan bun dari PowerShell menulis *junction*. Keduanya menempati path yang sama dan tak mau menimpa yang lain. Ini mengenai seluruh `node_modules` bersarang — di monorepo ini bisa ratusan link sekaligus, dan install yang gagal itu setengah jadi, bukan sekadar berisik.
+
+Pulihkan dengan membuang semua `node_modules` core, lalu install ulang dari shell yang akan Anda pakai seterusnya:
+
+```powershell
+# PowerShell, di folder core
+# 1. lepas link-nya dulu. JANGAN `Remove-Item -Recurse`: ia menembus junction dan ikut menghapus isi packages/*
+Get-ChildItem -Recurse -Force -Directory -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -like '*\node_modules\*' -and ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+  ForEach-Object { [System.IO.Directory]::Delete($_.FullName, $false) }
+
+# 2. baru foldernya — rmdir aman terhadap junction
+Get-ChildItem -Recurse -Force -Directory -Filter node_modules -ErrorAction SilentlyContinue |
+  Sort-Object { $_.FullName.Length } -Descending |
+  ForEach-Object { cmd /c rmdir /s /q "`"$($_.FullName)`"" }
+
+bun install
+```
+
+Setelah itu `git status` core harus tetap bersih — kalau tidak, langkah 1 terlewat dan ada source yang ikut terhapus.
+
 **b. Biarkan harness meng-clone sendiri** — tidak ada `CORE_DIR`, jadi ia meng-clone core ke `.core/` di dalam repo modul, pada ref yang tertulis di `package.json`. Ini yang dipakai CI, dan yang berguna saat Anda ingin menguji modul terhadap versi core yang **tepat seperti yang akan dipakai host**:
 
 ```bash
@@ -310,6 +337,7 @@ Untuk membagi daftar modul internal ke beberapa instalasi, taruh `modules.catalo
 | Gejala | Sebabnya |
 |---|---|
 | `bun install` di repo modul gagal / paket `@core/*` tidak ketemu | Modul hanya utuh di dalam core — pakai `harness`, jangan install langsung |
+| `EEXIST: File exists: failed to symlink dependencies for package: …` untuk tiap workspace core | `bun install` core pernah dijalankan dari shell lain (Git Bash ↔ PowerShell); link MSYS dan junction saling menolak. Buang semua `node_modules` core, install ulang dari satu shell (§2) |
 | `modules:add` menolak ref Anda | Branch tidak diterima; pakai tag atau commit |
 | `modules:add: repo tidak punya module.json di root pada ref …` | Yang diberikan URL repo **core**, bukan repo modul. `modules:add` memasang repo yang punya `module.json` di root — core adalah host yang memasang, bukan yang dipasang |
 | `modul "X" sudah terdaftar` / `modules/X sudah ada` saat `modules:add` | Core itu bekas harness (`source: "local"`) — `bun modules:remove X` dulu, atau pasang di instalasi host yang bersih (§6) |
