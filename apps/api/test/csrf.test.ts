@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import { resetEnvCache } from '@core/config';
 import { app } from '../src/app.ts';
-import { checkCsrf } from '../src/plugins/csrf.ts';
+import { allowedOrigins, checkCsrf } from '../src/plugins/csrf.ts';
 
 /** M1 gate #2 (PRD §8 #10): a cross-origin state-changing request is rejected. */
 const TOKEN = 'A'.repeat(43);
@@ -140,5 +141,50 @@ describe('ordering: CSRF is decided before body validation', () => {
       }),
     );
     expect(res.status).toBe(422);
+  });
+});
+
+describe('allowedOrigins — APP_ORIGIN and the loopback twins', () => {
+  const saved = { APP_ORIGIN: process.env.APP_ORIGIN, NODE_ENV: process.env.NODE_ENV };
+  const restore = () => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    resetEnvCache();
+  };
+  const fromWeb = (host: string) =>
+    new Request('http://127.0.0.1:5001/v1/auth/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-proto': 'http', 'x-forwarded-host': host },
+    });
+
+  test('development: the origin the request came from joins the configured list', () => {
+    process.env.APP_ORIGIN = 'http://localhost:5170';
+    process.env.NODE_ENV = 'development';
+    resetEnvCache();
+    expect(allowedOrigins(fromWeb('127.0.0.1:5170'))).toEqual([
+      'http://localhost:5170',
+      'http://127.0.0.1:5170',
+    ]);
+    // Already listed: no duplicate.
+    expect(allowedOrigins(fromWeb('localhost:5170'))).toEqual(['http://localhost:5170']);
+    restore();
+  });
+
+  test('outside development the configured list is the whole truth', () => {
+    process.env.APP_ORIGIN = 'http://localhost:5170';
+    process.env.NODE_ENV = 'test';
+    resetEnvCache();
+    expect(allowedOrigins(fromWeb('127.0.0.1:5170'))).toEqual(['http://localhost:5170']);
+    restore();
+  });
+
+  test('no APP_ORIGIN: the forwarded origin of this request, and only that', () => {
+    delete process.env.APP_ORIGIN;
+    process.env.NODE_ENV = 'test';
+    resetEnvCache();
+    expect(allowedOrigins(fromWeb('App.Example.com'))).toEqual(['http://app.example.com']);
+    restore();
   });
 });

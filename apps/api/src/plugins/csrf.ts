@@ -78,14 +78,23 @@ export function checkCsrf(i: CsrfInput): CsrfVerdict {
  * Origins a state-changing request may come from: the configured APP_ORIGIN list when set (one
  * installation may serve several domains), else the origin this request was served from — behind
  * Caddy that is the forwarded scheme + host (Decision E).
+ *
+ * In `NODE_ENV=development` the request's own origin is accepted ALONGSIDE the configured list,
+ * mirroring apps/web/src/lib/server/origin.ts: a developer who listed `localhost` in APP_ORIGIN
+ * and then opens `127.0.0.1` (or the other way round) would otherwise see every login and form
+ * answered with `csrf_failed` / `origin_mismatch`, while the web side — which already relaxes in
+ * dev — had let the request through. Only the explicit `development` value relaxes this; `test`
+ * and `production` stay strict, and an empty list still means "the origin we were served from".
  */
 export function allowedOrigins(request: Request): readonly string[] {
   const configured = env().APP_ORIGINS;
-  if (configured.length) return configured;
   const url = new URL(request.url);
   const proto = request.headers.get('x-forwarded-proto') ?? url.protocol.replace(':', '');
   const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? url.host;
-  return [`${proto}://${host}`.toLowerCase()];
+  const own = `${proto}://${host}`.toLowerCase();
+  if (!configured.length) return [own];
+  if (env().NODE_ENV === 'development' && !configured.includes(own)) return [...configured, own];
+  return configured;
 }
 
 /** First allowed origin — kept for callers that need a single value. */
