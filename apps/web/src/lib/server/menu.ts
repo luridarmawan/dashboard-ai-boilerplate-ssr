@@ -250,8 +250,15 @@ export function buildMenu(
   );
   const all: Entry[] = [...coreEntries, ...moduleEntries];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));
-  const isActive = (href: string) =>
+  // A link is current when the path is it or lies under it — but a module's home (`/m/x`) sits
+  // above every page of that module, so the deepest matching entry wins: `/m/x` is not current
+  // while another allowed entry `/m/x/quests` matches the same path. Otherwise a tab bar or rail
+  // would light two links on every inner page.
+  const matches = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+  const hrefs = allowed.map((e) => e.href);
+  const isActive = (href: string) =>
+    matches(href) && !hrefs.some((o) => o !== href && o.startsWith(`${href}/`) && matches(o));
   const toItem = (e: Entry): MenuItem => ({
     id: e.id,
     kind: 'link',
