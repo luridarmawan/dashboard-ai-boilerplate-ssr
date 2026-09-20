@@ -3,5 +3,18 @@
   "hello.notes.new": "Note baru",
   "hello.notes.empty": "Belum ada notes.",
   "hello.notes.saved": "Tersimpan.",
-  "hello.widget.title": "Notes"
+  "hello.notes.deleted": "Note dihapus.",
+  "hello.notes.search_hint": "Cari notes…",
+  "hello.notes.clear": "Bersihkan",
+  "hello.notes.count": "{total} notes",
+  "hello.notes.forbidden": "Anda tidak punya izin melihat notes",
+  "hello.notes.load_failed": "Notes tidak bisa dimuat",
+  "hello.notes.not_found": "Note tidak ditemukan",
+  "hello.note.field.title": "Title",
+  "hello.note.field.body": "Body",
+  "hello.note.field.pinned": "Pinned",
+  "hello.widget.title": "Notes",
+  "hello.widget.manage": "Kelola notes",
+  "hello.public.title": "Hello",
+  "hello.public.lead": "Halaman publik modul Hello, ter-SSR dengan layout publik tema aktif."
 }

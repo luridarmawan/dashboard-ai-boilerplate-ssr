@@ -69,6 +69,7 @@ scripts/        modgen, modules:add, sim:module, proof gate M1–M6, penjaga CI
 | `bun create module ../mod-x --no-install` lalu `bun run rename <Nama>` | repositori modul standalone dengan harness sendiri; nama folder **tidak** menamai modulnya — `rename` yang melakukannya, sekali, sebelum Anda menulis kode |
 | `bun modules:add <git-url> --ref <tag>` | pasang modul dari repositori lain |
 | `bun modules:remove <Nama>` | uninstall bersih: lepas registrasi, hapus folder/submodule, migrasi turun untuk tabelnya (G-15) |
+| `bun run clean` | buang `node_modules` root + tiap workspace, lalu `bun install` lagi. Melepas junction sebagai link, jadi aman di Windows; perbaikan untuk `EEXIST … failed to symlink dependencies` sesudah folder yang sama di-install dari WSL/container ([Build-Module-for-Your-Apps §2](./docs/Build-Module-for-Your-Apps.md)) |
 | `bun run db:generate` | migrasi baru (mysql + pg) setelah mengubah tabel |
 | `bun run db:matrix:docker` | migrasi + smoke di MySQL 8, MariaDB 11, PostgreSQL 16 |
 

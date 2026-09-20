@@ -27,6 +27,7 @@
     "ci:modgen-guard": "sh scripts/ci/modgen-guard.sh",
     "ci:starter-check": "bun run scripts/create-module-template.ts --check",
     "ci:sync-pure": "bun run bootstrap && git diff --exit-code && test -z \"$(git ls-files --others --exclude-standard)\"",
+    "clean": "bun run scripts/clean.ts",
     "db:codegen": "bun run --cwd packages/db codegen",
     "db:generate": "bun run bootstrap && bun run --cwd packages/db generate",
     "db:matrix": "docker compose --profile matrix up -d --wait && bun run scripts/db-matrix.ts",

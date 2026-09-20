@@ -92,8 +92,8 @@ cd core
 bun create module ../mod-billing --no-install   # templatenya dari .bun-create/module di core ini
 cd ../mod-billing
 bun run rename Billing                    # sekali saja: Hello → Billing (namespace, tabel, izin, route, tes)
-git init -b main
 git add -A && git commit -m "modul Billing dari template"
+git branch -M main                        # bun create sudah git init; branch awalnya ikut default git Anda
 ```
 
 **Nama foldernya tidak menentukan nama modul.** `bun create module` hanyalah penyalin template — Bun tidak meneruskan nama apa pun ke dalamnya, jadi `bun create module ../Contact` pun menghasilkan modul yang masih bernama `Hello` (tabel `hello_*`, route `/m/hello/…`). Yang mengubahnya cuma `bun run rename <Nama>`, yang menulis ulang nama itu di ±25 berkas sekaligus: `module.json`, nama paket, tabel, izin, id menu, route, kunci i18n, dan nama berkas tes. Satu-satunya jejak folder adalah `package.json` → `name`, yang memang ditimpa Bun dengan nama folder tujuan; `rename` mengembalikannya ke `@modules/<namespace>`. Karena itu urutannya selalu **create → rename**, dan rename dijalankan **sekali, sebelum Anda menulis kode sendiri**: ia mengganti kata `Hello`/`hello` di seluruh berkas teks, termasuk yang nanti Anda tulis sendiri.
@@ -102,12 +102,14 @@ git add -A && git commit -m "modul Billing dari template"
 
 Bun akan mencetak saran penutup `cd <folder> && bun dev`. **Abaikan** — itu teks bawaan `bun create`, dan repo modul tidak punya skrip `dev`. Skrip yang ada hanya `rename`, `harness`, `typecheck`, dan `test` (tiga yang terakhir memanggil harness). Langkah berikutnya selalu `bun run rename <Nama>` lalu harness.
 
+**`git init` tidak perlu — `bun create` sudah melakukannya**, lengkap dengan commit pertama `Initial commit (via bun create)`. Karena itu perintah di atas memakai `git branch -M main`, bukan `git init -b main`: pada repo yang sudah ada git-nya, `git init -b main` hanya mencetak `warning: re-init: ignored --initial-branch=main` dan meninggalkan Anda di branch default git Anda — yang di banyak pemasangan masih `master`. Akibatnya baru terasa satu langkah kemudian, saat §1a menjalankan `git push -u origin main` dan git menjawab `error: src refspec main does not match any`.
+
 Peta direktorinya sekarang — dua repo bersebelahan, tidak bersarang:
 
 ```
 ~/kerja/
 ├── core/            ← clone dashboard-ai-boilerplate-ssr (tidak Anda commit)
-└── mod-billing/     ← repo modul ANDA (git init sendiri, remote sendiri)
+└── mod-billing/     ← repo modul ANDA (remote sendiri, tag sendiri)
 ```
 
 Kalau Anda sedang tidak berada di dalam checkout core: `BUN_CREATE_DIR=<path-core>/.bun-create bun create module ../mod-billing --no-install`, atau salin folder `.bun-create/module` sekali dan pakai berulang. Keduanya tetap mengandaikan Anda pernah meng-clone core.
@@ -148,11 +150,39 @@ Kalau nanti repo ini privat, host yang memasangnya perlu kredensial baca — §7
 CORE_DIR=../core bun run harness
 ```
 
+**Di Windows**, jalankan seluruh dokumen ini dari **Git Bash** — prefix env di depan perintah seperti di atas tidak ada di PowerShell. Kalau Anda memang mau tetap di PowerShell, atau sekadar bosan mengulang prefixnya di Linux, tulis sekali saja di `.env` repo modul:
+
+```bash
+echo 'CORE_DIR=../core' > .env    # Bun memuat .env otomatis; harness.ts membaca process.env.CORE_DIR
+bun run harness
+```
+
+**Jangan `bun install` folder yang sama dari Windows dan dari Linux bergantian.** Harness menjalankan `bun install` di dalam core, jadi kalau core berada di folder Windows dan installnya pernah datang dari sisi Linux — **WSL** lewat `/mnt/d/…`, atau container yang me-mount folder itu seperti skrip `*:docker` di `package.json` — install berikutnya dari Windows gagal dengan satu blok per workspace:
+
+```
+EEXIST: File exists: failed to symlink dependencies for package: @core/auth@workspace:packages\auth
+```
+
+Sebabnya bukan izin dan bukan Developer Mode. Bun Linux menulis symlink POSIX relatif (`node_modules/@core/config` → `../../../config`); Windows melihat berkas itu sebagai *reparse point* yang tidak bisa ia resolusikan — `Get-Item` memberi `LinkType` dan `Target` kosong — sedangkan bun Windows menulis *junction* absolut. Keduanya menempati path yang sama dan tak mau menimpa yang lain, jadi installnya berhenti setengah jalan, bukan sekadar berisik.
+
+**Git Bash aman**, dan bukan penyebabnya: ia memanggil bun Windows yang sama dan menghasilkan junction yang sama persis dengan PowerShell dan cmd. Yang menentukan bukan shell-nya, melainkan sisi mana yang menjalankan bun.
+
+Pulihkan dengan `bun run clean`, lalu install ulang dari sisi yang akan Anda pakai seterusnya:
+
+```bash
+bun run clean     # buang node_modules root + milik tiap workspace
+bun install
+```
+
+`clean` melepas junction sebagai **link**, tidak menembus ke isinya, jadi source di `packages/*` aman — lihat [`scripts/clean.ts`](../scripts/clean.ts). Ia tidak butuh `node_modules` untuk berjalan, jadi tetap bisa dipakai justru ketika installnya rusak setengah jalan, dan perintahnya sama di PowerShell, cmd, Git Bash, WSL, Linux, dan macOS.
+
+Sebagai jaring pengaman, `git status` core harus tetap bersih sesudahnya — kalau ada berkas hilang, yang terhapus bukan sekadar link.
+
 **b. Biarkan harness meng-clone sendiri** — tidak ada `CORE_DIR`, jadi ia meng-clone core ke `.core/` di dalam repo modul, pada ref yang tertulis di `package.json`. Ini yang dipakai CI, dan yang berguna saat Anda ingin menguji modul terhadap versi core yang **tepat seperti yang akan dipakai host**:
 
 ```bash
 bun run harness                                     # clone ke .core/ (sekali; berikutnya dipakai ulang)
-bun run harness --web                               # + svelte-check untuk halaman modul
+bun run harness --web                               # + svelte-check untuk halaman modul Anda sendiri
 DATABASE_URL=mysql://app:app@127.0.0.1:3306/app bun run harness   # + migrasi & tes integrasi
 #   ^ database Anda sendiri; kalau memakai `docker compose` milik core, portnya 33306
 ```
@@ -209,6 +239,8 @@ Tag yang hanya ada di mesin Anda tidak bisa dipasang siapa pun: `modules:add` me
 
 ## 6. Memasang di host
 
+Host di sini adalah **instalasi lain** — bukan clone core yang Anda pakai sebagai alat di §2. Clone itu sudah punya `modules/<Nama>` dan entri `source: "local"` bikinan harness, dan `modules:add` menolak keduanya (`modul "Billing" sudah terdaftar di modules.json`, `modules/Billing sudah ada`). Kalau Anda memang ingin mencobanya di core yang sama, cabut dulu salinan harness itu: `bun modules:remove Billing`.
+
 ```bash
 bun modules:add https://github.com/tim/mod-billing.git --ref v1.4.2   # modul privat: pakai URL SSH, lihat §7b
 bun db:generate && bun run --cwd packages/db migrate
@@ -220,6 +252,14 @@ git push                     # repo HOST, bukan repo modul — inilah yang dipak
 Yang terjadi: `git submodule add` ke `modules/Billing`, checkout detach pada ref, entri `{ "source": "submodule", "repo", "ref", "path" }` di `modules.json`, path itu dikecualikan dari Biome host (modul eksternal di-lint di repo asalnya), `bun install`, lalu `modules:sync`.
 
 **Ref wajib tag atau commit — branch ditolak**, supaya sebuah build bisa direproduksi dari `modules.json` saja.
+
+**Mencoba pemasangan tanpa push dulu.** `modules:add` menerima URL `file://` (transport itu diblokir git sejak 2.38.1, dan `modules:add` membukanya khusus untuk URL lokal), jadi tag lokal saja sudah cukup untuk melihat seluruh §6 berjalan sebelum repo modul punya remote:
+
+```bash
+bun modules:add "file:///$(cd ../mod-billing && (pwd -W 2>/dev/null || pwd))" --ref v0.1.0
+```
+
+`pwd -W` memberi `D:/…` di Git Bash dan otomatis gagal-lalu-fallback ke `pwd` di Linux, sehingga satu baris itu sama di kedua sistem. Perhatikan **tiga** slash: dengan `file://D:/…` huruf drive terbaca git sebagai nama host.
 
 Menaikkan versi:
 
@@ -291,7 +331,13 @@ Untuk membagi daftar modul internal ke beberapa instalasi, taruh `modules.catalo
 | Gejala | Sebabnya |
 |---|---|
 | `bun install` di repo modul gagal / paket `@core/*` tidak ketemu | Modul hanya utuh di dalam core — pakai `harness`, jangan install langsung |
+| `EEXIST: File exists: failed to symlink dependencies for package: …` untuk tiap workspace core | Folder core pernah di-`bun install` dari sisi Linux (WSL, container yang me-mount folder Windows); symlink POSIX-nya tidak terbaca Windows. `bun run clean && bun install` (§2). Git Bash bukan penyebabnya |
 | `modules:add` menolak ref Anda | Branch tidak diterima; pakai tag atau commit |
+| `modules:add: repo tidak punya module.json di root pada ref …` | Yang diberikan URL repo **core**, bukan repo modul. `modules:add` memasang repo yang punya `module.json` di root — core adalah host yang memasang, bukan yang dipasang |
+| `modul "X" sudah terdaftar` / `modules/X sudah ada` saat `modules:add` | Core itu bekas harness (`source: "local"`) — `bun modules:remove X` dulu, atau pasang di instalasi host yang bersih (§6) |
+| `git push -u origin main` → `src refspec main does not match any` | `git init -b main` diabaikan karena `bun create` sudah meng-init repo; branch Anda masih `master`. Pakai `git branch -M main` (§1) |
+| `file://D:/…` ditolak git di Windows | Kurang satu slash — `D:` terbaca sebagai nama host. Pakai `file:///D:/…` |
+| `CORE_DIR=../core bun run harness` error di PowerShell | PowerShell tidak punya prefix env inline — pakai Git Bash, atau taruh `CORE_DIR=../core` di `.env` repo modul (§2) |
 | `modules:sync` gagal menyebut dua commit | HEAD submodule bergeser dari `ref` di `modules.json` — checkout ulang ke ref-nya |
 | Modul tidak muncul di menu | Izinnya belum diberikan ke grup, atau modul dimatikan untuk tenant itu di halaman **Modul** |
 | Nama constraint kepanjangan saat migrasi MySQL | Nama tabel modul terlalu panjang; ingat `TABLE_PREFIX` ikut dihitung dalam batas 64 karakter |

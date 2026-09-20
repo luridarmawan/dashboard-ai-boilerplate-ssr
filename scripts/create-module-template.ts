@@ -101,6 +101,19 @@ bun modules:add <git-url> --ref v0.1.0
 Semua titik perluasan yang dipakai berjalan: \`db/tables.ts\`, \`permissions.ts\`, \`menu.ts\`, \`config.ts\`, \`i18n/\`,
 \`api/\` (route + skema bersama), \`web/routes/\` (list, baru, ubah), \`web/public/\` (halaman publik), \`widgets.ts\`,
 \`hooks.ts\`, \`jobs.ts\`, \`seed.ts\`, \`test/\`. Panduan lengkap: \`docs/MODULES.md\` di core.
+
+Tiga kebiasaan yang sudah terpasang dan sebaiknya Anda teruskan:
+
+- **Tidak ada teks yang terpaku di kode.** Judul, label field, pilihan \`select\`, pesan galat aksi, sampai teks widget
+  dan halaman publik semuanya kunci di \`i18n/{id,en}.json\`. \`_form.ts\` menerima \`Translate\` (\`noteFields(t)\`)
+  justru supaya label ikut bahasa pembaca; server memakai \`createTranslator(event.locals.locale.locale)\`.
+  Menambah bahasa = menambah satu berkas katalog, bukan menyisir halaman.
+- **Pencarian dua lapis.** \`web/routes/notes/+page.svelte\` menaruh satu form GET biasa (jalan tanpa JavaScript) dan
+  melapisinya dengan \`goto\` ter-debounce: mengetik mencari sendiri setelah 300 ms, hanya baris tabel yang berganti,
+  dan URL tetap menggambarkan apa yang tampil sehingga hasilnya bisa dibagikan dan tombol Back tetap benar.
+  Pola yang sama dipakai pagernya. Jangan mengganti lapisan dasar dengan fetch saja — itu melanggar L-22.
+- **Tombol menunjuk balik.** Kursor pointer datang dari core (\`apps/web/src/app.css\`) untuk setiap \`<button>\`,
+  \`role="button"\` dan \`<summary>\`; pakai \`<Button>\` dari \`@core/ui\` dan Anda tidak perlu mengurusnya.
 `;
 
 function walk(dir: string, base = dir, acc: string[] = []): string[] {

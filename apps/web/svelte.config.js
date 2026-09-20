@@ -25,5 +25,26 @@ export default {
       // Extension point 10: modules import core components as `@core/ui` (see src/lib/components/index.ts).
       '@core/ui': 'src/lib/components',
     },
+    typescript: {
+      /**
+       * Module pages live OUTSIDE this app (`modules/<Name>/web/**`); what sits in `src/routes` is
+       * a generated shim that only re-exports them (extension points 3, 10, 13). SvelteKit's
+       * tsconfig therefore includes `src/**` alone, and `svelte-check` diagnoses what the tsconfig
+       * includes — so a module's own pages were type-checked by nobody: not by the module's `tsc`
+       * (its tsconfig excludes `web/**`, because `$lib` and `@core/ui` are aliases of THIS app),
+       * and not here. A wrong i18n key or a renamed prop in a module page reached the browser.
+       *
+       * Adding the sources closes that: the same `bun run typecheck` that guards core pages now
+       * guards module pages, here and in `bun run harness --web` inside a module's own repository.
+       * Paths are relative to `kit.outDir` (`apps/web/.svelte-kit`), hence `../../../modules`.
+       */
+      config(config) {
+        for (const ext of ['ts', 'svelte']) {
+          config.include.push(`../../../modules/**/web/**/*.${ext}`);
+        }
+        config.exclude.push('../../../modules/**/node_modules/**');
+        return config;
+      },
+    },
   },
 };

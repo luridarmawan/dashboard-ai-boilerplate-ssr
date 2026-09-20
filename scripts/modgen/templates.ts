@@ -43,8 +43,14 @@ const tsType = (f: FieldSpec): string =>
     : f.type === 'boolean'
       ? 't.Boolean()'
       : 't.Nullable(t.String())';
-const fieldDef = (f: FieldSpec): string => {
-  const base = `name: '${camel(f.name)}', label: '${title(f.name)}'`;
+/** i18n key of a field's label / of one option of a select field (K-6). */
+const labelKey = (ns: string, resource: string, f: FieldSpec): string =>
+  `${ns}.${resource}.field.${f.name}`;
+const optionKey = (ns: string, resource: string, f: FieldSpec, option: string): string =>
+  `${ns}.${resource}.option.${f.name}.${option}`;
+/** A FieldDef literal. Labels are looked up, never baked in — the form follows the reader's locale. */
+const fieldDef = (f: FieldSpec, ns: string, resource: string): string => {
+  const base = `name: '${camel(f.name)}', label: t('${labelKey(ns, resource, f)}')`;
   switch (f.type) {
     case 'string':
       return `{ ${base}, type: 'string', ${f.required ? 'required: true, ' : ''}maxlength: ${f.max ?? 191} }`;
@@ -57,7 +63,7 @@ const fieldDef = (f: FieldSpec): string => {
     case 'date':
       return `{ ${base}, type: 'date'${f.required ? ', required: true' : ''} }`;
     case 'select':
-      return `{ ${base}, type: 'select', ${f.required ? 'required: true, ' : ''}options: [${(f.options ?? []).map((o) => `{ value: '${o}', label: '${title(o)}' }`).join(', ')}] }`;
+      return `{ ${base}, type: 'select', ${f.required ? 'required: true, ' : ''}options: [${(f.options ?? []).map((o) => `{ value: '${o}', label: t('${optionKey(ns, resource, f, o)}') }`).join(', ')}] }`;
   }
 };
 
@@ -89,6 +95,7 @@ export function renderModule(s: ModuleSpec): Files {
         '@core/auth': 'workspace:*',
         '@core/contracts': 'workspace:*',
         '@core/db': 'workspace:*',
+        '@core/i18n': 'workspace:*',
         '@core/logger': 'workspace:*',
         '@core/module-kit': 'workspace:*',
         elysia: '^1.4.0',
@@ -145,6 +152,17 @@ export default defineConfig('${name}', [
   },
 ]);
 `;
+  /**
+   * One key per form field and per select option (K-6): a label belongs in the catalogue, not in
+   * `_form.ts`. The generator cannot know the Indonesian for a field YOU named, so both locales
+   * start from the column name — translating `i18n/id.json` is the first edit worth making.
+   */
+  const fieldKeys = Object.fromEntries([
+    ...fields.map((f) => [labelKey(ns, resource, f), title(f.name)] as const),
+    ...fields.flatMap((f) =>
+      (f.options ?? []).map((o) => [optionKey(ns, resource, f, o), title(o)] as const),
+    ),
+  ]);
   const i18n = (loc: 'id' | 'en') =>
     JSON.stringify(
       {
@@ -152,7 +170,29 @@ export default defineConfig('${name}', [
         [`${ns}.${plural}.new`]: loc === 'id' ? `${Res} baru` : `New ${Res}`,
         [`${ns}.${plural}.empty`]: loc === 'id' ? `Belum ada ${plural}.` : `No ${plural} yet.`,
         [`${ns}.${plural}.saved`]: loc === 'id' ? 'Tersimpan.' : 'Saved.',
+        [`${ns}.${plural}.deleted`]: loc === 'id' ? `${Res} dihapus.` : `${Res} deleted.`,
+        [`${ns}.${plural}.search_hint`]: loc === 'id' ? `Cari ${plural}…` : `Search ${plural}…`,
+        [`${ns}.${plural}.clear`]: loc === 'id' ? 'Bersihkan' : 'Clear',
+        [`${ns}.${plural}.count`]: `{total} ${plural}`,
+        [`${ns}.${plural}.forbidden`]:
+          loc === 'id' ? `Anda tidak punya izin melihat ${plural}` : `You may not view ${plural}`,
+        [`${ns}.${plural}.load_failed`]:
+          loc === 'id'
+            ? `${title(plural)} tidak bisa dimuat`
+            : `${title(plural)} could not be loaded`,
+        [`${ns}.${plural}.not_found`]: loc === 'id' ? `${Res} tidak ditemukan` : `${Res} not found`,
+        ...fieldKeys,
         [`${ns}.widget.title`]: title(plural),
+        [`${ns}.widget.manage`]: loc === 'id' ? `Kelola ${plural}` : `Manage ${plural}`,
+        ...(s.withPublic
+          ? {
+              [`${ns}.public.title`]: name,
+              [`${ns}.public.lead`]:
+                loc === 'id'
+                  ? `Halaman publik modul ${name}, ter-SSR dengan layout publik tema aktif.`
+                  : `Public page of the ${name} module, server-rendered in the active theme's public layout.`,
+            }
+          : {}),
       },
       null,
       2,
@@ -336,11 +376,18 @@ export default defineWidgets('${name}', [
 ]);
 `;
   files['web/widgets/Summary.svelte'] = `<script lang="ts">
-let { context }: { context?: { locale: string } } = $props();
+import { useT } from '$lib/i18n';
+
+/**
+ * A widget is rendered inside the dashboard, so it reads the active locale's catalogue from
+ * context like any other component (K-6) — the \`context\` prop it also receives carries the
+ * tenant and the caller's permissions, for widgets that need them.
+ */
+const t = useT();
 </script>
 
 <div class="grid gap-2 text-sm" data-testid="widget-${ns}">
-  <a href="/m/${ns}/${plural}" class="font-medium">{context?.locale === 'en' ? 'Manage ${plural}' : 'Kelola ${plural}'} →</a>
+  <a href="/m/${ns}/${plural}" class="font-medium">{t('${ns}.widget.manage')} →</a>
 </div>
 `;
   files['seed.ts'] = `import { and, type Db, eq, newId, schema } from '@core/db';
@@ -357,36 +404,98 @@ export default defineSeed('${name}', async ({ db: raw, tenantId, log }) => {
 `;
 
   // ---- dashboard pages (extension point 3) ----
-  files[`web/routes/${plural}/_form.ts`] = `import type { FieldDef } from '@core/ui';
+  const fieldsFn = `${camel(resource)}Fields`;
+  files[`web/routes/${plural}/_form.ts`] = `import type { Translate } from '@core/i18n';
+import type { FieldDef } from '@core/ui';
 
-export const fields: FieldDef[] = [
-${fields.map((f) => `  ${fieldDef(f)},`).join('\n')}
-];
+/**
+ * Field declarations for the ${resource} form (FormBuilder, L-17); shared by new + edit. It takes
+ * the translator rather than exporting a constant, so every label comes from the catalogue and
+ * follows the reader's language — a literal here would be the one string the picker cannot change.
+ */
+export function ${fieldsFn}(t: Translate): FieldDef[] {
+  return [
+${fields.map((f) => `    ${fieldDef(f, ns, resource)},`).join('\n')}
+  ];
+}
 `;
-  files[`web/routes/${plural}/+page.server.ts`] = `import type { ServerLoad } from '@sveltejs/kit';
+  files[`web/routes/${plural}/+page.server.ts`] = `import { createTranslator } from '@core/i18n';
+import type { ServerLoad } from '@sveltejs/kit';
 import { error } from '@sveltejs/kit';
 import { apiFor } from '$lib/server/session';
 
 export const _layoutVariant = 'wide';
 
+/**
+ * The URL is the whole state of this page: \`?q=\` and \`?page=\`. That is what lets the search be
+ * two layers over one \`load\` — a plain GET form without JavaScript, the same URL fetched in the
+ * background with it (see +page.svelte) — and what makes a filtered list shareable either way.
+ */
 export const load: ServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const q = event.url.searchParams.get('q') ?? '';
   const pageNo = event.url.searchParams.get('page') ?? '1';
   const res = await apiFor(event).v1.m.${ns}.${plural}.get({ query: { ...(q ? { q } : {}), page: pageNo, limit: '20' } });
-  if (!res.data?.success) error(res.status, res.status === 403 ? 'Anda tidak punya izin' : 'Data tidak bisa dimuat');
+  if (!res.data?.success) error(res.status, res.status === 403 ? t('${ns}.${plural}.forbidden') : t('${ns}.${plural}.load_failed'));
   return { rows: res.data.data, meta: res.data.meta, q, saved: event.url.searchParams.get('saved') };
 };
 `;
   files[`web/routes/${plural}/+page.svelte`] = `<script lang="ts">
+import { goto } from '$app/navigation';
+import { navigating } from '$app/state';
 import { Button, Icon, Table } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 
+/**
+ * Two layers over one URL (L-20 over L-22). BASE: the search is an ordinary GET form and the pager
+ * is a pair of links, so the page filters and pages with JavaScript off — \`load\` does the work.
+ * ENHANCED: the same controls answer over fetch instead. Typing searches on its own after a pause,
+ * only the row set is replaced, and the URL still says exactly what is on screen, so the result
+ * stays shareable, bookmarkable and reachable with the back button.
+ */
 let { data } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 /** Eden revives ISO dates into Date objects — show them as YYYY-MM-DD. */
 const cell = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) : (v ?? '—'));
+
+const base = '/m/${ns}/${plural}';
+/** A link that keeps the search and changes the page — the pager's no-JavaScript half. */
+const pageHref = (n: number) => {
+  const p = new URLSearchParams();
+  if (data.q) p.set('q', data.q);
+  if (n > 1) p.set('page', String(n));
+  const s = p.toString();
+  return s ? \`\${base}?\${s}\` : base;
+};
+
+// ---- enhanced layer: the same form, without the page reload ------------------------------
+const busy = $derived(navigating.to !== null);
+let searchForm = $state<HTMLFormElement | null>(null);
+let debounce: ReturnType<typeof setTimeout> | undefined;
+
+/** Read the form as FormData so the DOM stays the single source of truth for the query. */
+function search(replace = false) {
+  if (!searchForm) return;
+  const p = new URLSearchParams();
+  for (const [k, v] of new FormData(searchForm)) {
+    const s = String(v).trim();
+    if (s) p.set(k, s);
+  }
+  const qs = p.toString();
+  void goto(qs ? \`\${base}?\${qs}\` : base, { keepFocus: true, noScroll: true, replaceState: replace });
+}
+/** Typing searches by itself; the pause is what keeps it one request per word, not per keystroke. */
+function typed() {
+  clearTimeout(debounce);
+  debounce = setTimeout(() => search(true), 300);
+}
+function submitSearch(event: SubmitEvent) {
+  event.preventDefault();
+  clearTimeout(debounce);
+  search();
+}
 </script>
 
 <svelte:head><title>{t('${ns}.${plural}.title')}</title></svelte:head>
@@ -394,42 +503,62 @@ const cell = (v: unknown) => (v instanceof Date ? v.toISOString().slice(0, 10) :
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('${ns}.${plural}.title')}</h1>
-    <div class="flex gap-2">
-      <form method="GET" class="flex gap-1"><input name="q" value={data.q} placeholder={t('common.search')} class="h-9 rounded-md border border-input bg-background px-3 text-sm" /><Button type="submit" variant="outline" size="sm"><Icon name="search" size={16} /></Button></form>
+    <div class="flex flex-wrap items-center gap-2">
+      <form method="GET" action={base} role="search" bind:this={searchForm} onsubmit={submitSearch} class="flex items-center gap-1" data-testid="${ns}-${plural}-search">
+        <label class="sr-only" for="${ns}-${plural}-q">{t('common.search')}</label>
+        <input id="${ns}-${plural}-q" type="search" name="q" value={data.q} oninput={typed} placeholder={t('${ns}.${plural}.search_hint')} maxlength="191" class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
+        <Button type="submit" variant="outline" size="sm" title={t('common.search')} aria-label={t('common.search')}><Icon name={busy ? 'loader' : 'search'} size={16} class={busy ? 'animate-spin' : ''} /></Button>
+        {#if data.q}<a href={base} class="text-sm text-muted-foreground">{t('${ns}.${plural}.clear')}</a>{/if}
+      </form>
       {#if can('${perm}.create')}<Button href="/m/${ns}/${plural}/new" size="sm"><Icon name="plus" size={16} />{t('${ns}.${plural}.new')}</Button>{/if}
     </div>
   </div>
-  {#if data.saved === 'deleted'}<p class="notice">{t('common.delete')}: OK</p>{/if}
-  <Table caption={t('${ns}.${plural}.title')}>
-    <thead><tr>${fields
-      .slice(0, 4)
-      .map((f) => `<th>${title(f.name)}</th>`)
-      .join('')}<th></th></tr></thead>
-    <tbody>
-      {#each data.rows as r (r.id)}
-        <tr>
+  {#if data.saved === 'deleted'}<p class="notice">{t('${ns}.${plural}.deleted')}</p>{/if}
+  <!-- The count is the enhanced layer's receipt: it is what a screen reader hears when a search
+       that never reloaded the page comes back with a different set of rows. -->
+  <p class="text-sm text-muted-foreground" aria-live="polite" data-testid="${ns}-${plural}-count">{t('${ns}.${plural}.count', { total: data.meta.total })}</p>
+  <div aria-busy={busy}>
+    <Table caption={t('${ns}.${plural}.title')}>
+      <thead><tr>${fields
+        .slice(0, 4)
+        .map((f) => `<th>{t('${labelKey(ns, resource, f)}')}</th>`)
+        .join('')}<th></th></tr></thead>
+      <tbody>
+        {#each data.rows as r (r.id)}
+          <tr>
 ${fields
   .slice(0, 4)
   .map(
     (f, i) =>
-      `          <td${i === 0 ? ' class="font-medium"' : ''}>{${f.type === 'boolean' ? `r.${camel(f.name)} ? '✓' : '—'` : `cell(r.${camel(f.name)})`}}</td>`,
+      `            <td${i === 0 ? ' class="font-medium"' : ''}>{${f.type === 'boolean' ? `r.${camel(f.name)} ? '✓' : '—'` : `cell(r.${camel(f.name)})`}}</td>`,
   )
   .join('\n')}
-          <td class="text-right"><a href={\`/m/${ns}/${plural}/\${r.id}\`}>{can('${perm}.edit') ? t('common.edit') : t('common.view')}</a></td>
-        </tr>
-      {:else}
-        <tr><td colspan="${Math.min(fields.length, 4) + 1}" class="py-8 text-center text-muted-foreground">{t('${ns}.${plural}.empty')}</td></tr>
-      {/each}
-    </tbody>
-  </Table>
-  <p class="text-sm text-muted-foreground">{data.meta.total} · {data.meta.page}/{data.meta.totalPages}</p>
+            <td class="text-right"><a href={\`/m/${ns}/${plural}/\${r.id}\`}>{can('${perm}.edit') ? t('common.edit') : t('common.view')}</a></td>
+          </tr>
+        {:else}
+          <tr><td colspan="${Math.min(fields.length, 4) + 1}" class="py-8 text-center text-muted-foreground">{t('${ns}.${plural}.empty')}</td></tr>
+        {/each}
+      </tbody>
+    </Table>
+  </div>
+  {#if data.meta.totalPages > 1}
+    <!-- Plain links: the pager pages without JavaScript, and client-side with it. -->
+    <nav class="flex items-center gap-3 text-sm" aria-label={t('table.pagination')}>
+      {#if data.meta.page > 1}<a href={pageHref(data.meta.page - 1)} rel="prev">{t('table.prev')}</a>{/if}
+      <span class="text-muted-foreground">{t('table.page')} {data.meta.page} {t('table.of')} {data.meta.totalPages}</span>
+      {#if data.meta.page < data.meta.totalPages}<a href={pageHref(data.meta.page + 1)} rel="next">{t('table.next')}</a>{/if}
+    </nav>
+  {/if}
 </div>
 `;
   const actionPrelude = `import { formToObject, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import type { Actions } from '@sveltejs/kit';
 import { redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 `;
+  /** Every message an action can send back is a catalogue key — an action answers in the reader's language too. */
+  const translator = `    const t = createTranslator(event.locals.locale.locale);`;
   const boolNames = fields.filter((f) => f.type === 'boolean').map((f) => camel(f.name));
   const nullable = fields
     .filter((f) => !f.required && f.type !== 'boolean')
@@ -441,11 +570,12 @@ import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 
 export const actions: Actions = {
   default: async (event) => {
+${translator}
     const form = await event.request.formData();
 ${normalize}
-    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' }, raw);
+    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: t('common.form_expired') }, raw);
     const v = validateForm(${Res}Body, input); // the API's own schema (L-17)
-    if (!v.ok) return actionFailure({ status: 422, code: 'validation_failed', message: 'Periksa isian yang ditandai', details: v.errors }, raw);
+    if (!v.ok) return actionFailure({ status: 422, code: 'validation_failed', message: t('common.check_fields'), details: v.errors }, raw);
     const r = unwrap<{ success: true; data: { id: string } }>(await apiFor(event).v1.m.${ns}.${plural}.post(v.value));
     if (!r.ok) return actionFailure(r.failure, raw);
     redirect(303, \`/m/${ns}/${plural}/\${r.data.data.id}?saved=1\`);
@@ -455,7 +585,7 @@ ${normalize}
   files[`web/routes/${plural}/new/+page.svelte`] = `<script lang="ts">
 import { FormBuilder } from '@core/ui';
 import { useT } from '$lib/i18n';
-import { fields } from '../_form.ts';
+import { ${fieldsFn} } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
@@ -466,40 +596,44 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
 
 <div class="page">
   <h1>{t('${ns}.${plural}.new')}</h1>
-  <FormBuilder {fields} values={(form?.values as Record<string, unknown> | undefined) ?? {}} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/${ns}/${plural}" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+  <FormBuilder fields={${fieldsFn}(t)} values={(form?.values as Record<string, unknown> | undefined) ?? {}} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.save')} cancelHref="/m/${ns}/${plural}" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
 </div>
 `;
   files[`web/routes/${plural}/[id]/+page.server.ts`] =
     `import { formToObject, validateForm } from '@core/contracts';
+import { createTranslator } from '@core/i18n';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, confirmed, confirmFail, unwrap } from '$lib/server/session';
 import { ${Res}UpdateBody } from '../../../../api/schemas.ts';
 
 export const load: ServerLoad = async (event) => {
+  const t = createTranslator(event.locals.locale.locale);
   const id = String(event.params.id ?? '');
   const res = await apiFor(event).v1.m.${ns}.${plural}({ id }).get();
-  if (!res.data?.success) error(res.status === 404 ? 404 : res.status, '${Res} tidak ditemukan');
+  if (!res.data?.success) error(res.status === 404 ? 404 : res.status, t('${ns}.${plural}.not_found'));
   /** \`confirmDelete\` opens the delete confirmation; the action below checks the same flag. */
   return { row: res.data.data, saved: event.url.searchParams.has('saved'), confirmDelete: confirmed(event) };
 };
 
 export const actions: Actions = {
   save: async (event) => {
+${translator}
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
 ${normalize}
-    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' }, raw);
+    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: t('common.form_expired') }, raw);
     const v = validateForm(${Res}UpdateBody, input);
-    if (!v.ok) return actionFailure({ status: 422, code: 'validation_failed', message: 'Periksa isian yang ditandai', details: v.errors }, raw);
+    if (!v.ok) return actionFailure({ status: 422, code: 'validation_failed', message: t('common.check_fields'), details: v.errors }, raw);
     const r = unwrap(await apiFor(event).v1.m.${ns}.${plural}({ id }).put(v.value));
     if (!r.ok) return actionFailure(r.failure, raw);
     return { saved: true };
   },
   delete: async (event) => {
+${translator}
     const form = await event.request.formData();
     const id = String(event.params.id ?? '');
-    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: 'Sesi formulir kedaluwarsa — muat ulang halaman' });
+    if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: t('common.form_expired') });
     // Never one POST away: the confirmation (modal with JavaScript, a page step without it) is enforced here.
     if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
     const r = unwrap(await apiFor(event).v1.m.${ns}.${plural}({ id }).delete());
@@ -512,7 +646,7 @@ ${normalize}
 import { Card, ConfirmDelete, FormBuilder } from '@core/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
-import { fields } from '../_form.ts';
+import { ${fieldsFn} } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
@@ -526,7 +660,7 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
 <div class="page">
   <h1>{r.${titleProp} ?? r.id}</h1>
   <Card>
-    <FormBuilder {fields} values={r as unknown as Record<string, unknown>} errors={fieldErrors} csrf={data.csrf} action="?/save" columns={2} readonly={!can('${perm}.edit')} cancelHref="/m/${ns}/${plural}" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('${ns}.${plural}.saved') : null} error={form?.error && form.code !== 'confirm_failed' && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+    <FormBuilder fields={${fieldsFn}(t)} values={r as unknown as Record<string, unknown>} errors={fieldErrors} csrf={data.csrf} action="?/save" columns={2} readonly={!can('${perm}.edit')} cancelHref="/m/${ns}/${plural}" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('${ns}.${plural}.saved') : null} error={form?.error && form.code !== 'confirm_failed' && Object.keys(fieldErrors).length === 0 ? form.error : null} />
   </Card>
   {#if can('${perm}.manage')}
     <Card><ConfirmDelete csrf={data.csrf} href={\`/m/${ns}/${plural}/\${r.id}?confirm=delete#confirm-delete\`} cancelHref={\`/m/${ns}/${plural}/\${r.id}\`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} /></Card>
@@ -540,11 +674,17 @@ const fieldErrors = $derived((form?.details && typeof form.details === 'object' 
 /** Public page (extension point 13) at /${ns}, no session, public layout of the active theme. */
 export default definePublicRoutes('${name}', [{ path: '/${ns}', dir: 'web/public/home', sitemap: true }]);
 `;
-    files['web/public/home/+page.svelte'] =
-      `<svelte:head><title>${name}</title><meta name="description" content="${name} — public page from a module (extension point 13)." /></svelte:head>
+    files['web/public/home/+page.svelte'] = `<script lang="ts">
+import { useT } from '$lib/i18n';
+
+/** A public page has no session, but it still has a locale (K-2) — so it has a catalogue too. */
+const t = useT();
+</script>
+
+<svelte:head><title>{t('${ns}.public.title')}</title><meta name="description" content={t('${ns}.public.lead')} /></svelte:head>
 <section class="mx-auto max-w-3xl px-4 py-16" data-testid="public-${ns}">
-  <h1>${name}</h1>
-  <p class="mt-2 text-muted-foreground">Halaman publik modul ${name}, ter-SSR dengan layout publik tema aktif.</p>
+  <h1>{t('${ns}.public.title')}</h1>
+  <p class="mt-2 text-muted-foreground">{t('${ns}.public.lead')}</p>
 </section>
 `;
   }
