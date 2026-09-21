@@ -1,4 +1,10 @@
-import { formToObject, UserUpdateBody, validateForm } from '@core/contracts';
+import {
+  AdminPasswordSetBody,
+  formToObject,
+  isUndeliverableEmail,
+  UserUpdateBody,
+  validateForm,
+} from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { allGroups } from '$lib/server/groups';
@@ -34,6 +40,11 @@ export const load: PageServerLoad = async (event) => {
      * needed (L-22) — and the action below still refuses a POST whose typed e-mail does not match.
      */
     confirmDelete: event.url.searchParams.get('confirm') === 'delete',
+    /**
+     * `.test` / `.invalid` addresses never receive mail (RFC 2606), so the reset-link button is not
+     * offered for them; the API refuses the same addresses, this only spares the click.
+     */
+    resetLinkDeliverable: !isUndeliverableEmail(user.data.data.email),
   };
 };
 
@@ -89,6 +100,91 @@ export const actions: Actions = {
     const r = unwrap(await apiFor(event).v1.users({ id: event.params.id }).put(v.value));
     if (!r.ok) return actionFailure(r.failure, raw);
     return { saved: true };
+  },
+  /**
+   * Set this user's password (D-1): the admin types it twice, the API applies the same strength
+   * rule as everywhere else and ends every session of the target. Failures carry `scope` so the
+   * profile form above does not mistake them for its own.
+   */
+  password: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        {},
+        { scope: 'password' },
+      );
+    if (str(form, 'newPassword') !== str(form, 'confirm'))
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: t('common.check_fields'),
+          details: { confirm: t('profile.password.mismatch') },
+        },
+        {},
+        { scope: 'password' },
+      );
+    const v = validateForm(AdminPasswordSetBody, { newPassword: str(form, 'newPassword') });
+    if (!v.ok)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: t('common.check_fields'),
+          details: v.errors,
+        },
+        {},
+        { scope: 'password' },
+      );
+    const r = unwrap(await apiFor(event).v1.users({ id: event.params.id }).password.put(v.value));
+    if (!r.ok) {
+      // The API lists the strength problems in its own words; the field shows the i18n rule instead.
+      if (r.failure.code === 'weak_password')
+        return actionFailure(
+          {
+            status: 422,
+            code: 'weak_password',
+            message: t('common.check_fields'),
+            details: { newPassword: t('users.detail.password.weak') },
+          },
+          {},
+          { scope: 'password' },
+        );
+      return actionFailure(r.failure, {}, { scope: 'password' });
+    }
+    return { passwordChanged: true };
+  },
+  /** E-mail this user a (re)set-password link (A-7) on their behalf. */
+  resetLink: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        {},
+        { scope: 'resetLink' },
+      );
+    const r = unwrap(
+      await apiFor(event).v1.users({ id: event.params.id }).password['reset-link'].post(),
+    );
+    if (!r.ok) {
+      const reason = (r.failure.details as { reason?: string } | undefined)?.reason;
+      if (reason === 'email_undeliverable')
+        return actionFailure(
+          {
+            status: 422,
+            code: 'validation_failed',
+            message: t('users.detail.password.link_undeliverable'),
+            details: r.failure.details,
+          },
+          {},
+          { scope: 'resetLink' },
+        );
+      return actionFailure(r.failure, {}, { scope: 'resetLink' });
+    }
+    return { linkSent: true };
   },
   delete: async (event) => {
     const t = createTranslator(event.locals.locale.locale);

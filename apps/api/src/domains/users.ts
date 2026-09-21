@@ -22,8 +22,10 @@ import {
   writeAudit,
 } from '@core/auth';
 import {
+  AdminPasswordSetBody,
   errorResponses,
   fail,
+  isUndeliverableEmail,
   MfaCodeBody,
   MfaDisableBody,
   OkSchema,
@@ -68,6 +70,9 @@ import { emit, settings } from '../services.ts';
 
 /** Avatars are small by construction: 2 MB caps even a generous PNG. */
 const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+
+/** A link an admin mails on someone's behalf waits for its reader: a day, like a new account's. */
+const ADMIN_RESET_LINK_TTL_MS = 24 * 3600_000;
 
 /** Phone (D-4) is typed free-form; only the digits and a leading `+` are stored. */
 const normalizePhone = (v: string | null | undefined) =>
@@ -844,6 +849,155 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ reset: t.Literal(true) })), ...errorResponses },
       detail: { summary: 'Admin: remove a user’s 2FA (lock-out recovery) and end their sessions' },
+    },
+  )
+  .put(
+    '/:id/password',
+    async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+      /**
+       * An administrator sets a member's password (D-1) — the desk-side recovery when the person
+       * cannot receive mail, or a shared account with no inbox. The rules of PUT /:id apply (member
+       * of the active tenant, superadmins only by a superadmin) plus one of its own: never for
+       * oneself, because the profile page asks for the current password first and this route does
+       * not. Every session of the target ends: whoever held them was signed in with a password that
+       * is no longer theirs.
+       */
+      const a = actor(auth);
+      const ts = tenantOf(tenantState);
+      const target = ts ? await memberRow(ts.tenant, params.id) : null;
+      if (!ts || !target) return notFound(set, requestId, 'Pengguna');
+      if (target.id === a.user.id) {
+        return conflict(set, requestId, 'Ganti kata sandi Anda sendiri lewat halaman profil');
+      }
+      if (target.is_superadmin && !a.user.is_superadmin) {
+        set.status = 403;
+        return fail('forbidden', 'Superadmin hanya bisa diubah oleh superadmin', requestId);
+      }
+      const problems = passwordProblems(body.newPassword);
+      if (problems.length) {
+        set.status = 422;
+        return fail('weak_password', 'Kata sandi baru terlalu lemah', requestId, problems);
+      }
+      const db = unsafeAcrossTenants(); // users is global (membership checked above)
+      await db
+        .update(schema.users)
+        .set({ password_hash: await hashPassword(body.newPassword) })
+        .where(eq(schema.users.id, target.id));
+      // A reset link that is still in flight would let an older mail override what was just set.
+      await db
+        .update(schema.passwordResetTokens)
+        .set({ used_at: new Date() })
+        .where(
+          and(
+            eq(schema.passwordResetTokens.user_id, target.id),
+            isNull(schema.passwordResetTokens.used_at),
+          ),
+        );
+      await invalidateUserSessions(target.id);
+      const revoked = await revokeAllSessions(db, target.id);
+      await writeAudit(db, {
+        clientId: ts.clientId,
+        actorId: a.user.id,
+        action: 'user.password_set_by_admin',
+        resource: 'user',
+        resourceId: target.id,
+        ip: clientIp(request, server),
+        requestId,
+        after: { revokedSessions: revoked },
+      });
+      return ok({ changed: true as const, revokedSessions: revoked });
+    },
+    {
+      beforeHandle: [notImpersonating, permission('user.edit')],
+      params: t.Object({ id: Id }),
+      body: AdminPasswordSetBody,
+      response: {
+        200: OkSchema(t.Object({ changed: t.Literal(true), revokedSessions: t.Integer() })),
+        ...errorResponses,
+      },
+      detail: {
+        summary: 'Admin: set a member’s password (not one’s own); ends all their sessions; audited',
+      },
+    },
+  )
+  .post(
+    '/:id/password/reset-link',
+    async ({ auth, params, set, request, server, requestId, tenantState }) => {
+      /**
+       * Mail a member the same link the "forgot password" page would (A-7), on their behalf. The
+       * link lives 24 hours like the one a freshly created account gets — the admin is not the one
+       * who will open it. An account that never had a password gets the "set" wording, one that has
+       * a password gets "reset". The mail follows the RECIPIENT's saved language (K-2), the request's
+       * only when they never chose one.
+       */
+      const a = actor(auth);
+      const ts = tenantOf(tenantState);
+      const target = ts ? await memberRow(ts.tenant, params.id) : null;
+      if (!ts || !target) return notFound(set, requestId, 'Pengguna');
+      if (target.is_superadmin && !a.user.is_superadmin) {
+        set.status = 403;
+        return fail('forbidden', 'Superadmin hanya bisa diubah oleh superadmin', requestId);
+      }
+      if (isUndeliverableEmail(target.email)) {
+        // `.test` / `.invalid` never receive mail (RFC 2606): the link would only bounce.
+        set.status = 422;
+        return fail(
+          'validation_failed',
+          'Domain e-mail pengguna ini tidak bisa menerima surat',
+          requestId,
+          { reason: 'email_undeliverable', email: target.email },
+        );
+      }
+      const db = unsafeAcrossTenants();
+      const raw = randomToken();
+      const expiresAt = new Date(Date.now() + ADMIN_RESET_LINK_TTL_MS);
+      await db.insert(schema.passwordResetTokens).values({
+        id: newId(),
+        user_id: target.id,
+        token_hash: hashToken(raw),
+        expires_at: expiresAt,
+      });
+      const template = target.password_hash ? 'reset-password' : 'set-password';
+      const locale =
+        (target.locale === 'id' || target.locale === 'en' ? target.locale : null) ??
+        (await mailLocale({ request, clientId: ts.clientId }));
+      await sendTemplate(db, {
+        to: target.email,
+        toName: target.name,
+        template,
+        locale,
+        clientId: ts.clientId,
+        data: { name: target.name, link: publicLink(`/auth/reset?token=${raw}`, request) },
+      });
+      await writeAudit(db, {
+        clientId: ts.clientId,
+        actorId: a.user.id,
+        action: 'user.password_reset_link',
+        resource: 'user',
+        resourceId: target.id,
+        ip: clientIp(request, server),
+        requestId,
+        after: { template, expiresAt: expiresAt.toISOString() },
+      });
+      return ok({ sent: true as const, template, expiresAt: expiresAt.toISOString() });
+    },
+    {
+      beforeHandle: [notImpersonating, permission('user.edit')],
+      params: t.Object({ id: Id }),
+      response: {
+        200: OkSchema(
+          t.Object({
+            sent: t.Literal(true),
+            template: t.Union([t.Literal('reset-password'), t.Literal('set-password')]),
+            expiresAt: t.String(),
+          }),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary:
+          'Admin: e-mail a member a password (re)set link valid 24 h; refused for .test/.invalid addresses',
+      },
     },
   )
   .put(
