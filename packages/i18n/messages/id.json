@@ -107,6 +107,7 @@
   "dashboard.email": "Email",
   "dashboard.active_tenant": "Tenant aktif",
   "dashboard.permissions": "Izin efektif",
+  "dashboard.permissions_count": "{count} izin",
   "dashboard.widgets_soon": "Widget dasbor modul muncul di sini (G-19).",
   "theme.title": "Tema & tampilan",
   "theme.lead": "Tema mengubah warna, ikon, dan susunan halaman. Pilihan tersimpan di browser ini",

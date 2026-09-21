@@ -107,6 +107,7 @@
   "dashboard.email": "Email",
   "dashboard.active_tenant": "Active tenant",
   "dashboard.permissions": "Effective permissions",
+  "dashboard.permissions_count": "{count} permissions",
   "dashboard.widgets_soon": "Module dashboard widgets appear here (G-19).",
   "theme.title": "Theme & appearance",
   "theme.lead": "A theme changes colours, icons and page layout. Your choice is kept in this browser",
