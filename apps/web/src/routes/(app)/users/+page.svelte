@@ -32,14 +32,34 @@ const columns: ColumnDef<Row>[] = [
   { key: 'status', label: t('users.status') },
   /** D-5: off by default — the dot next to the name already says it; this spells it out. */
   { key: 'presence', label: t('users.presence'), hidden: true },
-  /** Shown by default: an admin scanning the list wants to spot dormant accounts at a glance. */
+  /**
+   * Two different questions: "last active" is the newest request of any session (login included)
+   * and answers "is this account still in use"; "last login" only moves when a session is opened.
+   * The former is what an admin scans for, so it is on by default; the login IP stays in the picker.
+   */
+  {
+    key: 'lastActive',
+    label: t('users.last_active'),
+    sortKey: 'last_active_at',
+    value: (r) => formatDateTime(r.lastActiveAt),
+  },
+  {
+    key: 'lastActiveIp',
+    label: t('users.last_active_ip'),
+    value: (r) => r.lastActiveIp || '—',
+  },
   {
     key: 'lastLogin',
     label: t('users.last_login'),
     sortKey: 'last_login_at',
     value: (r) => formatDateTime(r.lastLoginAt),
   },
-  { key: 'lastLoginIp', label: t('users.last_login_ip'), value: (r) => r.lastLoginIp || '—' },
+  {
+    key: 'lastLoginIp',
+    label: t('users.last_login_ip'),
+    hidden: true,
+    value: (r) => r.lastLoginIp || '—',
+  },
   {
     key: 'created',
     label: t('users.created'),

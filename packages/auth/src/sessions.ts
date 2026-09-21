@@ -130,10 +130,16 @@ export async function createSession(db: Db, s: NewSession): Promise<CreatedSessi
   return { id, token, expiresAt };
 }
 
-/** Resolve a cookie token to a live session + its user, touching last_seen (throttled). Null when invalid. */
+/**
+ * Resolve a cookie token to a live session + its user, touching last_seen (throttled). Null when
+ * invalid. With `activity`, the same throttled write also stamps `users.last_active_at/_ip`, so
+ * "last used the system" survives the purge of expired sessions; callers that resolve a session
+ * on someone's behalf (impersonation, logout housekeeping) leave it out.
+ */
 export async function findSession(
   db: Db,
   token: string,
+  activity?: { ip: string | null },
 ): Promise<{ session: SessionRow; user: UserRow } | null> {
   const now = new Date();
   const tokenHash = hashToken(token);
@@ -166,6 +172,15 @@ export async function findSession(
       .set({ last_seen_at: now })
       .where(eq(schema.sessions.id, row.session.id));
     row.session.last_seen_at = now;
+    if (activity) {
+      await db
+        .update(schema.users)
+        .set({ last_active_at: now, last_active_ip: activity.ip })
+        .where(eq(schema.users.id, row.user.id));
+      // Keep the cached copy consistent without evicting it: a stale stamp here is harmless.
+      row.user.last_active_at = now;
+      row.user.last_active_ip = activity.ip;
+    }
   }
   await cachePut(tokenHash, row);
   return row;

@@ -49,7 +49,7 @@ export interface AuthState {
 
 export const authContext = new Elysia({ name: 'auth-context' }).derive(
   { as: 'global' },
-  async ({ cookie, request }): Promise<{ auth: AuthState | null }> => {
+  async ({ cookie, request, server }): Promise<{ auth: AuthState | null }> => {
     const db = unsafeAcrossTenants(); // global tables (sessions, tokens, users): no tenant to scope by yet
     const header = request.headers.get('authorization');
     if (header && /^bearer\s+/i.test(header)) {
@@ -73,7 +73,7 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
     }
     const token = cookie[SESSION_COOKIE]?.value;
     if (typeof token !== 'string' || !looksLikeToken(token)) return { auth: null };
-    const found = await findSession(db, token);
+    const found = await findSession(db, token, { ip: clientIp(request, server) });
     if (!found) return { auth: null };
     const impToken = cookie[IMPERSONATE_COOKIE]?.value;
     if (typeof impToken === 'string' && looksLikeToken(impToken)) {
@@ -185,6 +185,8 @@ export function publicUser(u: UserRow) {
     emailVerifiedAt: u.email_verified_at?.toISOString() ?? null,
     lastLoginAt: u.last_login_at?.toISOString() ?? null,
     lastLoginIp: u.last_login_ip ?? null,
+    lastActiveAt: u.last_active_at?.toISOString() ?? null,
+    lastActiveIp: u.last_active_ip ?? null,
     createdAt: u.created_at.toISOString(),
   };
 }

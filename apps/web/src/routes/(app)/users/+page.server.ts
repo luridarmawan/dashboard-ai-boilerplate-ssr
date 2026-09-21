@@ -20,7 +20,7 @@ import type { Actions, PageServerLoad } from './$types';
  */
 export const _layoutVariant = 'wide';
 
-const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at']);
+const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at', 'last_active_at']);
 
 /** Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders. */
 export const load: PageServerLoad = async (event) => {

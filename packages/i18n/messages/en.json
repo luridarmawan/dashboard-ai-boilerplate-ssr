@@ -574,6 +574,8 @@
   "users.impersonate": "Sign in as this user",
   "users.last_login": "Last login",
   "users.last_login_ip": "Last login IP",
+  "users.last_active": "Last active",
+  "users.last_active_ip": "Last active IP",
   "users.name": "Name",
   "users.new.email_hint": "An existing account with this email will be added to this tenant.",
   "users.new.password_hint": "Leave blank to let the user set it via a set-password link.",
