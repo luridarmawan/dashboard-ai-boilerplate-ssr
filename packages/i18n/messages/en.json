@@ -73,6 +73,8 @@
   "auth.login.or": "or",
   "auth.login.google": "Sign in with Google",
   "auth.login.submitting": "Signing in…",
+  "auth.login.show_password": "Show password",
+  "auth.login.hide_password": "Hide password",
   "auth.login.err.invalid_credentials": "Wrong email or password.",
   "auth.login.err.rate_limited": "Too many sign-in attempts — try again later.",
   "auth.login.err.expired": "This form has expired — reload the page.",

@@ -73,6 +73,8 @@
   "auth.login.or": "atau",
   "auth.login.google": "Masuk dengan Google",
   "auth.login.submitting": "Memproses…",
+  "auth.login.show_password": "Tampilkan kata sandi",
+  "auth.login.hide_password": "Sembunyikan kata sandi",
   "auth.login.err.invalid_credentials": "Email atau kata sandi salah.",
   "auth.login.err.rate_limited": "Terlalu banyak percobaan masuk — coba lagi nanti.",
   "auth.login.err.expired": "Sesi formulir kedaluwarsa — muat ulang halaman.",

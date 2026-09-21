@@ -230,7 +230,12 @@ async function send(e: SubmitEvent) {
 {#if ctx && !onChatPage}
   <div class="fixed end-4 bottom-4 z-40 flex flex-col items-end gap-2 print:hidden" data-testid="floating-chat" data-shell-dock="bottom-end" data-shell-dock-open={open || undefined}>
     {#if open}
-      <section class="flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-lg border bg-card text-card-foreground shadow-lg" style="height: min(32rem, calc(100vh - 6rem))" aria-label={t('ai.float.title')} data-testid="floating-chat-panel">
+      <!--
+        On a phone the panel takes the whole viewport (`fixed inset-0`): a 24rem card floating over
+        a 390px page is neither a dialog nor a page, and the round button underneath it reads as a
+        second, unrelated control. From `sm` up it is the corner card again, sized by the viewport.
+      -->
+      <section class="fixed inset-0 flex flex-col overflow-hidden bg-card text-card-foreground shadow-lg sm:static sm:h-[min(32rem,calc(100vh-6rem))] sm:w-[min(24rem,calc(100vw-2rem))] sm:rounded-lg sm:border" aria-label={t('ai.float.title')} data-testid="floating-chat-panel">
         <header class="flex items-center gap-2 border-b px-3 py-2">
           <Icon name="sparkles" size={16} />
           <div class="min-w-0 flex-1">
@@ -276,11 +281,13 @@ async function send(e: SubmitEvent) {
             </ul>
           {/if}
         </form>
-        <a href={conversationId ? `/m/ai/chat?c=${conversationId}` : '/m/ai/chat'} class="border-t px-3 py-1.5 text-center text-xs text-muted-foreground hover:text-foreground">{t('ai.float.open_full')} →</a>
+        <!-- Full screen on a phone: keep the last row clear of the home indicator (safe area). -->
+        <a href={conversationId ? `/m/ai/chat?c=${conversationId}` : '/m/ai/chat'} class="border-t px-3 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] text-center text-xs text-muted-foreground hover:text-foreground sm:pb-1.5">{t('ai.float.open_full')} →</a>
       </section>
     {/if}
     {#if mounted}
-      <button type="button" onclick={toggle} class="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90" aria-label={t('ai.float.open')} aria-expanded={open} title={t('ai.float.open')} data-testid="floating-chat-button">
+      <!-- While the panel is full screen (below `sm`) its header owns "close"; the round button would only peek through. -->
+      <button type="button" onclick={toggle} class="{open ? 'hidden sm:flex' : 'flex'} h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:opacity-90" aria-label={t('ai.float.open')} aria-expanded={open} title={t('ai.float.open')} data-testid="floating-chat-button">
         <Icon name={open ? 'x' : 'sparkles'} size={22} />
       </button>
     {:else}

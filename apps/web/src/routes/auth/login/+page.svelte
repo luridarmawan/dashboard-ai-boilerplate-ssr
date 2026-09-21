@@ -3,6 +3,7 @@ import type { MessageKey } from '@core/i18n';
 import { tick, untrack } from 'svelte';
 import { goto } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
+import Icon from '$lib/components/Icon.svelte';
 import { useT } from '$lib/i18n';
 import type { ActionData, PageData } from './$types';
 
@@ -66,6 +67,13 @@ $effect(() => {
 /** Set once the fetch layer has answered a submit; from then on it owns what the page says. */
 let handled = $state(false);
 let ajaxError = $state<string | null>(null);
+/**
+ * Show/hide the password. Purely a JavaScript nicety, so the toggle is rendered only once the page
+ * is hydrated (`enhanced`): without a script there is nothing it could do, and a dead button next
+ * to the field would be worse than none. The field itself is untouched either way — same `name`,
+ * same value on submit, `type` is the only thing that changes.
+ */
+let showPassword = $state(false);
 /** Step two as the fetch layer knows it; without JavaScript the action supplies its own copy. */
 let challenge = $state<string | null>(null);
 let codeInput = $state<HTMLInputElement | null>(null);
@@ -197,7 +205,21 @@ async function submitCode(event: SubmitEvent) {
     <Csrf token={data.csrf} />
     <input type="hidden" name="next" value={data.next} />
     <label>{t('auth.login.email')} <input name="email" type="email" required autocomplete="username" bind:value={email} /></label>
-    <label>{t('auth.login.password')} <input name="password" type="password" required autocomplete="current-password" /></label>
+    <!--
+      A `<label for>` rather than a wrapping one: a `<button>` may not sit inside a `<label>` that
+      already labels an input (both are labelable elements), so the toggle lives beside the field.
+    -->
+    <div class="grid gap-1 text-sm">
+      <label for="login-password">{t('auth.login.password')}</label>
+      <div class="password-field relative">
+        <input id="login-password" name="password" type={showPassword ? 'text' : 'password'} required autocomplete="current-password" />
+        {#if enhanced}
+          <button type="button" class="absolute end-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-muted-foreground hover:text-foreground" onclick={() => (showPassword = !showPassword)} aria-pressed={showPassword} aria-controls="login-password" aria-label={showPassword ? t('auth.login.hide_password') : t('auth.login.show_password')} title={showPassword ? t('auth.login.hide_password') : t('auth.login.show_password')} data-testid="password-toggle">
+            <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} />
+          </button>
+        {/if}
+      </div>
+    </div>
     <div class="row">
       <button type="submit" disabled={busy} aria-busy={busy}>{busy ? t('auth.login.submitting') : t('auth.login.submit')}</button>
       <a href="/auth/forgot">{t('auth.login.forgot')}</a>
@@ -211,3 +233,14 @@ async function submitCode(event: SubmitEvent) {
   {/if}
   {/if}
 </div>
+
+<style>
+  /*
+   * The input keeps the global `input:not([class])` look (app.css), so the room for the toggle is
+   * scoped here rather than as a class. Logical property: RTL puts the button at the start.
+   */
+  .password-field input {
+    width: 100%;
+    padding-inline-end: 2.5rem;
+  }
+</style>
