@@ -338,7 +338,7 @@ Halaman yang dirender belakangan — hasil navigasi klien, blok `{#if}` — ikut
 
 ### `config.ts` — konfigurasi runtime (titik perluasan 6)
 
-Section konfigurasi modul muncul otomatis di halaman **Pengaturan**; formnya di-generate dari metadata ini (E-3). Nilai tersimpan di database per tenant dengan fallback global (E-2), dan setiap penyimpanan menaikkan versi cache sehingga semua instance melihatnya tanpa restart (E-5).
+Section konfigurasi modul muncul otomatis di halaman **Pengaturan** selama modulnya aktif untuk lingkup itu (G-8: modul nonaktif → section-nya ikut hilang, nilainya tetap tersimpan); formnya di-generate dari metadata ini (E-3). Nilai tersimpan di database per tenant dengan fallback global (E-2), dan setiap penyimpanan menaikkan versi cache sehingga semua instance melihatnya tanpa restart (E-5).
 
 ```ts
 // config.ts

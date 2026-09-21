@@ -9,7 +9,7 @@ import { smtpFor } from '../mail.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
-import { customThemes, emit, settings } from '../services.ts';
+import { customThemes, emit, moduleState, settings } from '../services.ts';
 
 /**
  * Runtime configuration (PRD FR-E, Decision I). Scope = the active tenant, or `global` when the
@@ -113,7 +113,13 @@ export const configuration = new Elysia({
           label: { ...(c.name as { id: string; en: string }) },
         })),
       ];
-      const view = await settings.adminView(scope.clientId);
+      // G-8: a module disabled for this scope (tenant override, else global) contributes no
+      // section — the Settings page must not offer a form for something the tenant cannot use.
+      // Its stored values stay untouched, so re-enabling brings the section back as it was.
+      const enabledModules = await moduleState.enabledFor(scope.clientId);
+      const view = (await settings.adminView(scope.clientId)).filter(
+        (s) => s.module === 'core' || enabledModules.has(s.module),
+      );
       // The mail tester opens with the SMTP account this scope actually sends as — which lives
       // in the settings OR in .env (J-1, E-6), so only `smtpFor()` can name it. Resolved once,
       // and only when the section that asks for it is on the page.
