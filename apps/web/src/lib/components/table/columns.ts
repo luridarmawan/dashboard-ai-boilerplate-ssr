@@ -45,6 +45,21 @@ export interface BulkAction {
   label: string;
   icon?: string;
   destructive?: boolean;
+  /**
+   * Ask before acting (L-22). With JavaScript the click opens a modal whose form re-posts the
+   * ticked ids to `<action>&confirm=<token>`; without it the plain submit reaches the action
+   * unconfirmed, and the page is expected to answer with the same question inline (the ticked
+   * ids travel in the form, so a `?confirm=` link cannot carry them the way `ConfirmDelete` does).
+   * Either way the action must refuse a POST without the token (`confirmed()` in
+   * `$lib/server/session`): a confirmation that lives only in the markup is not one.
+   */
+  confirm?: {
+    token: string;
+    title: string;
+    /** Wording for the number of ticked rows. */
+    lead: (count: number) => string;
+    submitLabel: string;
+  };
 }
 
 export interface TableState {

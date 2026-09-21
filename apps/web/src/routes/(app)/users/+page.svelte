@@ -4,7 +4,8 @@ import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
 import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
-import { Badge, Button, Card } from '$lib/components/ui';
+import { Alert, Badge, Button, Card } from '$lib/components/ui';
+import { formatDateTime } from '$lib/format';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { presenceText } from '$lib/presence';
@@ -31,12 +32,12 @@ const columns: ColumnDef<Row>[] = [
   { key: 'status', label: t('users.status') },
   /** D-5: off by default — the dot next to the name already says it; this spells it out. */
   { key: 'presence', label: t('users.presence'), hidden: true },
+  /** Shown by default: an admin scanning the list wants to spot dormant accounts at a glance. */
   {
     key: 'lastLogin',
     label: t('users.last_login'),
     sortKey: 'last_login_at',
-    hidden: true,
-    value: (r) => (r.lastLoginAt ? new Date(r.lastLoginAt).toLocaleString(dateLocale) : '—'),
+    value: (r) => formatDateTime(r.lastLoginAt),
   },
   {
     key: 'created',
@@ -72,6 +73,13 @@ const rowActions: RowAction<Row>[] = $derived([
     : []),
 ]);
 const deactivated = $derived(page.url.searchParams.get('deactivated'));
+/** Deactivation asks first (L-22); the table shows this in a modal, the server inline (below). */
+const deactivateConfirm = {
+  token: 'deactivate',
+  title: t('users.deactivate_confirm'),
+  lead: (n: number) => t('users.deactivate_confirm_lead', { n }),
+  submitLabel: t('users.deactivate_confirm_submit'),
+};
 </script>
 
 <svelte:head><title>{t('nav.users')}</title></svelte:head>
@@ -84,6 +92,21 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
   <!-- A refused impersonation belongs above the table, not inside the invite card below it. -->
   {#if form?.impersonate && form?.error}<p class="error" role="alert" data-testid="impersonate-error">{form.error}</p>{/if}
   {#if form?.deactivate && form?.error}<p class="error" role="alert" data-testid="deactivate-error">{form.error}</p>{/if}
+  {#if form?.confirmDeactivate}
+    <!-- No-JavaScript path: the first POST only asked; this form is the second step, token included. -->
+    <div class="grid gap-3" id="confirm-deactivate" data-testid="deactivate-confirm">
+      <Alert variant="warning" title={deactivateConfirm.title}>
+        <p>{deactivateConfirm.lead(form.confirmDeactivate.length)}</p>
+        <ul class="mt-2 list-disc ps-5">{#each form.confirmDeactivate as u (u.id)}<li>{u.name}{#if u.email} <span class="text-muted-foreground">({u.email})</span>{/if}</li>{/each}</ul>
+      </Alert>
+      <form method="POST" action="?/deactivate&confirm=deactivate" class="flex flex-wrap gap-2">
+        <Csrf token={data.csrf} />
+        {#each form.confirmDeactivate as u (u.id)}<input type="hidden" name="ids" value={u.id} />{/each}
+        <Button type="submit" variant="destructive"><Icon name="lock" size={16} />{deactivateConfirm.submitLabel}</Button>
+        <Button href={`${page.url.pathname}${page.url.search}`} variant="secondary">{t('common.cancel')}</Button>
+      </form>
+    </div>
+  {/if}
 
   <DataTable
     rows={data.users}
@@ -96,7 +119,7 @@ const deactivated = $derived(page.url.searchParams.get('deactivated'));
     emptyTitle={t('users.empty_title')}
     emptyHint={data.state.q ? t('users.empty_hint_search') : t('users.empty_hint_add')}
     {rowActions}
-    bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true }] : []}
+    bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm }] : []}
   >
     {#snippet toolbar()}
       {#if can('user.create')}<Button href="/users/new" size="sm"><Icon name="plus" size={16} />{t('users.add')}</Button>{/if}

@@ -2,7 +2,7 @@
 import type { Snippet } from 'svelte';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Button, Skeleton } from '$lib/components/ui';
+import { Button, Dialog, Skeleton } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import {
@@ -56,11 +56,12 @@ const defaultLabels = {
   retry: t('table.retry'),
   withSelected: t('table.with_selected'),
   pagination: t('table.pagination'),
+  cancel: t('common.cancel'),
 };
 let {
   rows,
   columns,
-  state,
+  state: tableState,
   csrf = '',
   rowActions = [],
   bulkActions = [],
@@ -78,14 +79,14 @@ let {
 
 const L = $derived({ ...defaultLabels, ...labelOverrides });
 const visible = $derived(
-  state.cols.length
-    ? columns.filter((c) => state.cols.includes(c.key))
+  tableState.cols.length
+    ? columns.filter((c) => tableState.cols.includes(c.key))
     : columns.filter((c) => !c.hidden),
 );
 const sortHref = (c: ColumnDef<Row>) => {
   if (!c.sortKey) return null;
-  const nextOrder = state.sort === c.sortKey && state.order === 'asc' ? 'desc' : 'asc';
-  return withParams(state, { sort: c.sortKey, order: nextOrder, page: 1 });
+  const nextOrder = tableState.sort === c.sortKey && tableState.order === 'asc' ? 'desc' : 'asc';
+  return withParams(tableState, { sort: c.sortKey, order: nextOrder, page: 1 });
 };
 const align = (c: ColumnDef<Row>) =>
   c.align === 'right' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start';
@@ -98,8 +99,8 @@ const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
  * the `:has()` rule at the bottom greys the buttons out and swallows clicks with no JavaScript
  * at all, and `disabled` below takes over once this runs — that is what a keyboard submit obeys.
  * Neither is a guarantee, so the page's action is still expected to refuse an empty list.
- * (`disabled` is set on the element rather than bound: `state` is a prop here, which makes the
- * `$state` rune ambiguous in this component.)
+ * (`disabled` is set on the element rather than bound — it predates the prop alias
+ * `tableState` below, which is what makes the `$state` rune usable in this component at all.)
  */
 let root: HTMLElement | undefined;
 const syncSelected = () => {
@@ -116,27 +117,47 @@ $effect(() => {
   void rows;
   syncSelected();
 });
+
+/**
+ * Enhanced path of a confirmed bulk action: the click never submits the bulk form. The ticked ids
+ * are copied into a second form inside a modal, which posts them WITH the confirm token. Without
+ * JavaScript the same button submits the bulk form as-is and the page asks inline.
+ */
+let confirmOpen = $state(false);
+let pending = $state<{ action: BulkAction; ids: string[] } | null>(null);
+const askFirst = (e: MouseEvent, b: BulkAction) => {
+  if (!b.confirm || !root) return;
+  e.preventDefault();
+  const ids = [...root.querySelectorAll<HTMLInputElement>('input[name="ids"]:checked')].map(
+    (i) => i.value,
+  );
+  if (ids.length === 0) return;
+  pending = { action: b, ids };
+  confirmOpen = true;
+};
+const confirmPost = (b: BulkAction) =>
+  `${b.action}${b.action.includes('?') ? '&' : '?'}confirm=${b.confirm?.token ?? ''}`;
 </script>
 
 <div bind:this={root} class={cn('dt grid gap-3', className)}>
   <!-- toolbar: search + column picker, both plain GET forms -->
   <div class="flex flex-wrap items-center gap-2">
     <form method="GET" class="flex items-center gap-2" role="search">
-      {#if state.sort}<input type="hidden" name="sort" value={state.sort} />{/if}
-      <input type="hidden" name="order" value={state.order} />
-      {#if state.cols.length}<input type="hidden" name="cols" value={state.cols.join(',')} />{/if}
-      <input type="hidden" name="limit" value={state.limit} />
+      {#if tableState.sort}<input type="hidden" name="sort" value={tableState.sort} />{/if}
+      <input type="hidden" name="order" value={tableState.order} />
+      {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
+      <input type="hidden" name="limit" value={tableState.limit} />
       <label class="sr-only" for={`${formId}-q`}>{L.search}</label>
-      <input id={`${formId}-q`} name="q" value={state.q} placeholder={searchPlaceholder ?? L.search} class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
+      <input id={`${formId}-q`} name="q" value={tableState.q} placeholder={searchPlaceholder ?? L.search} class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
       <Button type="submit" variant="outline" size="sm"><Icon name="search" size={16} />{L.search}</Button>
     </form>
     <details class="relative">
       <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"><Icon name="columns" size={16} />{L.columns}</summary>
       <form method="GET" class="absolute z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md">
-        {#if state.q}<input type="hidden" name="q" value={state.q} />{/if}
-        <input type="hidden" name="sort" value={state.sort} />
-        <input type="hidden" name="order" value={state.order} />
-        <input type="hidden" name="limit" value={state.limit} />
+        {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
+        <input type="hidden" name="sort" value={tableState.sort} />
+        <input type="hidden" name="order" value={tableState.order} />
+        <input type="hidden" name="limit" value={tableState.limit} />
         {#each columns as c (c.key)}
           <label class="flex items-center gap-2"><input type="checkbox" name="cols" value={c.key} checked={visible.some((v) => v.key === c.key)} class="h-4 w-4 accent-primary" />{c.label}</label>
         {/each}
@@ -149,7 +170,7 @@ $effect(() => {
   {#if error}
     <div class="flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm" role="alert">
       <span class="flex items-center gap-2"><Icon name="error" />{error}</span>
-      <a href={withParams(state, {})} class="text-sm">{L.retry}</a>
+      <a href={withParams(tableState, {})} class="text-sm">{L.retry}</a>
     </div>
   {:else}
     {#if hasBulk}<form id={formId} method="POST"><Csrf token={csrf} /></form>{/if}
@@ -161,11 +182,11 @@ $effect(() => {
             {#if hasBulk}<th class="w-8 px-3"><span class="sr-only">{L.select}</span></th>{/if}
             {#each visible as c (c.key)}
               {@const href = sortHref(c)}
-              <th scope="col" class={cn('h-10 px-3 font-medium text-muted-foreground', align(c), c.class)} aria-sort={state.sort === c.sortKey ? (state.order === 'asc' ? 'ascending' : 'descending') : undefined}>
+              <th scope="col" class={cn('h-10 px-3 font-medium text-muted-foreground', align(c), c.class)} aria-sort={tableState.sort === c.sortKey ? (tableState.order === 'asc' ? 'ascending' : 'descending') : undefined}>
                 {#if href}
                   <a {href} class="inline-flex items-center gap-1 text-muted-foreground no-underline hover:text-foreground hover:no-underline">
                     {c.label}
-                    {#if state.sort === c.sortKey}<Icon name={state.order === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} />{:else}<Icon name="sort" size={14} class="opacity-40" />{/if}
+                    {#if tableState.sort === c.sortKey}<Icon name={tableState.order === 'asc' ? 'chevron-up' : 'chevron-down'} size={14} />{:else}<Icon name="sort" size={14} class="opacity-40" />{/if}
                   </a>
                 {:else}{c.label}{/if}
               </th>
@@ -229,20 +250,20 @@ $effect(() => {
         <div class="flex items-center gap-2">
           <span>{L.withSelected}:</span>
           {#each bulkActions as b (b.action)}
-            <Button type="submit" form={formId} formaction={b.action} variant={b.destructive ? 'destructive' : 'outline'} size="sm" class="dt-bulk-action">{#if b.icon}<Icon name={b.icon} size={14} />{/if}{b.label}</Button>
+            <Button type="submit" form={formId} formaction={b.action} variant={b.destructive ? 'destructive' : 'outline'} size="sm" class="dt-bulk-action" aria-haspopup={b.confirm ? 'dialog' : undefined} onclick={(e) => askFirst(e, b)}>{#if b.icon}<Icon name={b.icon} size={14} />{/if}{b.label}</Button>
           {/each}
         </div>
       {:else}<span></span>{/if}
       <nav class="flex items-center gap-2" aria-label={L.pagination}>
-        <span>{state.total} {L.rows} · {L.page} {state.page} {L.of} {state.totalPages}</span>
-        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.max(1, state.page - 1) })} aria-disabled={state.page <= 1}><Icon name="chevron-left" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.prev}</span></a>
-        <a class={cn('rounded-md border px-2 py-1 no-underline', state.page >= state.totalPages && 'pointer-events-none opacity-40')} href={withParams(state, { page: Math.min(state.totalPages, state.page + 1) })} aria-disabled={state.page >= state.totalPages}><Icon name="chevron-right" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.next}</span></a>
+        <span>{tableState.total} {L.rows} · {L.page} {tableState.page} {L.of} {tableState.totalPages}</span>
+        <a class={cn('rounded-md border px-2 py-1 no-underline', tableState.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(tableState, { page: Math.max(1, tableState.page - 1) })} aria-disabled={tableState.page <= 1}><Icon name="chevron-left" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.prev}</span></a>
+        <a class={cn('rounded-md border px-2 py-1 no-underline', tableState.page >= tableState.totalPages && 'pointer-events-none opacity-40')} href={withParams(tableState, { page: Math.min(tableState.totalPages, tableState.page + 1) })} aria-disabled={tableState.page >= tableState.totalPages}><Icon name="chevron-right" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.next}</span></a>
         <form method="GET" class="flex items-center gap-1">
-          {#if state.q}<input type="hidden" name="q" value={state.q} />{/if}
-          <input type="hidden" name="sort" value={state.sort} /><input type="hidden" name="order" value={state.order} />
-          {#if state.cols.length}<input type="hidden" name="cols" value={state.cols.join(',')} />{/if}
+          {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
+          <input type="hidden" name="sort" value={tableState.sort} /><input type="hidden" name="order" value={tableState.order} />
+          {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
           <select name="limit" class="h-8 rounded-md border border-input bg-background px-1 text-sm" aria-label={L.perPage}>
-            {#each [10, 20, 50, 100] as n (n)}<option value={n} selected={n === state.limit}>{n}</option>{/each}
+            {#each [10, 20, 50, 100] as n (n)}<option value={n} selected={n === tableState.limit}>{n}</option>{/each}
           </select>
           <Button type="submit" variant="outline" size="sm">{L.apply}</Button>
         </form>
@@ -250,6 +271,19 @@ $effect(() => {
     </div>
   {/if}
 </div>
+
+{#if pending && pending.action.confirm}
+  {@const b = pending.action}
+  {@const c = pending.action.confirm}
+  <Dialog bind:open={confirmOpen} title={c.title} description={c.lead(pending.ids.length)}>
+    <form method="POST" action={confirmPost(b)} class="flex flex-wrap gap-2" data-testid="dt-bulk-confirm">
+      <Csrf token={csrf} />
+      {#each pending.ids as id (id)}<input type="hidden" name="ids" value={id} />{/each}
+      <Button type="submit" variant={b.destructive ? 'destructive' : 'default'}>{#if b.icon}<Icon name={b.icon} size={16} />{/if}{c.submitLabel}</Button>
+      <Button variant="secondary" onclick={() => { confirmOpen = false; }}>{L.cancel}</Button>
+    </form>
+  </Dialog>
+{/if}
 
 <style>
   /* No-JavaScript layer for the rule above: same look as `:disabled` on the button itself. */
