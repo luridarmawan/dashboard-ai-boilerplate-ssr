@@ -81,6 +81,12 @@ export const CORE_MENU: readonly Entry[] = [
     label: { id: 'Dasbor', en: 'Dashboard' },
     href: '/dashboard',
     icon: 'dashboard',
+    // `user.read` is the grant every regular member holds (the `user` system group, seeded in
+    // every tenant), so the entry is unchanged for them and for admins. It disappears only for an
+    // account that holds module grants alone — a module-managed account such as a child login,
+    // whose home is the module's own page and for whom the core dashboard is noise. The page
+    // itself stays reachable by URL; only the menu is gated.
+    permission: 'user.read',
     order: 0,
     group: null,
   },

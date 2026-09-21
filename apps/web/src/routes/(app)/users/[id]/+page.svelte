@@ -1,4 +1,5 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
@@ -65,6 +66,41 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
+/** Which form a bounced action belongs to: the password card's failures must not land on the profile form. */
+const scope = $derived((form as { scope?: string } | null)?.scope);
+/**
+ * Setting someone's password or mailing them a reset link is an edit of that user — except one's
+ * own, which the profile page handles with the current password first; a superadmin's only by a
+ * superadmin (mirrors the API); and never while impersonating, since credential changes are refused
+ * meanwhile (D-6).
+ */
+const canPassword = $derived(
+  can('user.edit') &&
+    !data.impersonator &&
+    u.id !== data.viewer.id &&
+    (!u.isSuperadmin || data.viewer.isSuperadmin),
+);
+const passwordFields: FieldDef[] = $derived([
+  {
+    name: 'newPassword',
+    type: 'password',
+    label: t('auth.reset.new_password'),
+    required: true,
+    minlength: 10,
+    maxlength: 256,
+    autocomplete: 'new-password',
+    hint: t('users.detail.password.weak'),
+  },
+  {
+    name: 'confirm',
+    type: 'password',
+    label: t('profile.password.confirm'),
+    required: true,
+    minlength: 10,
+    maxlength: 256,
+    autocomplete: 'new-password',
+  },
+]);
 </script>
 
 <svelte:head><title>{u.name}</title></svelte:head>
@@ -101,10 +137,45 @@ const fieldErrors = $derived(
       cancelHref="/users"
       cancelLabel={t('common.back')}
       notice={form?.saved ? t('common.saved') : null}
-      error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null}
+      error={form?.error && !scope && Object.keys(fieldErrors).length === 0 ? form.error : null}
     />
     <p class="mt-4 text-sm text-muted-foreground">{t('users.detail.meta', { created: new Date(u.createdAt).toLocaleString(dateLocale), lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString(dateLocale) : '—' })}</p>
   </Card>
+
+  {#if canPassword}
+    <Card title={t('users.detail.password.title')} description={t('users.detail.password.desc')}>
+      <div class="grid gap-6 lg:grid-cols-2" data-testid="password-card">
+        <!-- Set it here: same rules as the profile page minus the current password (the admin has none to give). -->
+        <FormBuilder
+          fields={passwordFields}
+          errors={scope === 'password' ? fieldErrors : {}}
+          csrf={data.csrf}
+          action="?/password"
+          ajax
+          class="[&_button]:cursor-pointer"
+          submitLabel={t('users.detail.password.submit')}
+          notice={form?.passwordChanged ? t('users.detail.password.changed') : null}
+          error={scope === 'password' && Object.keys(fieldErrors).length === 0 ? (form?.error ?? null) : null}
+        />
+        <!-- Or let the person set it themselves: one click mails the link the forgot-password page would. -->
+        <form method="POST" action="?/resetLink" class="flex flex-col gap-3 rounded-md border p-4 text-sm" data-testid="reset-link-form" use:enhance>
+          <Csrf token={data.csrf} />
+          <div class="flex items-start gap-2">
+            <Icon name="mail" size={16} class="mt-0.5 shrink-0" />
+            <p>{t('users.detail.password.link_hint', { email: u.email })}</p>
+          </div>
+          {#if form?.linkSent}<p class="notice" role="status">{t('users.detail.password.link_sent', { email: u.email })}</p>{/if}
+          {#if scope === 'resetLink' && form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+          {#if data.resetLinkDeliverable}
+            <div><Button type="submit" variant="outline">{t('users.detail.password.link_send')}</Button></div>
+          {:else}
+            <!-- `.test` / `.invalid` never receive mail (RFC 2606): say so instead of offering a click that bounces. -->
+            <p class="text-muted-foreground" data-testid="reset-link-undeliverable">{t('users.detail.password.link_undeliverable', { email: u.email })}</p>
+          {/if}
+        </form>
+      </div>
+    </Card>
+  {/if}
 
   {#if can('user.manage')}
     <Card title={t('users.detail.remove_title')} description={t('users.detail.remove_desc')}>
