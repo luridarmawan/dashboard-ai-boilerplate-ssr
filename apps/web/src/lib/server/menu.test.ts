@@ -94,8 +94,12 @@ describe('buildMenu (F-3 groups)', () => {
   });
 
   test('a group whose entries are all hidden is not built', () => {
+    // Dashboard needs `user.read` too: an account with no core grant at all — a module-managed
+    // login, for instance — gets an empty core menu and lives in its module's pages.
     const bare = buildMenu(nobody, '/dashboard', 'en');
-    expect(labels(bare)).toEqual(['Dashboard']);
+    expect(labels(bare)).toEqual([]);
+    const member = { ...admin, can: (p: string) => p === 'user.read' } as unknown as Session;
+    expect(labels(buildMenu(member, '/dashboard', 'en'))[0]).toBe('Dashboard');
   });
 
   test('a disabled module contributes neither entries nor a group (G-8)', () => {

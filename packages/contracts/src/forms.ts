@@ -43,6 +43,20 @@ export const PasswordChangeBody = t.Object({
   currentPassword: Password,
   newPassword: Password,
 });
+/** An administrator sets someone else's password (D-1): no current password to prove, only the new one. */
+export const AdminPasswordSetBody = t.Object({ newPassword: Password });
+
+/**
+ * Top-level domains that never receive mail (RFC 2606 reserves them for testing and for names
+ * that must not resolve). Seed and fixture accounts live there — `admin@example.test`,
+ * `someone@local.invalid` — so a "send them a reset link" button has to know it would only fill the
+ * outbox with bounces. Shared by the API (refuses) and the web (does not offer the button).
+ */
+export const UNDELIVERABLE_EMAIL_SUFFIXES = ['.invalid', '.test'] as const;
+export function isUndeliverableEmail(email: string): boolean {
+  const domain = email.trim().toLowerCase().split('@').pop() ?? '';
+  return UNDELIVERABLE_EMAIL_SUFFIXES.some((s) => domain.endsWith(s));
+}
 
 // ---- users (D-1) ----
 export const UserCreateBody = t.Object({

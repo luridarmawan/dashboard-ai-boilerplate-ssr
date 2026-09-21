@@ -81,6 +81,12 @@ export const CORE_MENU: readonly Entry[] = [
     label: { id: 'Dasbor', en: 'Dashboard' },
     href: '/dashboard',
     icon: 'dashboard',
+    // `user.read` is the grant every regular member holds (the `user` system group, seeded in
+    // every tenant), so the entry is unchanged for them and for admins. It disappears only for an
+    // account that holds module grants alone — a module-managed account such as a child login,
+    // whose home is the module's own page and for whom the core dashboard is noise. The page
+    // itself stays reachable by URL; only the menu is gated.
+    permission: 'user.read',
     order: 0,
     group: null,
   },
@@ -250,8 +256,15 @@ export function buildMenu(
   );
   const all: Entry[] = [...coreEntries, ...moduleEntries];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));
-  const isActive = (href: string) =>
+  // A link is current when the path is it or lies under it — but a module's home (`/m/x`) sits
+  // above every page of that module, so the deepest matching entry wins: `/m/x` is not current
+  // while another allowed entry `/m/x/quests` matches the same path. Otherwise a tab bar or rail
+  // would light two links on every inner page.
+  const matches = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+  const hrefs = allowed.map((e) => e.href);
+  const isActive = (href: string) =>
+    matches(href) && !hrefs.some((o) => o !== href && o.startsWith(`${href}/`) && matches(o));
   const toItem = (e: Entry): MenuItem => ({
     id: e.id,
     kind: 'link',

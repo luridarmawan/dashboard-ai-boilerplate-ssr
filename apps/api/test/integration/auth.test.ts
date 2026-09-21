@@ -152,18 +152,19 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
         .limit(1);
       return row;
     };
-    // The web forwards the locale it resolved for the visitor; anything else falls back to `id`.
+    // The web forwards the locale it resolved for the visitor; without one the installation's
+    // `app.default_locale` applies, whose registry default is `en` (no row is written in tests).
     await call('/v1/auth/reset-password/request', {
       method: 'POST',
       body: JSON.stringify({ email }),
-      headers: { 'accept-language': 'en' },
-    });
-    expect((await queued())?.locale).toBe('en');
-    await call('/v1/auth/reset-password/request', {
-      method: 'POST',
-      body: JSON.stringify({ email }),
+      headers: { 'accept-language': 'id' },
     });
     expect((await queued())?.locale).toBe('id');
+    await call('/v1/auth/reset-password/request', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    expect((await queued())?.locale).toBe('en');
   });
 
   test('password reset: request is uniform, confirm revokes all sessions (A-7)', async () => {

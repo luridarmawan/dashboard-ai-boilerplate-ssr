@@ -147,6 +147,7 @@ export const errorResponses = {
 } as const;
 
 export {
+  AdminPasswordSetBody,
   ClientCode,
   ClientCreateBody,
   ClientUpdateBody,
@@ -159,6 +160,7 @@ export {
   GroupPermissionsBody,
   GroupUpdateBody,
   Id,
+  isUndeliverableEmail,
   LoginBody,
   MfaCodeBody,
   MfaDisableBody,
@@ -167,6 +169,7 @@ export {
   PasswordChangeBody,
   ProfileBody,
   RegisterBody,
+  UNDELIVERABLE_EMAIL_SUFFIXES,
   UserCreateBody,
   UserUpdateBody,
   validateForm,

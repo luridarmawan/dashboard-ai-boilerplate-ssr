@@ -589,7 +589,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 
 | ID | Kebutuhan |
 |---|---|
-| D-1 | **[P0]** CRUD user: list (paginasi, cari, urut, filter), detail, buat, ubah, hapus lunak. |
+| D-1 | **[P0]** CRUD user: list (paginasi, cari, urut, filter), detail, buat, ubah, hapus lunak. Di halaman detail, pemegang `user.edit` juga bisa **menyetel kata sandi** anggota (`PUT /v1/users/:id/password`; aturan kekuatan sama dengan A-1, semua sesi anggota itu berakhir, token reset yang masih menggantung dibatalkan) dan **mengirim tautan reset** atas nama anggota (`POST /v1/users/:id/password/reset-link`; token A-7 berlaku 24 jam, template `set-password` bila akun belum punya kata sandi, bahasa mengikuti `users.locale` penerima lalu K-2). Keduanya tidak berlaku untuk diri sendiri (itu urusan D-4), untuk superadmin hanya oleh superadmin, ditolak saat impersonasi (D-6), dan diaudit (`user.password_set_by_admin`, `user.password_reset_link`). Tautan reset **tidak dikirim** ke alamat berdomain `.test` atau `.invalid` (RFC 2606 — tidak pernah menerima surat): API menjawab 422 `validation_failed` dengan `details.reason = email_undeliverable`, dan web tidak menawarkan tombolnya; aturannya satu, `isUndeliverableEmail` di `@core/contracts`. |
 | D-2 | **[P0]** CRUD group + CRUD izin di dalam group + kelola anggota group. |
 | D-3 | **[P0]** CRUD tenant (`clients`), termasuk endpoint "scope" — daftar tenant yang boleh diakses user saat ini. |
 | D-4 | **[P0]** Halaman profil sendiri: info dasar, ubah password, avatar, dan preferensi (bahasa, **tema**). |
