@@ -5,6 +5,7 @@ import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
 import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
 import { Badge, Button, Card } from '$lib/components/ui';
+import { formatDateTime } from '$lib/format';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { presenceText } from '$lib/presence';
@@ -31,12 +32,12 @@ const columns: ColumnDef<Row>[] = [
   { key: 'status', label: t('users.status') },
   /** D-5: off by default — the dot next to the name already says it; this spells it out. */
   { key: 'presence', label: t('users.presence'), hidden: true },
+  /** Shown by default: an admin scanning the list wants to spot dormant accounts at a glance. */
   {
     key: 'lastLogin',
     label: t('users.last_login'),
     sortKey: 'last_login_at',
-    hidden: true,
-    value: (r) => (r.lastLoginAt ? new Date(r.lastLoginAt).toLocaleString(dateLocale) : '—'),
+    value: (r) => formatDateTime(r.lastLoginAt),
   },
   {
     key: 'created',
