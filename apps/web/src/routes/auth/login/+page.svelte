@@ -208,11 +208,16 @@ async function submitCode(event: SubmitEvent) {
     <!--
       A `<label for>` rather than a wrapping one: a `<button>` may not sit inside a `<label>` that
       already labels an input (both are labelable elements), so the toggle lives beside the field.
+      The fields and the submit button take their look from app.css as CLASS-LESS elements
+      (`input:not([class])`, `button:not([class])`), so this page must not have a `<style>` block:
+      Svelte scoping would hand its hash class to the elements a selector reaches — and in dev, to
+      every element of the component — and the border, height and fill would vanish. The room for
+      the toggle is therefore an inline style. Logical property: RTL puts the button at the start.
     -->
     <div class="grid gap-1 text-sm">
       <label for="login-password">{t('auth.login.password')}</label>
-      <div class="password-field relative">
-        <input id="login-password" name="password" type={showPassword ? 'text' : 'password'} required autocomplete="current-password" />
+      <div class="relative">
+        <input id="login-password" name="password" type={showPassword ? 'text' : 'password'} required autocomplete="current-password" style="width: 100%; padding-inline-end: 2.5rem" />
         {#if enhanced}
           <button type="button" class="absolute end-1 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded text-muted-foreground hover:text-foreground" onclick={() => (showPassword = !showPassword)} aria-pressed={showPassword} aria-controls="login-password" aria-label={showPassword ? t('auth.login.hide_password') : t('auth.login.show_password')} title={showPassword ? t('auth.login.hide_password') : t('auth.login.show_password')} data-testid="password-toggle">
             <Icon name={showPassword ? 'eye-off' : 'eye'} size={18} />
@@ -233,14 +238,3 @@ async function submitCode(event: SubmitEvent) {
   {/if}
   {/if}
 </div>
-
-<style>
-  /*
-   * The input keeps the global `input:not([class])` look (app.css), so the room for the toggle is
-   * scoped here rather than as a class. Logical property: RTL puts the button at the start.
-   */
-  .password-field input {
-    width: 100%;
-    padding-inline-end: 2.5rem;
-  }
-</style>
