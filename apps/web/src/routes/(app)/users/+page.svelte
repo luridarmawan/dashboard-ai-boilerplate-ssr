@@ -39,6 +39,7 @@ const columns: ColumnDef<Row>[] = [
     sortKey: 'last_login_at',
     value: (r) => formatDateTime(r.lastLoginAt),
   },
+  { key: 'lastLoginIp', label: t('users.last_login_ip'), value: (r) => r.lastLoginIp || '—' },
   {
     key: 'created',
     label: t('users.created'),

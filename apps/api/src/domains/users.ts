@@ -110,6 +110,8 @@ const PublicUser = t.Object({
   isSuperadmin: t.Boolean(),
   emailVerifiedAt: t.Nullable(t.String()),
   lastLoginAt: t.Nullable(t.String()),
+  /** Address of that login; null before the first login or when the proxy sent none. */
+  lastLoginIp: t.Nullable(t.String()),
   createdAt: t.String(),
 });
 const TenantUser = t.Intersect([

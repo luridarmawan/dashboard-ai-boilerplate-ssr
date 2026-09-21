@@ -184,6 +184,7 @@ export function publicUser(u: UserRow) {
     isSuperadmin: u.is_superadmin,
     emailVerifiedAt: u.email_verified_at?.toISOString() ?? null,
     lastLoginAt: u.last_login_at?.toISOString() ?? null,
+    lastLoginIp: u.last_login_ip ?? null,
     createdAt: u.created_at.toISOString(),
   };
 }

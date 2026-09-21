@@ -183,6 +183,13 @@
       "when": 1789687384091,
       "tag": "0025_plain_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1789994066400,
+      "tag": "0026_breezy_red_shift",
+      "breakpoints": true
     }
   ]
 }
