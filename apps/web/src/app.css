@@ -131,8 +131,15 @@
 
 /* Transitional classes used by the M1 pages until they move onto components (M2 S5). */
 @layer components {
+  /*
+   * `minmax(0,1fr)`, not a bare `grid`: the single implicit track of a bare grid is `auto`, so it
+   * is sized to the MAX-CONTENT of its widest child. One wide child — a table with many columns,
+   * a long unbreakable URL — stretched the track past the viewport and dragged every other row
+   * (heading, filter bar, cards) out with it. Capping the track at the container is what lets a
+   * child with its own `overflow-x-auto` scroll on its own instead of blowing up the page.
+   */
   .page {
-    @apply grid gap-4;
+    @apply grid grid-cols-[minmax(0,1fr)] gap-4;
   }
   .page > h1:first-child {
     @apply mb-0;

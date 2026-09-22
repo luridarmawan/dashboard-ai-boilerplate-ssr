@@ -171,14 +171,7 @@ const paramOf = (location: string, key: string) => {
 
 <svelte:head><title>{t('outbox.title')}</title></svelte:head>
 
-<!--
-  `.page` is a bare `grid`, whose single implicit track is `auto` — sized to the MAX-CONTENT of
-  its widest child. A table with nine nowrap columns is far wider than the shell, so the track
-  grew to the table's natural width and dragged every other row (heading, filter bar, paging)
-  out with it, past the viewport. `minmax(0,1fr)` caps the track at the container instead, which
-  is what finally lets the table's own `overflow-x-auto` do its job and scroll on its own.
--->
-<div id="outbox-monitor-container" class="page grid-cols-[minmax(0,1fr)]">
+<div id="outbox-monitor-container" class="page">
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1>{t('outbox.title')}</h1>
