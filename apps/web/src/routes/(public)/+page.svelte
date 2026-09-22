@@ -48,11 +48,12 @@ const steps = [
 ] as const;
 /** Bar heights of the token-drawn chart in the preview (percent), fixed so SSR and CSR agree. */
 const bars = [42, 58, 51, 74, 66, 88, 79, 95] as const;
+/** `as const` like the lists above: `k` must stay a literal, or `landing.hero.${k}` is not a MessageKey. */
 const stats = $derived([
   { k: 'stat_modules', value: data.api ? String(data.api.modules.length) : '—' },
   { k: 'stat_locales', value: String(data.localeCount) },
   { k: 'stat_themes', value: String(data.themeCount) },
-]);
+] as const);
 </script>
 
 <svelte:head>
