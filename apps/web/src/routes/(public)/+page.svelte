@@ -64,7 +64,14 @@ const stats = $derived([
   <meta property="og:description" content={description} />
   <meta property="og:url" content={`${data.origin}/`} />
   <meta property="og:site_name" content={siteName} />
-  <meta name="twitter:card" content="summary" />
+  <!-- Share preview (R-4): the deploy ships one image at /og-image.jpg (apps/web/static); absolute URL as the crawlers require. -->
+  <meta property="og:image" content={`${data.origin}/og-image.jpg`} />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1672" />
+  <meta property="og:image:height" content="941" />
+  <meta property="og:image:alt" content={title} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={`${data.origin}/og-image.jpg`} />
   {@html `<script type="application/ld+json">${ld}</script>`}
 </svelte:head>
 
