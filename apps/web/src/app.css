@@ -109,6 +109,42 @@
   summary {
     cursor: pointer;
   }
+  /*
+   * A label bound to a checkbox or radio IS part of the control — the browser forwards a click on
+   * it to the box — but preflight leaves it at the text cursor, which reads as "this is prose".
+   * Three shapes occur here. The label WRAPS the input (`<label><Checkbox /> text</label>`, most of
+   * /settings) and the label FOLLOWS it carrying `for=` (FormBuilder's boolean field). `:has()`
+   * catches the first and the sibling combinator the second. The third is a Field TITLE whose
+   * `for=` reaches the box further down its own field (every boolean row of /settings). A `for=`
+   * target is not addressable in CSS, so the rule asks for the next thing: an IDENTIFIED box in
+   * the label's immediate next sibling — the Field shape where a `for=` has something to bind to.
+   * A group of checkboxes (a multiselect) carries no id per box and a text or secret control holds
+   * no box at all, so neither title claims a click it cannot deliver.
+   * The box itself points too, or the pointer would die at the label's edge. Disabled controls keep
+   * the default cursor, as above.
+   */
+  label:has(:is(input[type="checkbox"], input[type="radio"]):not(:disabled)),
+  :is(input[type="checkbox"], input[type="radio"]):not(:disabled),
+  :is(input[type="checkbox"], input[type="radio"]):not(:disabled) + label,
+  label[for]:has(+ * :is(input[type="checkbox"], input[type="radio"])[id]:not(:disabled)) {
+    cursor: pointer;
+  }
+  /*
+   * A <select> and a menu entry choose or open something on click, exactly like a button, yet the
+   * browser leaves both at the arrow. The shell's own dropdowns are <details>/<summary>, already
+   * covered above; the role selectors here catch a menu or combobox a theme or module builds by
+   * hand. bits-ui ships menu items at `cursor-default` (shadcn's default) and that utility
+   * outranks this layer, so DropdownMenu.svelte sets the pointer on its own items.
+   * Disabled controls keep the default cursor, as above.
+   */
+  select:not(:disabled),
+  [role="combobox"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+  [role="menuitemradio"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
   }

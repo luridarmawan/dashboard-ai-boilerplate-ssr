@@ -22,7 +22,7 @@ interface Props {
 }
 let { items, align = 'end', class: className, trigger }: Props = $props();
 const itemClass =
-  'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground';
+  'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden data-highlighted:bg-accent data-highlighted:text-accent-foreground';
 </script>
 
 <DropdownMenu.Root>
