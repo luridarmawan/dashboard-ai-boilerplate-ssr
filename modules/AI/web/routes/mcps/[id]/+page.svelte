@@ -155,7 +155,7 @@ async function runTest(event: SubmitEvent) {
           bind:value={query}
           placeholder={t('ai.mcps.search_tools')}
           autocomplete="off"
-          class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm"
+          class="h-8 w-56 rounded-md border border-input bg-background px-3 text-sm"
           data-testid="mcp-tool-search"
         />
         <!-- Only the no-JavaScript path needs it; with JavaScript the list is already narrowed. -->
