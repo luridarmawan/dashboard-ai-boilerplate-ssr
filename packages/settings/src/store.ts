@@ -153,6 +153,8 @@ export class SettingsStore {
     opts: {
       actorId?: string | null;
       routes?: readonly string[];
+      /** The anonymous-reachable subset, for `public_route` fields (§4.7). */
+      publicRoutes?: readonly string[];
       allowedThemes?: readonly string[];
     } = {},
   ): Promise<SaveResult> {
@@ -173,6 +175,7 @@ export class SettingsStore {
       if (field.type === 'secret' && (e.value === '' || e.value === undefined)) continue;
       const v = validateValue(field, e.value === '__clear__' ? null : e.value, {
         routes: opts.routes,
+        publicRoutes: opts.publicRoutes,
       });
       if (!v.ok) {
         errors[e.key] = v.message;

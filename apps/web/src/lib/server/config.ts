@@ -119,3 +119,12 @@ export function isSignupEnabled(c: PublicConfig): boolean {
   if (raw === 'false') return false;
   return env.NODE_ENV !== 'production';
 }
+
+/**
+ * L-19: the built-in page-pattern gallery at `/examples`. A deployment flag, not a runtime
+ * setting — the pages either ship with this deployment or they do not — so it is read from
+ * `.env` alone and is ON unless EXAMPLE_PAGE_ENABLE says otherwise.
+ */
+export function examplePagesEnabled(): boolean {
+  return env.EXAMPLE_PAGE_ENABLE?.trim() !== 'false';
+}

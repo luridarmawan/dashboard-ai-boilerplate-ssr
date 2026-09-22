@@ -87,20 +87,40 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       expect.arrayContaining(['app', 'security', 'mail', 'ai', 'dummy']),
     );
     const app = sections.find((s) => s.section === 'app');
-    expect(app?.fields.some((f) => f.key === 'app.landing_route' && f.type === 'route')).toBe(true);
+    expect(
+      app?.fields.some((f) => f.key === 'app.landing_route' && f.type === 'public_route'),
+    ).toBe(true);
+    expect(app?.fields.some((f) => f.key === 'app.home_route' && f.type === 'route')).toBe(true);
     expect((d(r).routes as string[]).includes('/dashboard')).toBe(true);
+    // §4.7: the landing page picks from the anonymous-reachable subset only.
+    const publicRoutes = d(r).publicRoutes as string[];
+    expect(publicRoutes).toEqual(expect.arrayContaining(['/', '/auth/login']));
+    expect(publicRoutes).not.toContain('/dashboard');
+    expect(publicRoutes).not.toContain('/settings');
   });
 
   test('route values are validated against the route registry when saved (§4.7 rule 1)', async () => {
-    const bad = await put('/v1/configuration', { values: { 'app.landing_route': '/m/ghost' } }, [
+    const bad = await put('/v1/configuration', { values: { 'app.home_route': '/m/ghost' } }, [
       admin,
     ]);
     expect(bad.status).toBe(422);
     expect(
       (((await json(bad)).error ?? {}) as { details?: Record<string, string> }).details?.[
-        'app.landing_route'
+        'app.home_route'
       ],
     ).toMatch(/registry route/);
+    // The landing page is a `public_route`: a real page that needs a session is refused too.
+    const behindLogin = await put(
+      '/v1/configuration',
+      { values: { 'app.landing_route': '/dashboard' } },
+      [admin],
+    );
+    expect(behindLogin.status).toBe(422);
+    expect(
+      (((await json(behindLogin)).error ?? {}) as { details?: Record<string, string> }).details?.[
+        'app.landing_route'
+      ],
+    ).toMatch(/halaman publik/);
     const badTheme = await put('/v1/configuration', { values: { 'app.default_theme': 'neon' } }, [
       admin,
     ]);
@@ -129,7 +149,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(pub.data?.['app.landing_route']).toBe('/auth/login');
     // tenant
     expect(
-      (await put('/v1/configuration', { values: { 'app.landing_route': '/dashboard' } }, [admin]))
+      (await put('/v1/configuration', { values: { 'app.landing_route': '/theme' } }, [admin]))
         .status,
     ).toBe(200);
     const view = await json(await call('/v1/configuration', {}, [admin]));
@@ -138,7 +158,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     )
       .flatMap((s) => s.fields)
       .find((f) => f.key === 'app.landing_route');
-    expect(field?.value).toBe('/dashboard');
+    expect(field?.value).toBe('/theme');
     expect(field?.source).toBe('tenant');
     // anonymous, no tenant → global
     const anon = await json(await call('/v1/configuration/public'));
@@ -215,6 +235,11 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(await routesOf()).not.toContain('/hello-dummy');
     expect(await routesOf()).not.toContain('/m/dummy/notes');
     expect(await routesOf()).toEqual(expect.arrayContaining(['/dashboard', '/example']));
+    // The landing page's own (public) list is narrowed by the same rule.
+    const publicRoutesOf = async () =>
+      d(await json(await call('/v1/configuration', {}, [admin]))).publicRoutes as string[];
+    expect(await publicRoutesOf()).not.toContain('/hello-dummy');
+    expect(await publicRoutesOf()).toContain('/example');
     // Saving such a route is refused as well: the list is the one the form was generated from.
     const refused = await put(
       '/v1/configuration',

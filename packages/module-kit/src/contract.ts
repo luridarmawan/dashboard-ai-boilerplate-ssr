@@ -303,6 +303,8 @@ export type ConfigFieldType =
   | 'secret'
   | 'markdown'
   | 'route'
+  /** Like `route`, but narrowed to the pages an anonymous visitor can reach (§4.7). */
+  | 'public_route'
   | 'theme'
   | 'locale'
   | 'timezone'

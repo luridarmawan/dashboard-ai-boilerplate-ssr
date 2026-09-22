@@ -25,6 +25,8 @@ export const load: PageServerLoad = async (event) => {
     canGlobal: !!event.locals.session?.user.isSuperadmin,
     sections: res.data.data.sections,
     routes: res.data.data.routes,
+    /** §4.7: what a `public_route` field (the landing page) may point at — no sign-in required. */
+    publicRoutes: res.data.data.publicRoutes,
     saved: event.url.searchParams.get('saved'),
   };
 };

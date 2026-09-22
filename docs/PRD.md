@@ -380,16 +380,17 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 
 | Kunci | Tempat | Nilai baku | Keterangan |
 |---|---|---|---|
-| `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/` |
+| `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
 | `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil |
 | `LANDING_ROUTE` | `.env` | `/m/example` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):
 
-1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan. Registry itu **dipersempit per lingkup**: halaman modul yang dinonaktifkan untuk lingkup tersebut (G-8) tidak ditawarkan di pilihan `app.landing_route`/`app.home_route` dan ditolak bila dikirim langsung ke API.
-2. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
-3. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
-4. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
+1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan. Registry itu **dipersempit per lingkup**: halaman modul yang dinonaktifkan untuk lingkup tersebut (G-8) tidak ditawarkan di pilihan `app.landing_route`/`app.home_route` dan ditolak bila dikirim langsung ke API. Halaman contoh bawaan `/examples/*` hilang dengan cara yang sama bila deployment mematikannya lewat `EXAMPLE_PAGE_ENABLE=false` (L-19).
+2. `app.landing_route` dipersempit **sekali lagi**: ia bertipe `public_route`, jadi hanya halaman di luar grup `(app)` — yang bisa dibuka tanpa sesi — yang ditawarkan dan diterima. Halaman di balik dinding masuk hanya akan melempar pengunjung anonim ke `/auth/login`, jadi ia bukan halaman depan. `app.home_route` tetap memakai registry penuh: tujuannya justru pemakai yang sudah masuk.
+3. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
+4. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
+5. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
 
 ### 4.8 Anatomi tema: warna, ikon, dan layout
 
@@ -602,7 +603,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 |---|---|
 | E-1 | **[P0]** Konfigurasi tersimpan di database dengan bentuk `section` / `sub` / `key` / `value` / `type` / `title` / `note` / `order` / `public`. |
 | E-2 | **[P0]** Konfigurasi bersifat per-tenant dengan fallback ke global (`client_id IS NULL`). Nilai global harus benar-benar terpakai saat tenant belum menimpanya. |
-| E-3 | **[P0]** Form konfigurasi **di-generate** dari metadata section + `type` field (`string`, `text`, `number`, `boolean`, `select`, `secret`, `markdown`, `route`, `theme`, `locale`, `timezone`, `list`). Tipe tervalidasi skema, bukan string bebas — dan tipe pula yang menentukan tambahan tampilannya (mis. `timezone` membawa jam berjalan di bawah fieldnya), tidak pernah nama kunci. |
+| E-3 | **[P0]** Form konfigurasi **di-generate** dari metadata section + `type` field (`string`, `text`, `number`, `boolean`, `select`, `secret`, `markdown`, `route`, `public_route`, `theme`, `locale`, `timezone`, `list`). Tipe tervalidasi skema, bukan string bebas — dan tipe pula yang menentukan tambahan tampilannya (mis. `timezone` membawa jam berjalan di bawah fieldnya), tidak pernah nama kunci. |
 | E-4 | **[P0]** Field `public` menentukan apakah nilai boleh dibaca klien yang belum login. Field bertipe `secret` **tidak pernah** dikirim ke klien dalam bentuk asli — hanya penanda "sudah diisi". |
 | E-5 | **[P0]** Cache konfigurasi lewat `CACHE_DRIVER` (Keputusan M), **bukan `Map` proses yang tak tervalidasi**. Adapter `database` (baku) memakai kolom versi: salinan di memori hanya dipakai selama versi masih cocok. Adapter `redis` memakai TTL + invalidasi eksplisit saat simpan. Menyimpan konfigurasi **selalu** menaikkan versi/menginvalidasi, di adapter mana pun — instance lain wajib melihat perubahan tanpa restart. Menutup D1. |
 | E-6 | **[P0]** Batas `.env` vs database ditulis eksplisit dan ditegakkan: `.env` hanya untuk hal yang dibutuhkan **sebelum** database bisa dibaca (koneksi DB, Redis, port, secret sesi, mode, fallback bootstrap). Selebihnya di database (§4.7). |
@@ -740,7 +741,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | L-16 | **[P0]** **DataTable** sebagai komponen inti: paginasi server-side, pengurutan, pencarian, filter kolom, pilih kolom tampil, aksi baris, aksi massal, serta state kosong/loading/error. Komponen ini **hanya menangani presentasi** — pengambilan data ada di `load` SvelteKit. |
 | L-17 | **[P0]** **FormBuilder** berbasis deklarasi field: tipe `string`, `text`, `number`, `boolean`, `date`, `select`, `multiselect`, `file`, `password`, `markdown`. Validasi memakai **skema yang sama dengan API** — satu sumber kebenaran, bukan dua. |
 | L-18 | **[P0]** **Enam** layout bawaan tersedia sejak awal: **dashboard** — `sidebar-classic` (sidebar + header + konten), `topnav-compact` (navigasi atas, tanpa sidebar), dan `centered-narrow` (kolom sempit di tengah untuk wizard & form panjang — ini yang menjawab varian `focused` di keempat tema bawaan); **publik** — `marketing-wide`; **auth** — `centered-card` dan `split-hero`. Semuanya responsif sampai 360 px dan menjadi contoh nyata bentuk kontrak layout bagi developer yang membuat layoutnya sendiri. Daftar & region tiap layout ada di `packages/ui-theme/layouts/registry.json`. |
-| L-19 | **[P0]** Halaman contoh yang menunjukkan pola: list CRUD, form, detail, chart, kosong, 404, 403, 500. |
+| L-19 | **[P0]** Halaman contoh yang menunjukkan pola: list CRUD, form, detail, chart, kosong, 404, 403, 500. Halaman ini milik boilerplate, bukan milik setiap deployment yang lahir darinya: `EXAMPLE_PAGE_ENABLE=false` di `.env` mematikannya seluruhnya — `/examples/*` menjawab 404, entri sidebar hilang, dan field `route` di Pengaturan (halaman depan, halaman setelah masuk) tidak lagi menawarkannya (§4.7). Bawaannya `true`. |
 | L-20 | **[P0]** Toast/notifikasi, dialog konfirmasi, sheet, dropdown, tabs, skeleton loading. |
 | L-21 | **[P0]** **Aksesibilitas**: navigasi keyboard penuh, fokus terlihat, label ARIA, kontras minimal WCAG AA — **diverifikasi pada setiap kombinasi tema × layout bawaan**, bukan hanya pada tema dan layout baku. |
 | L-22 | **[P0]** Progressive enhancement — form utama (login, CRUD, kontak, pemilih tema & bahasa) tetap berfungsi tanpa JavaScript lewat SvelteKit form actions. |

@@ -18,7 +18,20 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     });
     expect(validateValue(f({ type: 'route' }), '/m/ghost', { routes }).ok).toBe(false);
     expect(validateValue(f({ type: 'route' }), 'dashboard', { routes }).ok).toBe(false);
-    expect(validateValue(f({ type: 'route' }), '/auth/login', { routes }).ok).toBe(true); // §4.7 rule 3
+    expect(validateValue(f({ type: 'route' }), '/auth/login', { routes }).ok).toBe(true); // §4.7 rule 4
+  });
+  test('public_route accepts only the anonymous-reachable subset (§4.7)', () => {
+    const ctx = { routes, publicRoutes: ['/', '/auth/login', '/example'] };
+    expect(validateValue(f({ type: 'public_route' }), '/example', ctx)).toEqual({
+      ok: true,
+      stored: '/example',
+    });
+    expect(validateValue(f({ type: 'public_route' }), '/auth/login', ctx).ok).toBe(true); // §4.7 rule 4
+    // in the full registry, but behind the sign-in wall — a landing page it cannot be
+    expect(validateValue(f({ type: 'public_route' }), '/dashboard', ctx).ok).toBe(false);
+    expect(validateValue(f({ type: 'route' }), '/dashboard', ctx).ok).toBe(true);
+    // clearing it still falls back to LANDING_ROUTE
+    expect(validateValue(f({ type: 'public_route' }), '', ctx)).toEqual({ ok: true, stored: null });
   });
   test('theme must be registered; select must be an option; locale must exist', () => {
     expect(validateValue(f({ type: 'theme' }), 'corporate').ok).toBe(true);

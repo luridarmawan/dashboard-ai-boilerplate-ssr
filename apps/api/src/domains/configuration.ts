@@ -2,7 +2,7 @@ import { consumeRateLimit, rateLimitHeaders, writeAudit } from '@core/auth';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
 import { createSmtpTransport, formatFrom, sendTestEmail, smtpHints, tlsMode } from '@core/mail';
-import { GLOBAL, maskChanges, routesForModules } from '@core/settings';
+import { GLOBAL, maskChanges, publicRoutesForModules, routesForModules } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
 import { smtpFor } from '../mail.ts';
@@ -182,6 +182,7 @@ export const configuration = new Elysia({
         scope: scope.clientId ?? GLOBAL,
         sections,
         routes: routesForModules(enabledModules),
+        publicRoutes: publicRoutesForModules(enabledModules),
       });
     },
     {
@@ -189,7 +190,12 @@ export const configuration = new Elysia({
       query: t.Object({ scope: t.Optional(t.Union([t.Literal('tenant'), t.Literal('global')])) }),
       response: {
         200: OkSchema(
-          t.Object({ scope: t.String(), sections: t.Array(Section), routes: t.Array(t.String()) }),
+          t.Object({
+            scope: t.String(),
+            sections: t.Array(Section),
+            routes: t.Array(t.String()),
+            publicRoutes: t.Array(t.String()),
+          }),
         ),
         ...errorResponses,
       },
@@ -248,10 +254,13 @@ export const configuration = new Elysia({
       }
       const entries = Object.entries(body.values).map(([key, value]) => ({ key, value }));
       const allowed = body.values['app.allowed_themes'];
+      const enabled = await moduleState.enabledFor(scope.clientId);
       const result = await settings.save(scope.clientId, entries, {
         actorId: a.user.id,
-        // Same list the form was generated from: a disabled module's page is not a valid route here.
-        routes: routesForModules(await moduleState.enabledFor(scope.clientId)),
+        // The same two lists the form was generated from: a disabled module's page is not a valid
+        // route here, and a page behind the sign-in wall is not a valid landing page.
+        routes: routesForModules(enabled),
+        publicRoutes: publicRoutesForModules(enabled),
         ...(Array.isArray(allowed) ? { allowedThemes: allowed.map(String) } : {}),
       });
       if (Object.keys(result.errors).length) {

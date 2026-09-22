@@ -351,10 +351,11 @@ $effect(() => {
                   <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
                   {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={strVal === o.value}>{L(o.label)}</option>{/each}
                 </Select>
-              {:else if f.type === 'route'}
+              {:else if f.type === 'route' || f.type === 'public_route'}
+                <!-- §4.7: a `public_route` (the landing page) offers only the pages an anonymous visitor can open. -->
                 <Select {id} name={f.key} value={strVal}>
                   <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                  {#each data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
+                  {#each f.type === 'public_route' ? data.publicRoutes : data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
                 </Select>
               {:else if f.type === 'locale'}
                 <Select {id} name={f.key} value={strVal}>

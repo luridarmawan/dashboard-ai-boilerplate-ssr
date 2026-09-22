@@ -89,6 +89,15 @@ const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    /**
+     * The built-in page-pattern gallery at `/examples` (L-19) — part of the boilerplate, not of
+     * every deployment built from it. With `false` those pages answer 404, the sidebar entry is
+     * gone, and the `route` settings (landing, home) no longer offer them.
+     */
+    EXAMPLE_PAGE_ENABLE: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
     /** Self-service registration (A-1). Off by default in production; on for development. */
     SIGNUP_ENABLED: z
       .enum(['true', 'false'])
