@@ -3,7 +3,15 @@ import type { Snippet } from 'svelte';
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Button, Checkbox, Field, Input, PasswordInput, Select, Textarea } from '$lib/components/ui';
+import {
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  PasswordInput,
+  Select,
+  Textarea,
+} from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import type { FieldDef, FormErrors, FormValues } from './fields.ts';
