@@ -573,4 +573,9 @@ function copy(text: string) {
   :global(.prose-chat code:not(pre code)) { background: var(--background); padding: 0 0.3rem; border-radius: 0.25rem; }
   :global(.prose-chat ul), :global(.prose-chat ol) { padding-left: 1.25rem; }
   :global(.prose-chat a) { text-decoration: underline; }
+  /* Assistant-reply block spacing, kept to the transcript so other prose surfaces are untouched. */
+  #messages-list :global(.prose-chat table) { margin: 10px 5px 10px 0px; }
+  #messages-list :global(.prose-chat ul) { margin-bottom: 5px; }
+  #messages-list :global(.prose-chat ul li) { padding-top: 5px; }
+  #messages-list :global(.prose-chat h2) { padding-top: 5px; border-bottom: 1px solid gray; }
 </style>
