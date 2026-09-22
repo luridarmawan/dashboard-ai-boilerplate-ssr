@@ -4,7 +4,7 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 
 |   |   |
 |---|---|
-| ![Home](docs/screenshot/home.png) | ![Settings](docs/screenshot/settings.png) |
+| ![Home](docs/screenshot/og-image.jpg) | ![Settings](docs/screenshot/settings.png) |
 
 ## Architecture
 
