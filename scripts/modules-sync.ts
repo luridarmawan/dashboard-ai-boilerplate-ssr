@@ -30,6 +30,27 @@ if (!existsSync(join(root, 'packages', 'db', 'src', 'generated', 'active.ts'))) 
   }
 }
 
+// Module routes import `@core/settings`, which imports `publicWebRoutes`/`webRoutes` from
+// `src/generated/routes.ts` — written only by `layout:variants`. That file is gitignored, so a
+// fresh clone lacks it and an older checkout keeps a stale copy a `git pull` never refreshes
+// (e.g. one predating `publicWebRoutes`); either way every module fails to load. Unlike the
+// check above, run it unconditionally: it only walks page files, so it is cheap, and "exists"
+// does not mean "current". Module pages are not shimmed yet, so this list is partial —
+// `bootstrap` runs `layout:variants` again after the sync for the full one.
+{
+  const p = Bun.spawnSync(['bun', 'run', 'scripts/layout-variants.ts'], {
+    cwd: root,
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+  if (p.exitCode !== 0) {
+    console.error(
+      'modules:sync: layout:variants gagal — tidak bisa memuat modul tanpa daftar route',
+    );
+    process.exit(p.exitCode ?? 1);
+  }
+}
+
 try {
   const result = await syncModules({ root });
   const names = result.modules.map((m) => `${m.name}@${m.version}`).join(', ') || '(tidak ada)';
