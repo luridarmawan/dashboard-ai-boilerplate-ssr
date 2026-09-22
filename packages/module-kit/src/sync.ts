@@ -956,6 +956,14 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     }
     const seedsOut = join(root, 'packages/module-kit/src/generated/seeds.ts');
     files.push(await writeFile(seedsOut, emitSeeds(seedModules, root, seedsOut)));
+    // The same public-route table the web gets below, importable by the API through
+    // `@core/module-kit/public-routes`: `@core/settings` narrows the route registry with it (G-8).
+    files.push(
+      await writeFile(
+        join(root, 'packages/module-kit/src/generated/public-routes.ts'),
+        emitPublicRoutes(publicRoutes),
+      ),
+    );
     files.push(
       await writeFile(
         join(root, 'packages/ui-theme/src/generated/contrib.ts'),
@@ -1552,7 +1560,7 @@ function emitPublicRoutes(
   routes: readonly (PublicRouteDef & { module: string; ns: string })[],
 ): string {
   return `${GEN_HEADER}
-/** Module public routes: SvelteKit path, owning module namespace, sitemap flag (F-7, G-8). */
+/** Module public routes (extension point 13): SvelteKit path, owning module + namespace, sitemap flag (F-7, G-8). */
 export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean }[] = ${JSON.stringify(
     routes.map((r) => ({
       path: r.path,
@@ -1610,6 +1618,8 @@ export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = 
 `,
     'packages/module-kit/src/generated/seeds.ts': `${H}import type { ModuleSeed } from '../contract.ts';
 export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [];
+`,
+    'packages/module-kit/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean }[] = [];
 `,
     'packages/i18n/src/generated/messages.ts': `${H}export const LOCALES = ${JSON.stringify(I18N_LOCALES)} as const;
 export type Locale = (typeof LOCALES)[number];

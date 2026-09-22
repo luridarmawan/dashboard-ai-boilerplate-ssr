@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./sync": "./src/sync.ts",
     "./registry": "./src/generated/registry.ts",
+    "./public-routes": "./src/generated/public-routes.ts",
     "./seeds": "./src/generated/seeds.ts"
   },
   "scripts": {

@@ -2,7 +2,7 @@ import { consumeRateLimit, rateLimitHeaders, writeAudit } from '@core/auth';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
 import { createSmtpTransport, formatFrom, sendTestEmail, smtpHints, tlsMode } from '@core/mail';
-import { GLOBAL, maskChanges, webRoutes } from '@core/settings';
+import { GLOBAL, maskChanges, routesForModules } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
 import { smtpFor } from '../mail.ts';
@@ -176,7 +176,13 @@ export const configuration = new Elysia({
           };
         }),
       }));
-      return ok({ scope: scope.clientId ?? GLOBAL, sections, routes: [...webRoutes] });
+      // The `route` fields (landing, home) may only offer pages this scope can reach: a page of a
+      // module disabled here would be refused on save and fall back at `/` anyway (§4.7, G-8).
+      return ok({
+        scope: scope.clientId ?? GLOBAL,
+        sections,
+        routes: routesForModules(enabledModules),
+      });
     },
     {
       beforeHandle: permission('config.read'),
@@ -244,7 +250,8 @@ export const configuration = new Elysia({
       const allowed = body.values['app.allowed_themes'];
       const result = await settings.save(scope.clientId, entries, {
         actorId: a.user.id,
-        routes: webRoutes,
+        // Same list the form was generated from: a disabled module's page is not a valid route here.
+        routes: routesForModules(await moduleState.enabledFor(scope.clientId)),
         ...(Array.isArray(allowed) ? { allowedThemes: allowed.map(String) } : {}),
       });
       if (Object.keys(result.errors).length) {

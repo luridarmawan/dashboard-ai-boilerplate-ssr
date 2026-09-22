@@ -208,6 +208,20 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       ).map((s) => s.section);
     expect(await sectionsOf()).not.toContain('dummy');
     expect(await sectionsOf()).toEqual(expect.arrayContaining(['app', 'security', 'mail']));
+    // …and its pages leave the route registry the `route` fields (landing, home) pick from —
+    // both the public page and the dashboard page; core pages and other modules stay.
+    const routesOf = async () =>
+      d(await json(await call('/v1/configuration', {}, [admin]))).routes as string[];
+    expect(await routesOf()).not.toContain('/hello-dummy');
+    expect(await routesOf()).not.toContain('/m/dummy/notes');
+    expect(await routesOf()).toEqual(expect.arrayContaining(['/dashboard', '/example']));
+    // Saving such a route is refused as well: the list is the one the form was generated from.
+    const refused = await put(
+      '/v1/configuration',
+      { values: { 'app.landing_route': '/hello-dummy' } },
+      [admin],
+    );
+    expect(refused.status).toBe(422);
     const list = await json(await call('/v1/module', {}, [admin]));
     expect(
       (d(list) as unknown as { name: string; effective: boolean }[]).find((m) => m.name === 'Dummy')
@@ -216,6 +230,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect((await put('/v1/module/Dummy/enabled', { enabled: null }, [admin])).status).toBe(200); // drop override
     expect((await call('/v1/m/dummy/ping', {}, [admin])).status).toBe(200);
     expect(await sectionsOf()).toContain('dummy');
+    expect(await routesOf()).toEqual(expect.arrayContaining(['/hello-dummy', '/m/dummy/notes']));
   });
 
   test('themes: default and allowlist come from configuration (L-10, L-11)', async () => {

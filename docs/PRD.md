@@ -386,7 +386,7 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):
 
-1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan.
+1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan. Registry itu **dipersempit per lingkup**: halaman modul yang dinonaktifkan untuk lingkup tersebut (G-8) tidak ditawarkan di pilihan `app.landing_route`/`app.home_route` dan ditolak bila dikirim langsung ke API.
 2. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
 3. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
 4. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
