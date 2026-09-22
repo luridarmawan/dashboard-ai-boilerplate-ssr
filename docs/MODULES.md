@@ -282,7 +282,7 @@ export default definePublicRoutes('Example', [
 
 Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data yang sama (R-9): modul `Example` mengapalkan `/example` (gaya toko: hero, cerita, paket harga) **dan** `/catalog` (gaya katalog: masthead tipis, bilah filter, daftar padat, form kontak satu baris). Keduanya route publik biasa, keduanya masuk `sitemap`, dan keduanya bisa dipilih sebagai landing — jadi bentuk halaman depan adalah keputusan admin, bukan deploy.
 
-Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7). `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
+Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7) — selama modulnya aktif untuk lingkup yang sedang disunting; route modul yang dinonaktifkan (G-8) tidak ditawarkan dan ditolak saat disimpan. Tabel pemiliknya dihasilkan sync di `packages/module-kit/src/generated/public-routes.ts` (`@core/module-kit/public-routes`) dan `apps/web/src/generated/public-routes.ts`. `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
 
 ### Gambar & lazy load — `<Img>` dan `class="lazy"`
 
@@ -338,7 +338,7 @@ Halaman yang dirender belakangan — hasil navigasi klien, blok `{#if}` — ikut
 
 ### `config.ts` — konfigurasi runtime (titik perluasan 6)
 
-Section konfigurasi modul muncul otomatis di halaman **Pengaturan**; formnya di-generate dari metadata ini (E-3). Nilai tersimpan di database per tenant dengan fallback global (E-2), dan setiap penyimpanan menaikkan versi cache sehingga semua instance melihatnya tanpa restart (E-5).
+Section konfigurasi modul muncul otomatis di halaman **Pengaturan** selama modulnya aktif untuk lingkup itu (G-8: modul nonaktif → section-nya ikut hilang, nilainya tetap tersimpan); formnya di-generate dari metadata ini (E-3). Nilai tersimpan di database per tenant dengan fallback global (E-2), dan setiap penyimpanan menaikkan versi cache sehingga semua instance melihatnya tanpa restart (E-5).
 
 ```ts
 // config.ts

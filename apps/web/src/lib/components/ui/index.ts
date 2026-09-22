@@ -10,6 +10,7 @@ export { default as DropdownMenu, type MenuItem } from './DropdownMenu.svelte';
 export { default as Field } from './Field.svelte';
 export { default as Input } from './Input.svelte';
 export { default as Label } from './Label.svelte';
+export { default as PasswordInput } from './PasswordInput.svelte';
 export { default as Select } from './Select.svelte';
 export { default as Separator } from './Separator.svelte';
 export { default as Sheet } from './Sheet.svelte';

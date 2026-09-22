@@ -187,6 +187,20 @@ function selectTab(section: string) {
   activeSection = section;
 }
 
+/**
+ * The tab row never wraps: on a narrow screen it scrolls sideways instead (one line, swipeable),
+ * so a deep link (`?tab=`, `#hash`) or a keyboard pick can land on a tab that is off to the side.
+ * Bring it into view — horizontally only, the page itself must not jump.
+ */
+let tablistEl = $state<HTMLElement | null>(null);
+$effect(() => {
+  const section = activeSection || sortedSections[0]?.section;
+  if (!section || !tablistEl) return;
+  tablistEl
+    .querySelector<HTMLElement>(`[data-tab="${section}"]`)
+    ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+});
+
 // Track AJAX save status per section
 let saving = $state<string | null>(null);
 let savedNotice = $state<string | null>(null);
@@ -236,9 +250,13 @@ $effect(() => {
   </p>
   {#if form?.error && !failedSection}<p class="error">{form.error}</p>{/if}
 
-  <!-- Tab navigation -->
-  <div class="border-b border-border">
-    <div class="-mb-px flex flex-wrap gap-1 text-sm font-medium" role="tablist" aria-label={t('nav.settings')}>
+  <!--
+    Tab navigation: one row, always. Too many tabs for the width → the row scrolls sideways.
+    `min-w-0` matters: `.page` is a grid, and an auto track grows to its item's min-content width —
+    which for a no-wrap row is the whole row. Without it the page, not the row, would scroll.
+  -->
+  <div class="min-w-0 border-b border-border">
+    <div bind:this={tablistEl} class="tablist -mb-px flex flex-nowrap gap-1 overflow-x-auto text-sm font-medium" role="tablist" aria-label={t('nav.settings')}>
       {#each sortedSections as s (s.section)}
         {@const isActive = (activeSection || sortedSections[0]?.section) === s.section}
         <button
@@ -250,7 +268,7 @@ $effect(() => {
           aria-controls={s.section}
           tabindex={isActive ? 0 : -1}
           onclick={() => selectTab(s.section)}
-          class={`group inline-flex items-center gap-2 border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+          class={`group inline-flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
             isActive
               ? 'border-primary text-primary font-semibold'
               : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
@@ -423,3 +441,10 @@ $effect(() => {
     </div>
   {/each}
 </div>
+
+<style>
+  /* A thin bar where scrollbars are drawn at all (desktop); phones overlay theirs and hide them. */
+  .tablist {
+    scrollbar-width: thin;
+  }
+</style>

@@ -3,6 +3,7 @@ import type { MessageKey } from '@core/i18n';
 import { tick, untrack } from 'svelte';
 import { goto } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
+import { PasswordInput } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import type { ActionData, PageData } from './$types';
 
@@ -197,7 +198,15 @@ async function submitCode(event: SubmitEvent) {
     <Csrf token={data.csrf} />
     <input type="hidden" name="next" value={data.next} />
     <label>{t('auth.login.email')} <input name="email" type="email" required autocomplete="username" bind:value={email} /></label>
-    <label>{t('auth.login.password')} <input name="password" type="password" required autocomplete="current-password" /></label>
+    <!--
+      A `<label for>` rather than a wrapping one: the toggle inside <PasswordInput> is a <button>,
+      and a <button> may not sit inside a <label> that already labels an input. `plain`: this field
+      keeps the class-less app.css look of the e-mail field above it (see the component).
+    -->
+    <div class="grid gap-1 text-sm">
+      <label for="login-password">{t('auth.login.password')}</label>
+      <PasswordInput plain id="login-password" name="password" required autocomplete="current-password" />
+    </div>
     <div class="row">
       <button type="submit" disabled={busy} aria-busy={busy}>{busy ? t('auth.login.submitting') : t('auth.login.submit')}</button>
       <a href="/auth/forgot">{t('auth.login.forgot')}</a>

@@ -3,7 +3,15 @@ import type { Snippet } from 'svelte';
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Button, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
+import {
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  PasswordInput,
+  Select,
+  Textarea,
+} from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import type { FieldDef, FormErrors, FormValues } from './fields.ts';
@@ -178,6 +186,21 @@ function submitOverFetch(node: HTMLFormElement) {
             </div>
           {:else if f.type === 'file'}
             <Input {id} type="file" name={f.name} accept={f.accept} required={f.required} disabled={readonly || f.disabled} />
+          {:else if f.type === 'password'}
+            <!-- Never seeded with a value; carries its own show/hide toggle. -->
+            <PasswordInput
+              {id}
+              name={f.name}
+              placeholder={f.placeholder}
+              required={f.required}
+              disabled={readonly || f.disabled}
+              autocomplete={f.autocomplete}
+              minlength={f.minlength}
+              maxlength={f.maxlength}
+              pattern={f.pattern}
+              value=""
+              aria-invalid={err ? 'true' : undefined}
+            />
           {:else}
             <Input
               {id}
@@ -193,7 +216,7 @@ function submitOverFetch(node: HTMLFormElement) {
               minlength={f.minlength}
               maxlength={f.maxlength}
               pattern={f.pattern}
-              value={f.type === 'password' ? '' : val(f, values[f.name])}
+              value={val(f, values[f.name])}
               aria-invalid={err ? 'true' : undefined}
             />
           {/if}

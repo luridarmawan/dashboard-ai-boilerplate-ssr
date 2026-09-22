@@ -6,6 +6,7 @@ import {
   actionFailure,
   apiFor,
   checkCsrf,
+  confirmed,
   csrfToken,
   forwardSetCookies,
   str,
@@ -19,7 +20,7 @@ import type { Actions, PageServerLoad } from './$types';
  */
 export const _layoutVariant = 'wide';
 
-const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at']);
+const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at', 'last_active_at']);
 
 /** Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders. */
 export const load: PageServerLoad = async (event) => {
@@ -125,7 +126,12 @@ export const actions: Actions = {
     if (!r.ok) return actionFailure(r.failure);
     redirect(303, `${event.url.pathname}${event.url.search}`);
   },
-  /** Bulk action (L-16): deactivate the selected users — one PUT each, through the same API guard. */
+  /**
+   * Bulk action (L-16): deactivate the selected users — one PUT each, through the same API guard.
+   * Two POSTs (L-22): the first carries the ticked ids but no `confirm` token and only earns the
+   * question — the page renders it inline (or the table already asked in a modal and posts the
+   * second step straight away). Nothing changes until `?confirm=deactivate` arrives.
+   */
   deactivate: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
@@ -141,15 +147,28 @@ export const actions: Actions = {
     if (ids.length === 0)
       return fail(400, { error: t('table.select_none'), code: 'no_selection', deactivate: true });
     const client = apiFor(event);
+    if (!confirmed(event, 'deactivate')) {
+      // Name what is about to happen: the POST URL has no `q`/`page`, so the rows may not be in the
+      // page that renders the question. One GET each — the confirmed step costs one PUT each anyway.
+      const rows = await Promise.all(
+        ids.map(async (id) => {
+          const r = unwrap<{ success: true; data: { name: string; email: string } }>(
+            await client.v1.users({ id }).get(),
+          );
+          return r.ok
+            ? { id, name: r.data.data.name, email: r.data.data.email }
+            : { id, name: id, email: '' };
+        }),
+      );
+      return { confirmDeactivate: rows };
+    }
     let done = 0;
     for (const id of ids) {
       const r = unwrap(await client.v1.users({ id }).put({ statusId: 0 }));
       if (r.ok) done++;
       else if (r.failure.status === 403) return actionFailure(r.failure);
     }
-    redirect(
-      303,
-      `${event.url.pathname}${event.url.search}${event.url.search ? '&' : '?'}deactivated=${done}`,
-    );
+    // A clean URL: the action's own `?/deactivate&confirm=deactivate` must not survive the redirect.
+    redirect(303, `${event.url.pathname}?deactivated=${done}`);
   },
 };

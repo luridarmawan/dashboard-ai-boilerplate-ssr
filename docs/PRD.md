@@ -386,7 +386,7 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):
 
-1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan.
+1. Nilai konfigurasi divalidasi terhadap registry route hasil `modules:sync` **saat disimpan**. Route yang tidak ada ditolak di UI, bukan menghasilkan 404 belakangan. Registry itu **dipersempit per lingkup**: halaman modul yang dinonaktifkan untuk lingkup tersebut (G-8) tidak ditawarkan di pilihan `app.landing_route`/`app.home_route` dan ditolak bila dikirim langsung ke API.
 2. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
 3. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
 4. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
@@ -636,7 +636,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | G-5 | **[P0]** **16 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
 | G-6 | **[P0]** **Menambah atau menghapus modul tidak mengubah berkas core mana pun.** Ditegakkan di CI: pipeline menjalankan `modgen`, lalu memeriksa bahwa `git diff` hanya menyentuh `modules/`, `modules.json`, dan direktori hasil generate. Ini mengubah janji modularitas dari niat menjadi sesuatu yang terukur. |
 | G-7 | **[P0]** Kegagalan satu modul saat inisialisasi tidak boleh mematikan aplikasi; catat galatnya, tandai modul sebagai gagal di UI admin, lanjutkan. |
-| G-8 | **[P0]** Modul bisa diaktifkan/nonaktifkan **per tenant** lewat tabel `modules`. Modul nonaktif: menu hilang, route menolak, tema & route publiknya tidak terdaftar, tabelnya tetap ada. |
+| G-8 | **[P0]** Modul bisa diaktifkan/nonaktifkan **per tenant** lewat tabel `modules`. Modul nonaktif: menu hilang, section-nya di Pengaturan hilang (nilai tersimpan tidak disentuh), route menolak, tema & route publiknya tidak terdaftar, tabelnya tetap ada. |
 | G-9 | **[P0]** Namespace terisolasi dan **divalidasi saat sync**: tabel diawali nama modul, route API di `/v1/m/<nama>/*`, route dashboard di `/m/<nama>/*`, resource izin di `<nama>.*`, kunci i18n di `<nama>.*`, nama tema di `<nama>.*`. Bentrokan antar modul ditolak dengan pesan yang menyebut kedua modul. |
 | G-10 | **[P0]** **Modul lintas repositori** (§4.9): `modules.json` mendeklarasikan sumber (`local` / `submodule` / `package`); `bun modules:add <git-url>` memasang submodule dan mengunci `ref`; `bun modules:sync` menyinkronkan lalu meng-generate registry. |
 | G-11 | **[P0]** `module.json` menyatakan `engines.core`; ketidakcocokan versi ditolak saat `modules:sync` dengan pesan yang menyebut versi dibutuhkan vs terpasang. Dependensi antar-modul dinyatakan dan diurutkan saat inisialisasi. |

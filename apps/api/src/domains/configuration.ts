@@ -2,14 +2,14 @@ import { consumeRateLimit, rateLimitHeaders, writeAudit } from '@core/auth';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
 import { createSmtpTransport, formatFrom, sendTestEmail, smtpHints, tlsMode } from '@core/mail';
-import { GLOBAL, maskChanges, webRoutes } from '@core/settings';
+import { GLOBAL, maskChanges, routesForModules } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
 import { smtpFor } from '../mail.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
-import { customThemes, emit, settings } from '../services.ts';
+import { customThemes, emit, moduleState, settings } from '../services.ts';
 
 /**
  * Runtime configuration (PRD FR-E, Decision I). Scope = the active tenant, or `global` when the
@@ -113,7 +113,13 @@ export const configuration = new Elysia({
           label: { ...(c.name as { id: string; en: string }) },
         })),
       ];
-      const view = await settings.adminView(scope.clientId);
+      // G-8: a module disabled for this scope (tenant override, else global) contributes no
+      // section — the Settings page must not offer a form for something the tenant cannot use.
+      // Its stored values stay untouched, so re-enabling brings the section back as it was.
+      const enabledModules = await moduleState.enabledFor(scope.clientId);
+      const view = (await settings.adminView(scope.clientId)).filter(
+        (s) => s.module === 'core' || enabledModules.has(s.module),
+      );
       // The mail tester opens with the SMTP account this scope actually sends as — which lives
       // in the settings OR in .env (J-1, E-6), so only `smtpFor()` can name it. Resolved once,
       // and only when the section that asks for it is on the page.
@@ -170,7 +176,13 @@ export const configuration = new Elysia({
           };
         }),
       }));
-      return ok({ scope: scope.clientId ?? GLOBAL, sections, routes: [...webRoutes] });
+      // The `route` fields (landing, home) may only offer pages this scope can reach: a page of a
+      // module disabled here would be refused on save and fall back at `/` anyway (§4.7, G-8).
+      return ok({
+        scope: scope.clientId ?? GLOBAL,
+        sections,
+        routes: routesForModules(enabledModules),
+      });
     },
     {
       beforeHandle: permission('config.read'),
@@ -238,7 +250,8 @@ export const configuration = new Elysia({
       const allowed = body.values['app.allowed_themes'];
       const result = await settings.save(scope.clientId, entries, {
         actorId: a.user.id,
-        routes: webRoutes,
+        // Same list the form was generated from: a disabled module's page is not a valid route here.
+        routes: routesForModules(await moduleState.enabledFor(scope.clientId)),
         ...(Array.isArray(allowed) ? { allowedThemes: allowed.map(String) } : {}),
       });
       if (Object.keys(result.errors).length) {

@@ -62,6 +62,9 @@ export const PublicUser = t.Object({
   isSuperadmin: t.Boolean(),
   emailVerifiedAt: t.Nullable(t.String()),
   lastLoginAt: t.Nullable(t.String()),
+  lastLoginIp: t.Nullable(t.String()),
+  lastActiveAt: t.Nullable(t.String()),
+  lastActiveIp: t.Nullable(t.String()),
   createdAt: t.String(),
 });
 
@@ -137,7 +140,12 @@ export async function issueSession(p: {
   const revoked = e.SINGLE_LOGIN_ENABLE ? await revokeAllSessions(p.db, p.user.id, session.id) : 0;
   await p.db
     .update(schema.users)
-    .set({ last_login_at: new Date() })
+    .set({
+      last_login_at: new Date(),
+      last_login_ip: p.ip || null,
+      last_active_at: new Date(),
+      last_active_ip: p.ip || null,
+    })
     .where(eq(schema.users.id, p.user.id));
   p.cookie[SESSION_COOKIE]?.set({
     value: session.token,

@@ -314,9 +314,11 @@ const admin = new Jar();
   check('disable Example globally → 303', off.res.status === 303);
   const front = await get(anon, '/');
   check(
-    '#4 `/` still 200 with the built-in landing (not 404)',
+    '#4 `/` still 200 with the built-in landing (not 404): hero + API status, no storefront',
     front.res.status === 200 &&
       !front.res.headers.get('x-landing-route') &&
+      front.html.includes('data-testid="landing-hero"') &&
+      front.html.includes('data-testid="api-status"') &&
       !front.html.includes('data-testid="products"'),
   );
   const gone = await get(anon, '/example');

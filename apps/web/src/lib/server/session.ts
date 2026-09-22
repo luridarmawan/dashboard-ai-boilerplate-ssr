@@ -34,6 +34,9 @@ export interface SessionUser {
   isSuperadmin: boolean;
   emailVerifiedAt: string | null;
   lastLoginAt: string | null;
+  lastLoginIp: string | null;
+  lastActiveAt: string | null;
+  lastActiveIp: string | null;
   createdAt: string;
 }
 export interface TenantSummary {

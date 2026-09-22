@@ -102,3 +102,38 @@ test('login: API tak terjangkau → submit jatuh ke form action', async ({ page 
   await expect(page).toHaveURL(/\/dashboard/);
   expect(posts).toEqual(['/v1/auth/login', '/auth/login']);
 });
+
+test('login: tombol tampil/sembunyikan kata sandi', async ({ page }) => {
+  await page.goto('/auth/login');
+  const form = page.getByTestId('login-form');
+  // The toggle is a JavaScript nicety: it exists only once the page is hydrated.
+  await expect(form).toHaveAttribute('data-enhanced', 'true');
+  const field = form.locator('input[name="password"]');
+  const toggle = form.getByTestId('password-toggle');
+  // The fields and the submit button are styled by app.css as class-less elements; a scoped style
+  // that reaches them would hand them a Svelte class and strip that look (the border went missing
+  // once). Pin the visible result, not the mechanism.
+  const border = (sel: string) =>
+    form.locator(sel).evaluate((el) => getComputedStyle(el).borderTopWidth);
+  expect(await border('input[name="email"]')).toBe('1px');
+  expect(await border('input[name="password"]')).toBe('1px');
+  expect(
+    await form
+      .locator('button[type="submit"]')
+      .evaluate((el) => getComputedStyle(el).backgroundColor),
+  ).not.toBe('rgba(0, 0, 0, 0)');
+  await field.fill(PASSWORD);
+  await expect(field).toHaveAttribute('type', 'password');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+  await toggle.click();
+  await expect(field).toHaveAttribute('type', 'text');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  // Showing the password must not touch what was typed — nor submit the form (`type="button"`).
+  await expect(field).toHaveValue(PASSWORD);
+  await expect(page).toHaveURL(/\/auth\/login/);
+
+  await toggle.click();
+  await expect(field).toHaveAttribute('type', 'password');
+  await expect(field).toHaveValue(PASSWORD);
+});

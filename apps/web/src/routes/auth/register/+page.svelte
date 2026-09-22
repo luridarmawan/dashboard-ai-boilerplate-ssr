@@ -1,5 +1,6 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
+import { PasswordInput } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import type { ActionData, PageData } from './$types';
 
@@ -21,7 +22,12 @@ const t = useT();
     <Csrf token={data.csrf} />
     <label>{t('auth.register.name')} <input name="name" required maxlength="191" value={form?.values?.name ?? ''} /></label>
     <label>{t('auth.login.email')} <input name="email" type="email" required autocomplete="username" value={form?.values?.email ?? ''} /></label>
-    <label>{t('auth.login.password')} <input name="password" type="password" required minlength="12" autocomplete="new-password" /><span class="muted">{t('auth.register.password_hint')}</span></label>
+    <!-- `<label for>` + <PasswordInput plain>: same shape as the login page, see there. -->
+    <div class="grid gap-1 text-sm">
+      <label for="register-password">{t('auth.login.password')}</label>
+      <PasswordInput plain id="register-password" name="password" required minlength={12} autocomplete="new-password" />
+      <span class="muted">{t('auth.register.password_hint')}</span>
+    </div>
     <div class="row"><button type="submit">{t('auth.register.submit')}</button><a href="/auth/login">{t('auth.register.have_account')}</a></div>
   </form>
   {/if}

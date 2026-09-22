@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `last_login_ip` varchar(45) CHARACTER SET ascii COLLATE ascii_bin;

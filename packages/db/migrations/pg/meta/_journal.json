@@ -183,6 +183,20 @@
       "when": 1789687385491,
       "tag": "0025_hot_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789994067024,
+      "tag": "0026_steep_zaran",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790018060590,
+      "tag": "0027_swift_gorgon",
+      "breakpoints": true
     }
   ]
 }

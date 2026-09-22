@@ -36,6 +36,17 @@ const CORE_REPO = process.env.CORE_REPO ?? pkg.core?.repo ?? '';
 const CORE_REF = process.env.CORE_REF ?? pkg.core?.ref ?? 'main';
 const coreDir = resolve(process.env.CORE_DIR ?? join(here, '.core'));
 
+/** Commit id for a branch, tag or commit — `null` when the ref does not resolve here. */
+function revParse(ref: string, cwd: string): string | null {
+  const p = Bun.spawnSync(['git', 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+    cwd,
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+  const out = p.stdout.toString().trim();
+  return p.exitCode === 0 && out !== '' ? out : null;
+}
+
 function sh(cmd: string[], cwd: string, env: Record<string, string> = {}): void {
   console.log(`\n$ ${cmd.join(' ')}   (in ${cwd})`);
   const p = Bun.spawnSync(cmd, {
@@ -63,9 +74,23 @@ if (!existsSync(join(coreDir, 'modules.json'))) {
   const local = CORE_REPO.startsWith('file://') || CORE_REPO.startsWith('/');
   const git = local ? ['git', '-c', 'protocol.file.allow=always'] : ['git'];
   console.log(`harness: clone core ${CORE_REPO}@${CORE_REF} → ${coreDir}`);
-  // A ref may be a branch, tag or commit: clone then checkout so all three work.
+  // A half-finished clone from an earlier run would make `git clone` refuse the directory, and it
+  // is worthless anyway: no modules.json means no usable core.
+  rmSync(coreDir, { recursive: true, force: true });
   sh([...git, 'clone', '--quiet', '--no-checkout', CORE_REPO, coreDir], here);
-  sh(['git', 'checkout', '--quiet', '--detach', CORE_REF], coreDir);
+  // A ref may be a branch, tag or commit. `git checkout --detach <name>` refuses a branch that
+  // exists only on the remote: git's DWIM would first create a tracking branch, which --detach
+  // forbids ("'--detach' cannot be used with '-b/-B/--orphan'"). Only the clone's default branch
+  // is local here, so "development" fails where "main" happens to work. Resolving the ref to a
+  // commit id first removes the guess, and keeps all three kinds of ref working.
+  const commit = revParse(CORE_REF, coreDir) ?? revParse(`origin/${CORE_REF}`, coreDir);
+  if (!commit) {
+    console.error(
+      `harness: ref "${CORE_REF}" tidak ada di ${CORE_REPO} (bukan branch, tag, atau commit)`,
+    );
+    process.exit(1);
+  }
+  sh(['git', 'checkout', '--quiet', '--detach', commit], coreDir);
   sh(['git', 'submodule', 'update', '--init', '--quiet'], coreDir);
 } else {
   console.log(`harness: memakai core di ${coreDir}`);

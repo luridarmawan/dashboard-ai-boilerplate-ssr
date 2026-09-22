@@ -93,6 +93,7 @@ const SORT = {
   email: schema.users.email,
   created_at: schema.users.created_at,
   last_login_at: schema.users.last_login_at,
+  last_active_at: schema.users.last_active_at,
 } as const;
 const sortColumn = (key: string | undefined) =>
   key && key in SORT ? SORT[key as keyof typeof SORT] : SORT.name;
@@ -110,6 +111,11 @@ const PublicUser = t.Object({
   isSuperadmin: t.Boolean(),
   emailVerifiedAt: t.Nullable(t.String()),
   lastLoginAt: t.Nullable(t.String()),
+  /** Address of that login; null before the first login or when the proxy sent none. */
+  lastLoginIp: t.Nullable(t.String()),
+  /** Newest request of any session, kept on the account (outlives session purge); login counts. */
+  lastActiveAt: t.Nullable(t.String()),
+  lastActiveIp: t.Nullable(t.String()),
   createdAt: t.String(),
 });
 const TenantUser = t.Intersect([
