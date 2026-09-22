@@ -1,5 +1,6 @@
 import type { RequestEvent, RequestHandler } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { forwardedOrigin } from '$lib/server/origin';
 import { CSRF_COOKIE, checkCsrf, IMPERSONATE_COOKIE, SESSION_COOKIE } from '$lib/server/session';
 
 /**
@@ -33,13 +34,18 @@ export const POST: RequestHandler = async (event) => {
     ip = '';
   }
   const base = env.API_URL ?? 'http://127.0.0.1:3001';
+  // The origin handed to the API is the browser's own, once it passed the APP_ORIGIN allow-list —
+  // the same rule `apiFor` applies. `event.url.origin` is only a RECONSTRUCTION from the proxy's
+  // X-Forwarded-* headers: a front proxy that omits X-Forwarded-Proto makes it `http://…`, and the
+  // API's CSRF check then refuses every chat with `origin_mismatch` while every other form works.
+  const publicOrigin = new URL(forwardedOrigin(event));
   const headers = {
     'content-type': 'application/json',
     cookie: `${SESSION_COOKIE}=${session}; ${CSRF_COOKIE}=${csrf}${imp ? `; ${IMPERSONATE_COOKIE}=${imp}` : ''}`,
     'x-csrf-token': csrf,
-    origin: event.url.origin,
-    'x-forwarded-proto': event.url.protocol.replace(':', ''),
-    'x-forwarded-host': event.url.host,
+    origin: publicOrigin.origin,
+    'x-forwarded-proto': publicOrigin.protocol.replace(':', ''),
+    'x-forwarded-host': publicOrigin.host,
     ...(ip ? { 'x-forwarded-for': ip } : {}),
     'x-request-id': event.locals.requestId,
   };

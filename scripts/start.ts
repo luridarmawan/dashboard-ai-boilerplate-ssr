@@ -207,8 +207,19 @@ if (proxied) {
           headers.set('x-forwarded-for', server.requestIP(req)?.address ?? '127.0.0.1');
         }
         const hostHeader = req.headers.get('host');
+        // A front proxy that sets X-Forwarded-Host/Proto itself while its proxy module adds them
+        // too ends up sending "a, a" (Apache merges). adapter-node builds the request URL from
+        // these and answers 400 Bad Request to a comma list — keep only the first value.
+        for (const name of ['x-forwarded-host', 'x-forwarded-proto']) {
+          const v = headers.get(name);
+          if (v?.includes(',')) headers.set(name, v.split(',')[0]?.trim() ?? '');
+        }
         if (!headers.has('x-forwarded-proto')) {
-          headers.set('x-forwarded-proto', declaredScheme(hostHeader) ?? 'http');
+          // Apache's mod_proxy sends the public host in X-Forwarded-Host but rewrites Host to this
+          // listener (127.0.0.1:$PORT) unless ProxyPreserveHost is on — so when a public host is
+          // given, that is the one APP_ORIGIN has to be matched against, not our own address.
+          const publicHost = headers.get('x-forwarded-host') || hostHeader;
+          headers.set('x-forwarded-proto', declaredScheme(publicHost) ?? 'http');
         }
         if (!headers.has('x-forwarded-host') && hostHeader) {
           headers.set('x-forwarded-host', hostHeader);

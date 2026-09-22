@@ -17,9 +17,10 @@
 
     ProxyPreserveHost On
     ProxyRequests Off
-    # The app decides https/absolute links and the client IP from these (Caddy passes them through).
+    # The app decides https/absolute links from this (Caddy passes it through). mod_proxy adds
+    # X-Forwarded-For and X-Forwarded-Host on its own and MERGES with a value set here
+    # ("host, host"), which the web process refuses with 400 — so only the scheme is set.
     RequestHeader set X-Forwarded-Proto "https"
-    RequestHeader set X-Forwarded-Host "%{HTTP_HOST}s"
     # SSE streaming (AI chat): flush every packet, no buffering, long read timeout.
     # 8080 = Caddy in behind-proxy mode; without Docker point this at the port of
     # `bun start` instead (default 127.0.0.1:3000) — DEPLOY.md §8e.
