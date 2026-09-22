@@ -95,7 +95,7 @@ const absPath = join(root, path);
 const ns = namespaceOf(name);
 
 // ---- 2. what the database holds for it: the latest snapshot per dialect ----------------------
-const DIALECTS: RemovalDialect[] = ['mysql', 'pg'];
+const DIALECTS: RemovalDialect[] = ['mysql', 'pg', 'sqlite'];
 const migrationsDir = (d: RemovalDialect) => join(root, 'packages/db/migrations', d);
 function latestSnapshot(d: RemovalDialect): DrizzleSnapshotLike | null {
   const journalPath = join(migrationsDir(d), 'meta/_journal.json');

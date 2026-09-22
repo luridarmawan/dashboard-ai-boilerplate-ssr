@@ -152,7 +152,10 @@ export async function runPreflight(
       status: 'fail',
       detail: db.error.slice(0, 200),
       ms: db.ms,
-      hint: 'periksa DATABASE_URL, service mysql/postgres sehat (`dc ps`), kata sandi (`dc run --rm db-init`) dan firewall',
+      hint:
+        e.DB_DIALECT === 'sqlite'
+          ? 'periksa DATABASE_URL menunjuk berkas (mis. file:./data/app.db), foldernya ada dan prosesnya boleh menulis di sana'
+          : 'periksa DATABASE_URL, service mysql/postgres sehat (`dc ps`), kata sandi (`dc run --rm db-init`) dan firewall',
     });
     return { ok: false, checks };
   }

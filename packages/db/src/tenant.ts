@@ -1,4 +1,5 @@
 import { and, eq, getTableName, type SQL, type Table } from 'drizzle-orm';
+import { affectedRows as affected } from './affected-rows.ts';
 import { type Db, tenantTables } from './generated/active.ts';
 
 /**
@@ -57,12 +58,6 @@ function clientIdColumn(table: Table): unknown {
     );
   }
   return col;
-}
-
-function affected(result: unknown): number {
-  if (Array.isArray(result))
-    return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number((result as { count?: number })?.count ?? 0);
 }
 
 /** Build a facade bound to one tenant over an existing connection. */

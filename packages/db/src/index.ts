@@ -44,6 +44,7 @@ export {
   sql,
   sum,
 } from 'drizzle-orm';
+export { affectedRows } from './affected-rows.ts';
 export {
   Col,
   type ColumnDef,
@@ -75,7 +76,8 @@ export function getDb(): Db {
     const e = env();
     // The generated schema binds a driver at codegen time. Connecting the postgres driver to a
     // MySQL URL (or vice versa) does not fail — it hangs on the handshake. Refuse up front.
-    const family = (d: string): 'pg' | 'mysql' => (d === 'postgres' ? 'pg' : 'mysql');
+    const family = (d: string): 'pg' | 'mysql' | 'sqlite' =>
+      d === 'postgres' ? 'pg' : d === 'sqlite' ? 'sqlite' : 'mysql';
     if (family(e.DB_DIALECT) !== family(activeDialect)) {
       throw new Error(
         `@core/db: skema ter-generate untuk ${activeDialect}, tapi DB_DIALECT=${e.DB_DIALECT} — jalankan \`bun db:codegen\` dengan DB_DIALECT yang sama`,
@@ -86,6 +88,22 @@ export function getDb(): Db {
   return instance;
 }
 
+/**
+ * Release this process's database handle — for scripts that must exit cleanly, never for
+ * request handling. The three drivers disagree on the verb (mysql2 and postgres.js pools
+ * `end()`, bun:sqlite `close()`), so callers say what they mean and this decides how.
+ */
+export async function closeDb(): Promise<void> {
+  if (!instance) return;
+  const client = (instance as unknown as { $client: unknown }).$client as {
+    end?: () => Promise<unknown>;
+    close?: () => void;
+  };
+  instance = undefined;
+  if (typeof client.end === 'function') await client.end();
+  else client.close?.();
+}
+
 /** Connection-pool numbers for metrics (M-6); null before the first connection or when the driver hides them. */
 export function poolStats(): {
   max: number;
@@ -94,6 +112,9 @@ export function poolStats(): {
   queued: number | null;
 } | null {
   if (!instance) return null;
+  // SQLite has no pool: one file handle, always open, nothing queued at the driver level.
+  // `activeDialect` is a generated literal, so widen it before comparing.
+  if ((activeDialect as string) === 'sqlite') return { max: 1, open: 1, idle: null, queued: null };
   const client = (instance as unknown as { $client?: unknown }).$client as
     | {
         pool?: {

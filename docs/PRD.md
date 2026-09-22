@@ -178,19 +178,21 @@ Ini risiko teknis terbesar dari rencana ini dan harus diputuskan di awal.
 
 **Kendalanya:** Drizzle **tidak** punya skema lintas-dialect. `drizzle-orm/mysql-core`, `pg-core`, dan `sqlite-core` adalah API berbeda dengan tipe kolom berbeda. Satu berkas skema tidak bisa melayani MySQL dan PostgreSQL sekaligus.
 
-**Keputusan:** definisikan skema sekali dalam bentuk deskriptor netral di `packages/db/schema/*.def.ts`, lalu **generate** skema Drizzle per dialect (`schema.mysql.ts`, `schema.pg.ts`) lewat `bun db:codegen`. Kode aplikasi hanya mengimpor `packages/db` yang mengekspor skema sesuai `DB_DIALECT`. Query ditulis dengan Drizzle query builder (portabel); SQL mentah dilarang di kode domain. Modul memakai deskriptor yang sama, sehingga modul pihak ketiga otomatis ikut portabel.
+**Keputusan:** definisikan skema sekali dalam bentuk deskriptor netral di `packages/db/schema/*.def.ts`, lalu **generate** skema Drizzle per dialect (`schema.mysql.ts`, `schema.pg.ts`, `schema.sqlite.ts`) lewat `bun db:codegen`. Kode aplikasi hanya mengimpor `packages/db` yang mengekspor skema sesuai `DB_DIALECT`. Query ditulis dengan Drizzle query builder (portabel); SQL mentah dilarang di kode domain. Modul memakai deskriptor yang sama, sehingga modul pihak ketiga otomatis ikut portabel.
 
 **Aturan portabilitas tipe** (wajib dipatuhi deskriptor):
 
-| Konsep | MySQL / MariaDB | PostgreSQL | Catatan |
-|---|---|---|---|
-| Primary key | `char(36) CHARACTER SET ascii COLLATE ascii_bin` | `uuid` | **UUIDv7 (RFC 9562) di-generate aplikasi**, bukan DB — lihat §4.3.1 |
-| Timestamp | `datetime(3)` | `timestamptz(3)` | **Selalu simpan UTC.** Konversi zona waktu di lapisan presentasi. Untuk MySQL/MariaDB, `datetime` tidak menyimpan zona dan default `CURRENT_TIMESTAMP(3)` dievaluasi **server** — jadi setiap koneksi dari pool dipaku `SET time_zone = '+00:00'` (`packages/db/src/dialect/mysql-client.ts`), supaya server yang berjalan di zona lain tidak menulis jam lokal yang lalu dibaca sebagai UTC |
-| JSON | `json` | `jsonb` | Di MariaDB `json` hanyalah alias `longtext` + `json_valid()`, bukan tipe biner seperti MySQL 8. Karena itu: **jangan pernah query ke dalam JSON** di kode portabel, dan jangan mengindeks path JSON |
-| Decimal uang | `decimal(18,4)` | `numeric(18,4)` | Jangan pernah float |
-| Boolean | `tinyint(1)` | `boolean` | Drizzle menormalkan |
-| Enum | `varchar` + constraint aplikasi | `varchar` + constraint aplikasi | **Jangan pakai enum native** — biaya dan mekanisme migrasinya berbeda jauh antar dialect |
-| Text panjang | `text` / `longtext` | `text` | |
+| Konsep | MySQL / MariaDB | PostgreSQL | SQLite | Catatan |
+|---|---|---|---|---|
+| Primary key | `char(36) CHARACTER SET ascii COLLATE ascii_bin` | `uuid` | `text(36)` | **UUIDv7 (RFC 9562) di-generate aplikasi**, bukan DB — lihat §4.3.1 |
+| Timestamp | `datetime(3)` | `timestamptz(3)` | `integer` (epoch ms) | **Selalu simpan UTC.** Konversi zona waktu di lapisan presentasi. Untuk MySQL/MariaDB, `datetime` tidak menyimpan zona dan default `CURRENT_TIMESTAMP(3)` dievaluasi **server** — jadi setiap koneksi dari pool dipaku `SET time_zone = '+00:00'` (`packages/db/src/dialect/mysql-client.ts`), supaya server yang berjalan di zona lain tidak menulis jam lokal yang lalu dibaca sebagai UTC. SQLite tidak punya tipe tanggal: menyimpannya sebagai TEXT lewat fungsi tanggal bawaan akan memaksa presisi detik, jadi yang dipakai epoch milidetik dengan default `unixepoch('subsec')` — fungsi itu sendiri sudah UTC, tanpa perlu zona sesi |
+| JSON | `json` | `jsonb` | `text` (mode json) | Di MariaDB `json` hanyalah alias `longtext` + `json_valid()`, bukan tipe biner seperti MySQL 8; di SQLite ia teks biasa. Karena itu: **jangan pernah query ke dalam JSON** di kode portabel, dan jangan mengindeks path JSON |
+| Decimal uang | `decimal(18,4)` | `numeric(18,4)` | `text` | Jangan pernah float. Di SQLite justru **`NUMERIC` yang berbahaya**: affinity-nya mengubah literal desimal jadi REAL — sebuah float. TEXT menyimpan digitnya apa adanya, dan nilainya tetap string di JS persis seperti pada dua dialect lain |
+| Boolean | `tinyint(1)` | `boolean` | `integer` (mode boolean) | Drizzle menormalkan |
+| Enum | `varchar` + constraint aplikasi | `varchar` + constraint aplikasi | `text` + constraint aplikasi | **Jangan pakai enum native** — biaya dan mekanisme migrasinya berbeda jauh antar dialect |
+| Text panjang | `text` / `longtext` | `text` | `text` | |
+
+**Jumlah baris terdampak dibaca lewat satu fungsi, bukan disimpulkan di tempat pakai.** Ketiga driver melaporkannya dengan bentuk berbeda — mysql2 `[ResultSetHeader]` dengan `affectedRows`, postgres.js sebuah *subclass* Array yang membawa `count`, dan bun:sqlite objek `{ changes }` yang oleh Drizzle ditipekan `void`. `affectedRows()` di `packages/db/src/affected-rows.ts` adalah satu-satunya tempat yang tahu ini. Ini bukan kerapian: sewa penjadwal (G-18) memutuskan siapa pemilik satu interval dari angka itu, jadi driver yang bentuknya salah baca tidak melempar galat — ia diam-diam membuat semua instance melewati semua job.
 
 **Charset & collation ditulis eksplisit, tidak pernah mewarisi dari server.** MySQL 8 baku ke `utf8mb4_0900_ai_ci`, collation yang **tidak ada di MariaDB**. DDL yang mengandalkan nilai baku server akan gagal dijalankan lintas keduanya, dan — lebih berbahaya karena senyap — urutan `ORDER BY` serta tabrakan unique index bisa berbeda. Aturannya: setiap kolom teks menyatakan `CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`, dan setiap kolom identifier memakai `ascii`/`ascii_bin`.
 
@@ -218,10 +220,12 @@ Penyimpanannya `char(36) ascii_bin`, bukan `binary(16)` yang lebih hemat. Alasan
 | **1 — baku** | **MySQL 8+** | Dialect baku template; ini yang dipakai `compose.prod.yml`. Seluruh suite test jalan di CI |
 | **1 — diuji** | **MariaDB 11+** | Seluruh suite test jalan di CI sebagai job tersendiri. MariaDB **bukan** MySQL yang dinamai lain — perbedaan JSON, collation baku, dan tipe UUID-nya nyata (lihat tabel portabilitas di atas), jadi ia diuji terpisah, bukan diasumsikan ikut lolos |
 | **1 — diuji** | PostgreSQL 16+ | Seluruh suite test jalan di CI pada **PostgreSQL 16**, sejajar MySQL — inilah yang membuat klaim portabilitas bisa dipercaya. Versi 14–15 kemungkinan besar jalan (tidak ada fitur khusus 16 yang dipakai) tapi tidak masuk matriks CI, jadi tidak dijamin |
-| **2 — best-effort** | SQLite | Untuk dev cepat & test; sebagian fitur operasional (backup terjadwal, concurrency tinggi) tidak setara |
+| **2 — best-effort** | SQLite 3.42+ | Generator, driver (`bun:sqlite`) dan migrasinya ada dan dipakai `bun db:matrix`; seluruh suite integrasi lolos di atasnya. Yang **tidak** setara tetap tidak setara: backup terjadwal (§4.4 memakai `mysqldump`/`pg_dump`, bukan snapshot berkas), dan concurrency tulis — SQLite hanya punya satu penulis, jadi ini bukan pilihan untuk multi-instance (`--scale api=3`). Butuh 3.42+ karena default `created_at`/`updated_at` memakai `unixepoch('subsec')`. Koneksi selalu memasang `PRAGMA foreign_keys = ON` — SQLite mematikannya secara baku, yang akan membuat setiap `onDelete` di deskriptor diabaikan diam-diam |
 | **3 — terbuka** | Dialect lain yang didukung Drizzle | Deskriptor dan codegen terbuka untuk ditambah pemakai template; tidak ada jaminan CI dari kami |
 
 Pemilihan dialect lewat `DB_DIALECT` + `DATABASE_URL`; menambah dukungan dialect baru berarti menambah satu generator di `packages/db`, bukan menyentuh kode domain.
+
+`DATABASE_URL` selalu divalidasi sebagai URL, dan skemanya harus cocok dengan `DB_DIALECT`. Untuk SQLite itu berarti `file:./data/app.db` — path telanjang (`./data/app.db`) maupun `:memory:` tidak lolos karena keduanya bukan URL yang sah. Path relatif diselesaikan terhadap akar proyek seperti `UPLOADS_DIR`, sehingga setiap proses dari satu instalasi menunjuk berkas yang sama apa pun cwd-nya. Penguraiannya **tidak** memakai `new URL()`: parser WHATWG menormalkan `file:./data/app.db` menjadi `file:///data/app.db`, yang diam-diam memindahkan database ke akar filesystem.
 
 ### 4.4 Deployment: lokal & VPS
 
@@ -936,7 +940,7 @@ Milestone hanya memuat kebutuhan **P0**; rujukan grup (`FR-X`) sengaja tidak dip
 | Lisensi rilis template | **MIT**, diputuskan 2026-09-10 (menggantikan keputusan internal/proprietary 2026-09-09) — berkas `LICENSE` di root, `"license": "MIT"` di setiap `package.json` workspace | Repositori boleh dipublikasikan; siapa pun boleh memakai, mengubah, dan mendistribusikan asal pemberitahuan hak cipta ikut disertakan. Modul di repositori terpisah tetap boleh berlisensi sendiri (hanya bergantung pada `@core/*` lewat kontrak modul). Dependensi tetap wajib permisif (§9 Lisensi) |
 | Multi-tenant & RBAC | **Tetap bagian inti boilerplate**, bukan opsional | Penjaga tenant di lapisan data (B-3) dan instalasi single-tenant harus tetap terasa ringan (B-5) |
 | Bentuk isolasi tenant | **Per kolom `client_id`, satu database untuk seluruh tenant.** Tidak ada database/schema/koneksi per tenant | Satu pool, satu migrasi, satu backup; tapi B-3 naik jadi pengaman keamanan utama karena tidak ada batas fisik. Tenant yang butuh isolasi fisik dilayani lewat instalasi terpisah, bukan mode baru di template (§4.3, B-0) |
-| Pilihan database server | **Mengikuti dialect yang didukung Drizzle; MySQL 8 sebagai baku dan image `compose.prod.yml`.** MariaDB 11 dan PostgreSQL 16 diuji sejajar di CI; SQLite best-effort; sisanya terbuka tanpa jaminan | Tier ditentukan cakupan uji, bukan preferensi. Menambah dialect = menambah generator di `packages/db`, bukan menyentuh kode domain (§4.3) |
+| Pilihan database server | **Mengikuti dialect yang didukung Drizzle; MySQL 8 sebagai baku dan image `compose.prod.yml`.** MariaDB 11 dan PostgreSQL 16 diuji sejajar di CI; SQLite best-effort (jalan, tanpa backup terjadwal dan tanpa concurrency tulis); sisanya terbuka tanpa jaminan | Tier ditentukan cakupan uji, bukan preferensi. Menambah dialect = menambah generator di `packages/db`, bukan menyentuh kode domain (§4.3) |
 | MariaDB diperlakukan bagaimana | **Dialect tier-1 dengan job CI sendiri**, bukan diasumsikan ikut lolos bersama MySQL | Divergensi yang sudah diketahui ditutup aturan eksplisit: JSON tidak pernah di-query, charset/collation ditulis eksplisit, tipe `UUID`/SEQUENCE/system-versioned native MariaDB dilarang (§4.3, P-9) |
 | Bentuk identifier | **UUIDv7 (RFC 9562), di-generate aplikasi dari satu fungsi tunggal** | Terurut waktu dan monotonik dalam milidetik yang sama, jadi aman sebagai clustered PK dan sebagai cursor paginasi. Lebar kolom netral terhadap versi UUID — mengganti strategi ID kelak tidak menuntut migrasi skema (§4.3.1, O-6) |
 | Redis/Valkey | **Opsional.** Database adalah backing store baku untuk sesi, cache konfigurasi, dan rate limit | Setiap jenis state punya dua adapter yang keduanya benar di multi-instance; uji `--scale api=3` dijalankan **tanpa** Redis. Tidak boleh ada fitur yang hanya jalan bila Redis ada (Keputusan M) |

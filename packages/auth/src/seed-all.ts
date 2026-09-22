@@ -1,5 +1,5 @@
 import { env } from '@core/config';
-import { unsafeAcrossTenants } from '@core/db';
+import { closeDb, unsafeAcrossTenants } from '@core/db';
 import { moduleSeeds } from '@core/module-kit/seeds';
 import { runSeed, type SeedResult } from './seed.ts';
 
@@ -26,6 +26,6 @@ export async function runSeedAll(log: (line: string) => void = console.log): Pro
       log: (m) => log(`db:seed[${s.module}]: ${m}`),
     });
   }
-  await unsafeAcrossTenants().$client.end();
+  await closeDb();
   return result;
 }

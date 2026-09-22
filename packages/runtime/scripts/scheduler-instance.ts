@@ -6,7 +6,7 @@
  * exits. `scripts/scheduler-proof.ts` launches several of these at once and inspects
  * `scheduler_runs` afterwards. Env: PROBE_JOB, PROBE_EVERY (s), PROBE_TICK_MS, PROBE_DURATION (s).
  */
-import { getDb } from '@core/db';
+import { closeDb, getDb } from '@core/db';
 import { createScheduler } from '../src/scheduler.ts';
 
 const instanceId = process.env.INSTANCE_ID ?? `probe:${process.pid}`;
@@ -36,5 +36,5 @@ scheduler.register({
 await scheduler.start();
 await new Promise((r) => setTimeout(r, duration * 1000));
 await scheduler.stop();
-await getDb().$client.end();
+await closeDb();
 console.log(JSON.stringify({ instanceId, runs }));

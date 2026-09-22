@@ -1,4 +1,15 @@
-import { and, type Db, eq, isNull, lt, lte, newId, or, schema } from '@core/db';
+import {
+  affectedRows as affected,
+  and,
+  type Db,
+  eq,
+  isNull,
+  lt,
+  lte,
+  newId,
+  or,
+  schema,
+} from '@core/db';
 import { type JobDef, type ResolvedJob, resolveJob } from '@core/module-kit';
 
 /**
@@ -54,17 +65,6 @@ export interface Scheduler {
 interface Registered {
   job: ResolvedJob;
   module: string;
-}
-
-/** Affected-row count across drivers: mysql2 → [ResultSetHeader], postgres-js → RowList.count. */
-function affected(result: unknown): number {
-  if (Array.isArray(result))
-    return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number(
-    (result as { count?: number; rowCount?: number })?.count ??
-      (result as { rowCount?: number })?.rowCount ??
-      0,
-  );
 }
 
 export function createScheduler(opts: SchedulerOptions): Scheduler {

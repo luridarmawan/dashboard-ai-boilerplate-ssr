@@ -58,7 +58,11 @@ describe.skipIf(!enabled)('api preflight (Q-13)', () => {
   });
 
   test('unreachable database → actionable failure; wrong dialect → rebuild hint', async () => {
-    const down = await runPreflight({ ...process.env, DATABASE_URL: 'mysql://x:y@127.0.0.1:1/x' });
+    // The URL must match the active dialect's scheme, or config validation rejects it before
+    // preflight ever probes. For SQLite "unreachable" is a path that is not a database file.
+    const unreachableUrl =
+      process.env.DB_DIALECT === 'sqlite' ? 'file:./data' : 'mysql://x:y@127.0.0.1:1/x';
+    const down = await runPreflight({ ...process.env, DATABASE_URL: unreachableUrl });
     expect(down.ok).toBe(false);
     expect(byName(down, 'database')[0]?.status).toBe('fail');
     expect(byName(down, 'database')[0]?.hint).toContain('DATABASE_URL');

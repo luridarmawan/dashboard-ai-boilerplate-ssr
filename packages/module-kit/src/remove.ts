@@ -15,7 +15,7 @@
  * modules.json, git, files, install, sync, generate.
  */
 
-export type RemovalDialect = 'mysql' | 'pg';
+export type RemovalDialect = 'mysql' | 'pg' | 'sqlite';
 
 export interface SnapshotTable {
   name: string;
@@ -86,8 +86,10 @@ export function orderForDrop(tables: readonly SnapshotTable[]): string[] {
   return out;
 }
 
+// SQLite accepts both quotings; backticks are what drizzle-kit emits for it, so the migration
+// file stays uniform. Either way `migrate-prefix` recognises the identifier (O-2).
 const q = (dialect: RemovalDialect, ident: string) =>
-  dialect === 'mysql' ? `\`${ident}\`` : `"${ident}"`;
+  dialect === 'pg' ? `"${ident}"` : `\`${ident}\``;
 
 /** `DROP TABLE IF EXISTS …` in FK-safe order; PostgreSQL additionally CASCADEs dependent objects. */
 export function dropStatements(

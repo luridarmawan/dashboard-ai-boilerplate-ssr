@@ -1,4 +1,12 @@
-import { and, inArray, isNotNull, lt, schema, unsafeAcrossTenants } from '@core/db';
+import {
+  affectedRows as affected,
+  and,
+  inArray,
+  isNotNull,
+  lt,
+  schema,
+  unsafeAcrossTenants,
+} from '@core/db';
 import { logger } from '@core/logger';
 import { settings } from './services.ts';
 
@@ -25,12 +33,6 @@ export interface RetentionResult {
   };
 }
 
-function affected(r: unknown): number {
-  if (Array.isArray(r)) return Number((r[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number(
-    (r as { count?: number; rowCount?: number })?.rowCount ?? (r as { count?: number })?.count ?? 0,
-  );
-}
 const clamp = (v: number | null | undefined, def: number, min: number) =>
   typeof v === 'number' && Number.isFinite(v) && v >= min ? Math.floor(v) : def;
 
