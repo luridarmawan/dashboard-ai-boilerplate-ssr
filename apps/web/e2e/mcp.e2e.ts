@@ -94,6 +94,72 @@ test('mcp: testing a server and reloading its tools run over fetch, not page loa
   await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
   expect(await survived()).toBe(mark);
 
+  // Choosing tools: a checkbox saves itself the moment it changes — no save button, no load.
+  // Both start enabled (the default), so the header box is fully checked.
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/2 aktif|2 enabled/);
+  await expect(page.getByTestId('mcp-tools-all')).toBeChecked();
+  posts.length = 0;
+  const echoRow = page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' });
+  await echoRow.getByTestId('mcp-tool-toggle').uncheck();
+  await expect(page.getByTestId('mcp-tools-saved')).toBeVisible();
+  expect(posts).toEqual([expect.stringMatching(/^fetch \/m\/ai\/mcps\/[0-9a-f-]+\/tools$/)]);
+  expect(navigations).toEqual([]);
+  expect(await survived()).toBe(mark);
+  await expect(echoRow).toContainText(/nonaktif|disabled/);
+  await expect(echoRow).toHaveAttribute('data-enabled', 'false');
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/1 aktif|1 enabled/);
+  // Mixed: the header box is neither on nor off.
+  expect(
+    await page
+      .getByTestId('mcp-tools-all')
+      .evaluate((el) => (el as HTMLInputElement).indeterminate),
+  ).toBe(true);
+  // The choice is what the server holds, not just what the page drew: a fresh load shows it too.
+  await page.reload();
+  await expect(
+    page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' }).getByTestId('mcp-tool-toggle'),
+  ).not.toBeChecked();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/1 aktif|1 enabled/);
+  // …and a re-test keeps it: rows are rewritten, the disabled one stays disabled.
+  await page.getByTestId('mcp-test').click();
+  await expect(page.getByTestId('mcp-test-ok')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/1 aktif|1 enabled/);
+  // Select all / deselect all from the header box, one request each. Mixed reads as unchecked
+  // (plus indeterminate), so the first click of a mixed box selects ALL — the browser's own rule.
+  await page.evaluate((m) => {
+    window.__mcpMark = m;
+  }, mark);
+  posts.length = 0;
+  await page.getByTestId('mcp-tools-all').check();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/2 aktif|2 enabled/);
+  await expect(
+    page.getByTestId('mcp-tool-row').filter({ hasText: /nonaktif|disabled/ }),
+  ).toHaveCount(0);
+  await page.getByTestId('mcp-tools-all').uncheck();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/0 aktif|0 enabled/);
+  await expect(
+    page.getByTestId('mcp-tool-row').filter({ hasText: /nonaktif|disabled/ }),
+  ).toHaveCount(2);
+  await page.getByTestId('mcp-tools-all').check();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/2 aktif|2 enabled/);
+  await expect(page.getByTestId('mcp-tools-saved')).toBeVisible();
+  expect(posts.filter((p) => p.endsWith('/tools'))).toHaveLength(3);
+  expect(await survived()).toBe(mark);
+  // With a search active, "all" means the rows shown: the hidden row is left alone.
+  await page.fill('[data-testid="mcp-tool-search"]', 'ping');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+  await page.getByTestId('mcp-tools-all').uncheck();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/1 aktif|1 enabled/);
+  await page.fill('[data-testid="mcp-tool-search"]', '');
+  await expect(page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' })).toHaveAttribute(
+    'data-enabled',
+    'true',
+  );
+  await page.getByTestId('mcp-tools-all').check();
+  await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/2 aktif|2 enabled/);
+  expect(await survived()).toBe(mark);
+
   // A server that cannot be reached fails in place too: the error is shown, the page stays.
   await page.fill('input[name="url"]', 'http://127.0.0.1:9/mcp');
   await page.locator('form[action="?/save"] button[type="submit"]').click();
@@ -139,6 +205,20 @@ test.describe('no JavaScript', () => {
     await page.getByTestId('mcp-test').click();
     await expect(page.getByTestId('mcp-test-ok')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
+
+    // Choosing tools is a plain form too: untick, press the <noscript> button, the page reloads
+    // with the choice stored — the same API endpoint the fetch path uses.
+    const echoRow = page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' });
+    await echoRow.getByTestId('mcp-tool-toggle').uncheck();
+    await page.locator('form[action="?/tools"] button[type="submit"]').click();
+    await expect(page.getByTestId('mcp-tools-saved')).toBeVisible();
+    await expect(
+      page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' }).getByTestId('mcp-tool-toggle'),
+    ).not.toBeChecked();
+    await expect(page.getByTestId('mcp-tool-row').filter({ hasText: 'echo' })).toContainText(
+      /nonaktif|disabled/,
+    );
+    await expect(page.getByTestId('mcp-tools-enabled')).toContainText(/1 aktif|1 enabled/);
 
     // The search box is a plain GET field: submitting reloads the page as `?q=`, already narrowed.
     const detail = page.url().split('?')[0];

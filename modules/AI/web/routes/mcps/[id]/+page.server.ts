@@ -75,11 +75,45 @@ export const actions: Actions = {
         ok: boolean;
         error: string | null;
         ms: number;
-        tools: { id: string; name: string; wireName: string; description: string | null }[];
+        tools: {
+          id: string;
+          name: string;
+          wireName: string;
+          description: string | null;
+          enabled: boolean;
+        }[];
       };
     }>(await apiFor(event).v1.m.ai.mcps({ id }).test.post());
     if (!r.ok) return actionFailure(r.failure);
     return { tested: r.data.data };
+  },
+  /**
+   * Which tools the assistant may use — the no-JavaScript path (L-22). The table is one form: every
+   * listed tool posts its id under `ids`, every TICKED one also under `checked`, so the difference
+   * is the set to disable. With JavaScript each checkbox saves itself over fetch (`tools/+server.ts`)
+   * and this action is never reached; both call the same `PUT /v1/m/ai/mcps/:id/tools`.
+   */
+  tools: async (event) => {
+    const form = await event.request.formData();
+    const id = String(event.params.id ?? '');
+    if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    const strings = (key: string) =>
+      form.getAll(key).filter((v): v is string => typeof v === 'string' && v !== '');
+    const listed = strings('ids');
+    const checked = new Set(strings('checked'));
+    const on = listed.filter((x) => checked.has(x));
+    const off = listed.filter((x) => !checked.has(x));
+    const api = apiFor(event).v1.m.ai.mcps({ id }).tools;
+    // Two requests at most, and only for a non-empty set: the API refuses an empty `ids`.
+    for (const [ids, enabled] of [
+      [on, true],
+      [off, false],
+    ] as const) {
+      if (ids.length === 0) continue;
+      const r = unwrap(await api.put({ ids: [...ids], enabled }));
+      if (!r.ok) return actionFailure(r.failure);
+    }
+    return { toolsSaved: true };
   },
   delete: async (event) => {
     const form = await event.request.formData();

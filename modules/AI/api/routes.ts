@@ -74,6 +74,7 @@ import {
   ConversationCreate,
   ConversationPatch,
   McpBody,
+  McpToolsBody,
   McpUpdateBody,
   ProviderBody,
   ProviderUpdateBody,
@@ -2773,6 +2774,60 @@ export default defineApiRoutes(
         body: McpUpdateBody,
         response: { 200: OkSchema(McpView), ...errorResponses },
         detail: { summary: 'Update an MCP server; a header value of *** keeps the stored secret' },
+      },
+    )
+    .put(
+      '/mcps/:id/tools',
+      async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+        const a = auth as AuthState;
+        const tenant = tenantState?.tenant;
+        const row = tenant
+          ? await tenant.selectOne(
+              schema.aiMcps,
+              and(eq(schema.aiMcps.id, params.id), isNull(schema.aiMcps.deleted_at)),
+            )
+          : null;
+        if (!row || !tenant || !tenantState.clientId) {
+          set.status = 404;
+          return fail('not_found', 'Server MCP tidak ditemukan', requestId);
+        }
+        // Only this server's rows: an id from another server (or another tenant) changes nothing.
+        // A re-test replaces the rows and their ids, so a stale page may name ids that no longer
+        // exist; those are simply not matched, and the list returned below is the current truth.
+        const ids = [...new Set(body.ids)];
+        const updated = await tenant.update(
+          schema.aiMcpTools,
+          { enabled: body.enabled },
+          and(eq(schema.aiMcpTools.mcp_id, row.id), inArray(schema.aiMcpTools.id, ids)),
+        );
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tenantState.clientId,
+          actorId: a.user.id,
+          action: 'ai.mcp.tools',
+          resource: 'ai.mcp',
+          resourceId: row.id,
+          ip: clientIp(request, server),
+          requestId,
+          after: { enabled: body.enabled, ids, updated },
+        });
+        const tools = await tenant.select(schema.aiMcpTools, eq(schema.aiMcpTools.mcp_id, row.id));
+        return ok({
+          updated,
+          tools: tools.sort((x, y) => x.name.localeCompare(y.name)).map(mcpToolView(row.code)),
+        });
+      },
+      {
+        beforeHandle: permission('ai.mcp.manage'),
+        params: t.Object({ id: Id }),
+        body: McpToolsBody,
+        response: {
+          200: OkSchema(t.Object({ updated: t.Integer(), tools: t.Array(McpToolView) })),
+          ...errorResponses,
+        },
+        detail: {
+          summary:
+            'Enable or disable discovered tools of an MCP server; disabled tools are not offered to the assistant and survive a re-test',
+        },
       },
     )
     .delete(

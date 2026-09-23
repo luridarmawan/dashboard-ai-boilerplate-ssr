@@ -696,7 +696,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | I-2 | **[P1]** Metode yang didukung: `initialize`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`, `prompts/get`. |
 | I-3 | **[P1]** Modul bisa mendaftarkan tool MCP-nya sendiri. Registry tool memakai registry resource RBAC yang sama, sehingga **pemanggilan tool tetap tunduk pada izin user**. |
 | I-4 | **[P1]** Aplikasi juga bisa menjadi **MCP client** — menyambung ke MCP server eksternal (tabel `mcps` + `mcp_tools`, transport stdio/sse/websocket/http/stream). Tool dari server eksternal bisa dipakai dalam percakapan AI. |
-| I-5 | **[P1]** UI admin untuk mendaftarkan & menguji koneksi MCP server. |
+| I-5 | **[P1]** UI admin untuk mendaftarkan & menguji koneksi MCP server, serta memilih **tool mana** dari server itu yang ditawarkan ke asisten (per tool, bawaan aktif; pilihan bertahan melewati uji ulang). |
 | I-6 | **[P1]** Endpoint MCP terautentikasi dan tunduk pada tenancy — tidak boleh jadi pintu belakang yang melewati RBAC. **Prasyarat rilis FR-I, bukan pekerjaan terpisah:** MCP tidak boleh dinyatakan selesai (ROADMAP §8 butir 2) sebelum ini dibuktikan test — request tanpa sesi/token ditolak, dan tool hanya melihat data tenant aktif — dengan standar yang sama seperti kriteria §8 #10 untuk CSRF. Bertanda P1 hanya karena ia mengikuti jadwal MCP; sifatnya tidak bisa ditawar. |
 
 ### FR-J · Email & Notifikasi
