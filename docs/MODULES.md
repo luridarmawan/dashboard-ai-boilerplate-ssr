@@ -352,7 +352,7 @@ export default defineConfig('Billing', [
 ]);
 ```
 
-Tipe: `string · text · number · boolean · select · secret · markdown · route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan; `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di bawah field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di bawah field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
 

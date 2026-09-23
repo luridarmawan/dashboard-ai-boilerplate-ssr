@@ -235,6 +235,8 @@ export function buildMenu(
   pathname: string,
   locale: Locale = 'id',
   enabledModules?: ReadonlySet<string>,
+  /** L-19: false when EXAMPLE_PAGE_ENABLE switched the pattern gallery off for this deployment. */
+  examplePages = true,
 ): MenuItem[] {
   // G-8: entries of a module disabled for this tenant are not built at all.
   const moduleEntries: Entry[] = moduleMenu.filter(
@@ -250,9 +252,11 @@ export function buildMenu(
   const installed = new Set<string>(modules.map((m) => m.ns));
   const coreEntries: Entry[] = CORE_MENU.filter(
     (e) =>
-      !e.group ||
-      coreGroupIds.has(e.group) ||
-      (installed.has(e.group) && (!enabledModules || enabledModules.has(e.group))),
+      // L-19: the gallery entry goes when the deployment switched its pages off.
+      (examplePages || e.id !== 'core.examples') &&
+      (!e.group ||
+        coreGroupIds.has(e.group) ||
+        (installed.has(e.group) && (!enabledModules || enabledModules.has(e.group)))),
   );
   const all: Entry[] = [...coreEntries, ...moduleEntries];
   const allowed = all.filter((e) => !e.permission || session.can(e.permission));

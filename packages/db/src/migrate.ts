@@ -19,8 +19,9 @@ import { activeDialect } from './generated/active.ts';
 import { family as embeddedFamily, files, journal } from './generated/migrations.ts';
 import { collectTableNames, migrationsTableFor, prefixSql } from './migrate-prefix.ts';
 
-export type Family = 'mysql' | 'pg';
-export const familyOf = (dialect: string): Family => (dialect === 'postgres' ? 'pg' : 'mysql');
+export type Family = 'mysql' | 'pg' | 'sqlite';
+export const familyOf = (dialect: string): Family =>
+  dialect === 'postgres' ? 'pg' : dialect === 'sqlite' ? 'sqlite' : 'mysql';
 
 export interface MigrateResult {
   dialect: string;
@@ -55,12 +56,14 @@ async function journalCountWith(
   family: Family,
   migrationsTable: string,
 ): Promise<number> {
+  const countSql =
+    family === 'pg'
+      ? `select count(*)::int as n from drizzle."${migrationsTable}"`
+      : family === 'sqlite'
+        ? `select count(*) as n from "${migrationsTable}"`
+        : `select count(*) as n from \`${migrationsTable}\``;
   try {
-    const rows = (await run(
-      family === 'pg'
-        ? `select count(*)::int as n from drizzle."${migrationsTable}"`
-        : `select count(*) as n from \`${migrationsTable}\``,
-    )) as unknown;
+    const rows = (await run(countSql)) as unknown;
     const first = Array.isArray(rows)
       ? Array.isArray(rows[0])
         ? (rows[0] as Record<string, unknown>[])[0]
@@ -103,7 +106,17 @@ export async function probeDatabase(
   dialect: string,
   timeoutMs = 5000,
 ): Promise<void> {
-  if (familyOf(dialect) === 'pg') {
+  const family = familyOf(dialect);
+  if (family === 'sqlite') {
+    // No handshake to hang on: opening the file either works or throws, so no deadline is needed.
+    const { createDb } = await import('./dialect/sqlite-client.ts');
+    const db = createDb(databaseUrl);
+    try {
+      db.$client.query('select 1').get();
+    } finally {
+      db.$client.close();
+    }
+  } else if (family === 'pg') {
     const { createDb } = await import('./dialect/pg-client.ts');
     const db = createDb(databaseUrl);
     try {
@@ -133,7 +146,16 @@ export async function migrationStatus(
   const family = familyOf(e.DB_DIALECT);
   const migrationsTable = migrationsTableFor(e.TABLE_PREFIX);
   let applied = 0;
-  if (family === 'pg') {
+  if (family === 'sqlite') {
+    const { createDb } = await import('./dialect/sqlite-client.ts');
+    const db = createDb(e.DATABASE_URL);
+    applied = await journalCountWith(
+      async (q) => db.$client.query(q).all(),
+      family,
+      migrationsTable,
+    );
+    db.$client.close();
+  } else if (family === 'pg') {
     const { createDb } = await import('./dialect/pg-client.ts');
     const db = createDb(e.DATABASE_URL);
     applied = await journalCountWith((q) => db.$client.unsafe(q), family, migrationsTable);
@@ -167,7 +189,16 @@ export async function runMigrations(): Promise<MigrateResult> {
 
   let before = 0;
   let after = 0;
-  if (family === 'pg') {
+  if (family === 'sqlite') {
+    const { createDb } = await import('./dialect/sqlite-client.ts');
+    const { migrate } = await import('drizzle-orm/bun-sqlite/migrator');
+    const db = createDb(e.DATABASE_URL);
+    const raw = async (q: string) => db.$client.query(q).all();
+    before = await journalCount(raw);
+    migrate(db, { migrationsFolder, migrationsTable }); // bun:sqlite is synchronous
+    after = await journalCount(raw);
+    db.$client.close();
+  } else if (family === 'pg') {
     const { createDb } = await import('./dialect/pg-client.ts');
     const { migrate } = await import('drizzle-orm/postgres-js/migrator');
     const db = createDb(e.DATABASE_URL);

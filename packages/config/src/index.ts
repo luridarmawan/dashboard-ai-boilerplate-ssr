@@ -10,7 +10,7 @@ import { z } from 'zod';
  * in the `configurations` table, not here — do not add it to this schema.
  */
 
-export const DIALECTS = ['mysql', 'mariadb', 'postgres'] as const;
+export const DIALECTS = ['mysql', 'mariadb', 'postgres', 'sqlite'] as const;
 export type Dialect = (typeof DIALECTS)[number];
 
 export const STATE_DRIVERS = ['database', 'redis', 'memory'] as const;
@@ -20,6 +20,9 @@ const URL_SCHEME_BY_DIALECT: Record<Dialect, readonly string[]> = {
   mysql: ['mysql:'],
   mariadb: ['mysql:', 'mariadb:'],
   postgres: ['postgres:', 'postgresql:'],
+  // SQLite has no server, so the "URL" only names a file. A scheme is still required because
+  // DATABASE_URL is validated as a URL: a bare path such as `./data/app.db` does not parse.
+  sqlite: ['file:', 'sqlite:'],
 };
 
 const driver = z.enum(STATE_DRIVERS).default('database');
@@ -29,7 +32,9 @@ const envSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
     DB_DIALECT: z.enum(DIALECTS).default('mysql'),
-    DATABASE_URL: z.url({ error: 'wajib diisi, mis. mysql://user:pass@host:3306/db' }),
+    DATABASE_URL: z.url({
+      error: 'wajib diisi, mis. mysql://user:pass@host:3306/db atau file:./data/app.db',
+    }),
     TABLE_PREFIX: z
       .string()
       .regex(/^[a-z0-9_]*$/, 'hanya huruf kecil, angka, dan underscore')
@@ -88,6 +93,15 @@ const envSchema = z
     DEMO_MODE: z
       .enum(['true', 'false'])
       .default('false')
+      .transform((v) => v === 'true'),
+    /**
+     * The built-in page-pattern gallery at `/examples` (L-19) — part of the boilerplate, not of
+     * every deployment built from it. With `false` those pages answer 404, the sidebar entry is
+     * gone, and the `route` settings (landing, home) no longer offer them.
+     */
+    EXAMPLE_PAGE_ENABLE: z
+      .enum(['true', 'false'])
+      .default('true')
       .transform((v) => v === 'true'),
     /** Self-service registration (A-1). Off by default in production; on for development. */
     SIGNUP_ENABLED: z

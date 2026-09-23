@@ -8,7 +8,7 @@
  * back as UTC Dates, and UUIDv7 ids sort in insertion order. Cleans up after itself.
  */
 import { desc, eq } from 'drizzle-orm';
-import { activeDialect, getDb, newId, STATUS, schema } from '../src/index.ts';
+import { activeDialect, closeDb, getDb, newId, STATUS, schema } from '../src/index.ts';
 
 const db = getDb();
 const failures: string[] = [];
@@ -89,7 +89,7 @@ try {
   } catch (err) {
     failures.push(`cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
-  await db.$client.end();
+  await closeDb();
 }
 
 if (failures.length) {

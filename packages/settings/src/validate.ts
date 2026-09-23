@@ -1,6 +1,6 @@
 import type { ConfigFieldDef } from '@core/module-kit';
 import { CUSTOM_PREFIX, CUSTOM_SLUG_RE, themeById } from '@core/ui-theme';
-import { webRoutes } from './generated/routes.ts';
+import { publicWebRoutes, webRoutes } from './generated/routes.ts';
 
 /**
  * Typed validation of a configuration value (E-3): a `route` must exist in the route registry
@@ -39,9 +39,14 @@ function isValidTimeZone(zone: string): boolean {
 export function validateValue(
   field: ConfigFieldDef,
   input: unknown,
-  ctx: { routes?: readonly string[] | undefined; locales?: readonly string[] | undefined } = {},
+  ctx: {
+    routes?: readonly string[] | undefined;
+    publicRoutes?: readonly string[] | undefined;
+    locales?: readonly string[] | undefined;
+  } = {},
 ): ValidationOk | ValidationFail {
   const routes = ctx.routes ?? webRoutes;
+  const publicRoutes = ctx.publicRoutes ?? publicWebRoutes;
   const locales = ctx.locales ?? LOCALES;
   const raw =
     input === undefined || input === null ? null : Array.isArray(input) ? input : String(input);
@@ -83,13 +88,23 @@ export function validateValue(
       }
       return { ok: true, stored: list.length ? JSON.stringify(list) : null };
     }
-    case 'route': {
+    case 'route':
+    case 'public_route': {
       if (empty) return { ok: true, stored: null };
       const s = String(raw);
       if (!s.startsWith('/') || s.startsWith('//'))
         return { ok: false, message: 'harus path yang diawali /' };
-      if (!routes.includes(s))
-        return { ok: false, message: `route ${s} tidak ada di registry route (§4.7)` };
+      // `public_route` is checked against the anonymous-reachable subset: a landing page behind
+      // the sign-in wall would only redirect the visitor it was meant for (§4.7).
+      const allowed = field.type === 'public_route' ? publicRoutes : routes;
+      if (!allowed.includes(s))
+        return {
+          ok: false,
+          message:
+            field.type === 'public_route'
+              ? `route ${s} bukan halaman publik — halaman depan harus bisa dibuka tanpa masuk (§4.7)`
+              : `route ${s} tidak ada di registry route (§4.7)`,
+        };
       return { ok: true, stored: s };
     }
     case 'theme': {

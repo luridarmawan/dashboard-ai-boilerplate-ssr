@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { tables } from '../schema/index.ts';
-import { camel, emitMysql, emitPg } from '../src/codegen/emit.ts';
+import { camel, emitMysql, emitPg, emitSqlite } from '../src/codegen/emit.ts';
 import { col, defineTable } from '../src/descriptor.ts';
 
 /**
@@ -106,10 +106,52 @@ describe('emitPg — aturan §4.3 untuk PostgreSQL', () => {
   });
 });
 
+describe('emitSqlite — aturan §4.3 untuk SQLite', () => {
+  const out = emitSqlite([probe]);
+
+  test('uuid & varchar jadi text; panjang tetap ditulis walau SQLite mengabaikannya', () => {
+    expect(out).toContain("id: text('id', { length: 36 }).primaryKey()");
+    expect(out).toContain("code: text('code', { length: 16 }).notNull()");
+    expect(out).toContain("body: text('body').notNull()");
+    expect(out).toContain("blob: text('blob').notNull()");
+  });
+
+  test('datetime = epoch milidetik INTEGER, bukan TEXT — presisi ms tidak boleh hilang', () => {
+    expect(out).toContain("when: integer('when', { mode: 'timestamp_ms' })");
+    expect(out).toContain(
+      "created_at: integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(CAST(ROUND(unixepoch('subsec') * 1000) AS INTEGER))`)",
+    );
+    expect(out).toContain('.$onUpdate(() => new Date())');
+  });
+
+  test('decimal jadi TEXT — NUMERIC akan dikoersi ke float, dan uang tidak pernah float', () => {
+    expect(out).toContain("price: text('price').notNull()");
+    expect(out).not.toMatch(/numeric\(|real\(/);
+  });
+
+  test('json, boolean, bigint, dan enum tetap varchar-setara', () => {
+    expect(out).toContain("meta: text('meta', { mode: 'json' })");
+    expect(out).toContain("flag: integer('flag', { mode: 'boolean' }).notNull().default(false)");
+    expect(out).toContain("big: integer('big').notNull()");
+    expect(out).toContain('state: text(\'state\', { length: 8 }).notNull().default("draft")');
+  });
+
+  test('tidak ada sisa dialek lain', () => {
+    expect(out).not.toMatch(/CHARACTER SET|utf8|ascii|mysql|datetime\(|longtext|timestamp\(/);
+  });
+
+  test('prefix tabel lewat sqliteTableCreator', () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: asserting the literal text of generated code
+    expect(out).toContain('sqliteTableCreator((name) => `${TABLE_PREFIX}${name}`)');
+    expect(out).toContain("uniqueIndex('probe_client_id_code_uq').on(t.client_id, t.code)");
+  });
+});
+
 describe('codegen — sifat umum', () => {
   test('deterministik: input sama → keluaran identik byte demi byte', () => {
     expect(emitMysql(tables)).toBe(emitMysql(tables));
     expect(emitPg(tables)).toBe(emitPg(tables));
+    expect(emitSqlite(tables)).toBe(emitSqlite(tables));
   });
 
   test('urutan tabel stabil (berdasarkan nama), tidak tergantung urutan pendaftaran', () => {

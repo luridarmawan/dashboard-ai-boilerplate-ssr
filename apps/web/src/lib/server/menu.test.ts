@@ -114,4 +114,14 @@ describe('buildMenu (F-3 groups)', () => {
     // and it does not fall back to the top level either
     expect(noExample.some((i) => i.id === 'core.examples')).toBe(false);
   });
+
+  test('EXAMPLE_PAGE_ENABLE=false drops the gallery entry, group intact (L-19)', () => {
+    const has = (items: ReturnType<typeof buildMenu>): boolean =>
+      items.some((i) => i.id === 'core.examples' || has(i.children));
+    expect(has(buildMenu(admin, '/dashboard', 'en'))).toBe(true);
+    const off = buildMenu(admin, '/dashboard', 'en', undefined, false);
+    expect(has(off)).toBe(false);
+    // the Example module keeps its own group and entries — only the core showcase goes
+    expect(group(off, 'example')).toBeDefined();
+  });
 });

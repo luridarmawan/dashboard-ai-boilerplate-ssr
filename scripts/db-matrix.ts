@@ -11,7 +11,7 @@
 import { fileURLToPath } from 'node:url';
 
 interface Target {
-  dialect: 'mysql' | 'mariadb' | 'postgres';
+  dialect: 'mysql' | 'mariadb' | 'postgres' | 'sqlite';
   url: string;
 }
 
@@ -35,6 +35,9 @@ const targets: Target[] = [
       `postgres://app:app@127.0.0.1:${p('POSTGRES_PORT', '35432')}/app`,
     ),
   },
+  // Tier 2 (§4.3): no container, so this one also runs when the compose profile is not up.
+  // A throwaway file per run — the matrix proves migrate+smoke, not persistence.
+  { dialect: 'sqlite', url: p('MATRIX_SQLITE_URL', 'file:./data/matrix-sqlite.db') },
 ];
 
 const only = process.argv.slice(2);

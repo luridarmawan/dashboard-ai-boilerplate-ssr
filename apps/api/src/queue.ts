@@ -1,4 +1,16 @@
-import { and, asc, desc, eq, inArray, lt, lte, newId, schema, unsafeAcrossTenants } from '@core/db';
+import {
+  affectedRows as affected,
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  lt,
+  lte,
+  newId,
+  schema,
+  unsafeAcrossTenants,
+} from '@core/db';
 import { logger } from '@core/logger';
 import { metrics } from './metrics.ts';
 import { emit } from './services.ts';
@@ -165,12 +177,6 @@ export async function retryJob(id: string): Promise<boolean> {
   return ok;
 }
 
-function affected(r: unknown): number {
-  if (Array.isArray(r)) return Number((r[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number(
-    (r as { count?: number; rowCount?: number })?.rowCount ?? (r as { count?: number })?.count ?? 0,
-  );
-}
 function safeResult(v: unknown): Record<string, unknown> | null {
   if (v === undefined || v === null) return null;
   try {

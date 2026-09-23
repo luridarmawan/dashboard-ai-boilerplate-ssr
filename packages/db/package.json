@@ -12,13 +12,14 @@
     "./migrate": "./src/migrate.ts"
   },
   "scripts": {
-    "codegen": "bun run scripts/codegen.ts",
-    "generate": "bun run scripts/codegen.ts && TABLE_PREFIX= drizzle-kit generate --config drizzle.mysql.config.ts && TABLE_PREFIX= drizzle-kit generate --config drizzle.pg.config.ts && bun run scripts/codegen.ts",
-    "typecheck": "bun run typecheck:mysql && bun run typecheck:postgres",
+    "codegen": "bun --env-file=../../.env run scripts/codegen.ts",
+    "generate": "bun run scripts/codegen.ts && TABLE_PREFIX= drizzle-kit generate --config drizzle.mysql.config.ts && TABLE_PREFIX= drizzle-kit generate --config drizzle.pg.config.ts && TABLE_PREFIX= drizzle-kit generate --config drizzle.sqlite.config.ts && bun run scripts/codegen.ts",
+    "typecheck": "bun run typecheck:mysql && bun run typecheck:postgres && bun run typecheck:sqlite",
     "typecheck:mysql": "DB_DIALECT=mysql bun run scripts/codegen.ts && tsc -p tsconfig.json",
     "typecheck:postgres": "DB_DIALECT=postgres bun run scripts/codegen.ts && tsc -p tsconfig.json",
-    "migrate": "bun run scripts/codegen.ts && bun --env-file=../../.env run scripts/migrate.ts",
-    "smoke": "bun run scripts/codegen.ts && bun --env-file=../../.env run scripts/smoke.ts"
+    "typecheck:sqlite": "DB_DIALECT=sqlite bun run scripts/codegen.ts && tsc -p tsconfig.json",
+    "migrate": "bun run codegen && bun --env-file=../../.env run scripts/migrate.ts",
+    "smoke": "bun run codegen && bun --env-file=../../.env run scripts/smoke.ts"
   },
   "dependencies": {
     "@core/config": "workspace:*",

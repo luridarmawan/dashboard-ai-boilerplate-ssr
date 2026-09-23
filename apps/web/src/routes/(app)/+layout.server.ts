@@ -2,6 +2,7 @@ import { resolveLayout } from '@core/ui-theme';
 import { redirect } from '@sveltejs/kit';
 import { layoutVariants, pageAsides } from '$lib/../generated/layout-variants';
 import { moduleWidgets } from '$lib/../generated/widgets';
+import { examplePagesEnabled } from '$lib/server/config';
 import { buildBreadcrumb, buildMenu } from '$lib/server/menu';
 import { apiFetchData, apiFor, csrfToken } from '$lib/server/session';
 import type { LayoutServerLoad } from './$types';
@@ -26,7 +27,13 @@ export const load: LayoutServerLoad = async (event) => {
   if (!s)
     redirect(303, `/auth/login?next=${encodeURIComponent(event.url.pathname + event.url.search)}`);
   const locale = event.locals.locale.locale;
-  const menu = buildMenu(s, event.url.pathname, locale, event.locals.config.enabledModules);
+  const menu = buildMenu(
+    s,
+    event.url.pathname,
+    locale,
+    event.locals.config.enabledModules,
+    examplePagesEnabled(),
+  );
   // Bell (J-4): ONE call feeds both the badge and the dropdown preview — asking for the unread
   // rows returns the unread total alongside them, so this costs no more than the old count call.
   // A failure must never break the shell.

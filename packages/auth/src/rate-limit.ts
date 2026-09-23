@@ -1,4 +1,4 @@
-import { and, type Db, eq, newId, schema, sql } from '@core/db';
+import { affectedRows as affected, and, type Db, eq, newId, schema, sql } from '@core/db';
 import { rateLimitRedis, warnRedis } from './redis.ts';
 
 /**
@@ -118,10 +118,4 @@ export async function consume(
   }
   // Under pathological contention, fail closed: refusing one request is safer than admitting one too many.
   return { allowed: false, limit: rule.limit, remaining: 0, resetAt };
-}
-
-function affected(result: unknown): number {
-  if (Array.isArray(result))
-    return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number((result as { count?: number })?.count ?? 0);
 }

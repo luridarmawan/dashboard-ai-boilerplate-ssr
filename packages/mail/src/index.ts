@@ -1,4 +1,16 @@
-import { and, asc, type Db, eq, inArray, isNull, lte, newId, or, schema } from '@core/db';
+import {
+  affectedRows as affected,
+  and,
+  asc,
+  type Db,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  newId,
+  or,
+  schema,
+} from '@core/db';
 import { logger } from '@core/logger';
 import { createSmtpTransport, formatFrom } from './smtp-test.ts';
 import { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
@@ -209,10 +221,4 @@ export async function retryOutbox(db: Db, ids: readonly string[]): Promise<numbe
     .set({ status: 'pending', next_attempt_at: new Date(), last_error: null })
     .where(and(inArray(schema.outboxEmail.id, [...ids]), eq(schema.outboxEmail.status, 'failed')));
   return affected(r);
-}
-
-function affected(result: unknown): number {
-  if (Array.isArray(result))
-    return Number((result[0] as { affectedRows?: number })?.affectedRows ?? 0);
-  return Number((result as { count?: number })?.count ?? 0);
 }

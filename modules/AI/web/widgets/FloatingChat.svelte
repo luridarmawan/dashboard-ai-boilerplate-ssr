@@ -298,3 +298,11 @@ async function send(e: SubmitEvent) {
     {/if}
   </div>
 {/if}
+
+<style>
+  /* Same assistant-reply block spacing as the chat page's #messages-list. */
+  [data-testid='floating-chat-messages'] :global(.prose-chat table) { margin: 10px 5px 10px 0px; }
+  [data-testid='floating-chat-messages'] :global(.prose-chat ul) { margin-bottom: 5px; }
+  [data-testid='floating-chat-messages'] :global(.prose-chat ul li) { padding-top: 5px; }
+  [data-testid='floating-chat-messages'] :global(.prose-chat h2) { padding-top: 5px; border-bottom: 1px solid gray; }
+</style>

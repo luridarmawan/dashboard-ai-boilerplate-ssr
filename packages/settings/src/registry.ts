@@ -68,11 +68,11 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'app.landing_route',
-        type: 'route',
+        type: 'public_route',
         title: { id: 'Halaman depan (anonim)', en: 'Landing page (anonymous)' },
         note: {
-          id: 'Halaman yang disajikan di / untuk pengunjung yang belum masuk. Kosongkan untuk memakai LANDING_ROUTE dari .env. Divalidasi terhadap registry route.',
-          en: 'The page / serves to anonymous visitors. Leave empty to fall back to LANDING_ROUTE from .env. Validated against the route registry.',
+          id: 'Halaman yang disajikan di / untuk pengunjung yang belum masuk — hanya halaman publik yang bisa dipilih. Kosongkan untuk memakai LANDING_ROUTE dari .env.',
+          en: 'The page / serves to anonymous visitors — only public pages can be chosen. Leave empty to fall back to LANDING_ROUTE from .env.',
         },
         default: landingFallback(),
         public: true,
