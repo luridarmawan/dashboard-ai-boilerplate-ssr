@@ -1,5 +1,7 @@
 <script lang="ts" generics="Row extends { id: string }">
-import type { Snippet } from 'svelte';
+import { onMount, type Snippet } from 'svelte';
+import { goto } from '$app/navigation';
+import { navigating, page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button, Dialog, Skeleton } from '$lib/components/ui';
@@ -17,6 +19,12 @@ import {
 /**
  * Server-driven data table (L-16): paging, sorting, search, column picker, row & bulk actions,
  * empty / loading / error states — all as links and forms. Rendering only; no fetching.
+ *
+ * Two layers (L-20 over L-22). The BASE is the markup: every control is a link or a plain GET
+ * form, so the table works with JavaScript off. The ENHANCED layer answers the same controls over
+ * fetch — the GET forms submit through `goto()` (search as you type, filters on change), the
+ * links are client-side navigations already — so the rows update in place and the search box
+ * keeps what was typed and the focus. The URL that results is byte-identical either way.
  */
 interface Props {
   rows: Row[];
@@ -36,6 +44,13 @@ interface Props {
   cell?: Snippet<[Row, ColumnDef<Row>]>;
   /** Extra toolbar content (e.g. a "create" button). */
   toolbar?: Snippet;
+  /**
+   * Page-specific filter controls, rendered INSIDE the search form next to the box: a `<select>`
+   * or input whose `name` is one of `state.extra`'s keys. They submit together with `q` and, on
+   * the enhanced layer, apply on `change`. The keys in `state.extra` that the snippet does not
+   * own must still be carried by the page, so without a snippet they ride along as hidden inputs.
+   */
+  filters?: Snippet;
   labels?: Partial<typeof defaultLabels>;
 }
 const t = useT();
@@ -74,6 +89,7 @@ let {
   class: className,
   cell,
   toolbar,
+  filters,
   labels: labelOverrides = {},
 }: Props = $props();
 
@@ -92,6 +108,89 @@ const align = (c: ColumnDef<Row>) =>
   c.align === 'right' ? 'text-end' : c.align === 'center' ? 'text-center' : 'text-start';
 const hasBulk = $derived(bulkActions.length > 0 && csrf !== '');
 const formId = `dt-bulk-${Math.random().toString(36).slice(2, 8)}`;
+const extras = $derived(Object.entries(tableState.extra ?? {}));
+
+// ---- enhanced layer: the same GET forms, without the page reload -----------------------------
+
+/**
+ * True while a client-side navigation to THIS page is in flight: the rows on screen are the
+ * previous answer, so the table says so (dimmed, `aria-busy`) instead of hiding them.
+ */
+const refreshing = $derived(
+  navigating.to !== null && navigating.to?.url.pathname === page.url.pathname,
+);
+/**
+ * The search box is local state seeded from the URL. It is NOT re-seeded while the box has
+ * focus: a debounced search answers after the operator has typed on, and writing the older `q`
+ * from the URL back into the box would eat those keystrokes. A reset link or a Back navigation
+ * moves the focus away first, so those still refresh the box.
+ */
+// svelte-ignore state_referenced_locally -- the seed is deliberate; the effect below re-seeds it
+let q = $state(tableState.q);
+let qEl = $state<HTMLInputElement | null>(null);
+$effect(() => {
+  const fromUrl = tableState.q;
+  if (typeof document === 'undefined' || document.activeElement !== qEl) q = fromUrl;
+});
+let debounce: ReturnType<typeof setTimeout> | undefined;
+/** `data-enhanced` on the search form: which layer answers — for tests, and for anyone debugging. */
+let enhanced = $state(false);
+onMount(() => {
+  enhanced = true;
+});
+
+/**
+ * Submit a GET form over fetch: the same query string the browser would have built, sent with
+ * `goto()` so the page's `load` re-runs and the table re-renders in place. Repeated `cols` from
+ * the column picker fold into one comma-joined value, like the table's own links carry it.
+ * `replace` is for keystrokes — typing eight letters should leave one history entry, not eight.
+ */
+function applyForm(form: HTMLFormElement, replace = false) {
+  const p = new URLSearchParams();
+  const cols: string[] = [];
+  for (const [k, v] of new FormData(form)) {
+    const s = String(v).trim();
+    if (!s) continue;
+    if (k === 'cols') cols.push(s);
+    else p.set(k, s);
+  }
+  if (cols.length) p.set('cols', cols.join(','));
+  const qs = p.toString();
+  void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, {
+    keepFocus: true,
+    noScroll: true,
+    replaceState: replace,
+  });
+}
+/**
+ * Enter in the box or a click on the button: apply now, and put the focus back in the box — the
+ * click moved it to the button, and an operator who searches usually refines the search next.
+ */
+function submitSearch(e: SubmitEvent) {
+  e.preventDefault();
+  clearTimeout(debounce);
+  qEl?.focus();
+  applyForm(e.currentTarget as HTMLFormElement);
+}
+/** Typing searches on its own; the delay is what keeps it one request per pause, not per key. */
+function searchTyped(e: Event) {
+  clearTimeout(debounce);
+  const form = (e.currentTarget as HTMLInputElement).form;
+  if (form) debounce = setTimeout(() => applyForm(form, true), 300);
+}
+/** A filter control (from the `filters` snippet) changed: apply at once, the box is untouched. */
+function filterChanged(e: Event) {
+  if (e.target === qEl) return;
+  clearTimeout(debounce);
+  applyForm(e.currentTarget as HTMLFormElement);
+}
+/** The column picker and page-size forms: apply over fetch, and fold the picker shut. */
+function submitForm(e: SubmitEvent) {
+  e.preventDefault();
+  const form = e.currentTarget as HTMLFormElement;
+  applyForm(form);
+  form.closest('details')?.removeAttribute('open');
+}
 
 /**
  * A bulk action acts on the ticked rows, so with nothing ticked it must not fire — it would
@@ -140,24 +239,27 @@ const confirmPost = (b: BulkAction) =>
 </script>
 
 <div bind:this={root} class={cn('dt grid gap-3', className)}>
-  <!-- toolbar: search + column picker, both plain GET forms -->
+  <!-- toolbar: search (+ page filters) and column picker, both plain GET forms; JS only swaps the reload for goto() -->
   <div class="flex flex-wrap items-center gap-2">
-    <form method="GET" class="flex items-center gap-2" role="search">
+    <form method="GET" class="flex flex-wrap items-center gap-2" role="search" onsubmit={submitSearch} onchange={filterChanged} data-testid="dt-search" data-enhanced={enhanced}>
       {#if tableState.sort}<input type="hidden" name="sort" value={tableState.sort} />{/if}
       <input type="hidden" name="order" value={tableState.order} />
       {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
       <input type="hidden" name="limit" value={tableState.limit} />
+      {#if !filters}{#each extras as [k, v] (k)}<input type="hidden" name={k} value={v} />{/each}{/if}
       <label class="sr-only" for={`${formId}-q`}>{L.search}</label>
-      <input id={`${formId}-q`} name="q" value={tableState.q} placeholder={searchPlaceholder ?? L.search} class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
-      <Button type="submit" variant="outline" size="sm"><Icon name="search" size={16} />{L.search}</Button>
+      <input id={`${formId}-q`} bind:this={qEl} name="q" bind:value={q} oninput={searchTyped} placeholder={searchPlaceholder ?? L.search} autocomplete="off" class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm" />
+      {#if filters}{@render filters()}{/if}
+      <Button type="submit" variant="outline" size="sm"><Icon name={refreshing ? 'refresh' : 'search'} size={16} class={refreshing ? 'animate-spin' : ''} />{L.search}</Button>
     </form>
     <details class="relative">
       <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"><Icon name="columns" size={16} />{L.columns}</summary>
-      <form method="GET" class="absolute z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md">
+      <form method="GET" class="absolute z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
         {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
         <input type="hidden" name="sort" value={tableState.sort} />
         <input type="hidden" name="order" value={tableState.order} />
         <input type="hidden" name="limit" value={tableState.limit} />
+        {#each extras as [k, v] (k)}<input type="hidden" name={k} value={v} />{/each}
         {#each columns as c (c.key)}
           <label class="flex items-center gap-2"><input type="checkbox" name="cols" value={c.key} checked={visible.some((v) => v.key === c.key)} class="h-4 w-4 accent-primary" />{c.label}</label>
         {/each}
@@ -174,7 +276,8 @@ const confirmPost = (b: BulkAction) =>
     </div>
   {:else}
     {#if hasBulk}<form id={formId} method="POST"><Csrf token={csrf} /></form>{/if}
-    <div class="relative w-full overflow-x-auto rounded-lg border bg-card">
+    <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
+    <div class={cn('relative w-full overflow-x-auto rounded-lg border bg-card transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
       <table class="w-full text-sm">
         {#if caption}<caption class="sr-only">{caption}</caption>{/if}
         <thead>
@@ -258,10 +361,11 @@ const confirmPost = (b: BulkAction) =>
         <span>{tableState.total} {L.rows} · {L.page} {tableState.page} {L.of} {tableState.totalPages}</span>
         <a class={cn('rounded-md border px-2 py-1 no-underline', tableState.page <= 1 && 'pointer-events-none opacity-40')} href={withParams(tableState, { page: Math.max(1, tableState.page - 1) })} aria-disabled={tableState.page <= 1}><Icon name="chevron-left" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.prev}</span></a>
         <a class={cn('rounded-md border px-2 py-1 no-underline', tableState.page >= tableState.totalPages && 'pointer-events-none opacity-40')} href={withParams(tableState, { page: Math.min(tableState.totalPages, tableState.page + 1) })} aria-disabled={tableState.page >= tableState.totalPages}><Icon name="chevron-right" size={14} class="rtl:rotate-180" /><span class="sr-only">{L.next}</span></a>
-        <form method="GET" class="flex items-center gap-1">
+        <form method="GET" class="flex items-center gap-1" onsubmit={submitForm} onchange={(e) => applyForm(e.currentTarget)}>
           {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
           <input type="hidden" name="sort" value={tableState.sort} /><input type="hidden" name="order" value={tableState.order} />
           {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
+          {#each extras as [k, v] (k)}<input type="hidden" name={k} value={v} />{/each}
           <select name="limit" class="h-8 rounded-md border border-input bg-background px-1 text-sm" aria-label={L.perPage}>
             {#each [10, 20, 50, 100] as n (n)}<option value={n} selected={n === tableState.limit}>{n}</option>{/each}
           </select>

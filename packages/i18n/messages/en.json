@@ -627,6 +627,8 @@
   "users.empty_hint_add": "Add your first user.",
   "users.empty_hint_search": "Try another keyword.",
   "users.empty_title": "No users yet",
+  "users.filter_group": "Group",
+  "users.filter_group_all": "All groups",
   "users.groups": "Groups",
   "users.impersonate": "Sign in as this user",
   "users.last_login": "Last login",

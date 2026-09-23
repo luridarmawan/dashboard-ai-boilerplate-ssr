@@ -22,12 +22,23 @@ export const _layoutVariant = 'wide';
 
 const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at', 'last_active_at']);
 
-/** Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders. */
+/**
+ * Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders.
+ * `group` is the one page-specific filter: a group id of this tenant, narrowing to its members.
+ */
 export const load: PageServerLoad = async (event) => {
-  const st = tableStateFrom(event.url, { sort: 'name' });
+  const st = tableStateFrom(event.url, { sort: 'name', extra: ['group'] });
   const sort = SORTABLE.has(st.sort) ? st.sort : 'name';
+  const group = st.extra?.group;
   const res = await apiFor(event).v1.users.get({
-    query: { ...(st.q ? { q: st.q } : {}), page: st.page, limit: st.limit, sort, order: st.order },
+    query: {
+      ...(st.q ? { q: st.q } : {}),
+      ...(group ? { group } : {}),
+      page: st.page,
+      limit: st.limit,
+      sort,
+      order: st.order,
+    },
   });
   const r = unwrap<{
     success: true;
@@ -39,9 +50,16 @@ export const load: PageServerLoad = async (event) => {
   // Pending invitations (A-13): only readable with user.create — a 403 simply hides the section.
   const inv = await apiFor(event).v1.invitations.get();
   const invitations = inv.data?.success ? inv.data.data : null;
+  // The group filter's options: needs group.read — without it the select is not offered (the
+  // filter itself still applies from the URL; a group id is not a secret).
+  const grp = await apiFor(event).v1.groups.get({ query: { limit: 100, sort: 'name' } });
+  const groups = grp.data?.success
+    ? grp.data.data.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))
+    : null;
   return {
     users,
     invitations,
+    groups,
     csrf: csrfToken(event),
     state: { ...st, sort, total: r.data.meta.total, totalPages: r.data.meta.totalPages },
   };

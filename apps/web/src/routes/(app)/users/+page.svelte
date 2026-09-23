@@ -138,12 +138,24 @@ const deactivateConfirm = {
     caption={t('users.caption')}
     searchPlaceholder={t('users.search_placeholder')}
     emptyTitle={t('users.empty_title')}
-    emptyHint={data.state.q ? t('users.empty_hint_search') : t('users.empty_hint_add')}
+    emptyHint={data.state.q || data.state.extra?.group ? t('users.empty_hint_search') : t('users.empty_hint_add')}
     {rowActions}
     bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm }] : []}
   >
     {#snippet toolbar()}
       {#if can('user.create')}<Button href="/users/new" size="sm"><Icon name="plus" size={16} />{t('users.add')}</Button>{/if}
+    {/snippet}
+    {#snippet filters()}
+      <!-- Filter by group (D-1): submits with the search box; the enhanced layer applies it on change. -->
+      {#if data.groups}
+        <label class="sr-only" for="users-group">{t('users.filter_group')}</label>
+        <select id="users-group" name="group" class="h-9 rounded-md border border-input bg-background px-2 text-sm" data-testid="users-group">
+          <option value="">{t('users.filter_group_all')}</option>
+          {#each data.groups as g (g.id)}<option value={g.id} selected={data.state.extra?.group === g.id}>{g.name}</option>{/each}
+        </select>
+      {:else if data.state.extra?.group}
+        <input type="hidden" name="group" value={data.state.extra.group} />
+      {/if}
     {/snippet}
     {#snippet cell(row, col)}
       {#if col.key === 'status'}

@@ -134,6 +134,20 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((await call('/v1/clients/scope', {}, [bob])).status).toBe(200); // any session
   });
 
+  test('list filter by group (D-1): ?group= narrows to members of that group in this tenant', async () => {
+    const members = await json(
+      await call(`/v1/users?group=${editorsId}&q=bob-${run}&limit=5`, {}, [admin]),
+    );
+    expect(members.success).toBe(true);
+    expect(members.meta?.total).toBe(1);
+    // An unknown (or another tenant's) group id is not an error, it matches nobody.
+    const nobody = await json(
+      await call(`/v1/users?group=${crypto.randomUUID()}&q=bob-${run}`, {}, [admin]),
+    );
+    expect(nobody.success).toBe(true);
+    expect(nobody.meta?.total).toBe(0);
+  });
+
   test('user edit: deactivation ends the session on the next request; reactivation restores', async () => {
     expect((await put(`/v1/users/${bobId}`, { statusId: 0 }, [admin])).status).toBe(200);
     expect((await call('/v1/auth/me', {}, [bob])).status).toBe(401);

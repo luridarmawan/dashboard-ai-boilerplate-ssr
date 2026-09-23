@@ -627,6 +627,8 @@
   "users.empty_hint_add": "Tambahkan pengguna pertama Anda.",
   "users.empty_hint_search": "Coba kata kunci lain.",
   "users.empty_title": "Belum ada pengguna",
+  "users.filter_group": "Grup",
+  "users.filter_group_all": "Semua grup",
   "users.groups": "Grup",
   "users.impersonate": "Masuk sebagai pengguna ini",
   "users.last_login": "Login terakhir",

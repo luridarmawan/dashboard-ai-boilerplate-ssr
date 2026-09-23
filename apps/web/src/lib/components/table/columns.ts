@@ -72,19 +72,33 @@ export interface TableState {
   order: 'asc' | 'desc';
   /** Visible column keys, from `?cols=a,b` or a repeated `?cols=a&cols=b`; empty = defaults. */
   cols: string[];
+  /**
+   * Page-specific filters (e.g. `group` on /users), read from the URL by name. They travel with
+   * every link and form the table emits, so sorting or paging never drops the active filter.
+   * Empty values are absent, so `extra.group === undefined` means "not filtered".
+   */
+  extra?: Record<string, string>;
 }
 
 /** Parse the table's URL state with sane defaults; the page's `load` passes this to the API. */
 export function tableStateFrom(
   url: URL,
-  defaults: { sort: string; order?: 'asc' | 'desc'; limit?: number } = { sort: 'name' },
+  defaults: { sort: string; order?: 'asc' | 'desc'; limit?: number; extra?: string[] } = {
+    sort: 'name',
+  },
 ): Omit<TableState, 'total' | 'totalPages'> {
   const n = (k: string, d: number) => {
     const v = Number(url.searchParams.get(k));
     return Number.isFinite(v) && v > 0 ? Math.floor(v) : d;
   };
   const order = url.searchParams.get('order');
+  const extra: Record<string, string> = {};
+  for (const k of defaults.extra ?? []) {
+    const v = url.searchParams.get(k)?.trim();
+    if (v) extra[k] = v;
+  }
   return {
+    extra,
     page: n('page', 1),
     limit: Math.min(n('limit', defaults.limit ?? 20), 100),
     q: url.searchParams.get('q') ?? '',
@@ -120,6 +134,7 @@ export function withParams(
     sort: state.sort,
     order: state.order,
     cols: state.cols?.length ? state.cols.join(',') : undefined,
+    ...state.extra,
     ...patch,
   };
   for (const [k, v] of Object.entries(base)) if (v !== undefined && v !== '') p.set(k, String(v));
