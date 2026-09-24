@@ -6,7 +6,8 @@ import { isRegistered } from './registry.ts';
 /**
  * Idempotent seed (PRD O-3, C-5, B-5). Safe to run on every deploy:
  *   - tenant `default`
- *   - groups `admin` (*.*) and `user` (a small self-service set) in that tenant, `is_system`
+ *   - groups `admin` (*.*) and `user` (no grants: a plain member must not see the user list or any
+ *     admin page — grants are added per deployment by an administrator) in that tenant, `is_system`
  *   - the first superadmin from BOOTSTRAP_ADMIN_EMAIL / _PASSWORD, member of `default` and `admin`
  * Existing rows are left alone (passwords are never overwritten). Every seeded permission must be
  * a wildcard or registered (C-4) — a typo fails the seed instead of silently granting nothing.
@@ -28,7 +29,9 @@ export interface SeedResult {
 
 export const SYSTEM_GROUPS = [
   { code: 'admin', name: 'Administrator', permissions: ['*.*'] },
-  { code: 'user', name: 'Regular User', permissions: ['user.read'] },
+  // Deliberately empty: in a customer-facing deployment (e-commerce, portal) a regular user must not
+  // be able to list other users. Administrators grant what their deployment needs.
+  { code: 'user', name: 'Regular User', permissions: [] },
 ] as const;
 
 /**
