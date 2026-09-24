@@ -87,6 +87,18 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 3,
       },
       {
+        key: 'app.default_theme',
+        type: 'theme',
+        title: { id: 'Tema baku', en: 'Default theme' },
+        note: {
+          id: 'Dilihat pengunjung anonim dan pengguna yang belum memilih (L-10).',
+          en: 'Seen by anonymous visitors and users without a choice (L-10).',
+        },
+        default: 'warm',
+        public: true,
+        order: 4,
+      },
+      {
         key: 'app.favicon_url',
         type: 'string',
         title: { id: 'URL favicon', en: 'Favicon URL' },
@@ -97,18 +109,6 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: null,
         public: true,
         max: 512,
-        order: 4,
-      },
-      {
-        key: 'app.default_theme',
-        type: 'theme',
-        title: { id: 'Tema baku', en: 'Default theme' },
-        note: {
-          id: 'Dilihat pengunjung anonim dan pengguna yang belum memilih (L-10).',
-          en: 'Seen by anonymous visitors and users without a choice (L-10).',
-        },
-        default: 'warm',
-        public: true,
         order: 5,
       },
       {
