@@ -78,7 +78,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
     async ({ tenantState }) => {
       const clientId = tenantState?.clientId ?? null;
       const allowed = (await settings.get<string[] | null>(clientId, 'app.allowed_themes')) ?? [];
-      const def = (await settings.get<string | null>(clientId, 'app.default_theme')) ?? 'base';
+      const def = (await settings.get<string | null>(clientId, 'app.default_theme')) ?? 'warm';
       const custom = (await customThemes.manifestsFor(clientId)).map((c) => c.manifest);
       const list = [...themes(), ...custom].filter(
         (th) => !allowed.length || allowed.includes(th.id),

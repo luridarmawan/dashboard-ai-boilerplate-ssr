@@ -226,7 +226,7 @@ const anon = new Jar();
     'app.home_route': '',
   });
   const back = await get(new Jar(), '/auth/login');
-  check('reset applied immediately (base again)', htmlAttr(back.html, 'data-app-theme') === 'base');
+  check('reset applied immediately (warm again)', htmlAttr(back.html, 'data-app-theme') === 'warm');
 }
 
 // ---- E-1: tenant branding (name + logo) from configuration, in the brand region of every shell ----

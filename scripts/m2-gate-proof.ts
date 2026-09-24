@@ -88,7 +88,7 @@ const anon = new Jar();
   check(
     'anonymous landing → 200 with data-app-theme and data-mode on <html>',
     res.status === 200 &&
-      htmlAttr(html, 'data-app-theme') === 'base' &&
+      htmlAttr(html, 'data-app-theme') === 'warm' &&
       htmlAttr(html, 'data-mode') === 'system',
     `${res.status} ${htmlAttr(html, 'data-app-theme')}/${htmlAttr(html, 'data-mode')}`,
   );

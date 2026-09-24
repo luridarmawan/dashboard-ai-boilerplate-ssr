@@ -30,7 +30,7 @@ Semua font berlisensi permisif (OFL/Apache) dan **di-host sendiri**, bukan dari 
 
 - **`base`** ada karena setiap proyek akan menurunkan temanya sendiri. Ia sengaja netral supaya jadi titik awal yang jelas, bukan pesaing tema lain.
 - **`corporate`** mewakili kasus nyata yang paling sering diminta klien: aplikasi internal padat informasi, di mana sidebar memakan lebar yang dibutuhkan tabel.
-- **`warm`** ada supaya landing komersil modul `Example` (§4.6) punya tema yang cocok. Ia juga membuktikan bahwa netral tidak harus berarti abu-abu.
+- **`warm`** ada supaya landing komersil modul `Example` (§4.6) punya tema yang cocok. Ia juga membuktikan bahwa netral tidak harus berarti abu-abu. **Inilah tema baku awal** (`app.default_theme` sebelum admin mengubahnya, dan `FALLBACK_THEME` di ujung rantai L-12); `base` tetap titik awal untuk tema turunan (`themegen --from`).
 - **`contrast`** bukan sekadar "tema keempat". Ia memaksa kita menulis komponen yang tidak bergantung pada bayangan dan gradasi halus untuk menyampaikan batas — dan itu memperbaiki tiga tema lainnya juga.
 
 ---

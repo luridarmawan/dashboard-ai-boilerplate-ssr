@@ -94,7 +94,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
           id: 'Dilihat pengunjung anonim dan pengguna yang belum memilih (L-10).',
           en: 'Seen by anonymous visitors and users without a choice (L-10).',
         },
-        default: 'base',
+        default: 'warm',
         public: true,
         order: 4,
       },
