@@ -223,7 +223,8 @@ async function runTest(event: SubmitEvent) {
         <!-- Base: a POST to `?/test`. Enhanced: the same request over fetch, same endpoint. -->
         <form method="POST" action="?/test" onsubmit={runTest}>
           <Csrf token={data.csrf} />
-          <Button type="submit" variant="outline" size="sm" class="cursor-pointer" disabled={testing} aria-busy={testing} data-testid="mcp-test">
+          <!-- One height for the whole row: this button, the search box and the status select all sit at the default control size (h-9, text-sm). -->
+          <Button type="submit" variant="outline" class="cursor-pointer" disabled={testing} aria-busy={testing} data-testid="mcp-test">
             <Icon name="refresh" size={16} class={testing ? 'animate-spin' : ''} />
             {testing ? t('common.running') : connected ? t('ai.mcps.retest') : t('ai.mcps.test')}
           </Button>
@@ -244,18 +245,18 @@ async function runTest(event: SubmitEvent) {
           bind:value={query}
           placeholder={t('ai.mcps.search_tools')}
           autocomplete="off"
-          class="h-8 w-56 rounded-md border border-input bg-background px-3 text-sm"
+          class="h-9 w-56 rounded-md border border-input bg-background px-3 text-sm"
           data-testid="mcp-tool-search"
         />
         <label class="sr-only" for="mcp-tool-status">{t('ai.mcps.filter_status')}</label>
-        <Select id="mcp-tool-status" name="status" bind:value={statusFilter} class="h-8 w-auto" data-testid="mcp-tool-status">
+        <Select id="mcp-tool-status" name="status" bind:value={statusFilter} class="w-auto" data-testid="mcp-tool-status">
           <option value="all">{t('ai.mcps.filter_all')}</option>
           <option value="on">{t('ai.mcps.filter_enabled')}</option>
           <option value="off">{t('ai.mcps.filter_disabled')}</option>
         </Select>
         <!-- Only the no-JavaScript path needs it; with JavaScript the list is already narrowed. -->
         <noscript>
-          <Button type="submit" variant="outline" size="sm" class="cursor-pointer"><Icon name="search" size={16} />{t('common.apply')}</Button>
+          <Button type="submit" variant="outline" class="cursor-pointer"><Icon name="search" size={16} />{t('common.apply')}</Button>
         </noscript>
       </form>
       <p class="text-sm text-muted-foreground" data-testid="mcp-tools-count">
