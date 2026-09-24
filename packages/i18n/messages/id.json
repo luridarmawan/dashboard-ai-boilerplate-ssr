@@ -158,6 +158,8 @@
   "auth.reset.invalid": "Tautan tidak valid atau sudah kedaluwarsa.",
   "auth.reset.request_new": "Minta tautan baru",
   "auth.reset.new_password": "Kata sandi baru",
+  "auth.reset.confirm": "Ulangi kata sandi baru",
+  "auth.reset.mismatch": "Konfirmasi kata sandi tidak sama — kata sandi belum diubah.",
   "auth.verify.title": "Verifikasi email",
   "auth.verify.to_dashboard": "Ke dashboard",
   "dashboard.hello": "Halo, {name}",

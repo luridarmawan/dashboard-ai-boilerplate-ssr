@@ -158,6 +158,8 @@
   "auth.reset.invalid": "This link is invalid or has expired.",
   "auth.reset.request_new": "Request a new link",
   "auth.reset.new_password": "New password",
+  "auth.reset.confirm": "Repeat new password",
+  "auth.reset.mismatch": "The password confirmation does not match — the password was not changed.",
   "auth.verify.title": "Email verification",
   "auth.verify.to_dashboard": "Go to the dashboard",
   "dashboard.hello": "Hello, {name}",

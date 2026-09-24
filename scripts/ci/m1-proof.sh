@@ -41,6 +41,8 @@ export MCP_MOCK_URL=http://127.0.0.1:4020/mcp
 if wants M1; then echo "== proof M1"; bun run scripts/m1-gate1-proof.ts; fi
 if wants M2; then echo "== proof M2"; bun run scripts/m2-gate-proof.ts; fi
 if wants M3; then echo "== proof M3"; bun run scripts/m3-gate-proof.ts; fi
+# The reset-password form (A-7) needs a one-time token that no page shows: planted through DATABASE_URL.
+if wants RESET; then echo "== proof reset-password form"; bun run scripts/reset-form-proof.ts; fi
 if wants M4; then echo "== proof M4"; API_URL=http://127.0.0.1:3001 bun run scripts/m4-gate-proof.ts; fi
 if wants M5; then echo "== proof M5"; MOCK_URL=http://127.0.0.1:4010/v1 bun run scripts/m5-gate-proof.ts; fi
 if [ -d "modules/${MODGEN_GUARD_NAME:-CiProbe}" ] && wants M6; then
