@@ -729,6 +729,8 @@
   "join.email": "E-mail",
   "join.name": "Name",
   "join.password": "Password",
+  "join.password_confirm": "Repeat password",
+  "join.password_mismatch": "The password confirmation does not match — no account was created.",
   "join.submit": "Create account & sign in",
   "join.have_account": "Already have an account",
   "join.invalid": "This invitation link is unknown or has already been used.",

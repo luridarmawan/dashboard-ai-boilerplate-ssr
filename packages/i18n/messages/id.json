@@ -729,6 +729,8 @@
   "join.email": "Email",
   "join.name": "Nama",
   "join.password": "Kata sandi",
+  "join.password_confirm": "Ulangi kata sandi",
+  "join.password_mismatch": "Konfirmasi kata sandi tidak sama — akun belum dibuat.",
   "join.submit": "Buat akun & masuk",
   "join.have_account": "Sudah punya akun",
   "join.invalid": "Tautan undangan tidak dikenal atau sudah dipakai.",
