@@ -114,6 +114,17 @@ test('mcp: testing a server and reloading its tools run over fetch, not page loa
       .getByTestId('mcp-tools-all')
       .evaluate((el) => (el as HTMLInputElement).indeterminate),
   ).toBe(true);
+  // The status filter narrows in place like the search does: one disabled, one enabled.
+  await page.selectOption('[data-testid="mcp-tool-status"]', 'off');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+  await expect(page.getByTestId('mcp-tool-row').first()).toContainText('echo');
+  await expect(page.getByTestId('mcp-tools-count')).toContainText(/1 dari 2|1 of 2/);
+  await page.selectOption('[data-testid="mcp-tool-status"]', 'on');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+  await expect(page.getByTestId('mcp-tool-row').first()).not.toContainText('echo');
+  await page.selectOption('[data-testid="mcp-tool-status"]', 'all');
+  await expect(page.getByTestId('mcp-tool-row')).toHaveCount(2);
+  expect(await survived()).toBe(mark);
   // The choice is what the server holds, not just what the page drew: a fresh load shows it too.
   await page.reload();
   await expect(
@@ -225,6 +236,11 @@ test.describe('no JavaScript', () => {
     await page.goto(`${detail}?q=ping`);
     await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
     await expect(page.locator('[data-testid="mcp-tool-search"]')).toHaveValue('ping');
+    // So is the status filter: `?status=off` renders only the tool unticked above.
+    await page.goto(`${detail}?status=off`);
+    await expect(page.getByTestId('mcp-tool-row')).toHaveCount(1);
+    await expect(page.getByTestId('mcp-tool-row').first()).toContainText('echo');
+    await expect(page.locator('[data-testid="mcp-tool-status"]')).toHaveValue('off');
 
     // Without JavaScript the trigger is a real link to the confirmation the server renders.
     await page.goto(`${page.url().split('?')[0]}?confirm=delete`);

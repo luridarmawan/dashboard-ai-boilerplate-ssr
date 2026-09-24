@@ -446,8 +446,10 @@ describe.skipIf(!enabled)('AI module as MCP client (I-4, I-5)', () => {
     await post('/v1/m/ai/chat/completions', { messages: [{ role: 'user', content: 'hi' }] }, [
       admin,
     ]);
-    expect(providerToolsSeen).not.toContain(`ext_${CODE}__echo`);
-    expect(providerToolsSeen).toContain(`ext_${CODE}__weird_name_v2`);
+    // The mock wrote it back during the request above; TypeScript still sees the `null` from here.
+    const offered = providerToolsSeen as string[] | null;
+    expect(offered).not.toContain(`ext_${CODE}__echo`);
+    expect(offered).toContain(`ext_${CODE}__weird_name_v2`);
 
     // A re-test rewrites the rows (new ids) but keeps the choice, matched by wire name.
     const retest = (await json(await post(`/v1/m/ai/mcps/${mcpId}/test`, {}, [admin]))).data as {

@@ -4,7 +4,7 @@ import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import { FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Checkbox, ConfirmDelete, Table } from '$lib/components/ui';
+import { Badge, Button, Card, Checkbox, ConfirmDelete, Select, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { headerLines, mcpFields } from '../_form.ts';
@@ -76,12 +76,23 @@ const failure = $derived(
  */
 let query = $state(page.url.searchParams.get('q') ?? '');
 const needle = $derived(query.trim().toLowerCase());
+/**
+ * Status filter beside the search: all / enabled only / disabled only. Same shape as `q` — a
+ * `<select>` in the same GET form, read back from `?status=` so the server-rendered table is
+ * already narrowed; with JavaScript `onchange` narrows it in place. Combined with the header
+ * checkbox this is how "disable everything except…" or "re-enable what I turned off" gets done.
+ */
+type StatusFilter = 'all' | 'on' | 'off';
+const statusOf = (v: string | null): StatusFilter => (v === 'on' || v === 'off' ? v : 'all');
+let statusFilter = $state<StatusFilter>(statusOf(page.url.searchParams.get('status')));
+const filtering = $derived(needle !== '' || statusFilter !== 'all');
 const shown = $derived(
-  needle
-    ? tools.filter((tl) =>
-        `${tl.name} ${tl.wireName} ${tl.description ?? ''}`.toLowerCase().includes(needle),
-      )
-    : tools,
+  tools.filter(
+    (tl) =>
+      (statusFilter === 'all' || tl.enabled === (statusFilter === 'on')) &&
+      (!needle ||
+        `${tl.name} ${tl.wireName} ${tl.description ?? ''}`.toLowerCase().includes(needle)),
+  ),
 );
 /** With JavaScript the box has already filtered as it was typed; Enter must not reload. */
 const searchSubmit = (event: SubmitEvent) => event.preventDefault();
@@ -236,13 +247,19 @@ async function runTest(event: SubmitEvent) {
           class="h-8 w-56 rounded-md border border-input bg-background px-3 text-sm"
           data-testid="mcp-tool-search"
         />
+        <label class="sr-only" for="mcp-tool-status">{t('ai.mcps.filter_status')}</label>
+        <Select id="mcp-tool-status" name="status" bind:value={statusFilter} class="h-8 w-auto" data-testid="mcp-tool-status">
+          <option value="all">{t('ai.mcps.filter_all')}</option>
+          <option value="on">{t('ai.mcps.filter_enabled')}</option>
+          <option value="off">{t('ai.mcps.filter_disabled')}</option>
+        </Select>
         <!-- Only the no-JavaScript path needs it; with JavaScript the list is already narrowed. -->
         <noscript>
           <Button type="submit" variant="outline" size="sm" class="cursor-pointer"><Icon name="search" size={16} />{t('common.apply')}</Button>
         </noscript>
       </form>
       <p class="text-sm text-muted-foreground" data-testid="mcp-tools-count">
-        {#if needle}{t('ai.mcps.tools_filtered', { shown: shown.length, total: tools.length })}
+        {#if filtering}{t('ai.mcps.tools_filtered', { shown: shown.length, total: tools.length })}
         {:else}{t('ai.mcps.tools_available', { count: tools.length })}{/if}
         {#if tools.length}<span class="ms-1" data-testid="mcp-tools-enabled">· {t('ai.mcps.tools_enabled_count', { enabled: enabledCount })}</span>{/if}
         {#if syncedAt}<span class="ms-1">· {fmt(syncedAt)}</span>{/if}
@@ -314,7 +331,7 @@ async function runTest(event: SubmitEvent) {
               <td class="text-muted-foreground">{tl.description ?? '—'}</td>
             </tr>
           {:else}
-            <tr><td colspan={manage ? 4 : 3} class="py-6 text-center text-muted-foreground">{needle ? t('ai.mcps.tools_no_match') : status ? t('ai.mcps.tools_empty') : t('ai.mcps.never')}</td></tr>
+            <tr><td colspan={manage ? 4 : 3} class="py-6 text-center text-muted-foreground">{filtering ? t('ai.mcps.tools_no_match') : status ? t('ai.mcps.tools_empty') : t('ai.mcps.never')}</td></tr>
           {/each}
         </tbody>
       </Table>
