@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
           {
             target: env.API_URL ?? `http://127.0.0.1:${env.API_PORT ?? 3001}`,
             changeOrigin: false,
+            // Append the socket address to X-Forwarded-For (and keep the proxy's own entries),
+            // so the API sees the visitor's IP on browser-direct calls too.
+            xfwd: true,
           },
         ]),
       ),

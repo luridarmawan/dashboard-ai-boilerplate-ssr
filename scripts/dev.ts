@@ -20,7 +20,17 @@ const apiUrl = `http://${process.env.API_HOST ?? '127.0.0.1'}:${process.env.API_
 
 const procs = [
   { name: 'api', color: '\x1b[36m', cwd: `${root}apps/api`, cmd: ['bun', 'run', 'dev'] },
-  { name: 'web', color: '\x1b[35m', cwd: `${root}apps/web`, cmd: ['bun', 'run', 'dev'] },
+  {
+    name: 'web',
+    color: '\x1b[35m',
+    cwd: `${root}apps/web`,
+    cmd: ['bun', 'run', 'dev'],
+    // A dev server reached through a reverse proxy (APP_ORIGIN domain) sees the proxy's loopback
+    // address on the socket; trust X-Forwarded-For like `bun start` does, so Last Login IP /
+    // Last Active IP record the visitor. Without a proxy the header is absent and the socket
+    // address stands. Set ADDRESS_HEADER= (empty) to switch it off.
+    env: { ADDRESS_HEADER: process.env.ADDRESS_HEADER ?? 'X-Forwarded-For' },
+  },
 ];
 
 const reset = '\x1b[0m';
@@ -63,7 +73,7 @@ for (const p of procs) {
     cwd: p.cwd,
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env, FORCE_COLOR: '1' },
+    env: { ...process.env, ...p.env, FORCE_COLOR: '1' },
   });
   children.push(child);
   pipe(child.stdout, tag);
