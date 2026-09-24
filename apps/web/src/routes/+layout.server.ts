@@ -23,14 +23,16 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
     faviconUrl: usableAsset(locals.theme.theme.assets?.favicon),
   },
   /**
-   * Tenant branding from runtime configuration (E-1, E-2): the application name and logo an
-   * admin sets in Pengaturan → Aplikasi, for the brand region of every shell. `app.logo_url` is
-   * the tenant's base logo; a custom theme that uploaded its own (L-24) overrides it per theme.
-   * The i18n key `app.name` remains the fallback when configuration cannot be read (F-6).
+   * Tenant branding from runtime configuration (E-1, E-2): the application name, logo and
+   * favicon an admin sets in Pengaturan → Aplikasi, for the brand region and `<head>` of every
+   * shell. `app.logo_url` / `app.favicon_url` are the tenant's base assets; a custom theme that
+   * uploaded its own (L-24) overrides them per theme. The i18n key `app.name` remains the
+   * fallback when configuration cannot be read (F-6).
    */
   app: {
     name: cfgString(locals.config, 'app.name', ''),
     logoUrl: usableAsset(cfgString(locals.config, 'app.logo_url', '') || undefined),
+    faviconUrl: usableAsset(cfgString(locals.config, 'app.favicon_url', '') || undefined),
   },
   locale: locals.locale.locale,
   dir: locals.dir,

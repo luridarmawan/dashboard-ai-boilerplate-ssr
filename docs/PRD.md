@@ -386,6 +386,7 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 |---|---|---|---|
 | `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
 | `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil |
+| `app.favicon_url` | Database (per tenant, fallback global) | kosong | URL/path favicon tenant untuk `<link rel="icon">` semua shell; kosong = favicon bawaan `static/favicon.svg`. Favicon tema kustom (L-24) menimpanya selama tema itu aktif |
 | `LANDING_ROUTE` | `.env` | `/m/example` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):

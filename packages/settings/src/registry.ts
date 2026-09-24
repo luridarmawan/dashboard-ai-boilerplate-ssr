@@ -87,6 +87,19 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 3,
       },
       {
+        key: 'app.favicon_url',
+        type: 'string',
+        title: { id: 'URL favicon', en: 'Favicon URL' },
+        note: {
+          id: 'URL absolut atau path (mis. /files/…/content) ke berkas PNG/SVG/ICO persegi. Kosongkan untuk favicon bawaan. Tema kustom yang mengunggah favicon-nya sendiri menimpa ini selama tema itu aktif.',
+          en: 'Absolute URL or path (e.g. /files/…/content) to a square PNG/SVG/ICO. Leave empty for the built-in favicon. A custom theme that uploaded its own favicon overrides this while that theme is active.',
+        },
+        default: null,
+        public: true,
+        max: 512,
+        order: 4,
+      },
+      {
         key: 'app.default_theme',
         type: 'theme',
         title: { id: 'Tema baku', en: 'Default theme' },
@@ -96,7 +109,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: 'warm',
         public: true,
-        order: 4,
+        order: 5,
       },
       {
         key: 'app.allowed_themes',
@@ -109,7 +122,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: [],
         public: true,
         options: [],
-        order: 5,
+        order: 6,
       },
       {
         key: 'app.default_locale',
@@ -117,7 +130,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         title: { id: 'Bahasa baku', en: 'Default language' },
         default: 'en',
         public: true,
-        order: 6,
+        order: 7,
       },
       {
         key: 'app.timezone',
@@ -130,7 +143,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: timezoneFallback(),
         public: true,
         max: 64,
-        order: 7,
+        order: 8,
       },
     ],
   },
