@@ -14,6 +14,10 @@ export default defineConfig(({ mode }) => {
       port: Number(env.WEB_PORT ?? 5173),
       strictPort: true,
       host: env.WEB_HOST ?? '127.0.0.1',
+      // Vite rejects unknown Host headers (DNS-rebinding guard). A dev server reached through a
+      // public domain (reverse proxy, tunnel) needs that host listed: every host in APP_ORIGIN is
+      // allowed, so the public origin is configured in one place.
+      allowedHosts: allowedHosts(env.APP_ORIGIN),
       // Module pages are shimmed from modules/<Name>/web/routes — outside the web root.
       fs: { allow: ['../..'] },
       // Same-origin API surface in development, exactly what Caddy does in production (Decision E):
@@ -29,6 +33,21 @@ export default defineConfig(({ mode }) => {
         ]),
       ),
     },
-    preview: { port: 4173, strictPort: true },
+    preview: { port: 4173, strictPort: true, allowedHosts: allowedHosts(env.APP_ORIGIN) },
   };
 });
+
+/** Hostnames of the comma-separated APP_ORIGIN entries (full origins or bare hosts). */
+function allowedHosts(raw: string | undefined): string[] {
+  const hosts = new Set<string>();
+  for (const entry of (raw ?? '').split(',')) {
+    const e = entry.trim();
+    if (!e) continue;
+    try {
+      hosts.add(new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(e) ? e : `http://${e}`).hostname);
+    } catch {
+      /* skip invalid entry */
+    }
+  }
+  return [...hosts];
+}
