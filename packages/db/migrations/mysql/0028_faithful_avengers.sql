@@ -1,0 +1,2 @@
+ALTER TABLE `invitations` ADD `group_id` char(36) CHARACTER SET ascii COLLATE ascii_bin;--> statement-breakpoint
+ALTER TABLE `invitations` ADD CONSTRAINT `invitations_group_id_groups_id_fk` FOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON DELETE set null ON UPDATE no action;

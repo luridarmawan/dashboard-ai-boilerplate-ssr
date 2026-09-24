@@ -563,7 +563,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | A-10 | **[P0]** **Proteksi CSRF berlaku untuk seluruh endpoint yang mengubah state, tanpa pengecualian.** Mekanismenya: `SameSite=Lax` + validasi header `Origin`/`Referer` + token double-submit untuk form. Endpoint publik ditandai eksplisit lewat daftar putih, bukan dengan mematikan middleware (D6). |
 | A-11 | **[P2]** 2FA TOTP + recovery codes. |
 | A-12 | **[P0]** Rekam `last_seen`, `ip`, dan `device` per sesi. |
-| A-13 | **[P1]** Registrasi lewat **tautan undangan** per tenant (`/join/<kode>`): admin dengan `user.create` mengundang alamat email; tautan berlaku `security.invitation_hours` (baku 72 jam) dan **tetap bisa dipakai saat `SIGNUP_ENABLED=false`** (flag itu hanya mengatur pendaftaran mandiri). Email yang sudah terdaftar tidak diundang: akunnya ditambahkan ke tenant dan dikirimi informasi untuk masuk. Undangan bisa dicabut; mengundang ulang alamat yang sama mencabut yang lama. |
+| A-13 | **[P1]** Registrasi lewat **tautan undangan** per tenant (`/join/<kode>`): admin dengan `user.create` mengundang alamat email; tautan berlaku `security.invitation_hours` (baku 72 jam) dan **tetap bisa dipakai saat `SIGNUP_ENABLED=false`** (flag itu hanya mengatur pendaftaran mandiri). Email yang sudah terdaftar tidak diundang: akunnya ditambahkan ke tenant dan dikirimi informasi untuk masuk. Undangan bisa dicabut; mengundang ulang alamat yang sama mencabut yang lama. Setiap undangan menyebut **grup** yang akan dimasuki undangan (`groupId`, grup hidup tenant aktif; baku grup sistem `user` / Regular User; boleh tanpa grup): alamat baru mendapatkannya saat menerima tautan, alamat yang sudah terdaftar mendapatkannya langsung tanpa melepas grup lain. |
 
 ### FR-B · Multi-Tenancy
 

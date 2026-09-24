@@ -94,6 +94,15 @@ const rowActions: RowAction<Row>[] = $derived([
     : []),
 ]);
 const deactivated = $derived(page.url.searchParams.get('deactivated'));
+/**
+ * The group an invitation grants: what the admin last picked (a refused submit re-renders with
+ * it), else the seeded Regular User group — the same default the API applies without a picker.
+ */
+const inviteGroup = $derived(
+  typeof form?.values?.groupId === 'string'
+    ? form.values.groupId
+    : (data.groups?.find((g) => g.code === 'user')?.id ?? ''),
+);
 /** Deactivation asks first (L-22); the table shows this in a modal, the server inline (below). */
 const deactivateConfirm = {
   token: 'deactivate',
@@ -185,16 +194,26 @@ const deactivateConfirm = {
       <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form">
         <Csrf token={data.csrf} />
         <label class="grid gap-1 text-sm">{t('users.invite.email')} <input name="email" type="email" required autocomplete="off" class="h-9 w-72 rounded-md border border-input bg-background px-2 text-sm" value={form?.values?.email ?? ''} /></label>
+        {#if data.groups}
+          <!-- The group the invitee joins on acceptance; hidden without group.read (the API then applies Regular User). -->
+          <label class="grid gap-1 text-sm">{t('users.invite.group')}
+            <select name="groupId" class="h-9 min-w-44 rounded-md border border-input bg-background px-2 text-sm" data-testid="invite-group">
+              {#each data.groups as g (g.id)}<option value={g.id} selected={inviteGroup === g.id}>{g.name}</option>{/each}
+              <option value="" selected={inviteGroup === ''}>{t('users.invite.group_none')}</option>
+            </select>
+          </label>
+        {/if}
         <Button type="submit" size="sm" class="cursor-pointer"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
       </form>
       {#if data.invitations.length}
         <table class="mt-4 w-full text-sm" data-testid="invitations">
-          <thead class="text-start text-xs text-muted-foreground"><tr><th class="py-1 text-start">{t('users.invite.col_email')}</th><th class="py-1 text-start">{t('users.invite.col_status')}</th><th class="py-1 text-start">{t('users.invite.col_expires')}</th><th class="py-1 text-start">{t('users.invite.col_by')}</th><th class="py-1"></th></tr></thead>
+          <thead class="text-start text-xs text-muted-foreground"><tr><th class="py-1 text-start">{t('users.invite.col_email')}</th><th class="py-1 text-start">{t('users.invite.col_status')}</th><th class="py-1 text-start">{t('users.invite.col_group')}</th><th class="py-1 text-start">{t('users.invite.col_expires')}</th><th class="py-1 text-start">{t('users.invite.col_by')}</th><th class="py-1"></th></tr></thead>
           <tbody>
             {#each data.invitations as inv (inv.id)}
               <tr class="border-t">
                 <td class="py-1.5">{inv.email}</td>
                 <td class="py-1.5"><Badge variant={inv.status === 'pending' ? 'secondary' : 'destructive'}>{inv.status === 'pending' ? t('users.invite.status_pending') : t('users.invite.status_expired')}</Badge></td>
+                <td class="py-1.5 text-muted-foreground">{inv.group?.name ?? '—'}</td>
                 <td class="py-1.5 text-muted-foreground">{new Date(inv.expiresAt).toLocaleString(dateLocale)}</td>
                 <td class="py-1.5 text-muted-foreground">{inv.invitedBy ?? '—'}</td>
                 <td class="py-1.5 text-end"><form method="POST" action="?/revoke"><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm" class="cursor-pointer">{t('users.invite.revoke')}</Button></form></td>

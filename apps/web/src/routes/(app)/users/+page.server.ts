@@ -50,11 +50,16 @@ export const load: PageServerLoad = async (event) => {
   // Pending invitations (A-13): only readable with user.create — a 403 simply hides the section.
   const inv = await apiFor(event).v1.invitations.get();
   const invitations = inv.data?.success ? inv.data.data : null;
-  // The group filter's options: needs group.read — without it the select is not offered (the
-  // filter itself still applies from the URL; a group id is not a secret).
+  // The group filter's options, and the group picker of the invite card: needs group.read —
+  // without it neither is offered (the filter itself still applies from the URL; a group id is not
+  // a secret, and an invitation without a picked group lands in the API's default, Regular User).
   const grp = await apiFor(event).v1.groups.get({ query: { limit: 100, sort: 'name' } });
   const groups = grp.data?.success
-    ? grp.data.data.map((g: { id: string; name: string }) => ({ id: g.id, name: g.name }))
+    ? grp.data.data.map((g: { id: string; code: string; name: string }) => ({
+        id: g.id,
+        code: g.code,
+        name: g.name,
+      }))
     : null;
   return {
     users,
@@ -98,11 +103,17 @@ export const actions: Actions = {
     forwardSetCookies(event, res.response);
     redirect(303, '/dashboard');
   },
-  /** Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over. */
+  /**
+   * Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over.
+   * `groupId` is the group the invitee joins: the picker's value, `''` for "no group" (sent as
+   * null), and no field at all (the picker is hidden without group.read) leaves the API's default.
+   */
   invite: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    const values = { email: str(form, 'email') };
+    const groupField = form.get('groupId');
+    const groupId = typeof groupField === 'string' ? groupField : undefined;
+    const values = { email: str(form, 'email'), groupId: groupId ?? '' };
     if (!checkCsrf(event, form))
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
@@ -115,6 +126,7 @@ export const actions: Actions = {
       await apiFor(event).v1.invitations.post({
         email: values.email,
         locale: event.locals.locale.locale === 'en' ? 'en' : 'id',
+        ...(groupId === undefined ? {} : { groupId: groupId || null }),
       }),
     );
     if (!r.ok) return actionFailure(r.failure, values);

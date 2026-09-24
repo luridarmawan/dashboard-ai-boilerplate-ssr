@@ -1,0 +1,1 @@
+ALTER TABLE `invitations` ADD `group_id` text(36) REFERENCES groups(id);

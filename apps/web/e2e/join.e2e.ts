@@ -5,7 +5,9 @@ import { expect, test } from '@playwright/test';
  * fields on /auth/join/<code> carry the show/hide toggle, and a confirmation that does not match the
  * password is refused by the web action before the API is ever called. The invitation itself is
  * created through the /users page as an admin, and the link is followed in a fresh, signed-out
- * context: the join page sends a signed-in visitor straight to the dashboard.
+ * context: the join page sends a signed-in visitor straight to the dashboard. The invite form
+ * offers the group the invitee joins, preselecting Regular User (owner's ask of 2026-09-24), and
+ * the new account shows up in the users table with that group.
  */
 const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@example.test';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? 'bootstrap admin password';
@@ -22,10 +24,19 @@ test('join: kedua field kata sandi punya toggle, konfirmasi yang tidak cocok dit
 
   await page.goto('/users');
   const inviteForm = page.getByTestId('invite-form');
-  await inviteForm.locator('input[name="email"]').fill(`e2e-join-${Date.now()}@example.test`);
+  const inviteEmail = `e2e-join-${Date.now()}@example.test`;
+  await inviteForm.locator('input[name="email"]').fill(inviteEmail);
+  // The group picker defaults to the seeded Regular User group; "no group" is an option, not the default.
+  const groupPicker = inviteForm.getByTestId('invite-group');
+  await expect(groupPicker.locator('option:checked')).toHaveText('Regular User');
+  await expect(groupPicker.locator('option[value=""]')).toHaveCount(1);
   await inviteForm.locator('button[type="submit"]').click();
   const link = (await page.getByTestId('invite-sent').locator('code').textContent()) ?? '';
   expect(link).toMatch(/\/join\//);
+  // The pending row names the group it grants.
+  await expect(
+    page.getByTestId('invitations').locator('tr', { hasText: inviteEmail }).locator('td').nth(2),
+  ).toHaveText('Regular User');
   // The link carries the forwarded origin; only its path matters to the browser under test.
   const joinPath = new URL(link).pathname;
 
@@ -64,4 +75,9 @@ test('join: kedua field kata sandi punya toggle, konfirmasi yang tidak cocok dit
   await form.locator('button[type="submit"]').click();
   await expect(join).toHaveURL(/\/dashboard/);
   await guest.close();
+
+  // Accepting granted the group: the admin sees it in the users table.
+  await page.goto(`/users?q=${encodeURIComponent(inviteEmail)}`);
+  const row = page.locator('table tbody tr', { hasText: inviteEmail }).first();
+  await expect(row).toContainText('Regular User');
 });
