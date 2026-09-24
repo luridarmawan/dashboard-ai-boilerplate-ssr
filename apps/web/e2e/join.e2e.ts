@@ -6,8 +6,9 @@ import { expect, test } from '@playwright/test';
  * password is refused by the web action before the API is ever called. The invitation itself is
  * created through the /users page as an admin, and the link is followed in a fresh, signed-out
  * context: the join page sends a signed-in visitor straight to the dashboard. The invite form
- * offers the group the invitee joins, preselecting Regular User (owner's ask of 2026-09-24), and
- * the new account shows up in the users table with that group.
+ * offers the group the invitee joins, preselecting Regular User (owner's ask of 2026-09-24), asks
+ * for confirmation in a modal before anything is sent, and the new account shows up in the users
+ * table with that group.
  */
 const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@example.test';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? 'bootstrap admin password';
@@ -30,7 +31,14 @@ test('join: kedua field kata sandi punya toggle, konfirmasi yang tidak cocok dit
   const groupPicker = inviteForm.getByTestId('invite-group');
   await expect(groupPicker.locator('option:checked')).toHaveText('Regular User');
   await expect(groupPicker.locator('option[value=""]')).toHaveCount(1);
+  // Submitting only asks: a modal names the address and the group, nothing is sent yet.
   await inviteForm.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/users$/);
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText(inviteEmail);
+  await expect(dialog).toContainText('Regular User');
+  await expect(page.getByTestId('invite-sent')).toHaveCount(0);
+  await page.getByTestId('invite-confirm-dialog').locator('button[type="submit"]').click();
   const link = (await page.getByTestId('invite-sent').locator('code').textContent()) ?? '';
   expect(link).toMatch(/\/join\//);
   // The pending row names the group it grants.

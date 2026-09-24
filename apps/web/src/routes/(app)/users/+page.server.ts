@@ -107,18 +107,25 @@ export const actions: Actions = {
    * Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over.
    * `groupId` is the group the invitee joins: the picker's value, `''` for "no group" (sent as
    * null), and no field at all (the picker is hidden without group.read) leaves the API's default.
+   *
+   * Two POSTs (L-22), like `deactivate`: the first carries the address and group but no `confirm`
+   * token and only earns the question — the page asks inline (or already asked in a modal and
+   * posts the second step straight away). Nothing is sent until `?confirm=invite` arrives.
    */
   invite: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
     const groupField = form.get('groupId');
     const groupId = typeof groupField === 'string' ? groupField : undefined;
-    const values = { email: str(form, 'email'), groupId: groupId ?? '' };
+    const values = { email: str(form, 'email').trim(), groupId: groupId ?? '' };
     if (!checkCsrf(event, form))
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
         values,
       );
+    // An empty address is not worth a question: the API refuses it with the usual 422.
+    if (values.email && !confirmed(event, 'invite'))
+      return { confirmInvite: { email: values.email, groupId }, values };
     const r = unwrap<{
       success: true;
       data: { existing: boolean; email: string; link?: string; expiresAt?: string };

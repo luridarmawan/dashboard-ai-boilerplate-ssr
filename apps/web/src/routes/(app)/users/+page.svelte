@@ -4,7 +4,7 @@ import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
 import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
-import { Alert, Badge, Button, Card } from '$lib/components/ui';
+import { Alert, Badge, Button, Card, Dialog } from '$lib/components/ui';
 import { formatDateTime } from '$lib/format';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -103,6 +103,32 @@ const inviteGroup = $derived(
     ? form.values.groupId
     : (data.groups?.find((g) => g.code === 'user')?.id ?? ''),
 );
+/**
+ * Inviting asks first (L-22). Without JavaScript the form posts as-is and the server answers with
+ * `confirmInvite`, rendered inline below; with it the submit is intercepted and the same second
+ * step opens in a modal. Both post to `?/invite&confirm=invite` — the action refuses anything else.
+ */
+let inviteAsk = $state<{ email: string; groupId: string | undefined } | null>(null);
+let inviteOpen = $state(false);
+const askInvite = (e: SubmitEvent) => {
+  const f = e.currentTarget as HTMLFormElement;
+  const email = (new FormData(f).get('email') as string | null)?.trim() ?? '';
+  if (!email) return;
+  e.preventDefault();
+  const g = f.elements.namedItem('groupId') as HTMLSelectElement | null;
+  inviteAsk = { email, groupId: g ? g.value : undefined };
+  inviteOpen = true;
+};
+/** Wording of the question: the group's name, or the "no group" sentence when none is granted. */
+const inviteLead = (ask: { email: string; groupId: string | undefined }) => {
+  const name =
+    ask.groupId === undefined
+      ? data.groups?.find((g) => g.code === 'user')?.name
+      : data.groups?.find((g) => g.id === ask.groupId)?.name;
+  return name
+    ? t('users.invite.confirm_lead', { email: ask.email, group: name })
+    : t('users.invite.confirm_lead_nogroup', { email: ask.email });
+};
 /** Deactivation asks first (L-22); the table shows this in a modal, the server inline (below). */
 const deactivateConfirm = {
   token: 'deactivate',
@@ -111,6 +137,20 @@ const deactivateConfirm = {
   submitLabel: t('users.deactivate_confirm_submit'),
 };
 </script>
+
+{#snippet inviteConfirmForm(ask: { email: string; groupId: string | undefined }, inDialog: boolean)}
+  <form method="POST" action="?/invite&confirm=invite" class="flex flex-wrap gap-2" data-testid={inDialog ? 'invite-confirm-dialog' : 'invite-confirm-form'}>
+    <Csrf token={data.csrf} />
+    <input type="hidden" name="email" value={ask.email} />
+    {#if ask.groupId !== undefined}<input type="hidden" name="groupId" value={ask.groupId} />{/if}
+    <Button type="submit" class="cursor-pointer"><Icon name="mail" size={16} />{t('users.invite.confirm_submit')}</Button>
+    {#if inDialog}
+      <Button variant="secondary" onclick={() => { inviteOpen = false; }}>{t('common.cancel')}</Button>
+    {:else}
+      <Button href={`${page.url.pathname}${page.url.search}`} variant="secondary">{t('common.cancel')}</Button>
+    {/if}
+  </form>
+{/snippet}
 
 <svelte:head><title>{t('nav.users')}</title></svelte:head>
 
@@ -191,7 +231,14 @@ const deactivateConfirm = {
         </div>
       {/if}
       {#if form?.error && !form?.invited && !form?.impersonate && !form?.deactivate}<p class="error" role="alert">{form.error}</p>{/if}
-      <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form">
+      {#if form?.confirmInvite}
+        <!-- No-JavaScript path: the first POST only asked; this form is the second step, token included. -->
+        <div class="mt-3 grid gap-3" id="confirm-invite" data-testid="invite-confirm">
+          <Alert variant="warning" title={t('users.invite.confirm')}><p>{inviteLead(form.confirmInvite)}</p></Alert>
+          {@render inviteConfirmForm(form.confirmInvite, false)}
+        </div>
+      {/if}
+      <form method="POST" action="?/invite" class="mt-3 flex flex-wrap items-end gap-2" data-testid="invite-form" onsubmit={askInvite}>
         <Csrf token={data.csrf} />
         <label class="grid gap-1 text-sm">{t('users.invite.email')} <input name="email" type="email" required autocomplete="off" class="h-9 w-72 rounded-md border border-input bg-background px-2 text-sm" value={form?.values?.email ?? ''} /></label>
         {#if data.groups}
@@ -203,8 +250,14 @@ const deactivateConfirm = {
             </select>
           </label>
         {/if}
-        <Button type="submit" size="sm" class="cursor-pointer"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
+        <!-- Same height as the input and the select (h-9): the default size, not `sm`. -->
+        <Button type="submit" class="cursor-pointer"><Icon name="mail" size={16} />{t('users.invite.submit')}</Button>
       </form>
+      {#if inviteAsk}
+        <Dialog bind:open={inviteOpen} title={t('users.invite.confirm')} description={inviteLead(inviteAsk)}>
+          {@render inviteConfirmForm(inviteAsk, true)}
+        </Dialog>
+      {/if}
       {#if data.invitations.length}
         <table class="mt-4 w-full text-sm" data-testid="invitations">
           <thead class="text-start text-xs text-muted-foreground"><tr><th class="py-1 text-start">{t('users.invite.col_email')}</th><th class="py-1 text-start">{t('users.invite.col_status')}</th><th class="py-1 text-start">{t('users.invite.col_group')}</th><th class="py-1 text-start">{t('users.invite.col_expires')}</th><th class="py-1 text-start">{t('users.invite.col_by')}</th><th class="py-1"></th></tr></thead>
