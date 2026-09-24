@@ -98,6 +98,12 @@ const SORT = {
 const sortColumn = (key: string | undefined) =>
   key && key in SORT ? SORT[key as keyof typeof SORT] : SORT.name;
 
+/** The list query plus `group`: a group id of the active tenant; only its members are returned. */
+const UsersListQuery = t.Composite([
+  ListQuery,
+  t.Object({ group: t.Optional(t.String({ maxLength: 36 })) }),
+]);
+
 const PublicUser = t.Object({
   id: t.String(),
   email: t.String(),
@@ -1068,6 +1074,22 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
               sql`lower(${schema.users.name}) like ${likePattern(p.q)}`,
             )
           : undefined,
+        // Group filter (D-1): members of that group in THIS tenant. An id from another tenant or a
+        // deleted group simply matches nobody — the membership table is scoped, not the group id.
+        query.group
+          ? inArray(
+              schema.users.id,
+              db
+                .select({ id: schema.groupUserMaps.user_id })
+                .from(schema.groupUserMaps)
+                .where(
+                  and(
+                    scopeOf(ts.tenant, schema.groupUserMaps),
+                    eq(schema.groupUserMaps.group_id, query.group),
+                  ),
+                ),
+            )
+          : undefined,
       );
       const base = () =>
         db
@@ -1092,9 +1114,12 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
     },
     {
       beforeHandle: permission('user.read'),
-      query: ListQuery,
+      query: UsersListQuery,
       response: { 200: PageSchema(TenantUser), ...errorResponses },
-      detail: { summary: 'Users of the active tenant: paginated, searchable, sortable (D-1)' },
+      detail: {
+        summary:
+          'Users of the active tenant: paginated, searchable, sortable, filterable by group (D-1)',
+      },
     },
   )
   .get(

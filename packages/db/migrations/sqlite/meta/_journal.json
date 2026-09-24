@@ -8,6 +8,13 @@
       "when": 1790101328580,
       "tag": "0000_parallel_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790220551784,
+      "tag": "0001_rich_cardiac",
+      "breakpoints": true
     }
   ]
 }

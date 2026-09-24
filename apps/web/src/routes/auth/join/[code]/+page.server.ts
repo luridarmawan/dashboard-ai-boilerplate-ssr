@@ -14,7 +14,8 @@ import type { Actions, PageServerLoad } from './$types';
 
 /**
  * Registration by invitation (A-13): the page shows whom the code is for, the form asks only for a
- * name and a password, and the API opens the session — with SIGNUP_ENABLED off too. No JavaScript.
+ * name and a password (typed twice), and the API opens the session — with SIGNUP_ENABLED off too.
+ * Works without JavaScript; the show/hide toggle on the password fields is the only enhancement.
  */
 export const load: PageServerLoad = async (event) => {
   const home = cfgString(event.locals.config, 'app.home_route', '/dashboard');
@@ -39,6 +40,12 @@ export const actions: Actions = {
     if (!checkCsrf(event, form))
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        values,
+      );
+    // Same check as the password change on /profile: the API never sees the confirmation field.
+    if (str(form, 'password') !== str(form, 'password_confirm'))
+      return actionFailure(
+        { status: 422, code: 'password_mismatch', message: t('join.password_mismatch') },
         values,
       );
     const res = await apiFor(event).v1.auth.join.post({

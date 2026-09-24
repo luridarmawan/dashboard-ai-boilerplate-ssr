@@ -103,6 +103,7 @@ Selesai. Backup pertama sudah berjalan saat langkah 7 (service `backup` men-dump
 | `/v1/ready` merah (`ready:false`, 503) dengan `Failed query: select id from clients` | tabel belum ada: `dc up -d` tidak menjalankan migrasi — langkah 4–5 terlewat | `dc run --rm preflight` lalu `dc run --rm migrate && dc run --rm seed` |
 | `/v1/ready` merah dengan galat koneksi (`ECONNREFUSED`, `Access denied`) | database tidak terjangkau atau kredensial berubah | periksa `dc ps mysql`, `DATABASE_URL`; baris di bawah |
 | Setelah **restore** (atau `DROP DATABASE` manual) setiap kueri gagal, log `cause: ER_NO_DB_ERROR/1046: No database selected` | koneksi pool api/web dibuka sebelum database dibuat ulang dan kehilangan schema bawaannya | `dc up -d --force-recreate --scale api=3 web` — `restore.sh` juga mengingatkannya |
+| *Last Login IP* / *Last Active IP* / audit log berisi IP jaringan lokal (`192.168.…`, `10.…`, `172.…`) untuk semua orang | proxy terluar tidak menulis `X-Forwarded-For` (Caddy bawaan **membuang** header itu dari klien yang tidak dipercaya; proxy TCP/NAT *masquerade* tidak pernah membuatnya) | `curl -s https://DOMAIN/v1/health -H 'X-Forwarded-For: 203.0.113.7'` lalu lihat `ip` di log api; di belakang proxy lain di LAN pakai `Caddyfile.behind-proxy` (`trusted_proxies static private_ranges`) atau tambahkan blok `servers { trusted_proxies static <IP proxy> }` ke Caddyfile Anda; pastikan proxy depan menyetel `X-Forwarded-For` (`$proxy_add_x_forwarded_for` di Nginx; `mod_proxy` Apache melakukannya sendiri) |
 | `permission denied` di `./backups` | folder dibuat root oleh Docker | `sudo chown -R $USER ./backups` (dump ditulis oleh user image mysql) |
 | `migrate`/`seed`: `Access denied for user 'app'@'%' to database '<nama>'` (errno 1044) | `DATABASE_NAME` diubah setelah volume `mysql-data` dibuat — database baru belum ada / user `app` belum punya hak | `dc run --rm db-init` lalu `migrate` + `seed`; atau `dc down -v` bila data belum penting |
 | `migrate`/`seed`: `Access denied for user 'app'@'172.…' (using password: YES)` (errno 1045) | `MYSQL_PASSWORD` di `.env.prod` diubah setelah volume `mysql-data` dibuat (image MySQL hanya memakainya saat inisialisasi pertama), atau `DATABASE_URL` eksplisit berbeda, atau kata sandi berisi karakter URL | `dc config \| grep DATABASE_URL`; `dc run --rm db-init` menyamakan kata sandi user `app` dengan `.env.prod` (butuh root password yang berlaku di volume), atau bila data belum penting `dc down -v && dc up -d --wait mysql` |
@@ -116,7 +117,7 @@ Caddy butuh port 80 untuk tantangan Let's Encrypt, jadi bila Apache (atau Nginx)
 CADDYFILE=./deploy/Caddyfile.behind-proxy     # Caddy tanpa TLS, auto_https off, mempercayai X-Forwarded-* dari host
 HTTP_PORT=127.0.0.1:8080                      # hanya loopback; tidak ada port publik dari Docker
 HTTPS_PORT=127.0.0.1:8443                     # tidak dipakai di mode ini
-XFF_DEPTH=2                                   # IP klien = 2 hop di belakang (Apache → Caddy → web)
+XFF_DEPTH=2                                   # kedalaman untuk getClientAddress() SvelteKit; IP klien aplikasi sendiri tidak bergantung padanya (lihat bawah)
 #    DOMAIN = nama publik utama; APP_ORIGIN (daftar) menentukan origin yang lolos pemeriksaan CSRF
 
 # 2. Apache: aktifkan modul, pasang vhost dari contoh, minta sertifikat
@@ -137,7 +138,7 @@ curl -sI https://app.example.com/ | head -1                                  # 2
 
 Nginx: [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) dengan `proxy_pass http://127.0.0.1:8080` dan `proxy_buffering off` (streaming AI).
 
-Cara kerja hop ganda: Apache menulis `X-Forwarded-Proto: https` dan menambahkan IP klien ke `X-Forwarded-For`; Caddy mempercayainya (`trusted_proxies private_ranges`) dan meneruskan; web mengambil IP klien dari kedalaman `XFF_DEPTH=2`, API memakai entri pertama. Tanpa `XFF_DEPTH=2`, rate limit login dan audit log akan mencatat `127.0.0.1` untuk semua orang.
+Cara kerja hop ganda: Apache menulis `X-Forwarded-Proto: https` dan menambahkan IP klien ke `X-Forwarded-For`; Caddy mempercayainya (`trusted_proxies private_ranges`) dan meneruskan. **IP klien** (rate limit login, *Last Login IP* / *Last Active IP*, audit log) ditentukan api **dan** web dengan satu aturan (`clientIpFromForwarded` di `@core/contracts`): baca `X-Forwarded-For` dari **kanan**, lewati setiap alamat privat / loopback / link-local (`10/8`, `172.16/12`, `192.168/16`, `127/8`, `169.254/16`, `100.64/10`, `fc00::/7`, `fe80::/10`) — itu proxy dan hop NAT milik infrastruktur sendiri — dan ambil alamat **publik pertama**; bila semuanya privat (pengunjung dari LAN yang sama), entri paling kiri. Jadi rantai `pengunjung → proxy perimeter (LAN) → Apache → Caddy → web` menghasilkan IP pengunjung tanpa harus menghitung hop, dan pengunjung internet tidak bisa memalsukannya (alamat yang ditambahkan proxy terluar selalu diperiksa lebih dulu). `XFF_DEPTH` hanya masih mengatur `getClientAddress()` bawaan SvelteKit, yang tidak lagi dipakai aplikasi selama `ADDRESS_HEADER` disetel.
 
 Uji di laptop tanpa domain tetap memakai §2 dengan `DOMAIN=localhost` (Caddy memakai CA internalnya; terima peringatan sertifikat di browser).
 
@@ -372,7 +373,7 @@ Apache: [`deploy/apache.conf.example`](../deploy/apache.conf.example) sudah berb
 | `API_HOST` / `API_PORT` | proses api (baku `127.0.0.1:3001`) |
 | `WEB_PORT_INTERNAL` | proses web di belakang gateway (baku `3010`) |
 
-`X-Forwarded-*` dari proxy depan diteruskan apa adanya — gateway ini satu host dengan aplikasi, bukan hop kepercayaan tambahan, jadi `XFF_DEPTH` tetap **1**. Tanpa proxy depan, header itu diisi dari koneksi masuk sendiri.
+`X-Forwarded-*` dari proxy depan diteruskan apa adanya — gateway ini satu host dengan aplikasi, bukan hop kepercayaan tambahan, jadi `XFF_DEPTH` tetap **1**. Tanpa proxy depan, header itu diisi dari koneksi masuk sendiri. Berapa pun hop NAT/proxy privat di depan (router kantor, Nginx Proxy Manager di host lain, Apache di host ini), IP klien tetap benar karena aplikasi mengambil **entri publik paling kanan** `X-Forwarded-For` (§2b) — asal proxy terluar menuliskan header itu; proxy TCP murni (HAProxy mode `tcp`, DNAT dengan *masquerade*) tidak membawa header apa pun dan IP asli memang tidak bisa dipulihkan darinya.
 
 `bun start --no-proxy` melewatkan gateway: web di `$PORT`, api di `$API_PORT`, dan Anda mengatur dua `location` sendiri seperti [`deploy/nginx.conf.example`](../deploy/nginx.conf.example).
 

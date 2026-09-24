@@ -107,7 +107,9 @@ const procs = [
       PORT: String(webPort),
       API_URL: process.env.API_URL ?? `http://${localApiHost}:${apiPort}`,
       // Behind a reverse proxy (this gateway, or nginx/apache directly): trust its headers for the
-      // client IP and the public origin — same values as deploy/systemd/web.env.example.
+      // client IP and the public origin — same values as deploy/systemd/web.env.example. The web
+      // reads the whole X-Forwarded-For chain (rightmost public entry, see @core/contracts), so
+      // XFF_DEPTH only matters to SvelteKit's own getClientAddress().
       ADDRESS_HEADER: process.env.ADDRESS_HEADER ?? 'X-Forwarded-For',
       XFF_DEPTH: process.env.XFF_DEPTH ?? '1',
       PROTOCOL_HEADER: process.env.PROTOCOL_HEADER ?? 'x-forwarded-proto',

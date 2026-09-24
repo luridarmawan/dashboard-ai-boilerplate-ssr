@@ -1,5 +1,6 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
+import { PasswordInput } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import type { ActionData, PageData } from './$types';
 
@@ -20,7 +21,24 @@ const t = useT();
       <Csrf token={data.csrf} />
       <label>{t('join.email')} <input type="email" value={data.invitation.email} readonly /></label>
       <label>{t('join.name')} <input name="name" required maxlength="191" autocomplete="name" value={form?.values?.name ?? ''} /></label>
-      <label>{t('join.password')} <input name="password" type="password" required minlength="12" autocomplete="new-password" /><span class="muted">{t('auth.register.password_hint')}</span></label>
+      <!-- `<label for>` + <PasswordInput plain>: same shape as the login and register pages, see there. -->
+      <div class="grid gap-1 text-sm">
+        <label for="join-password">{t('join.password')}</label>
+        <PasswordInput plain id="join-password" name="password" required minlength={12} autocomplete="new-password" />
+        <span class="muted">{t('auth.register.password_hint')}</span>
+      </div>
+      <div class="grid gap-1 text-sm">
+        <label for="join-password-confirm">{t('join.password_confirm')}</label>
+        <PasswordInput
+          plain
+          id="join-password-confirm"
+          name="password_confirm"
+          required
+          minlength={12}
+          autocomplete="new-password"
+          aria-invalid={form?.code === 'password_mismatch' ? 'true' : undefined}
+        />
+      </div>
       <div class="row"><button type="submit">{t('join.submit')}</button><a href="/auth/login">{t('join.have_account')}</a></div>
     </form>
   {:else}

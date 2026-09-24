@@ -24,7 +24,7 @@ export const load: PageServerLoad = async (event) => {
     themes: res.data.data.themes,
     previews,
     bases: res.data.data.bases,
-    defaultTheme: String(event.locals.config.values['app.default_theme'] ?? 'base'),
+    defaultTheme: String(event.locals.config.values['app.default_theme'] ?? 'warm'),
     saved: event.url.searchParams.get('saved'),
   };
 };

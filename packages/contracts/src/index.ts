@@ -146,6 +146,7 @@ export const errorResponses = {
   500: FailSchema,
 } as const;
 
+export { clientIpFromForwarded, isPrivateAddress } from './client-ip.ts';
 export {
   AdminPasswordSetBody,
   ClientCode,

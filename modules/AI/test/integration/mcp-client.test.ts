@@ -378,6 +378,134 @@ describe.skipIf(!enabled)('AI module as MCP client (I-4, I-5)', () => {
     expect(body.choices[0]?.message.content).toContain('HELLO');
   });
 
+  test('disabling ONE tool hides just that tool; the choice survives a re-test; a member cannot choose', async () => {
+    const detail = async () =>
+      (
+        (await json(await call(`/v1/m/ai/mcps/${mcpId}`, {}, [admin]))).data as {
+          tools: { id: string; name: string; enabled: boolean }[];
+        }
+      ).tools;
+    const echoId = (await detail()).find((t) => t.name === 'echo')?.id ?? '';
+    expect(echoId).not.toBe('');
+
+    // Choosing is `ai.mcp.manage`: a member is refused, and an unknown server is 404.
+    expect(
+      (
+        await call(
+          `/v1/m/ai/mcps/${mcpId}/tools`,
+          { method: 'PUT', body: JSON.stringify({ ids: [echoId], enabled: false }) },
+          [member],
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await call(
+          `/v1/m/ai/mcps/${newId()}/tools`,
+          { method: 'PUT', body: JSON.stringify({ ids: [echoId], enabled: false }) },
+          [admin],
+        )
+      ).status,
+    ).toBe(404);
+    // An empty set is a request that says nothing: 422 rather than a silent no-op.
+    expect(
+      (
+        await call(
+          `/v1/m/ai/mcps/${mcpId}/tools`,
+          { method: 'PUT', body: JSON.stringify({ ids: [], enabled: false }) },
+          [admin],
+        )
+      ).status,
+    ).toBe(422);
+
+    // Disable `echo` only: the answer is the whole list, `echo` off, the other tool still on.
+    const off = await call(
+      `/v1/m/ai/mcps/${mcpId}/tools`,
+      { method: 'PUT', body: JSON.stringify({ ids: [echoId], enabled: false }) },
+      [admin],
+    );
+    expect(off.status).toBe(200);
+    const offData = (await json(off)).data as {
+      tools: { name: string; enabled: boolean }[];
+    };
+    expect(offData.tools.map((t) => [t.name, t.enabled]).sort()).toEqual([
+      ['echo', false],
+      ['weird name/v2', true],
+    ]);
+    // Gone from the registry — and therefore from the assistant, `/v1/tools` and `/v1/mcp` — while
+    // the sibling tool of the SAME server stays; calling it is 404, like any unknown tool.
+    const names = await toolNames([admin]);
+    expect(names).not.toContain(`ext.${CODE}__echo`);
+    expect(names).toContain(`ext.${CODE}__weird_name_v2`);
+    expect(
+      (await post('/v1/tools/call', { name: `ext_${CODE}__echo`, input: { text: 'x' } }, [admin]))
+        .status,
+    ).toBe(404);
+    // The chat loop no longer offers it to the model either.
+    providerToolsSeen = null;
+    await post('/v1/m/ai/chat/completions', { messages: [{ role: 'user', content: 'hi' }] }, [
+      admin,
+    ]);
+    // The mock wrote it back during the request above; TypeScript still sees the `null` from here.
+    const offered = providerToolsSeen as string[] | null;
+    expect(offered).not.toContain(`ext_${CODE}__echo`);
+    expect(offered).toContain(`ext_${CODE}__weird_name_v2`);
+
+    // A re-test rewrites the rows (new ids) but keeps the choice, matched by wire name.
+    const retest = (await json(await post(`/v1/m/ai/mcps/${mcpId}/test`, {}, [admin]))).data as {
+      ok: boolean;
+      tools: { id: string; name: string; enabled: boolean }[];
+    };
+    expect(retest.ok).toBe(true);
+    const echoAfter = retest.tools.find((t) => t.name === 'echo');
+    expect(echoAfter?.enabled).toBe(false);
+    expect(echoAfter?.id).not.toBe(echoId);
+    expect(retest.tools.find((t) => t.name === 'weird name/v2')?.enabled).toBe(true);
+    // The stale id from before the re-test matches nothing and changes nothing (200, updated 0).
+    const stale = await call(
+      `/v1/m/ai/mcps/${mcpId}/tools`,
+      { method: 'PUT', body: JSON.stringify({ ids: [echoId], enabled: true }) },
+      [admin],
+    );
+    expect(stale.status).toBe(200);
+    expect(((await json(stale)).data as { updated: number }).updated).toBe(0);
+    expect(await toolNames([admin])).not.toContain(`ext.${CODE}__echo`);
+
+    // A server in ANOTHER tenant cannot be reached through this one's route, even by the same admin.
+    const acme = (await json(await call('/v1/m/ai/mcps', {}, [admin], { 'x-client-id': acmeId })))
+      .data as { id: string }[];
+    expect(acme).toHaveLength(1);
+    expect(
+      (
+        await call(
+          `/v1/m/ai/mcps/${acme[0]?.id}/tools`,
+          { method: 'PUT', body: JSON.stringify({ ids: [echoAfter?.id], enabled: true }) },
+          [admin],
+        )
+      ).status,
+    ).toBe(404);
+
+    // "Select all": every id in one request, back to the default.
+    const all = retest.tools.map((t) => t.id);
+    const on = (
+      await json(
+        await call(
+          `/v1/m/ai/mcps/${mcpId}/tools`,
+          { method: 'PUT', body: JSON.stringify({ ids: all, enabled: true }) },
+          [admin],
+        ),
+      )
+    ).data as { tools: { enabled: boolean }[] };
+    expect(on.tools.every((t) => t.enabled)).toBe(true);
+    expect(await toolNames([admin])).toContain(`ext.${CODE}__echo`);
+    // Audited like every other admin decision about a server.
+    const audit = await db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.resource_id, mcpId));
+    expect(audit.some((r) => r.action === 'ai.mcp.tools')).toBe(true);
+  });
+
   test('disabling hides the tools; deleting forgets them', async () => {
     await call(
       `/v1/m/ai/mcps/${mcpId}`,

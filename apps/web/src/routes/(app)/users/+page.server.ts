@@ -22,12 +22,23 @@ export const _layoutVariant = 'wide';
 
 const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at', 'last_active_at']);
 
-/** Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders. */
+/**
+ * Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders.
+ * `group` is the one page-specific filter: a group id of this tenant, narrowing to its members.
+ */
 export const load: PageServerLoad = async (event) => {
-  const st = tableStateFrom(event.url, { sort: 'name' });
+  const st = tableStateFrom(event.url, { sort: 'name', extra: ['group'] });
   const sort = SORTABLE.has(st.sort) ? st.sort : 'name';
+  const group = st.extra?.group;
   const res = await apiFor(event).v1.users.get({
-    query: { ...(st.q ? { q: st.q } : {}), page: st.page, limit: st.limit, sort, order: st.order },
+    query: {
+      ...(st.q ? { q: st.q } : {}),
+      ...(group ? { group } : {}),
+      page: st.page,
+      limit: st.limit,
+      sort,
+      order: st.order,
+    },
   });
   const r = unwrap<{
     success: true;
@@ -39,9 +50,21 @@ export const load: PageServerLoad = async (event) => {
   // Pending invitations (A-13): only readable with user.create — a 403 simply hides the section.
   const inv = await apiFor(event).v1.invitations.get();
   const invitations = inv.data?.success ? inv.data.data : null;
+  // The group filter's options, and the group picker of the invite card: needs group.read —
+  // without it neither is offered (the filter itself still applies from the URL; a group id is not
+  // a secret, and an invitation without a picked group lands in the API's default, Regular User).
+  const grp = await apiFor(event).v1.groups.get({ query: { limit: 100, sort: 'name' } });
+  const groups = grp.data?.success
+    ? grp.data.data.map((g: { id: string; code: string; name: string }) => ({
+        id: g.id,
+        code: g.code,
+        name: g.name,
+      }))
+    : null;
   return {
     users,
     invitations,
+    groups,
     csrf: csrfToken(event),
     state: { ...st, sort, total: r.data.meta.total, totalPages: r.data.meta.totalPages },
   };
@@ -80,16 +103,29 @@ export const actions: Actions = {
     forwardSetCookies(event, res.response);
     redirect(303, '/dashboard');
   },
-  /** Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over. */
+  /**
+   * Invite an e-mail into the active tenant (A-13); the link comes back once for hand-over.
+   * `groupId` is the group the invitee joins: the picker's value, `''` for "no group" (sent as
+   * null), and no field at all (the picker is hidden without group.read) leaves the API's default.
+   *
+   * Two POSTs (L-22), like `deactivate`: the first carries the address and group but no `confirm`
+   * token and only earns the question — the page asks inline (or already asked in a modal and
+   * posts the second step straight away). Nothing is sent until `?confirm=invite` arrives.
+   */
   invite: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    const values = { email: str(form, 'email') };
+    const groupField = form.get('groupId');
+    const groupId = typeof groupField === 'string' ? groupField : undefined;
+    const values = { email: str(form, 'email').trim(), groupId: groupId ?? '' };
     if (!checkCsrf(event, form))
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
         values,
       );
+    // An empty address is not worth a question: the API refuses it with the usual 422.
+    if (values.email && !confirmed(event, 'invite'))
+      return { confirmInvite: { email: values.email, groupId }, values };
     const r = unwrap<{
       success: true;
       data: { existing: boolean; email: string; link?: string; expiresAt?: string };
@@ -97,6 +133,7 @@ export const actions: Actions = {
       await apiFor(event).v1.invitations.post({
         email: values.email,
         locale: event.locals.locale.locale === 'en' ? 'en' : 'id',
+        ...(groupId === undefined ? {} : { groupId: groupId || null }),
       }),
     );
     if (!r.ok) return actionFailure(r.failure, values);

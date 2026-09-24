@@ -66,7 +66,7 @@ describe('custom themes (L-24): tokens ↔ CSS, contrast (L-21), resolution', ()
       tokens: { light: {}, dark: {} },
     });
     expect(resolveTheme({ user: 'custom.night', extra: [custom] }).theme.id).toBe('custom.night');
-    expect(resolveTheme({ user: 'custom.night' }).theme.id).toBe('base'); // unknown without extra
+    expect(resolveTheme({ user: 'custom.night' }).theme.id).toBe('warm'); // unknown without extra → built-in fallback
     expect(
       resolveTheme({ user: 'custom.night', extra: [custom], allowed: ['base'] }).theme.id,
     ).toBe('base');

@@ -10,6 +10,10 @@ import { col, defineTable } from '../src/descriptor.ts';
  * Global like `sessions`, with an explicit `client_id`: the code is looked up WITHOUT a tenant
  * (the invitee has none yet), which a tenant table could not index (B-0). Admin routes filter by
  * `client_id` explicitly and are guarded by `user.create` in the active tenant.
+ *
+ * `group_id` is the group the invitee joins on acceptance (owner's ask of 2026-09-24): the admin
+ * picks it when inviting, defaulting to the tenant's `user` (Regular User) group; NULL = none. A
+ * group deleted in the meantime nulls the column and the invitee simply lands without a group.
  */
 export const invitations = defineTable({
   name: 'invitations',
@@ -20,6 +24,7 @@ export const invitations = defineTable({
     email: col.identifier(191),
     token_hash: col.identifier(64),
     invited_by: col.uuid().references('users', 'set null').nullable(),
+    group_id: col.uuid().references('groups', 'set null').nullable(),
     expires_at: col.datetime(),
     accepted_at: col.datetime().nullable(),
     accepted_user_id: col.uuid().references('users', 'set null').nullable(),

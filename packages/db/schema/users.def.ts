@@ -29,7 +29,7 @@ export const users = defineTable({
     is_superadmin: col.boolean().default(false),
     email_verified_at: col.datetime().nullable(),
     last_login_at: col.datetime().nullable(),
-    /** Client address of that login (first X-Forwarded-For hop behind the proxy); IPv6 fits in 45. */
+    /** Visitor address of that login: rightmost public X-Forwarded-For entry (`clientIpFromForwarded`); IPv6 fits in 45. */
     last_login_ip: col.identifier(45).nullable(),
     /**
      * Newest request of any session (D-5), throttled like `sessions.last_seen_at` — but kept on

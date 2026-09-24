@@ -121,16 +121,34 @@ const admin = new Jar();
   );
 }
 
-// 2. create a user with the seeded `user` group
+// 2. create a group of our own, then a user in it. The seeded `user` group is shared state
+//    that deliberately grants nothing (a plain member must not see the user list); this proof
+//    must never widen it, so it works on a throwaway group instead.
 const gateEmail = `gate1-${run}@example.test`;
 const gatePassword = 'a gate one password 123';
 let userGroupId = '';
 let newUserId = '';
 {
+  const form = await get(admin, '/groups/new');
+  const created = await post(admin, '/groups/new', {
+    _csrf: csrfOf(form.html),
+    code: `gate1-${run}`.slice(0, 32),
+    name: `Gate One ${run}`,
+    description: '',
+  });
+  userGroupId = /\/groups\/([0-9a-f-]{36})/.exec(location(created.res))?.[1] ?? '';
+  check(
+    'create group → 303 to the new group page',
+    created.res.status === 303 && userGroupId.length === 36,
+    `${created.res.status} ${location(created.res)} ${errorOf(created.html)}`,
+  );
   const page = await get(admin, '/users/new');
   const token = csrfOf(page.html);
-  userGroupId = groupIdFor(page.html, 'Regular User');
-  check('users/new lists the seeded "Regular User" group', userGroupId.length === 36);
+  check(
+    'users/new lists the seeded "Regular User" group',
+    groupIdFor(page.html, 'Regular User').length === 36,
+  );
+  check('users/new lists the new group', groupIdFor(page.html, `Gate One ${run}`) === userGroupId);
   const r = await post(admin, '/users/new', {
     _csrf: token,
     name: 'Gate One',

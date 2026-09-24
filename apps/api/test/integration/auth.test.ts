@@ -102,6 +102,34 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
     expect(sessionCookie(good)).not.toBe(cookie);
   });
 
+  test('behind NAT / a proxy chain the recorded login IP is the visitor, not the LAN hop', async () => {
+    // visitor → perimeter proxy on the LAN → Apache/Caddy on the host: every hop appends itself.
+    const chain = `203.0.113.${run % 250}, 192.168.1.10, 127.0.0.1`;
+    const res = await call('/v1/auth/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': chain },
+      body: JSON.stringify({ email, password }),
+    });
+    expect(res.status).toBe(200);
+    const me = await json(await call('/v1/auth/me', {}, [sessionCookie(res)]));
+    const user = me.data?.user as { lastLoginIp: string | null; lastActiveIp: string | null };
+    expect(user.lastLoginIp).toBe(`203.0.113.${run % 250}`);
+    expect(user.lastActiveIp).toBe(`203.0.113.${run % 250}`);
+
+    // A browser that sends its own X-Forwarded-For does not get to choose: the address the
+    // outermost proxy appended (examined first, from the right) wins over the leftmost entry.
+    const spoofed = await call('/v1/auth/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': `8.8.8.8, 203.0.113.${run % 250}, 10.0.0.5` },
+      body: JSON.stringify({ email, password }),
+    });
+    expect(spoofed.status).toBe(200);
+    const me2 = await json(await call('/v1/auth/me', {}, [sessionCookie(spoofed)]));
+    expect((me2.data?.user as { lastLoginIp: string | null }).lastLoginIp).toBe(
+      `203.0.113.${run % 250}`,
+    );
+  });
+
   test('login is rate limited per email (A-2): 11th attempt in the window → 429 + Retry-After', async () => {
     const victim = `rl-${run}@example.test`;
     let last: Response | undefined;

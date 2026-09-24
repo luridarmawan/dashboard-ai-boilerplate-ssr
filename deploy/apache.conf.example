@@ -1,6 +1,8 @@
 # Apache 2.4 in front of the stack (when Apache already owns :80/:443 on the host).
 # Requires: a2enmod ssl proxy proxy_http headers rewrite ; certbot --apache -d app.example.com
 # Pair with: CADDYFILE=./deploy/Caddyfile.behind-proxy  HTTP_PORT=127.0.0.1:8080  XFF_DEPTH=2  in .env.prod
+# Client IP: the app reads the rightmost PUBLIC X-Forwarded-For entry, so any number of private
+# NAT/proxy hops in front of Apache is fine as long as the outermost one writes that header.
 <VirtualHost *:80>
     ServerName app.example.com
     # certbot's ACME challenge stays on Apache; everything else goes to HTTPS

@@ -226,30 +226,43 @@ const anon = new Jar();
     'app.home_route': '',
   });
   const back = await get(new Jar(), '/auth/login');
-  check('reset applied immediately (base again)', htmlAttr(back.html, 'data-app-theme') === 'base');
+  check('reset applied immediately (warm again)', htmlAttr(back.html, 'data-app-theme') === 'warm');
 }
 
 // ---- E-1: tenant branding (name + logo) from configuration, in the brand region of every shell ----
 {
   const LOGO = 'https://example.test/logo.png';
-  await saveApp(admin, 'global', { 'app.name': 'Kopi Nusantara', 'app.logo_url': LOGO });
+  const FAVICON = 'https://example.test/favicon.png';
+  await saveApp(admin, 'global', {
+    'app.name': 'Kopi Nusantara',
+    'app.logo_url': LOGO,
+    'app.favicon_url': FAVICON,
+  });
   const dash = await get(admin, '/dashboard');
   check(
     'app.name from configuration is the brand of the dashboard shell',
     dash.html.includes('Kopi Nusantara'),
   );
   check('app.logo_url from configuration is the brand logo', dash.html.includes(LOGO));
+  check(
+    'app.favicon_url from configuration is the <link rel="icon"> of the shell',
+    dash.html.includes(`<link rel="icon" href="${FAVICON}"`) && !dash.html.includes('/favicon.svg'),
+  );
   const anonLogin = await get(new Jar(), '/auth/login');
   check(
     'the same branding reaches a visitor who is not signed in (auth shell)',
     anonLogin.html.includes('Kopi Nusantara') && anonLogin.html.includes(LOGO),
   );
-  // reset: an empty value falls back to the registry default (name) and to no logo
-  await saveApp(admin, 'global', { 'app.name': '', 'app.logo_url': '' });
+  // reset: an empty value falls back to the registry default (name), to no logo, and to the
+  // built-in favicon
+  await saveApp(admin, 'global', { 'app.name': '', 'app.logo_url': '', 'app.favicon_url': '' });
   const reset = await get(admin, '/dashboard');
   check(
-    'clearing both restores the built-in name and brand icon',
-    !reset.html.includes('Kopi Nusantara') && !reset.html.includes(LOGO),
+    'clearing all three restores the built-in name, brand icon and favicon',
+    !reset.html.includes('Kopi Nusantara') &&
+      !reset.html.includes(LOGO) &&
+      !reset.html.includes(FAVICON) &&
+      reset.html.includes('/favicon.svg'),
   );
 }
 

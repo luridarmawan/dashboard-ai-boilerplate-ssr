@@ -50,6 +50,15 @@ export const McpBody = t.Object({
   enabled: t.Optional(t.Boolean()),
 });
 export const McpUpdateBody = t.Partial(McpBody);
+/**
+ * Which discovered tools of one MCP server the assistant may use (I-5). One request carries one
+ * decision for a set of tools — a single checkbox sends one id, "select all" sends them all — so
+ * the admin page never needs a save button and never has to sequence requests.
+ */
+export const McpToolsBody = t.Object({
+  ids: t.Array(t.String({ minLength: 1, maxLength: 36 }), { minItems: 1, maxItems: 500 }),
+  enabled: t.Boolean(),
+});
 /** Provider + model selection for a conversation (H-10); `null` provider = tenant default. */
 export const ConversationCreate = t.Object({
   provider: t.Optional(t.Nullable(t.String({ maxLength: 40 }))),

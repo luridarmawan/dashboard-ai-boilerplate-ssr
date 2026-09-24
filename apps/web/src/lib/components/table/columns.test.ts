@@ -34,6 +34,25 @@ describe('tableStateFrom', () => {
     expect(state('?sort=name').cols).toEqual([]);
   });
 
+  test('reads only the named extra filters, dropping blanks', () => {
+    const st = tableStateFrom(new URL('http://x/users?group=g1&status=1&q=a&other=z'), {
+      sort: 'name',
+      extra: ['group', 'status', 'missing'],
+    });
+    expect(st.extra).toEqual({ group: 'g1', status: '1' });
+    expect(
+      tableStateFrom(new URL('http://x/users?group=+'), { sort: 'name', extra: ['group'] }).extra,
+    ).toEqual({});
+    // Without a list nothing is read: pages that have no filters see an empty object.
+    expect(state('?group=g1').extra).toEqual({});
+  });
+
+  test('extra filters ride along every link and can be patched away', () => {
+    const st = { ...state('?q=a'), extra: { group: 'g1' }, total: 0, totalPages: 1 };
+    expect(withParams(st, { page: 2 })).toContain('group=g1');
+    expect(withParams(st, { group: undefined })).not.toContain('group=');
+  });
+
   test('round-trips through withParams', () => {
     const st = state('?cols=name&cols=email&limit=50');
     expect(withParams({ ...st, total: 0, totalPages: 1 }, {})).toContain('cols=name%2Cemail');

@@ -88,7 +88,7 @@ const layoutList: LayoutDef[] = [
 ];
 
 /** Built-in default when nothing else decides (L-12 step 5). */
-export const FALLBACK_THEME = 'base';
+export const FALLBACK_THEME = 'warm';
 
 export function themes(): readonly ThemeManifest[] {
   return themeList;

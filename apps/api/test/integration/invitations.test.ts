@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
 import { resetEnvCache } from '@core/config';
-import { type Db, eq, schema, unsafeAcrossTenants } from '@core/db';
+import { and, type Db, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { settings } from '../../src/services.ts';
 
@@ -11,6 +11,8 @@ import { settings } from '../../src/services.ts';
  * user lands in the inviting tenant with a session; a code is single-use, expires, can be revoked;
  * re-inviting revokes the pending one; an already registered address gets a sign-in e-mail and a
  * tenant membership instead of an invitation; invitations need `user.create` in the tenant.
+ * Every invitation names the group the invitee joins: Regular User unless the admin picks another
+ * one (or none); an unknown group is refused; a registered address gets the group at once.
  */
 const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
@@ -41,11 +43,22 @@ const sessionCookie = (r: Response) =>
     .getSetCookie()
     .find((c) => c.startsWith('crk_session='))
     ?.split(';')[0] ?? '';
-const invite = (email: string, cookie: string) =>
-  call('/v1/invitations', { method: 'POST', body: JSON.stringify({ email }) }, [cookie]);
+const invite = (email: string, cookie: string, extra: Record<string, unknown> = {}) =>
+  call('/v1/invitations', { method: 'POST', body: JSON.stringify({ email, ...extra }) }, [cookie]);
 const join = (code: string, name: string, password = 'a long enough invite password') =>
   call('/v1/auth/join', { method: 'POST', body: JSON.stringify({ code, name, password }) });
 const codeOf = (link: string) => link.split('/join/')[1] ?? '';
+/** Names of the groups `userId` holds in `clientId`, straight from the mapping table. */
+async function groupNames(db: Db, clientId: string, userId: string) {
+  const rows = await db
+    .select({ name: schema.groups.name })
+    .from(schema.groupUserMaps)
+    .innerJoin(schema.groups, eq(schema.groups.id, schema.groupUserMaps.group_id))
+    .where(
+      and(eq(schema.groupUserMaps.client_id, clientId), eq(schema.groupUserMaps.user_id, userId)),
+    );
+  return rows.map((r) => r.name).sort();
+}
 
 describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
   let db: Db;
@@ -89,10 +102,13 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
       email: string;
       status: string;
       expiresAt: string;
+      group: { id: string; name: string } | null;
     };
     expect(d.existing).toBe(false);
     expect(d.email).toBe(email);
     expect(d.status).toBe('pending');
+    // No group named → the seeded Regular User group of this tenant.
+    expect(d.group?.name).toBe('Regular User');
     expect(d.link).toMatch(/\/join\/[A-Za-z0-9_-]{43}$/);
     // default validity: security.invitation_hours = 72 h
     const hours = (new Date(d.expiresAt).getTime() - Date.now()) / 3600_000;
@@ -108,10 +124,12 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
       email: string;
       status: string;
       invitedBy: string | null;
+      group: { id: string; name: string } | null;
     }[];
     const mine = list.find((i) => i.email === email);
     expect(mine?.status).toBe('pending');
     expect(mine?.invitedBy).toBeTruthy();
+    expect(mine?.group?.name).toBe('Regular User');
   });
 
   test('the code shows whom it is for, opens an account in the inviting tenant with SIGNUP_ENABLED=false, then is spent', async () => {
@@ -148,6 +166,12 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
     expect(me.user.email).toBe(email);
     expect(me.user.emailVerifiedAt).not.toBeNull();
     expect(me.clientId).toBe(tenantId);
+    // Accepting grants the group the invitation named — here the default.
+    const [joined] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, email));
+    expect(await groupNames(db, tenantId, (joined as { id: string }).id)).toEqual(['Regular User']);
     // single use
     const again = await join(code, 'Joiner again');
     expect(again.status).toBe(410);
@@ -183,6 +207,66 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
     );
   });
 
+  test('the admin picks the group: a tenant group, none at all, or an unknown one (refused)', async () => {
+    // A throw-away group of this tenant, so the seeded ones stay untouched.
+    const gr = await call(
+      '/v1/groups',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code: `inv-${run}`, name: `Invitees ${run}` }),
+      },
+      [admin],
+    );
+    expect(gr.status).toBe(201);
+    const groupId = ((await json(gr)).data as { id: string }).id;
+
+    const picked = `picked-${run}@example.test`;
+    const p = await invite(picked, admin, { groupId });
+    expect(p.status).toBe(201);
+    const pd = (await json(p)).data as { link: string; group: { id: string; name: string } | null };
+    expect(pd.group?.id).toBe(groupId);
+    expect((await join(codeOf(pd.link), 'Picked')).status).toBe(201);
+    const [pu] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, picked));
+    expect(await groupNames(db, tenantId, (pu as { id: string }).id)).toEqual([`Invitees ${run}`]);
+
+    const none = `nogroup-${run}@example.test`;
+    const n = await invite(none, admin, { groupId: null });
+    expect(n.status).toBe(201);
+    const nd = (await json(n)).data as { link: string; group: unknown };
+    expect(nd.group).toBeNull();
+    expect((await join(codeOf(nd.link), 'No group')).status).toBe(201);
+    const [nu] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, none));
+    expect(await groupNames(db, tenantId, (nu as { id: string }).id)).toEqual([]);
+
+    // Not a group of this tenant (a random id): refused before anything is written or sent.
+    const bad = `badgroup-${run}@example.test`;
+    const b = await invite(bad, admin, { groupId: '00000000-0000-4000-8000-000000000000' });
+    expect(b.status).toBe(422);
+    expect((await json(b)).error?.code).toBe('validation_failed');
+    const rows = await db
+      .select()
+      .from(schema.invitations)
+      .where(eq(schema.invitations.email, bad));
+    expect(rows.length).toBe(0);
+
+    // The group is deleted before the link is used: the invitee still joins, without a group.
+    const orphan = `orphan-${run}@example.test`;
+    const o = (await json(await invite(orphan, admin, { groupId }))).data as { link: string };
+    expect((await call(`/v1/groups/${groupId}`, { method: 'DELETE' }, [admin])).status).toBe(200);
+    expect((await join(codeOf(o.link), 'Orphan')).status).toBe(201);
+    const [ou] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, orphan));
+    expect(await groupNames(db, tenantId, (ou as { id: string }).id)).toEqual([]);
+  });
+
   test('an already registered address is added to the tenant and told to sign in — no invitation', async () => {
     process.env.SIGNUP_ENABLED = 'true';
     resetEnvCache();
@@ -196,8 +280,17 @@ describe.skipIf(!enabled)('registration by invitation (A-13)', () => {
     resetEnvCache();
     const r = await invite(email, admin);
     expect(r.status).toBe(200);
-    const d = (await json(r)).data as { existing: boolean; userId: string };
+    const d = (await json(r)).data as {
+      existing: boolean;
+      userId: string;
+      group: { name: string } | null;
+    };
     expect(d.existing).toBe(true);
+    expect(d.group?.name).toBe('Regular User');
+    expect(await groupNames(db, tenantId, d.userId)).toEqual(['Regular User']);
+    // Inviting again with the same group changes nothing; another group is added, not swapped.
+    expect((await invite(email, admin)).status).toBe(200);
+    expect(await groupNames(db, tenantId, d.userId)).toEqual(['Regular User']);
     const rows = await db
       .select()
       .from(schema.invitations)
