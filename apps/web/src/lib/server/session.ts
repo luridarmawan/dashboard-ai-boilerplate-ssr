@@ -1,3 +1,4 @@
+import { clientIpFromForwarded } from '@core/contracts';
 import { createTranslator, type Locale, type MessageKey } from '@core/i18n';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
@@ -108,14 +109,32 @@ function cookieHeader(cookies: Cookies): string | undefined {
   return parts.length ? parts.join('; ') : undefined;
 }
 
+/**
+ * The visitor's IP as forwarded to the API (rate limits A-2, last-active IP D-5, audit log).
+ * adapter-node's `getClientAddress()` reads ONE fixed hop of the address header (`XFF_DEPTH`),
+ * which behind NAT or a chain of proxies yields the LAN address of the hop in front instead of
+ * the visitor. So when the operator trusts a header (`ADDRESS_HEADER`, set by `bun start`,
+ * compose and the systemd env files) the whole chain is read and the rightmost public entry
+ * wins — the same rule the API applies (`clientIpFromForwarded`). Without a trusted header the
+ * socket address stands, as before. `undefined` while prerendering.
+ */
+export function clientAddress(event: RequestEvent): string | undefined {
+  const header = env.ADDRESS_HEADER?.trim().toLowerCase();
+  const forwarded = header ? event.request.headers.get(header) : null;
+  let socket: string | undefined;
+  if (!forwarded) {
+    try {
+      socket = event.getClientAddress();
+    } catch {
+      socket = undefined;
+    }
+  }
+  return clientIpFromForwarded(forwarded, socket) ?? undefined;
+}
+
 /** API client bound to this browser: session cookie, CSRF pair, public origin, active tenant. */
 export function apiFor(event: RequestEvent, clientId?: string | null) {
-  let ip: string | undefined;
-  try {
-    ip = event.getClientAddress();
-  } catch {
-    ip = undefined;
-  }
+  const ip = clientAddress(event);
   return api({
     requestId: event.locals.requestId,
     cookie: cookieHeader(event.cookies),
@@ -144,11 +163,8 @@ function forwardHeaders(event: RequestEvent, clientId?: string | null): Record<s
   headers['x-forwarded-proto'] = origin.protocol.replace(':', '');
   headers['x-forwarded-host'] = origin.host;
   if (clientId) headers['x-client-id'] = clientId;
-  try {
-    headers['x-forwarded-for'] = event.getClientAddress();
-  } catch {
-    /* not available (prerender) */
-  }
+  const ip = clientAddress(event);
+  if (ip) headers['x-forwarded-for'] = ip;
   return headers;
 }
 
@@ -228,11 +244,8 @@ export async function apiFetchData<T = unknown>(
   headers['x-forwarded-proto'] = origin.protocol.replace(':', '');
   headers['x-forwarded-host'] = origin.host;
   if (clientId) headers['x-client-id'] = clientId;
-  try {
-    headers['x-forwarded-for'] = event.getClientAddress();
-  } catch {
-    /* not available (prerender) */
-  }
+  const ip = clientAddress(event);
+  if (ip) headers['x-forwarded-for'] = ip;
   try {
     const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, { headers });
     if (!res.ok) return null;

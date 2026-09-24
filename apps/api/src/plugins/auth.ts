@@ -7,7 +7,7 @@ import {
   type SessionRow,
   type UserRow,
 } from '@core/auth';
-import { fail } from '@core/contracts';
+import { clientIpFromForwarded, fail } from '@core/contracts';
 import { newId, unsafeAcrossTenants } from '@core/db';
 import { Elysia } from 'elysia';
 
@@ -160,14 +160,18 @@ export const requireAuth = new Elysia({ name: 'require-auth' })
     return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', rid);
   });
 
-/** Client IP behind the reverse proxy (first hop of X-Forwarded-For), else the socket address. */
+/**
+ * Client IP behind the reverse proxy: the rightmost PUBLIC entry of X-Forwarded-For (private
+ * NAT/proxy hops are skipped, see `clientIpFromForwarded`), else the socket address.
+ */
 export function clientIp(
   request: Request,
   server: { requestIP?: (r: Request) => { address: string } | null } | null,
 ): string | null {
-  const fwd = request.headers.get('x-forwarded-for');
-  if (fwd) return fwd.split(',')[0]?.trim() ?? null;
-  return server?.requestIP?.(request)?.address ?? null;
+  return clientIpFromForwarded(
+    request.headers.get('x-forwarded-for'),
+    server?.requestIP?.(request)?.address ?? null,
+  );
 }
 
 /** Fields of a user row that may leave the server. Never the password hash. */
