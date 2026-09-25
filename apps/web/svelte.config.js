@@ -1,5 +1,22 @@
+import { readFileSync } from 'node:fs';
 import adapter from '@sveltejs/adapter-node';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+/**
+ * Repo-relative directories of the modules listed in modules.json, resolved the way
+ * `resolveModuleDir` in packages/module-kit/src/sync.ts does (`path`, else `modules/<name>`).
+ * Without a readable modules.json every folder under modules/ counts, as before.
+ */
+function registeredModuleDirs() {
+  try {
+    const file = JSON.parse(readFileSync(new URL('../../modules.json', import.meta.url), 'utf8'));
+    return file.modules
+      .filter((m) => m.source !== 'package')
+      .map((m) => (m.path ?? `modules/${m.name}`).replace(/\/+$/, ''));
+  } catch {
+    return ['modules/*'];
+  }
+}
 
 /** @type {import('@sveltejs/kit').Config} */
 export default {
@@ -36,13 +53,19 @@ export default {
        *
        * Adding the sources closes that: the same `bun run typecheck` that guards core pages now
        * guards module pages, here and in `bun run harness --web` inside a module's own repository.
-       * Paths are relative to `kit.outDir` (`apps/web/.svelte-kit`), hence `../../../modules`.
+       * Paths are relative to `kit.outDir` (`apps/web/.svelte-kit`), hence `../../..`.
+       *
+       * Only modules REGISTERED in modules.json are included: a module folder left on disk but
+       * removed from modules.json has no generated i18n keys or registry entries, so checking it
+       * reports errors for code the app does not build (gate M5 #4 removes AI exactly this way).
        */
       config(config) {
-        for (const ext of ['ts', 'svelte']) {
-          config.include.push(`../../../modules/**/web/**/*.${ext}`);
+        for (const dir of registeredModuleDirs()) {
+          for (const ext of ['ts', 'svelte']) {
+            config.include.push(`../../../${dir}/web/**/*.${ext}`);
+          }
+          config.exclude.push(`../../../${dir}/node_modules/**`);
         }
-        config.exclude.push('../../../modules/**/node_modules/**');
         return config;
       },
     },

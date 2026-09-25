@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import config from '../../../apps/web/svelte.config.js';
 
 /**
@@ -21,14 +22,27 @@ describe('module pages are inside the app type-check (K-5)', () => {
     expect(typeof hook).toBe('function');
   });
 
-  test('it adds the module page sources and skips their node_modules', () => {
+  test('it adds the registered module page sources and skips their node_modules', () => {
     const tsconfig = { include: ['../src/**/*.svelte'], exclude: ['../node_modules/**'] };
     const out = hook?.(tsconfig) ?? tsconfig;
+    const registered: { name: string; path?: string }[] = JSON.parse(
+      readFileSync(new URL('../../../modules.json', import.meta.url), 'utf8'),
+    ).modules;
 
-    expect(out.include).toContain('../../../modules/**/web/**/*.svelte');
-    expect(out.include).toContain('../../../modules/**/web/**/*.ts');
-    expect(out.exclude).toContain('../../../modules/**/node_modules/**');
+    expect(registered.length).toBeGreaterThan(0);
+    for (const m of registered) {
+      const dir = m.path ?? `modules/${m.name}`;
+      expect(out.include).toContain(`../../../${dir}/web/**/*.svelte`);
+      expect(out.include).toContain(`../../../${dir}/web/**/*.ts`);
+      expect(out.exclude).toContain(`../../../${dir}/node_modules/**`);
+    }
     // Whatever SvelteKit generated stays: the hook extends the list, it does not replace it.
     expect(out.include).toContain('../src/**/*.svelte');
+  });
+
+  test('a module folder that modules.json does not list is not checked (gate M5 #4)', () => {
+    const out = hook?.({ include: [], exclude: [] }) ?? { include: [], exclude: [] };
+    // No blanket glob: a removed module has no generated i18n keys, so checking it only fails.
+    expect(out.include.some((p: string) => p.includes('modules/**'))).toBe(false);
   });
 });

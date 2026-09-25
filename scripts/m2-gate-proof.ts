@@ -156,8 +156,8 @@ let pickerCsrf = '';
     seen[theme] = { layout, icons: iconFamily(pickerHtml) };
   }
   check(
-    'auth layout differs between themes (base=centered-card, corporate=split-hero)',
-    seen.base?.layout === 'centered-card' && seen.corporate?.layout === 'split-hero',
+    'auth layout differs between themes (contrast=centered-card, corporate=split-hero)',
+    seen.contrast?.layout === 'centered-card' && seen.corporate?.layout === 'split-hero',
     JSON.stringify(seen),
   );
   check(
@@ -241,18 +241,21 @@ const admin = new Jar();
 // ---- #6 (language) + K-2/K-7: server-side language, picker without JS ----
 {
   const fresh = new Jar();
-  const idHtml = (await get(fresh, '/')).html;
+  // The configured default is English since 2026-09-18 (`app.default_locale`, K-3).
+  const enPage = await get(fresh, '/');
+  const enHtml = enPage.html;
   check(
-    'K-2 default language id on <html lang> for a visitor with no preference',
-    htmlAttr(idHtml, 'lang') === 'id' && idHtml.includes('Masuk'),
-  );
-  const enRes = await fetch(`${WEB}/`, {
-    headers: { accept: 'text/html', 'accept-language': 'en-US,en;q=0.9' },
-  });
-  const enHtml = await enRes.text();
-  check(
-    'K-2 Accept-Language: en → first HTML already in English (lang="en", "Sign in")',
+    'K-2 default language en on <html lang> for a visitor with no preference',
     htmlAttr(enHtml, 'lang') === 'en' && enHtml.includes('Sign in'),
+    `${enPage.res.status} lang=${htmlAttr(enHtml, 'lang')} location=${enPage.res.headers.get('location') ?? '-'}`,
+  );
+  const idRes = await fetch(`${WEB}/`, {
+    headers: { accept: 'text/html', 'accept-language': 'id-ID,id;q=0.9' },
+  });
+  const idHtml = await idRes.text();
+  check(
+    'K-2 Accept-Language: id → first HTML already in Indonesian (lang="id", "Masuk")',
+    htmlAttr(idHtml, 'lang') === 'id' && idHtml.includes('Masuk'),
   );
   const picker = await get(fresh, '/lang');
   check(
@@ -263,19 +266,19 @@ const admin = new Jar();
   );
   const r = await post(fresh, '/lang', {
     _csrf: csrfOf(picker.html),
-    lang: 'en',
+    lang: 'id',
     back: '/auth/login',
   });
   check(
     '#6 POST /lang (no JS) → 303 back, crk_lang cookie',
-    r.res.status === 303 && fresh.cookies.get('crk_lang') === 'en',
+    r.res.status === 303 && fresh.cookies.get('crk_lang') === 'id',
   );
   const login = await get(fresh, '/auth/login');
   check(
-    'cookie wins over header default: login page in English',
-    htmlAttr(login.html, 'lang') === 'en' &&
-      login.html.includes('Sign in') &&
-      !login.html.includes('Kata sandi'),
+    'cookie wins over the configured default: login page in Indonesian',
+    htmlAttr(login.html, 'lang') === 'id' &&
+      login.html.includes('Masuk') &&
+      login.html.includes('Kata sandi'),
   );
   // Logged in: the menu (SSR) follows the locale, and the choice is persisted to the profile.
   await post(admin, '/lang', {

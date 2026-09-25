@@ -40,7 +40,7 @@ bun run db:generate >/dev/null 2>&1
 bun run modules:sync >/dev/null
 CHANGED="$(git status --porcelain --untracked-files=all | awk '{print $2}')"
 echo "$CHANGED" | sed 's/^/  /'
-BAD="$(echo "$CHANGED" | grep -v -E "^(modules/$NAME/?|modules\.json$|\.gitmodules$|biome\.json$|bun\.lock$|packages/db/migrations/(mysql|pg)/(0[0-9]+_.*\.sql|meta/(_journal\.json|0[0-9]+_snapshot\.json))$)" || true)"
+BAD="$(echo "$CHANGED" | grep -v -E "^(modules/$NAME/?|modules\.json$|\.gitmodules$|biome\.json$|bun\.lock$|packages/db/migrations/(mysql|pg|sqlite)/(0[0-9]+_.*\.sql|meta/(_journal\.json|0[0-9]+_snapshot\.json))$)" || true)"
 [ -z "$BAD" ] || { echo "cross-repo: GAGAL — berkas core berubah:"; echo "$BAD" | sed 's/^/  ✗ /'; exit 1; }
 grep -q "\"name\": \"$NAME\"" modules.json && grep -q "\"source\": \"submodule\"" modules.json || { echo "cross-repo: modules.json tidak mencatat submodule"; exit 1; }
 grep -q "$NS" apps/api/src/generated/modules.ts && grep -q "${NS}_notes" packages/db/src/generated/module-tables.ts || { echo "cross-repo: registry tidak memuat $NS"; exit 1; }

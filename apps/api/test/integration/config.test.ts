@@ -171,6 +171,13 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     await put('/v1/configuration', { values: { 'app.landing_route': '' } }, [admin]);
     const back = await json(await call('/v1/configuration/key/app.landing_route', {}, [admin]));
     expect(back.data?.source).toBe('global');
+    // Clear the global override too: the gate proofs run on this database after the suite, and a
+    // leftover landing route turns `/` into a redirect (K-2 reads the language from that page).
+    await put('/v1/configuration', { scope: 'global', values: { 'app.landing_route': '' } }, [
+      admin,
+    ]);
+    const reset = await json(await call('/v1/configuration/key/app.landing_route', {}, [admin]));
+    expect(reset.data?.source).not.toBe('global');
   });
 
   test('secrets never leave in the clear: only "set" is reported; empty submit keeps it (E-4)', async () => {

@@ -25,7 +25,7 @@ bun run modgen "$NAME" --resource widget --fields "name:string!,qty:number,activ
 echo "== files touched (must be modules/, modules.json, bun.lock, migrations only)"
 CHANGED="$(git status --porcelain --untracked-files=all | awk '{print $2}')"
 echo "$CHANGED" | sed 's/^/  /'
-BAD="$(echo "$CHANGED" | grep -v -E "^(modules/$NAME/|modules\.json$|bun\.lock$|packages/db/migrations/(mysql|pg)/(0[0-9]+_.*\.sql|meta/(_journal\.json|0[0-9]+_snapshot\.json))$)" || true)"
+BAD="$(echo "$CHANGED" | grep -v -E "^(modules/$NAME/|modules\.json$|bun\.lock$|packages/db/migrations/(mysql|pg|sqlite)/(0[0-9]+_.*\.sql|meta/(_journal\.json|0[0-9]+_snapshot\.json))$)" || true)"
 if [ -n "$BAD" ]; then
   echo "modgen-guard: GAGAL — berkas core berubah:"; echo "$BAD" | sed 's/^/  ✗ /'; exit 1
 fi

@@ -181,7 +181,7 @@ let newUserId = '';
   });
   check(
     'set permissions → saved',
-    r.res.status === 200 && r.html.includes('Tersimpan'),
+    r.res.status === 200 && /Tersimpan|Saved/.test(r.html),
     `${r.res.status}`,
   );
 }
