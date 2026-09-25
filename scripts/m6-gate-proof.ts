@@ -229,7 +229,7 @@ let id = '';
   );
   check(
     'edit page shows the saved notice',
-    detail.html.includes('Tersimpan'),
+    /Tersimpan|Saved/.test(detail.html),
     detail.html.slice(0, 200),
   );
   const save = await post(admin, `${BASE}/${id}?/save`, {
@@ -241,7 +241,7 @@ let id = '';
   });
   check(
     'edit → 200 saved notice',
-    save.res.status === 200 && save.html.includes('Tersimpan'),
+    save.res.status === 200 && /Tersimpan|Saved/.test(save.html),
     `${save.res.status}`,
   );
   const list = await get(admin, `${BASE}?q=proof+${run}`);

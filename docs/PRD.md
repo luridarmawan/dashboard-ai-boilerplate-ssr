@@ -442,7 +442,7 @@ Dua tema boleh berbeda bukan hanya warnanya, tapi juga bahasa ikonnya dan susuna
 }
 ```
 
-Bandingkan dengan `themes/base/theme.json` yang menjawab `default` dengan `sidebar-classic` dan `auth` dengan `centered-card`: dua tema, dua susunan, nol perubahan di halaman. Manifest keempat tema bawaan sudah final — lihat [`THEMES.md`](./THEMES.md).
+Bandingkan dengan `themes/contrast/theme.json` yang menjawab `default` dengan `sidebar-classic` dan `auth` dengan `centered-card` (`base` sejak 2026-09-18 memakai `split-hero` untuk auth): dua tema, dua susunan, nol perubahan di halaman. Manifest keempat tema bawaan sudah final — lihat [`THEMES.md`](./THEMES.md).
 
 **Kontrak ikon — komponen tidak pernah mengimpor glyph langsung.**
 Core mendefinisikan daftar **nama ikon semantik** (`icon.save`, `icon.user`, `icon.menu`, `icon.chevron-right`, …); modul mendaftarkan namanya sendiri di namespace `<nama>.*` (G-9). Set ikon adalah pemetaan nama → glyph. Komponen hanya menulis `<Icon name="save" />`. Konsekuensinya ditegakkan, bukan disepakati:
