@@ -18,20 +18,15 @@ const idKey = (sessionId: string) => `${CACHE_PREFIX}id:${sessionId}`;
 const userKey = (userId: string) => `${CACHE_PREFIX}u:${userId}`;
 
 type Cached = { session: SessionRow; user: UserRow };
-const DATE_FIELDS = new Set([
-  'expires_at',
-  'last_seen_at',
-  'revoked_at',
-  'created_at',
-  'updated_at',
-  'deleted_at',
-  'email_verified_at',
-  'last_login_at',
-]);
+/**
+ * JSON turns Date columns into strings. Every timestamp column on `sessions` and `users` is named
+ * `*_at`, so revive by that convention rather than a list: a hand-kept list missed
+ * `last_active_at` and every cached session then answered 500 on `/me`.
+ */
 function revive<T extends object>(o: T): T {
   const out = { ...o } as Record<string, unknown>;
   for (const k of Object.keys(out))
-    if (DATE_FIELDS.has(k) && typeof out[k] === 'string') out[k] = new Date(out[k] as string);
+    if (k.endsWith('_at') && typeof out[k] === 'string') out[k] = new Date(out[k] as string);
   return out as T;
 }
 
