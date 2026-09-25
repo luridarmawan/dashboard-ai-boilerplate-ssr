@@ -296,6 +296,70 @@
       animation: none;
     }
   }
+  /*
+   * Marquee: a horizontal row that slides by itself, CSS only. The track holds its items twice
+   * and moves by exactly half its width, so the loop has no seam; spacing is a margin on each
+   * item (not `gap`) because a gap would make the two halves unequal. Hover or keyboard focus
+   * pauses it so a card can be read; the edges fade out through a mask, not a colour.
+   */
+  .marquee {
+    overflow: hidden;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 2rem,
+      #000 calc(100% - 2rem),
+      transparent
+    );
+  }
+  .marquee-track {
+    display: flex;
+    width: max-content;
+    padding-block: 0.5rem;
+    animation: marquee var(--marquee-duration, 40s) linear infinite;
+  }
+  [dir="rtl"] .marquee-track {
+    animation-name: marquee-rtl;
+  }
+  /* Layout lives here, not in utility classes: those would outrank the reduced-motion hide below. */
+  .marquee-item {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    margin-inline-end: 1.25rem;
+  }
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track,
+  .marquee:active .marquee-track {
+    animation-play-state: paused;
+  }
+  /* Asked for less motion: no sliding, a swipeable row with snap points, one copy only. */
+  @media (prefers-reduced-motion: reduce) {
+    .marquee {
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      mask-image: none;
+    }
+    .marquee-track {
+      animation: none;
+    }
+    .marquee-item {
+      scroll-snap-align: start;
+    }
+    .marquee-item[data-copy] {
+      display: none;
+    }
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes marquee-rtl {
+    to {
+      transform: translateX(50%);
+    }
+  }
   @keyframes lazy-in {
     from {
       opacity: 0;

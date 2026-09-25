@@ -181,15 +181,21 @@ const stats = $derived([
     <h2 id="features-title" class="mt-3 text-3xl font-semibold leading-tight tracking-tight">{t('landing.features.title')}</h2>
     <p class="mt-4 text-muted-foreground">{t('landing.features.lead')}</p>
   </div>
-  <ul id="features-items" class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-    {#each features as f (f.k)}
-      <li class="flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-transform hover:-translate-y-0.5">
-        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name={f.icon} size={22} /></span>
-        <h3 class="mt-5 text-lg font-semibold text-foreground">{t(`landing.features.${f.k}`)}</h3>
-        <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{t(`landing.features.${f.k}.text`)}</p>
-      </li>
-    {/each}
-  </ul>
+  <!-- auto-sliding row, pure CSS (no JS on this page): the list is drawn twice so the loop is
+       seamless; the second copy is hidden from assistive tech and dropped under reduced motion -->
+  <div class="marquee mt-10" style="--marquee-duration: {features.length * 6}s">
+    <ul id="features-items" class="marquee-track">
+      {#each [false, true] as copy (copy)}
+        {#each features as f (f.k)}
+          <li class="marquee-item w-[17rem] rounded-2xl border bg-card p-6 shadow-sm transition-transform hover:-translate-y-0.5 sm:w-80" aria-hidden={copy || undefined} data-copy={copy || undefined}>
+            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name={f.icon} size={22} /></span>
+            <h3 class="mt-5 text-lg font-semibold text-foreground">{t(`landing.features.${f.k}`)}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{t(`landing.features.${f.k}.text`)}</p>
+          </li>
+        {/each}
+      {/each}
+    </ul>
+  </div>
 </section>
 
 <!-- platform status: build identity + installed modules, straight from the API -->
