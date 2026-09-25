@@ -85,6 +85,27 @@ describe('TABLE_PREFIX for migrations (O-2)', () => {
     );
     expect(out).toContain('"settings" jsonb');
   });
+  test('sqlite: an unquoted ADD ... REFERENCES target and a table copy get the prefix', () => {
+    const tables = new Set(['invitations', 'groups', '__new_invitations']);
+    const added = prefixSql(
+      'ALTER TABLE `invitations` ADD `group_id` text(36) REFERENCES groups(id);',
+      'x_',
+      tables,
+    );
+    expect(added).toBe(
+      'ALTER TABLE `x_invitations` ADD `group_id` text(36) REFERENCES x_groups(id);',
+    );
+    const copy = prefixSql(
+      'INSERT INTO `__new_invitations` (`id`) SELECT `id` FROM `invitations`;\nFOREIGN KEY (`group_id`) REFERENCES `groups`(`id`) ON UPDATE no action ON DELETE set null',
+      'x_',
+      tables,
+    );
+    expect(copy).toContain(
+      'INSERT INTO `x___new_invitations` (`id`) SELECT `id` FROM `x_invitations`;',
+    );
+    // referential actions are keywords, not tables
+    expect(copy).toContain('REFERENCES `x_groups`(`id`) ON UPDATE no action ON DELETE set null');
+  });
   test('empty prefix is the identity; journal table follows the prefix', () => {
     expect(prefixSql(mysql, '', collectTableNames([mysql]))).toBe(mysql);
     expect(migrationsTableFor('')).toBe('__drizzle_migrations');

@@ -4,11 +4,12 @@
  * schema); the committed migration SQL is written for an empty prefix, so at migrate time each
  * file is rewritten for the configured prefix:
  *   - table names after CREATE/ALTER/DROP TABLE, REFERENCES, INSERT INTO, UPDATE, DELETE FROM,
- *     RENAME TO and the `ON <table>` of index statements;
+ *     FROM (a table copy's `INSERT ... SELECT`), RENAME TO and the `ON <table>` of index statements;
  *   - constraint and index names, which Drizzle derives from the table name (`users_email_uq`,
  *     `sessions_user_id_users_id_fk`), because MySQL FK names are unique per schema.
  * Only identifiers that are (or start with) a known table name are touched, so columns such as
- * `client_id` or `settings` are never rewritten.
+ * `client_id` or `settings` are never rewritten. Table references may be unquoted: drizzle-kit
+ * writes SQLite's `ALTER TABLE ... ADD col REFERENCES groups(id)` without backticks.
  */
 const Q = '[`"]';
 const ID = '([A-Za-z0-9_]+)';
@@ -30,10 +31,10 @@ export function prefixSql(sql: string, prefix: string, tables: ReadonlySet<strin
     return false;
   };
   const tableRefs = new RegExp(
-    `\\b(CREATE TABLE(?: IF NOT EXISTS)?|ALTER TABLE|DROP TABLE(?: IF EXISTS)?|REFERENCES|INSERT INTO|UPDATE|DELETE FROM|RENAME TO|TRUNCATE(?: TABLE)?)(\\s+)((?:"public"\\.)?)(${Q})${ID}\\4`,
+    `\\b(CREATE TABLE(?: IF NOT EXISTS)?|ALTER TABLE|DROP TABLE(?: IF EXISTS)?|REFERENCES|INSERT INTO|UPDATE|DELETE FROM|FROM|RENAME TO|TRUNCATE(?: TABLE)?)(\\s+)((?:"public"\\.)?)(${Q}?)${ID}\\4`,
     'gi',
   );
-  const onRefs = new RegExp(`\\b(ON)(\\s+)((?:"public"\\.)?)(${Q})${ID}\\4`, 'gi');
+  const onRefs = new RegExp(`\\b(ON)(\\s+)((?:"public"\\.)?)(${Q}?)${ID}\\4`, 'gi');
   const namedObjects = new RegExp(
     `\\b(CONSTRAINT|CREATE\\s+(?:UNIQUE\\s+)?INDEX(?: IF NOT EXISTS)?|DROP INDEX(?: IF EXISTS)?|DROP CONSTRAINT|DROP FOREIGN KEY)(\\s+)(${Q})${ID}\\3`,
     'gi',
