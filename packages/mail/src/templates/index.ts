@@ -17,6 +17,19 @@ export interface Rendered {
   readonly text: string;
 }
 
+/**
+ * Engagement tracking for ONE rendering (J-6). Both are opt-in per tenant and only touch the
+ * HTML part: the text alternative and the "copy this link" fallback keep the raw link, so a
+ * reader who distrusts tracked links still has a clean one — and the one-time token behind
+ * that link records the visit anyway.
+ */
+export interface Tracking {
+  /** Absolute URL of the 1×1 image appended to the body. */
+  readonly pixelUrl?: string | undefined;
+  /** Absolute URL the call-to-action button points at instead of the raw link. */
+  readonly buttonUrl?: string | undefined;
+}
+
 export type TemplateId =
   | 'verify-email'
   | 'reset-password'
@@ -113,7 +126,13 @@ function escapeHtml(s: string): string {
   );
 }
 
-function shell(brand: Brand, locale: string, title: string, bodyHtml: string): string {
+function shell(
+  brand: Brand,
+  locale: string,
+  title: string,
+  bodyHtml: string,
+  pixelUrl?: string,
+): string {
   // The app name always shows; with a logo it sits to its right, in a two-cell table because
   // Outlook ignores flex and inline-block alignment. `alt=""` keeps the name from being read twice.
   const name = `<strong style="font-size:18px;color:${brand.primary}">${escapeHtml(brand.appName)}</strong>`;
@@ -128,7 +147,7 @@ function shell(brand: Brand, locale: string, title: string, bodyHtml: string): s
 <tr><td style="padding:24px 32px;border-bottom:4px solid ${brand.primary}">${header}</td></tr>
 <tr><td style="padding:32px"><h1 style="margin:0 0 16px;font-size:20px">${escapeHtml(title)}</h1>${bodyHtml}</td></tr>
 <tr><td style="padding:16px 32px;background:#fafafa;color:#71717a;font-size:12px">${tr(locale, 'footer', { app: brand.appName })}</td></tr>
-</table></td></tr></table></body></html>`;
+</table></td></tr></table>${pixelUrl ? `<img src="${escapeHtml(pixelUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ''}</body></html>`;
 }
 const button = (href: string, label: string, color: string) =>
   `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${label}</a></p>`;
@@ -140,35 +159,40 @@ export function renderTemplate(
   locale: string,
   data: Record<string, unknown>,
   brand: Brand,
+  track: Tracking = {},
 ): Rendered {
   const app = brand.appName;
   const name = String(data.name ?? '');
   const link = String(data.link ?? '');
+  /** What the button points at: the tracked redirect when asked for, else the link itself. */
+  const cta = track.buttonUrl ?? link;
+  const shellHtml = (locale: string, subject: string, body: string) =>
+    shell(brand, locale, subject, body, track.pixelUrl);
   switch (id) {
     case 'verify-email': {
       const subject = tr(locale, 'verify.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'verify.body')}</p>${button(link, tr(locale, 'verify.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'verify.body')}</p>${button(cta, tr(locale, 'verify.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'verify.body')}\n\n${link}\n\n${tr(locale, 'ignore')}`,
       };
     }
     case 'reset-password': {
       const subject = tr(locale, 'reset.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'reset.body')}</p>${button(link, tr(locale, 'reset.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'reset.body')}</p>${button(cta, tr(locale, 'reset.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'reset.body')}\n\n${link}`,
       };
     }
     case 'set-password': {
       const subject = tr(locale, 'set.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'set.body')}</p>${button(link, tr(locale, 'set.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'set.body')}</p>${button(cta, tr(locale, 'set.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'set.body')}\n\n${link}`,
       };
     }
@@ -178,20 +202,20 @@ export function renderTemplate(
         data.hours === undefined
           ? ''
           : `<p>${tr(locale, 'invite.expires', { hours: String(data.hours) })}</p>`;
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${hours}${button(link, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${hours}${button(cta, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}\n\n${link}`,
       };
     }
     case 'invite-existing': {
       const vars = { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') };
       const subject = tr(locale, 'invite_existing.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite_existing.body', vars)}</p>${button(link, tr(locale, 'invite_existing.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite_existing.body', vars)}</p>${button(cta, tr(locale, 'invite_existing.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'invite_existing.body', vars)}\n\n${link}`,
       };
     }
@@ -203,7 +227,7 @@ export function renderTemplate(
       const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'contact_ack.body')}</p><p style="color:#71717a;font-size:13px;margin-bottom:4px">${tr(locale, 'contact_ack.copy')}</p><blockquote style="margin:4px 0 24px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${msg}</blockquote><p style="color:#71717a;font-size:12px">${tr(locale, 'contact_ack.noreply')}</p>`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'contact_ack.body')}\n\n${tr(locale, 'contact_ack.copy')}\n${String(data.message ?? '')}\n\n${tr(locale, 'contact_ack.noreply')}`,
       };
     }
@@ -213,7 +237,7 @@ export function renderTemplate(
       const body = `<p>${tr(locale, 'contact.body')}</p><blockquote style="margin:16px 0;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${msg}</blockquote><p><strong>${tr(locale, 'contact.reply')}:</strong> ${escapeHtml(name)} &lt;${escapeHtml(String(data.email ?? ''))}&gt;</p>`;
       return {
         subject,
-        html: shell(brand, locale, subject, body),
+        html: shellHtml(locale, subject, body),
         text: `${tr(locale, 'contact.body')}\n\n${String(data.message ?? '')}\n\n${tr(locale, 'contact.reply')}: ${name} <${String(data.email ?? '')}>`,
       };
     }

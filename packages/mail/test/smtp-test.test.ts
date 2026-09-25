@@ -47,6 +47,17 @@ describe('smtpFromEnv', () => {
     expect(tlsMode(smtpFromEnv({ ...base, SMTP_SECURE: 'false' })!)).toBe('STARTTLS');
     expect(smtpFromEnv({ ...base, SMTP_PORT: '2525', SMTP_SECURE: 'true' })!.secure).toBe(true);
   });
+  test('MAIL_BCC joins the configuration, and is stated in the test message itself', () => {
+    const base = { SMTP_HOST: 'smtp.x.test', MAIL_FROM_ADDRESS: 'a@x.test' };
+    expect(smtpFromEnv(base)!.bcc).toBeUndefined();
+    const s = smtpFromEnv({ ...base, MAIL_BCC: ' arsip@x.test ' })!;
+    expect(s.bcc).toBe('arsip@x.test');
+    const msg = buildTestMessage(s, 'me@x.test');
+    expect(msg.bcc).toBe('arsip@x.test');
+    expect(msg.text).toContain('arsip@x.test');
+    expect(buildTestMessage(smtpFromEnv(base)!, 'me@x.test').bcc).toBeUndefined();
+    expect(() => smtpFromEnv({ ...base, MAIL_BCC: 'bukan-alamat' })).toThrow(/MAIL_BCC/);
+  });
   test('malformed values throw instead of silently sending elsewhere', () => {
     const ok = { SMTP_HOST: 'smtp.x.test', MAIL_FROM_ADDRESS: 'a@x.test' };
     expect(() => smtpFromEnv({ ...ok, SMTP_PORT: 'abc' })).toThrow(/SMTP_PORT/);
@@ -98,6 +109,7 @@ describe('test message', () => {
     };
     const r = await sendTestEmail(smtp, 'me@x.test', { transport, subject: 'Custom' });
     expect(r).toEqual({
+      subject: 'Custom',
       messageId: '<id@x.test>',
       accepted: ['me@x.test'],
       rejected: ['bad@x.test'],

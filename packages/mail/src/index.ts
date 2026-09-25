@@ -12,8 +12,24 @@ import {
   schema,
 } from '@core/db';
 import { logger } from '@core/logger';
-import { createSmtpTransport, formatFrom } from './smtp-test.ts';
-import { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
+import { ensureOpenToken } from './engagement.ts';
+import { buildTestMessage, createSmtpTransport, formatFrom } from './smtp-test.ts';
+import {
+  type Brand,
+  type Rendered,
+  renderTemplate,
+  type TemplateId,
+  type Tracking,
+} from './templates/index.ts';
+
+export {
+  type ActedInput,
+  ensureOpenToken,
+  markActed,
+  markOpened,
+  newOpenToken,
+  resolveClick,
+} from './engagement.ts';
 
 export {
   buildTestMessage,
@@ -29,7 +45,13 @@ export {
   type TransportOptions,
   tlsMode,
 } from './smtp-test.ts';
-export { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
+export {
+  type Brand,
+  type Rendered,
+  renderTemplate,
+  type TemplateId,
+  type Tracking,
+} from './templates/index.ts';
 
 /**
  * The outbox (PRD J-1, J-2). `enqueue()` is all a request does — one INSERT, no SMTP on the
@@ -77,6 +99,11 @@ export interface SmtpConfig {
   readonly fromAddress: string;
   /** Implicit TLS (SMTPS). Default: true on port 465, STARTTLS otherwise. */
   readonly secure?: boolean;
+  /**
+   * Blind copy of EVERY message sent through this configuration (`MAIL_BCC`): an archive or a
+   * compliance mailbox. Only the envelope carries it, so recipients never see the address.
+   */
+  readonly bcc?: string | null;
 }
 
 export interface DeliverOptions {
@@ -87,14 +114,28 @@ export interface DeliverOptions {
   readonly brand: Brand;
   /** Without SMTP outside production, emails are "sent" to the log so flows stay testable. */
   readonly allowLogTransport: boolean;
+  /**
+   * Engagement tracking (J-6), decided per row at delivery time so a setting flipped later
+   * applies to the next delivery — and to a re-send. `origin` is the public origin the pixel
+   * and click URLs are built on, the same one links in the mail use.
+   */
+  readonly tracking?: {
+    readonly enabled: (clientId: string | null) => Promise<boolean>;
+    readonly origin: string;
+  };
   /** Injectable sender for tests. */
-  readonly send?: (msg: {
-    to: string;
-    from: string;
-    subject: string;
-    html: string;
-    text: string;
-  }) => Promise<void>;
+  readonly send?: (msg: OutboundMessage) => Promise<void>;
+}
+
+/** What one delivery hands the transport — nodemailer's `sendMail()` takes exactly this shape. */
+export interface OutboundMessage {
+  readonly to: string;
+  readonly from: string;
+  readonly subject: string;
+  readonly html: string;
+  readonly text: string;
+  /** Present only when the configuration in effect carries a `bcc` (MAIL_BCC). */
+  readonly bcc?: string;
 }
 
 export interface DeliverResult {
@@ -105,6 +146,81 @@ export interface DeliverResult {
 }
 
 const BACKOFF_MIN = [1, 5, 15, 60, 240, 1440];
+
+/**
+ * The outbox row a Settings → Email test leaves behind. It is not a `TemplateId`: the tester
+ * sends straight through SMTP and records the outcome here afterwards, so the outbox shows the
+ * test next to real mail and can send it again. Rendering at (re)delivery describes the SMTP
+ * configuration in effect AT THAT MOMENT — the body names the server that actually sent it.
+ */
+export const SMTP_TEST_TEMPLATE = 'smtp-test';
+
+/** Payload of an `smtp-test` row: only what the body needs beyond the live configuration. */
+export interface SmtpTestPayload {
+  readonly sentBy?: string;
+}
+
+/** What the log transport (no SMTP outside production) pretends to be when a test is re-sent. */
+const LOG_STAND_IN = (brand: Brand): SmtpConfig => ({
+  host: 'log',
+  port: 0,
+  fromName: brand.appName,
+  fromAddress: 'no-reply@localhost',
+});
+
+function renderSmtpTest(
+  smtp: SmtpConfig | null,
+  brand: Brand,
+  to: string,
+  payload: SmtpTestPayload,
+  track: Tracking,
+): Rendered {
+  const msg = buildTestMessage(smtp ?? LOG_STAND_IN(brand), to, {
+    sentBy: payload.sentBy,
+    pixelUrl: track.pixelUrl,
+  });
+  return { subject: msg.subject, html: msg.html, text: msg.text };
+}
+
+export interface RecordTestEmailInput {
+  readonly to: string;
+  readonly subject: string;
+  readonly clientId?: string | null;
+  readonly sentBy: string;
+  /** null = delivered; a message = what SMTP answered, and the row is `failed`. */
+  readonly error: string | null;
+  /** The token the pixel in this very mail carries, when tracking was on for the scope. */
+  readonly openToken?: string | null;
+}
+
+/**
+ * Write the outcome of a direct SMTP test into the outbox (J-2): `sent` or `failed`, one
+ * attempt, transport `smtp`. Nothing is queued — the mail already went (or did not) — but the
+ * row shows up on `/outbox` with the rest and can be re-sent from there like any other.
+ */
+export async function recordTestEmail(db: Db, input: RecordTestEmailInput): Promise<string> {
+  const id = newId();
+  const now = new Date();
+  const payload: SmtpTestPayload = { sentBy: input.sentBy };
+  await db.insert(schema.outboxEmail).values({
+    id,
+    client_id: input.clientId ?? null,
+    to_address: input.to.trim().toLowerCase(),
+    to_name: null,
+    subject: input.subject,
+    template: SMTP_TEST_TEMPLATE,
+    locale: 'id',
+    payload,
+    status: input.error === null ? 'sent' : 'failed',
+    attempts: 1,
+    next_attempt_at: null,
+    sent_at: input.error === null ? now : null,
+    last_error: input.error?.slice(0, 2000) ?? null,
+    transport: 'smtp',
+    open_token: input.openToken ?? null,
+  });
+  return id;
+}
 
 export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<DeliverResult> {
   const now = new Date();
@@ -167,18 +283,20 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
     if (!row) continue;
     const attempts = row.attempts + 1;
     try {
-      const rendered: Rendered = renderTemplate(
-        row.template as TemplateId,
-        row.locale,
-        (row.payload as Record<string, unknown>) ?? {},
-        opts.brand,
-      );
+      const payload = (row.payload as Record<string, unknown>) ?? {};
+      const track = await trackingFor(db, row, payload, opts.tracking);
+      const rendered: Rendered =
+        row.template === SMTP_TEST_TEMPLATE
+          ? renderSmtpTest(opts.smtp, opts.brand, row.to_address, payload as SmtpTestPayload, track)
+          : renderTemplate(row.template as TemplateId, row.locale, payload, opts.brand, track);
       await send({
         to: row.to_name ? `"${row.to_name.replace(/"/g, '')}" <${row.to_address}>` : row.to_address,
         from,
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
+        // MAIL_BCC: the same blind copy on every message, added to the envelope only.
+        ...(opts.smtp?.bcc ? { bcc: opts.smtp.bcc } : {}),
       });
       await db
         .update(schema.outboxEmail)
@@ -213,12 +331,42 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
   return { picked: due.length, sent, failed, deferred };
 }
 
-/** Re-queue failed rows (admin action). */
-export async function retryOutbox(db: Db, ids: readonly string[]): Promise<number> {
+/**
+ * Pixel and click URLs for one delivery, when the row's tenant opted in. The token is minted
+ * on first tracked delivery and reused by every re-send, so the row keeps one identity.
+ */
+async function trackingFor(
+  db: Db,
+  row: { id: string; client_id: string | null; open_token: string | null },
+  payload: Record<string, unknown>,
+  tracking: DeliverOptions['tracking'],
+): Promise<Tracking> {
+  if (!tracking || !(await tracking.enabled(row.client_id))) return {};
+  const token = await ensureOpenToken(db, row.id, row.open_token);
+  const base = tracking.origin.replace(/\/$/, '');
+  return {
+    pixelUrl: `${base}/v1/mail/o/${token}.gif`,
+    ...(typeof payload.link === 'string' ? { buttonUrl: `${base}/v1/mail/c/${token}` } : {}),
+  };
+}
+
+/**
+ * Send again (admin action): a failed row gets another go, a delivered one goes out once more —
+ * to the same recipient, re-rendered from its payload with the brand and SMTP in effect NOW.
+ * The attempt counter restarts so the row has its full backoff budget again. A row that is
+ * `sending` is leased by a worker this moment and is left alone; a `pending` row is simply
+ * made due now.
+ */
+export async function resendOutbox(db: Db, ids: readonly string[]): Promise<number> {
   if (!ids.length) return 0;
   const r = await db
     .update(schema.outboxEmail)
-    .set({ status: 'pending', next_attempt_at: new Date(), last_error: null })
-    .where(and(inArray(schema.outboxEmail.id, [...ids]), eq(schema.outboxEmail.status, 'failed')));
+    .set({ status: 'pending', attempts: 0, next_attempt_at: new Date(), last_error: null })
+    .where(
+      and(
+        inArray(schema.outboxEmail.id, [...ids]),
+        inArray(schema.outboxEmail.status, ['pending', 'sent', 'failed']),
+      ),
+    );
   return affected(r);
 }

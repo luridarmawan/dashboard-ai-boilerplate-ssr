@@ -1,6 +1,14 @@
 import { createTranslator, type Locale } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
-import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import {
+  actionFailure,
+  apiFor,
+  checkCsrf,
+  confirmed,
+  confirmFail,
+  str,
+  unwrap,
+} from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -82,12 +90,17 @@ export const load: PageServerLoad = async (event) => {
       nextAttemptAt: r.nextAttemptAt ? new Date(r.nextAttemptAt).toISOString() : null,
       sentAt: r.sentAt ? new Date(r.sentAt).toISOString() : null,
       createdAt: new Date(r.createdAt).toISOString(),
+      openedAt: r.openedAt ? new Date(r.openedAt).toISOString() : null,
+      clickedAt: r.clickedAt ? new Date(r.clickedAt).toISOString() : null,
+      actedAt: r.actedAt ? new Date(r.actedAt).toISOString() : null,
     })),
     meta: list.data.meta,
     counts: stats.data?.success
       ? stats.data.data
       : { pending: 0, sending: 0, sent: 0, failed: 0, total: 0, templates: [] },
     filters: f,
+    /** The row whose "send again" is being confirmed on the no-JS path (`?confirm=resend&id=`). */
+    confirmResendId: confirmed(event, 'resend') ? event.url.searchParams.get('id') : null,
     saved: event.url.searchParams.get('saved'),
     delivered: event.url.searchParams.get('delivered'),
   };
@@ -107,16 +120,24 @@ const back = (form: FormData, extra: string) => {
 };
 
 export const actions: Actions = {
-  retry: async (event) => {
+  /**
+   * Send again — a failed row or one already delivered; the API re-queues it as is. Never one
+   * click: a delivered mail going out twice is what the recipient notices, so the trigger only
+   * links to `?confirm=resend` and the POST must carry that token (L-22).
+   */
+  resend: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
+    if (!confirmed(event, 'resend')) {
+      return confirmFail(event.locals.locale.locale, 'common.confirm_required');
+    }
     const r = unwrap(
       await apiFor(event)
         .v1.outbox({ id: str(form, 'id') })
-        .retry.post(),
+        .resend.post(),
     );
     if (!r.ok) return actionFailure(r.failure);
-    redirect(303, back(form, 'saved=retried'));
+    redirect(303, back(form, 'saved=resent'));
   },
   deliver: async (event) => {
     const form = await event.request.formData();

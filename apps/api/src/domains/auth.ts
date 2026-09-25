@@ -24,6 +24,7 @@ import {
 import { env } from '@core/config';
 import { Email, errorResponses, fail, MfaLoginBody, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
+import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import {
@@ -526,6 +527,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         .set({ email_verified_at: now })
         .where(eq(schema.users.id, row.user_id));
       await invalidateUserSessions(row.user_id);
+      // J-6: the link was followed — the mail that carried it was certainly read.
+      await markActed(db, { userId: row.user_id, templates: ['verify-email'] });
       return ok({ verified: true as const });
     },
     {
@@ -634,6 +637,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         .update(schema.passwordResetTokens)
         .set({ used_at: new Date() })
         .where(eq(schema.passwordResetTokens.id, row.id));
+      // J-6: both the reset mail and the admin's "set your password" mail carry this token.
+      await markActed(db, { userId: row.user_id, templates: ['reset-password', 'set-password'] });
       const revoked = await revokeAllSessions(db, row.user_id); // a reset ends every existing session
       await writeAudit(db, {
         clientId: null,

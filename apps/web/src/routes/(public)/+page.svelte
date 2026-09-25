@@ -1,4 +1,5 @@
 <script lang="ts">
+import { autoSlide } from '$lib/actions/auto-slide';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -8,7 +9,7 @@ import type { PageData } from './$types';
  * The built-in landing page — the safe front door (F-6). It lives by the same rules as a module's
  * landing (R-7): no literal colours, only theme tokens; no literal copy, only i18n keys (the
  * headline and lead are the deploy-time `APP_LANDING_TITLE` / `APP_LANDING_LEAD` overrides); fully
- * server-rendered, no state, nothing on the render path needs JavaScript. The dashboard "preview" is
+ * server-rendered, no state, nothing on the render path needs JavaScript (the feature row's autoplay is an enhancement). The dashboard "preview" is
  * drawn from tokens, so it restyles with every theme and costs no image request.
  */
 let { data }: { data: PageData } = $props();
@@ -39,6 +40,7 @@ const features = [
   { k: 'f4', icon: 'language' },
   { k: 'f5', icon: 'sparkles' },
   { k: 'f6', icon: 'chart-line' },
+  { k: 'f7', icon: 'check-double' },
 ] as const;
 /** Command per step is developer-facing and identical in every language, like a code sample. */
 const steps = [
@@ -174,21 +176,28 @@ const stats = $derived([
 </section>
 
 <!-- features -->
-<section class="mx-auto max-w-6xl px-4 py-20" aria-labelledby="features-title">
+<section id="features-container" class="mx-auto max-w-6xl px-4 py-20" aria-labelledby="features-title">
   <div class="max-w-2xl">
     <p class="text-xs font-medium uppercase tracking-[0.18em] text-primary">{t('landing.features.eyebrow')}</p>
     <h2 id="features-title" class="mt-3 text-3xl font-semibold leading-tight tracking-tight">{t('landing.features.title')}</h2>
     <p class="mt-4 text-muted-foreground">{t('landing.features.lead')}</p>
   </div>
-  <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-    {#each features as f (f.k)}
-      <li class="flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-transform hover:-translate-y-0.5">
-        <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name={f.icon} size={22} /></span>
-        <h3 class="mt-5 text-lg font-semibold text-foreground">{t(`landing.features.${f.k}`)}</h3>
-        <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{t(`landing.features.${f.k}.text`)}</p>
-      </li>
-    {/each}
-  </ul>
+  <!-- a swipeable row (CSS, works without JS); use:autoSlide adds one-card autoplay, mouse drag
+       and a seamless loop. The list is drawn twice for that loop; the copy is aria-hidden and
+       only shown once the action runs -->
+  <div class="marquee mt-10" use:autoSlide>
+    <ul id="features-items" class="marquee-track">
+      {#each [false, true] as copy (copy)}
+        {#each features as f (f.k)}
+          <li class="marquee-item w-[17rem] rounded-2xl border bg-card p-6 shadow-sm transition-transform hover:-translate-y-0.5 sm:w-80" aria-hidden={copy || undefined} data-copy={copy || undefined}>
+            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name={f.icon} size={22} /></span>
+            <h3 class="mt-5 text-lg font-semibold text-foreground">{t(`landing.features.${f.k}`)}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{t(`landing.features.${f.k}.text`)}</p>
+          </li>
+        {/each}
+      {/each}
+    </ul>
+  </div>
 </section>
 
 <!-- platform status: build identity + installed modules, straight from the API -->

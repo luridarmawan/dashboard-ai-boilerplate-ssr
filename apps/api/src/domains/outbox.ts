@@ -13,14 +13,14 @@ import {
   sql,
   unsafeAcrossTenants,
 } from '@core/db';
-import { retryOutbox } from '@core/mail';
+import { resendOutbox } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { Id, likePattern, MAX_LIMIT, paging } from '../lib/http.ts';
 import { runOutboxOnce } from '../mail.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
 
-/** Outbox administration (J-2): see what was sent, what failed, retry, run the worker now. */
+/** Outbox administration (J-2): see what was sent, what failed, send again, run the worker now. */
 const Row = t.Object({
   id: t.String(),
   clientId: t.Nullable(t.String()),
@@ -36,6 +36,11 @@ const Row = t.Object({
   nextAttemptAt: t.Nullable(t.String()),
   sentAt: t.Nullable(t.String()),
   createdAt: t.String(),
+  /** Engagement (J-6): pixel, tracked button, one-time token used. Null = no signal yet. */
+  openedAt: t.Nullable(t.String()),
+  openCount: t.Integer(),
+  clickedAt: t.Nullable(t.String()),
+  actedAt: t.Nullable(t.String()),
 });
 
 const STATUSES = ['pending', 'sending', 'sent', 'failed'] as const;
@@ -133,6 +138,10 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
           nextAttemptAt: r.next_attempt_at?.toISOString() ?? null,
           sentAt: r.sent_at?.toISOString() ?? null,
           createdAt: r.created_at.toISOString(),
+          openedAt: r.opened_at?.toISOString() ?? null,
+          openCount: r.open_count,
+          clickedAt: r.clicked_at?.toISOString() ?? null,
+          actedAt: r.acted_at?.toISOString() ?? null,
         })),
         p.meta(Number(tot?.n ?? 0)),
       );
@@ -148,13 +157,16 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
     },
   )
   .post(
-    '/:id/retry',
-    async ({ params }) => ok({ requeued: await retryOutbox(unsafeAcrossTenants(), [params.id]) }),
+    '/:id/resend',
+    async ({ params }) => ok({ requeued: await resendOutbox(unsafeAcrossTenants(), [params.id]) }),
     {
       beforeHandle: permission('mail.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ requeued: t.Integer() })), ...errorResponses },
-      detail: { summary: 'Re-queue a failed email' },
+      detail: {
+        summary:
+          'Send an e-mail again — failed or already delivered; re-rendered with the SMTP in effect now (requeued 0 = unknown id or currently sending)',
+      },
     },
   )
   .post('/deliver', async () => ok(await runOutboxOnce()), {

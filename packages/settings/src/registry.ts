@@ -474,6 +474,17 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         title: { id: 'SMTP password', en: 'SMTP password' },
         order: 5,
       },
+      {
+        key: 'mail.track_opens',
+        type: 'boolean',
+        title: { id: 'Lacak pembukaan & klik email', en: 'Track e-mail opens & clicks' },
+        note: {
+          id: 'Menyisipkan gambar pelacak 1×1 dan membungkus tombol di email HTML; hasilnya tampil di Outbox. Sinyal ini tidak pasti (proxy gambar, pemindai tautan) dan memproses data pribadi — sebutkan di kebijakan privasi bila dipakai untuk pelanggan.',
+          en: 'Adds a 1×1 tracking image and wraps the button link in HTML e-mail; results show in the Outbox. The signal is approximate (image proxies, link scanners) and is personal-data processing — mention it in your privacy policy when used for customers.',
+        },
+        default: false,
+        order: 6,
+      },
     ],
   },
 ];

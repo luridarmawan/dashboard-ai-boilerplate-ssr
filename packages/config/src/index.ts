@@ -154,6 +154,12 @@ const envSchema = z
     MAIL_FROM_ADDRESS: z.email().optional(),
     MAIL_FROM_NAME: z.string().min(1).max(120).optional(),
     /**
+     * Blind copy on EVERY outgoing e-mail (outbox deliveries and the Settings → Email test):
+     * an archive or compliance mailbox. Deployment-wide by design, so it is .env only — there
+     * is no `mail.*` setting for it and no tenant can switch it off.
+     */
+    MAIL_BCC: z.email().optional(),
+    /**
      * Google sign-in bootstrap (A-8): used when `security.google_client_id` / `_secret` are EMPTY
      * in the database, same rule as SMTP_*. The feature itself is switched on in Settings.
      */

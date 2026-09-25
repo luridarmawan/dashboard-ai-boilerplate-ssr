@@ -26,6 +26,10 @@ export function smtpFromEnv(
   if (rawSecure && rawSecure !== 'true' && rawSecure !== 'false') {
     throw new Error(`SMTP_SECURE harus "true" atau "false", bukan "${rawSecure}"`);
   }
+  const bcc = e.MAIL_BCC?.trim() || null;
+  if (bcc && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(bcc)) {
+    throw new Error(`MAIL_BCC bukan alamat email: "${bcc}"`);
+  }
   return {
     host,
     port,
@@ -34,6 +38,7 @@ export function smtpFromEnv(
     fromName: e.MAIL_FROM_NAME?.trim() || appName,
     fromAddress,
     ...(rawSecure ? { secure: rawSecure === 'true' } : {}),
+    ...(bcc ? { bcc } : {}),
   };
 }
 
@@ -75,6 +80,8 @@ export interface TestMessage {
   readonly subject: string;
   readonly text: string;
   readonly html: string;
+  /** The MAIL_BCC copy, when the configuration carries one. */
+  readonly bcc?: string;
 }
 
 /**
@@ -90,6 +97,8 @@ export function buildTestMessage(
     readonly sentAt?: Date | undefined;
     /** Who asked for it, for the footer — the CLI by default, "Pengaturan → Email" from the app. */
     readonly sentBy?: string | undefined;
+    /** Tracking pixel (J-6) — the test mail is what people try tracking with first. */
+    readonly pixelUrl?: string | undefined;
   } = {},
 ): TestMessage {
   const sentAt = opts.sentAt ?? new Date();
@@ -100,6 +109,9 @@ export function buildTestMessage(
     ['TLS', tlsMode(smtp)],
     ['Autentikasi', smtp.user ? `user "${smtp.user}"` : 'tanpa autentikasi'],
     ['Pengirim', formatFrom(smtp)],
+    // The blind copy is stated in the body: the person testing must know it goes out with
+    // every message, and the archive mailbox must be able to tell why it received this.
+    ...(smtp.bcc ? ([['BCC', smtp.bcc]] as [string, string][]) : []),
     ['Waktu', sentAt.toISOString()],
   ];
   const text = [
@@ -125,11 +137,20 @@ ${rows
   .join('\n')}
 </table>
 <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Dikirim oleh <code>${esc(sentBy)}</code> — abaikan jika tidak Anda kenali.</p>
-</div></body></html>`;
-  return { to, from: formatFrom(smtp), subject, text, html };
+</div>${opts.pixelUrl ? `<img src="${esc(opts.pixelUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ''}</body></html>`;
+  return {
+    to,
+    from: formatFrom(smtp),
+    subject,
+    text,
+    html,
+    ...(smtp.bcc ? { bcc: smtp.bcc } : {}),
+  };
 }
 
 export interface TestSendResult {
+  /** The subject that went out — what an outbox row recording this test is titled with. */
+  readonly subject: string;
   readonly messageId: string;
   readonly accepted: readonly string[];
   readonly rejected: readonly string[];
@@ -146,6 +167,8 @@ export interface SendTestOptions extends TransportOptions {
   readonly sentBy?: string | undefined;
   /** Injectable for tests; defaults to a real transport for `smtp`. */
   readonly transport?: MailSender | undefined;
+  /** A message built beforehand (so its subject is known even if sending fails); wins over `subject`/`sentBy`. */
+  readonly message?: TestMessage | undefined;
 }
 
 /** Send one test email through `smtp`. Throws nodemailer's error (with `code`) on failure. */
@@ -155,7 +178,8 @@ export async function sendTestEmail(
   opts: SendTestOptions = {},
 ): Promise<TestSendResult> {
   const transport = opts.transport ?? createSmtpTransport(smtp, opts);
-  const msg = buildTestMessage(smtp, to, { subject: opts.subject, sentBy: opts.sentBy });
+  const msg =
+    opts.message ?? buildTestMessage(smtp, to, { subject: opts.subject, sentBy: opts.sentBy });
   const info = (await transport.sendMail(msg)) as {
     messageId?: string;
     accepted?: (string | { address: string })[];
@@ -164,6 +188,7 @@ export async function sendTestEmail(
   };
   const addr = (a: string | { address: string }) => (typeof a === 'string' ? a : a.address);
   return {
+    subject: msg.subject,
     messageId: info.messageId ?? '',
     accepted: (info.accepted ?? []).map(addr),
     rejected: (info.rejected ?? []).map(addr),

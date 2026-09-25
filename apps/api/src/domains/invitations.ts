@@ -11,6 +11,7 @@ import {
 import { env } from '@core/config';
 import { Email, errorResponses, fail, OkSchema, ok, Password } from '@core/contracts';
 import { and, eq, inArray, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { Id, notFound } from '../lib/http.ts';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
@@ -600,6 +601,8 @@ export const joinDomain = new Elysia({ name: 'join', prefix: '/auth', tags: ['au
         .update(schema.invitations)
         .set({ accepted_at: now, accepted_user_id: userId })
         .where(eq(schema.invitations.id, row.id));
+      // J-6: the invitation link was followed — whichever invite mail carried it was read.
+      await markActed(db, { to: row.email, templates: ['invite', 'invite-existing'] });
       emit('user.created', { userId, clientId: row.client_id }, { requestId });
       await writeAudit(db, {
         clientId: row.client_id,

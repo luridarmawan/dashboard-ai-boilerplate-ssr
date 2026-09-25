@@ -39,22 +39,25 @@ const permissions = $derived([...data.permissions].sort());
     {/each}
   </div>
 
-  <!-- Effective permissions live in their own section below the widgets: some accounts hold
-       dozens of them, so they render as wrapping chips instead of one unbroken inline run. -->
-  <Card
-    id="effective-permissions"
-    title={t('dashboard.permissions')}
-    description={t('dashboard.permissions_count', { count: permissions.length })}
-    class="mt-4"
-  >
-    {#if permissions.length}
-      <ul class="flex flex-wrap gap-1.5 text-xs">
-        {#each permissions as p (p)}
-          <li><code class="inline-block rounded border bg-muted px-1.5 py-0.5 break-all">{p}</code></li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="text-sm text-muted-foreground">{t('common.none')}</p>
-    {/if}
-  </Card>
+  <!-- Effective permissions are a developer aid (NODE_ENV=development only, decided on the
+       server). They sit in their own section below the widgets: some accounts hold dozens of
+       them, so they render as wrapping chips instead of one unbroken inline run. -->
+  {#if data.showPermissions}
+    <Card
+      id="effective-permissions"
+      title={t('dashboard.permissions')}
+      description={t('dashboard.permissions_count', { count: permissions.length })}
+      class="mt-4"
+    >
+      {#if permissions.length}
+        <ul class="flex flex-wrap gap-1.5 text-xs">
+          {#each permissions as p (p)}
+            <li><code class="inline-block rounded border bg-muted px-1.5 py-0.5 break-all">{p}</code></li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="text-sm text-muted-foreground">{t('common.none')}</p>
+      {/if}
+    </Card>
+  {/if}
 </div>

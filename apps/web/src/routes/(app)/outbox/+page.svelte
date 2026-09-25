@@ -4,7 +4,7 @@ import { goto, invalidateAll } from '$app/navigation';
 import { navigating } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Table, toast } from '$lib/components/ui';
+import { Badge, Button, ConfirmDelete, Table, toast } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -17,9 +17,11 @@ import type { ActionData, PageData } from './$types';
  * Two layers (L-20 over L-22). The BASE is links and plain forms: every control works with
  * JavaScript off, and the API does the filtering either way. The ENHANCED layer makes the same
  * controls answer over fetch — the filter bar applies as you type instead of on a submit, the
- * chips / sort / paging links are client-side navigations, and retry and "deliver now" post in
- * place, toast their outcome and re-read the rows. Nothing here invents behaviour the base
- * lacks; it only removes the full page reload between the operator and the answer.
+ * chips / sort / paging links are client-side navigations, and "send again" and "deliver now" post in
+ * place, toast their outcome and re-read the rows. "Send again" asks first: without JavaScript
+ * the trigger links to `?confirm=resend&id=` and the row shows the question inline; with it the
+ * same form opens in a modal. Nothing here invents behaviour the base lacks; it only removes
+ * the full page reload between the operator and the answer.
  */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
@@ -254,7 +256,7 @@ const paramOf = (location: string, key: string) => {
   </form>
 
   {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-  {#if data.saved === 'retried'}<p class="notice">{t('outbox.retried')}</p>{/if}
+  {#if data.saved === 'resent'}<p class="notice">{t('outbox.resent')}</p>{/if}
   {#if delivered}<p class="notice">{t('outbox.delivered', { picked: delivered[0] ?? 0, sent: delivered[1] ?? 0, failed: delivered[2] ?? 0, deferred: delivered[3] ?? 0 })}</p>{/if}
 
   <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
@@ -269,6 +271,7 @@ const paramOf = (location: string, key: string) => {
         <th><a href={sortHref('status')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.status')} <Icon name={sortIcon('status')} size={14} /></a></th>
         <th class="text-end"><a href={sortHref('attempts')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.attempts')} <Icon name={sortIcon('attempts')} size={14} /></a></th>
         <th><a href={sortHref('sent')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.sent_at')} <Icon name={sortIcon('sent')} size={14} /></a></th>
+        <th>{t('outbox.engagement')}</th>
         <th></th>
       </tr>
     </thead>
@@ -280,36 +283,64 @@ const paramOf = (location: string, key: string) => {
           <td class="max-w-[22rem] truncate" title={r.subject}>{r.subject}</td>
           <td><code>{r.template}</code> <span class="text-xs text-muted-foreground">{r.locale}</span></td>
           <td>
-            <Badge variant={badge(r.status)}>{label(r.status)}</Badge>
+            <span class="inline-flex items-center gap-1">
+              <Badge variant={badge(r.status)}>{label(r.status)}</Badge>
+              <!-- Read ticks, the way a chat app shows them: one grey tick = delivered, two
+                   coloured ticks = opened (pixel, click or the link's token being used). -->
+              {#if r.status === 'sent'}
+                {@const readAt = r.actedAt ?? r.clickedAt ?? r.openedAt}
+                {#if readAt}
+                  <span class="inline-flex text-success" title={`${t('outbox.opened')} ${fmtFull(readAt)}`} aria-label={`${t('outbox.opened')} ${fmtFull(readAt)}`} data-testid="outbox-read" data-read="true"><Icon name="check-double" size={16} /></span>
+                {:else}
+                  <span class="inline-flex text-muted-foreground" title={t('outbox.not_opened')} aria-label={t('outbox.not_opened')} data-testid="outbox-read" data-read="false"><Icon name="check" size={16} /></span>
+                {/if}
+              {/if}
+            </span>
             {#if r.lastError}<span class="block max-w-[18rem] truncate text-xs text-destructive" title={r.lastError}>{r.lastError}</span>{/if}
             {#if r.status === 'pending' && r.nextAttemptAt}<span class="block text-xs text-muted-foreground" title={fmtFull(r.nextAttemptAt)}>{t('outbox.next_attempt')} {fmt(r.nextAttemptAt)}</span>{/if}
           </td>
           <td class="text-end">{r.attempts}</td>
           <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.sentAt)}>{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
+          <!-- Engagement (J-6), strongest signal first: the token was used > the button was
+               clicked > the image loaded. Each line carries its own time; none is a status. -->
+          <td class="whitespace-nowrap text-xs" data-testid="outbox-engagement">
+            {#if r.actedAt}<span class="flex items-center gap-1 text-success" title={fmtFull(r.actedAt)}><Icon name="check" size={12} />{t('outbox.acted')} {fmt(r.actedAt)}</span>{/if}
+            {#if r.clickedAt}<span class="flex items-center gap-1" title={fmtFull(r.clickedAt)}><Icon name="link" size={12} />{t('outbox.clicked')} {fmt(r.clickedAt)}</span>{/if}
+            {#if r.openedAt}<span class="flex items-center gap-1 text-muted-foreground" title={fmtFull(r.openedAt)}><Icon name="eye" size={12} />{t('outbox.opened')} {fmt(r.openedAt)}{#if r.openCount > 1} ×{r.openCount}{/if}</span>{/if}
+            {#if !r.actedAt && !r.clickedAt && !r.openedAt}<span class="text-muted-foreground">—</span>{/if}
+          </td>
           <td class="text-end whitespace-nowrap">
-            {#if can('mail.manage') && r.status === 'failed'}
-              <form
-                method="POST"
-                action="?/retry"
-                class="inline"
-                use:enhance={runAction(`retry:${r.id}`, () =>
-                  toast({ title: t('outbox.retried'), variant: 'success' }),
+            {#if can('mail.manage') && (r.status === 'failed' || r.status === 'sent')}
+              <!-- Send again: a failed row gets another go, a delivered one goes out once more —
+                   after a confirmation, since the second copy is what the recipient sees.
+                   Pending rows are already queued ("deliver now" covers them); sending rows are leased. -->
+              <ConfirmDelete
+                compact
+                csrf={data.csrf}
+                confirm="resend"
+                action="?/resend"
+                icon="refresh"
+                confirmVariant="default"
+                variant="ghost"
+                size="sm"
+                href={`${href({ confirm: 'resend', id: r.id })}#confirm-resend`}
+                cancelHref={href()}
+                confirming={data.confirmResendId === r.id}
+                label={t('outbox.resend')}
+                title={t('outbox.resend_confirm')}
+                confirmLabel={t('outbox.resend')}
+                description={t('outbox.resend_confirm_lead', { to: r.to, subject: r.subject })}
+                enhance={runAction(`resend:${r.id}`, () =>
+                  toast({ title: t('outbox.resent'), variant: 'success' }),
                 )}
               >
-                <Csrf token={data.csrf} />
-                <input type="hidden" name="id" value={r.id} />
-                <input type="hidden" name="query" value={currentQuery} />
-                <!-- Icon only: one row action per row, and the label rides along as tooltip and
-                     accessible name so nothing is lost for a screen reader. -->
-                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} title={t('outbox.retry')} aria-label={t('outbox.retry')} data-testid="outbox-retry">
-                  <Icon name="refresh" size={14} class={busy === `retry:${r.id}` ? 'animate-spin' : ''} />
-                </Button>
-              </form>
+                {#snippet fields()}<input type="hidden" name="id" value={r.id} /><input type="hidden" name="query" value={currentQuery} />{/snippet}
+              </ConfirmDelete>
             {/if}
           </td>
         </tr>
       {:else}
-        <tr><td colspan="8" class="py-8 text-center text-muted-foreground">{filtered ? t('outbox.empty_filtered') : t('outbox.empty')}</td></tr>
+        <tr><td colspan="9" class="py-8 text-center text-muted-foreground">{filtered ? t('outbox.empty_filtered') : t('outbox.empty')}</td></tr>
       {/each}
     </tbody>
   </Table>

@@ -85,7 +85,8 @@ curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/version          # 
 # 9. Masuk di browser: https://DOMAIN/auth/login dengan BOOTSTRAP_ADMIN_*; landing ada di https://DOMAIN/
 #    Lalu di Pengaturan: ganti kata sandi admin (Profil) dan (opsional) hapus BOOTSTRAP_* dari .env.prod.
 #    Email: isi SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/MAIL_FROM_ADDRESS di .env.prod (lalu `dc up -d`),
-#    atau lewat Pengaturan → Email; nilai di Pengaturan menang per kolom.
+#    atau lewat Pengaturan → Email; nilai di Pengaturan menang per kolom. MAIL_BCC (opsional, .env saja)
+#    = BCC ke setiap email keluar, mis. kotak arsip.
 #    Uji kredensial .env.prod: `bun --env-file=.env.prod run mail:test --to anda@contoh.id`
 #    (koneksi + autentikasi + satu email uji, tanpa database) — atau tombol "Kirim email uji" di Pengaturan → Email,
 #    yang menguji konfigurasi yang benar-benar dipakai lingkup itu (Pengaturan dulu, lalu .env) termasuk per tenant;

@@ -99,7 +99,11 @@ while (!stopping && Date.now() < deadline) {
   try {
     const res = await fetch(`${webUrl}/favicon.ico`, { signal: AbortSignal.timeout(2000) });
     if (res.ok) {
-      printBanner(webUrl, 'development', `api ${apiUrl} (Exposed through the Vite proxy at ${webUrl}/v1)`);
+      printBanner(
+        webUrl,
+        'development',
+        `api ${apiUrl} (Exposed through the Vite proxy at ${webUrl}/v1)`,
+      );
       break;
     }
   } catch {
