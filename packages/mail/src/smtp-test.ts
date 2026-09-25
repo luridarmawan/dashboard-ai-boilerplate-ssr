@@ -97,6 +97,8 @@ export function buildTestMessage(
     readonly sentAt?: Date | undefined;
     /** Who asked for it, for the footer — the CLI by default, "Pengaturan → Email" from the app. */
     readonly sentBy?: string | undefined;
+    /** Tracking pixel (J-6) — the test mail is what people try tracking with first. */
+    readonly pixelUrl?: string | undefined;
   } = {},
 ): TestMessage {
   const sentAt = opts.sentAt ?? new Date();
@@ -135,7 +137,7 @@ ${rows
   .join('\n')}
 </table>
 <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Dikirim oleh <code>${esc(sentBy)}</code> — abaikan jika tidak Anda kenali.</p>
-</div></body></html>`;
+</div>${opts.pixelUrl ? `<img src="${esc(opts.pixelUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ''}</body></html>`;
   return {
     to,
     from: formatFrom(smtp),

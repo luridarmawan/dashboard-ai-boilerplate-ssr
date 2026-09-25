@@ -173,8 +173,12 @@ function renderSmtpTest(
   brand: Brand,
   to: string,
   payload: SmtpTestPayload,
+  track: Tracking,
 ): Rendered {
-  const msg = buildTestMessage(smtp ?? LOG_STAND_IN(brand), to, { sentBy: payload.sentBy });
+  const msg = buildTestMessage(smtp ?? LOG_STAND_IN(brand), to, {
+    sentBy: payload.sentBy,
+    pixelUrl: track.pixelUrl,
+  });
   return { subject: msg.subject, html: msg.html, text: msg.text };
 }
 
@@ -185,6 +189,8 @@ export interface RecordTestEmailInput {
   readonly sentBy: string;
   /** null = delivered; a message = what SMTP answered, and the row is `failed`. */
   readonly error: string | null;
+  /** The token the pixel in this very mail carries, when tracking was on for the scope. */
+  readonly openToken?: string | null;
 }
 
 /**
@@ -211,6 +217,7 @@ export async function recordTestEmail(db: Db, input: RecordTestEmailInput): Prom
     sent_at: input.error === null ? now : null,
     last_error: input.error?.slice(0, 2000) ?? null,
     transport: 'smtp',
+    open_token: input.openToken ?? null,
   });
   return id;
 }
@@ -277,16 +284,11 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
     const attempts = row.attempts + 1;
     try {
       const payload = (row.payload as Record<string, unknown>) ?? {};
+      const track = await trackingFor(db, row, payload, opts.tracking);
       const rendered: Rendered =
         row.template === SMTP_TEST_TEMPLATE
-          ? renderSmtpTest(opts.smtp, opts.brand, row.to_address, payload as SmtpTestPayload)
-          : renderTemplate(
-              row.template as TemplateId,
-              row.locale,
-              payload,
-              opts.brand,
-              await trackingFor(db, row, payload, opts.tracking),
-            );
+          ? renderSmtpTest(opts.smtp, opts.brand, row.to_address, payload as SmtpTestPayload, track)
+          : renderTemplate(row.template as TemplateId, row.locale, payload, opts.brand, track);
       await send({
         to: row.to_name ? `"${row.to_name.replace(/"/g, '')}" <${row.to_address}>` : row.to_address,
         from,

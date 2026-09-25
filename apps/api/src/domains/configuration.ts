@@ -5,6 +5,7 @@ import {
   buildTestMessage,
   createSmtpTransport,
   formatFrom,
+  newOpenToken,
   recordTestEmail,
   sendTestEmail,
   smtpHints,
@@ -13,7 +14,7 @@ import {
 import { GLOBAL, maskChanges, publicRoutesForModules, routesForModules } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
-import { smtpFor } from '../mail.ts';
+import { publicOrigin, smtpFor } from '../mail.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
@@ -390,7 +391,15 @@ export const configuration = new Elysia({
       const transport = createSmtpTransport(smtp, { timeoutMs: 10_000 });
       // Built before sending so the outbox row is titled with the real subject either way.
       const sentBy = 'Pengaturan → Email';
-      const message = buildTestMessage(smtp, to, { sentBy });
+      // J-6: the test mail carries the pixel when this scope tracks opens — it is the mail an
+      // admin opens to see tracking work, so it must be the first one that is tracked.
+      const tracked =
+        (await settings.get<boolean | null>(scope.clientId, 'mail.track_opens')) === true;
+      const openToken = tracked ? newOpenToken() : null;
+      const message = buildTestMessage(smtp, to, {
+        sentBy,
+        ...(openToken ? { pixelUrl: `${publicOrigin(request)}/v1/mail/o/${openToken}.gif` } : {}),
+      });
       const record = (error: string | null) =>
         recordTestEmail(db, {
           to,
@@ -398,6 +407,7 @@ export const configuration = new Elysia({
           clientId: scope.clientId,
           sentBy,
           error,
+          openToken,
         });
       const started = Date.now();
       let step = 'Koneksi/autentikasi';
@@ -414,6 +424,7 @@ export const configuration = new Elysia({
           details: [
             ...context,
             ...(smtp.bcc ? [`bcc ${smtp.bcc}`] : []),
+            ...(openToken ? ['pelacakan buka aktif — pixel disertakan'] : []),
             ...(r.messageId ? [`message-id ${r.messageId}`] : []),
             ...(r.rejected.length ? [`ditolak: ${r.rejected.join(', ')}`] : []),
             ...(r.response ? [`respons server: ${r.response}`] : []),

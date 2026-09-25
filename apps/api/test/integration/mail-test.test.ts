@@ -185,6 +185,32 @@ describe.skipIf(!enabled)('settings → email tester (J-1, E-3, extension point 
     expect(row?.sent_at).not.toBeNull();
   });
 
+  test('with mail.track_opens on, the test mail carries the pixel and the row its token', async () => {
+    await put({ scope: 'global', values: { 'mail.track_opens': true } }, [admin]);
+    try {
+      const r = await json(
+        await call(
+          '/v1/configuration/mail/test',
+          { method: 'POST', body: JSON.stringify({ scope: 'global', to: 'lacak@contoh.test' }) },
+          [admin],
+        ),
+      );
+      const result = r.data as unknown as ActionResult;
+      expect(result.ok).toBe(true);
+      expect(result.details.join(' ')).toContain('pixel');
+      const row = await lastRowFor('lacak@contoh.test');
+      expect(row?.open_token).toMatch(/^[0-9a-f]{32}$/);
+      // Quoted-printable may fold the line, so compare on the unfolded source.
+      const src = (smtp?.messages.at(-1) ?? '').replace(/=\r\n/g, '');
+      expect(src).toContain(`/v1/mail/o/${row?.open_token}.gif`);
+      // Opening it marks the row: the whole point of trying tracking with the test mail.
+      expect((await call(`/v1/mail/o/${row?.open_token}.gif`)).status).toBe(200);
+      expect((await lastRowFor('lacak@contoh.test'))?.opened_at).not.toBeNull();
+    } finally {
+      await put({ scope: 'global', values: { 'mail.track_opens': false } }, [admin]);
+    }
+  });
+
   test('a test that fails is on record too, as a failed row, and can be sent again from the outbox', async () => {
     // A port nothing listens on: verify() fails before any envelope is sent.
     await put({ scope: 'global', values: { 'mail.smtp_port': '9' } }, [admin]);
