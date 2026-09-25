@@ -17,7 +17,7 @@ import type { ActionData, PageData } from './$types';
  * Two layers (L-20 over L-22). The BASE is links and plain forms: every control works with
  * JavaScript off, and the API does the filtering either way. The ENHANCED layer makes the same
  * controls answer over fetch — the filter bar applies as you type instead of on a submit, the
- * chips / sort / paging links are client-side navigations, and retry and "deliver now" post in
+ * chips / sort / paging links are client-side navigations, and "send again" and "deliver now" post in
  * place, toast their outcome and re-read the rows. Nothing here invents behaviour the base
  * lacks; it only removes the full page reload between the operator and the answer.
  */
@@ -254,7 +254,7 @@ const paramOf = (location: string, key: string) => {
   </form>
 
   {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-  {#if data.saved === 'retried'}<p class="notice">{t('outbox.retried')}</p>{/if}
+  {#if data.saved === 'resent'}<p class="notice">{t('outbox.resent')}</p>{/if}
   {#if delivered}<p class="notice">{t('outbox.delivered', { picked: delivered[0] ?? 0, sent: delivered[1] ?? 0, failed: delivered[2] ?? 0, deferred: delivered[3] ?? 0 })}</p>{/if}
 
   <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
@@ -287,13 +287,15 @@ const paramOf = (location: string, key: string) => {
           <td class="text-end">{r.attempts}</td>
           <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.sentAt)}>{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
           <td class="text-end whitespace-nowrap">
-            {#if can('mail.manage') && r.status === 'failed'}
+            {#if can('mail.manage') && (r.status === 'failed' || r.status === 'sent')}
+              <!-- Send again: a failed row gets another go, a delivered one goes out once more.
+                   Pending rows are already queued ("deliver now" covers them); sending rows are leased. -->
               <form
                 method="POST"
-                action="?/retry"
+                action="?/resend"
                 class="inline"
-                use:enhance={runAction(`retry:${r.id}`, () =>
-                  toast({ title: t('outbox.retried'), variant: 'success' }),
+                use:enhance={runAction(`resend:${r.id}`, () =>
+                  toast({ title: t('outbox.resent'), variant: 'success' }),
                 )}
               >
                 <Csrf token={data.csrf} />
@@ -301,8 +303,8 @@ const paramOf = (location: string, key: string) => {
                 <input type="hidden" name="query" value={currentQuery} />
                 <!-- Icon only: one row action per row, and the label rides along as tooltip and
                      accessible name so nothing is lost for a screen reader. -->
-                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} title={t('outbox.retry')} aria-label={t('outbox.retry')} data-testid="outbox-retry">
-                  <Icon name="refresh" size={14} class={busy === `retry:${r.id}` ? 'animate-spin' : ''} />
+                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} title={t('outbox.resend')} aria-label={t('outbox.resend')} data-testid="outbox-resend">
+                  <Icon name="refresh" size={14} class={busy === `resend:${r.id}` ? 'animate-spin' : ''} />
                 </Button>
               </form>
             {/if}

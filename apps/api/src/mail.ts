@@ -92,6 +92,7 @@ export interface SmtpSources {
     readonly SMTP_SECURE?: boolean | undefined;
     readonly MAIL_FROM_ADDRESS?: string | undefined;
     readonly MAIL_FROM_NAME?: string | undefined;
+    readonly MAIL_BCC?: string | undefined;
   };
   readonly appName: string;
 }
@@ -100,7 +101,8 @@ export interface SmtpSources {
  * Per field: database setting when filled, else .env (J-1, E-6). Host and from-address are the
  * minimum; without both there is no SMTP and the outbox keeps rows pending (or logs them outside
  * production). SMTP_SECURE only applies when the host itself comes from .env — a host configured
- * in Settings follows the port rule (465 = implicit TLS).
+ * in Settings follows the port rule (465 = implicit TLS). MAIL_BCC rides along whichever way
+ * the host was found: it is a deployment rule, not part of any tenant's SMTP account.
  */
 export function resolveSmtp(src: SmtpSources): SmtpConfig | null {
   const { setting, env: e } = src;
@@ -116,6 +118,7 @@ export function resolveSmtp(src: SmtpSources): SmtpConfig | null {
     fromName: setting.fromName ?? e.MAIL_FROM_NAME ?? src.appName,
     fromAddress,
     ...(hostFromEnv && e.SMTP_SECURE !== undefined ? { secure: e.SMTP_SECURE } : {}),
+    ...(e.MAIL_BCC ? { bcc: e.MAIL_BCC } : {}),
   };
 }
 

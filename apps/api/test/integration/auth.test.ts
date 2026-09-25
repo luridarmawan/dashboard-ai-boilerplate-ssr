@@ -125,7 +125,7 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
     });
     expect(spoofed.status).toBe(200);
     const me2 = await json(await call('/v1/auth/me', {}, [sessionCookie(spoofed)]));
-    expect((me2.data?.user as { lastLoginIp: string | null }).lastLoginIp).toBe(
+    expect((me2.data?.user as { lastLoginIp: string | null } | undefined)?.lastLoginIp).toBe(
       `203.0.113.${run % 250}`,
     );
   });

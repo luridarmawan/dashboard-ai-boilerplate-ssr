@@ -7,8 +7,9 @@ import { app } from '../../src/app.ts';
  * Integration (INTEGRATION=1): the outbox monitoring API (J-2). The list is newest first by
  * default, filters by status, template and a calendar-day range, searches recipient address,
  * recipient name and subject case-insensitively, sorts on request, and answers `mail.read`
- * only. The outbox is GLOBAL and other tests write to it, so every assertion is scoped by a
- * per-run marker in `q` rather than by counting the whole table.
+ * only. "Send again" re-queues a failed row AND a delivered one. The outbox is GLOBAL and other
+ * tests write to it, so every assertion is scoped by a per-run marker in `q` rather than by
+ * counting the whole table.
  */
 const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
@@ -215,8 +216,10 @@ describe.skipIf(!enabled)('outbox monitoring (J-2): order, filter, search, retry
     expect(d.templates.map((x) => x.template)).toContain('invite');
   });
 
-  test('retry re-queues a failed row; a member without mail.read is refused', async () => {
-    const r = await json(await call(`/v1/outbox/${ids.failed}/retry`, { method: 'POST' }, [admin]));
+  test('resend re-queues a failed row with a fresh attempt budget; a member without mail.read is refused', async () => {
+    const r = await json(
+      await call(`/v1/outbox/${ids.failed}/resend`, { method: 'POST' }, [admin]),
+    );
     expect(r.success).toBe(true);
     expect((r.data as { requeued: number }).requeued).toBe(1);
     const [back] = await db
@@ -224,11 +227,39 @@ describe.skipIf(!enabled)('outbox monitoring (J-2): order, filter, search, retry
       .from(schema.outboxEmail)
       .where(eq(schema.outboxEmail.id, ids.failed));
     expect(back?.status).toBe('pending');
+    expect(back?.attempts).toBe(0);
     expect(back?.last_error).toBeNull();
+    expect(back?.next_attempt_at).not.toBeNull();
 
     expect((await call('/v1/outbox', {}, [member])).status).toBe(403);
     expect(
-      (await call(`/v1/outbox/${ids.failed}/retry`, { method: 'POST' }, [member])).status,
+      (await call(`/v1/outbox/${ids.failed}/resend`, { method: 'POST' }, [member])).status,
     ).toBe(403);
+  });
+
+  test('resend also sends a delivered row again; a leased (sending) row and an unknown id change nothing', async () => {
+    const r = await json(await call(`/v1/outbox/${ids.mid}/resend`, { method: 'POST' }, [admin]));
+    expect((r.data as { requeued: number }).requeued).toBe(1);
+    const [again] = await db
+      .select()
+      .from(schema.outboxEmail)
+      .where(eq(schema.outboxEmail.id, ids.mid));
+    expect(again?.status).toBe('pending');
+    // Same recipient, same template and payload: only the delivery state is reset.
+    expect(again?.to_address).toBe(`alpha-${MARK}@example.test`);
+    expect(again?.template).toBe('contact');
+
+    await db
+      .update(schema.outboxEmail)
+      .set({ status: 'sending' })
+      .where(eq(schema.outboxEmail.id, ids.old));
+    const leased = await json(
+      await call(`/v1/outbox/${ids.old}/resend`, { method: 'POST' }, [admin]),
+    );
+    expect((leased.data as { requeued: number }).requeued).toBe(0);
+    const unknown = await json(
+      await call(`/v1/outbox/${newId()}/resend`, { method: 'POST' }, [admin]),
+    );
+    expect((unknown.data as { requeued: number }).requeued).toBe(0);
   });
 });

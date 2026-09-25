@@ -13,14 +13,14 @@ import {
   sql,
   unsafeAcrossTenants,
 } from '@core/db';
-import { retryOutbox } from '@core/mail';
+import { resendOutbox } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { Id, likePattern, MAX_LIMIT, paging } from '../lib/http.ts';
 import { runOutboxOnce } from '../mail.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
 
-/** Outbox administration (J-2): see what was sent, what failed, retry, run the worker now. */
+/** Outbox administration (J-2): see what was sent, what failed, send again, run the worker now. */
 const Row = t.Object({
   id: t.String(),
   clientId: t.Nullable(t.String()),
@@ -148,13 +148,16 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
     },
   )
   .post(
-    '/:id/retry',
-    async ({ params }) => ok({ requeued: await retryOutbox(unsafeAcrossTenants(), [params.id]) }),
+    '/:id/resend',
+    async ({ params }) => ok({ requeued: await resendOutbox(unsafeAcrossTenants(), [params.id]) }),
     {
       beforeHandle: permission('mail.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ requeued: t.Integer() })), ...errorResponses },
-      detail: { summary: 'Re-queue a failed email' },
+      detail: {
+        summary:
+          'Send an e-mail again — failed or already delivered; re-rendered with the SMTP in effect now (requeued 0 = unknown id or currently sending)',
+      },
     },
   )
   .post('/deliver', async () => ok(await runOutboxOnce()), {

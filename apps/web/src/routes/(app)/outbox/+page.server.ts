@@ -107,16 +107,17 @@ const back = (form: FormData, extra: string) => {
 };
 
 export const actions: Actions = {
-  retry: async (event) => {
+  /** Send again — a failed row or one already delivered; the API re-queues it as is. */
+  resend: async (event) => {
     const form = await event.request.formData();
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.outbox({ id: str(form, 'id') })
-        .retry.post(),
+        .resend.post(),
     );
     if (!r.ok) return actionFailure(r.failure);
-    redirect(303, back(form, 'saved=retried'));
+    redirect(303, back(form, 'saved=resent'));
   },
   deliver: async (event) => {
     const form = await event.request.formData();

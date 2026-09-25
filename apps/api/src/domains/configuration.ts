@@ -1,7 +1,15 @@
 import { consumeRateLimit, rateLimitHeaders, writeAudit } from '@core/auth';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
-import { createSmtpTransport, formatFrom, sendTestEmail, smtpHints, tlsMode } from '@core/mail';
+import {
+  buildTestMessage,
+  createSmtpTransport,
+  formatFrom,
+  recordTestEmail,
+  sendTestEmail,
+  smtpHints,
+  tlsMode,
+} from '@core/mail';
 import { GLOBAL, maskChanges, publicRoutesForModules, routesForModules } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
@@ -308,12 +316,14 @@ export const configuration = new Elysia({
   )
   /**
    * Send ONE test e-mail with the SMTP configuration of this scope — the `mail` section's action
-   * (extension point 6). Straight through SMTP, never the outbox: the question is "do these
-   * credentials work?", and an outbox row would answer it a minute later on another page. Two
+   * (extension point 6). Straight through SMTP, never queued: the question is "do these
+   * credentials work?", and a queued row would answer it a minute later on another page. Two
    * steps like `bun run mail:test` — verify (connection, TLS, auth) then send — so a failure says
    * which half broke, with `smtpHints()` for what to try next. The configuration comes from
    * `smtpFor()`, exactly as a real delivery resolves it (setting, else .env), so testing the
    * global scope and a tenant that overrides it are two different answers, as they should be.
+   * The outcome is then RECORDED in the outbox (`smtp-test`, sent or failed) so the test sits in
+   * the same history as real mail and can be sent again from `/outbox`.
    */
   .post(
     '/mail/test',
@@ -378,22 +388,36 @@ export const configuration = new Elysia({
           after: { ok: success, to, host: smtp.host, port: smtp.port, note },
         });
       const transport = createSmtpTransport(smtp, { timeoutMs: 10_000 });
+      // Built before sending so the outbox row is titled with the real subject either way.
+      const sentBy = 'Pengaturan → Email';
+      const message = buildTestMessage(smtp, to, { sentBy });
+      const record = (error: string | null) =>
+        recordTestEmail(db, {
+          to,
+          subject: message.subject,
+          clientId: scope.clientId,
+          sentBy,
+          error,
+        });
       const started = Date.now();
       let step = 'Koneksi/autentikasi';
       try {
         await transport.verify();
         step = 'Pengiriman';
-        const r = await sendTestEmail(smtp, to, { transport, sentBy: 'Pengaturan → Email' });
+        const r = await sendTestEmail(smtp, to, { transport, message });
         const ms = Date.now() - started;
         await audit(true, `terkirim dalam ${ms} ms`);
+        await record(null);
         return ok({
           ok: true,
           message: `Email uji terkirim ke ${to} (${ms} ms) — periksa kotak masuk, termasuk folder spam.`,
           details: [
             ...context,
+            ...(smtp.bcc ? [`bcc ${smtp.bcc}`] : []),
             ...(r.messageId ? [`message-id ${r.messageId}`] : []),
             ...(r.rejected.length ? [`ditolak: ${r.rejected.join(', ')}`] : []),
             ...(r.response ? [`respons server: ${r.response}`] : []),
+            'tercatat di Outbox',
           ],
         });
       } catch (err) {
@@ -401,10 +425,11 @@ export const configuration = new Elysia({
         const message = err instanceof Error ? err.message : String(err);
         const tag = [e.code, e.responseCode, e.command].filter(Boolean).join(' · ');
         await audit(false, `${step}: ${message}`.slice(0, 500));
+        await record(`${step}: ${message}`);
         return ok({
           ok: false,
           message: `${step} gagal${tag ? ` [${tag}]` : ''}: ${message}`,
-          details: [...context, ...smtpHints(err)],
+          details: [...context, ...smtpHints(err), 'tercatat di Outbox'],
         });
       } finally {
         transport.close();
