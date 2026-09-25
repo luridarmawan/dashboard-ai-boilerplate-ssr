@@ -101,6 +101,8 @@
   "landing.features.f5.text": "Chat streaming dengan riwayat, tool dari modul, server & klien MCP, log penggunaan, dan provider yang bisa diganti dari pengaturan.",
   "landing.features.f6": "Operasional",
   "landing.features.f6.text": "Audit log, outbox email, notifikasi, unggahan berkas, metrik Prometheus, dan kebijakan retensi — siap untuk produksi.",
+  "landing.features.f7": "Pelacakan email",
+  "landing.features.f7.text": "Setiap email keluar tercatat di outbox: dibuka, tautannya diklik, dan ditindaklanjuti — tampil sebagai centang ganda. Piksel dan klik opsional per tenant, tanpa menyimpan alamat IP.",
   "landing.platform.eyebrow": "Status Instalasi",
   "landing.platform.title": "Status platform",
   "landing.platform.lead": "Dibaca langsung dari API saat halaman ini ditampilkan — identitas build dan modul yang terpasang dan aktif.",

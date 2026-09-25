@@ -39,6 +39,7 @@ const features = [
   { k: 'f4', icon: 'language' },
   { k: 'f5', icon: 'sparkles' },
   { k: 'f6', icon: 'chart-line' },
+  { k: 'f7', icon: 'check-double' },
 ] as const;
 /** Command per step is developer-facing and identical in every language, like a code sample. */
 const steps = [
