@@ -210,6 +210,8 @@
   "error.generic": "Terjadi kesalahan",
   "error.root.forbidden": "Akses ditolak",
   "error.root.not_found": "Halaman tidak ditemukan",
+  "error.root.not_found_title": "404 Error.",
+  "error.root.not_found_lead": "Alamat yang dicari tidak ditemukan, seperti mencari mantan yang hilang.",
   "error.root.unauthorized": "Perlu masuk",
   "examples.category": "Kategori",
   "examples.chart.aria": "Bagan batang penjualan dan retur per bulan",

@@ -210,6 +210,8 @@
   "error.generic": "Something went wrong",
   "error.root.forbidden": "Access denied",
   "error.root.not_found": "Page not found",
+  "error.root.not_found_title": "404 Error.",
+  "error.root.not_found_lead": "The address you were looking for is nowhere to be found, like an ex who vanished without a trace.",
   "error.root.unauthorized": "Sign-in required",
   "examples.category": "Category",
   "examples.chart.aria": "Bar chart of sales and returns per month",

@@ -1,15 +1,21 @@
 <script lang="ts">
 import { page } from '$app/state';
 import Icon from '$lib/components/Icon.svelte';
+import Illustration404 from '$lib/components/Illustration404.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 
-/** Root error page (L-19: 404/403/500). Deeper layouts have their own so errors keep the shell. */
+/**
+ * Root error page (L-19: 404/403/500). Deeper layouts have their own so errors keep the shell.
+ * The 404 is the one visitors actually meet (a mistyped link, a page that moved), so it gets an
+ * illustration and a line with a smile; the rest stay plain and to the point.
+ */
 const t = useT();
 const status = $derived(page.status);
+const notFound = $derived(status === 404);
 const title = $derived(
-  status === 404
-    ? t('error.root.not_found')
+  notFound
+    ? t('error.root.not_found_title')
     : status === 403
       ? t('error.root.forbidden')
       : status === 401
@@ -18,15 +24,31 @@ const title = $derived(
 );
 </script>
 
-<svelte:head><title>{status} · {title}</title></svelte:head>
+<svelte:head><title>{status} · {notFound ? t('error.root.not_found') : title}</title></svelte:head>
 
-<div class="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
-  <Icon name={status === 404 ? 'search' : status === 403 || status === 401 ? 'lock' : 'error'} size={40} class="text-muted-foreground" />
-  <p class="font-mono text-5xl font-semibold text-muted-foreground">{status}</p>
-  <h1>{title}</h1>
-  {#if page.error?.message && status !== 404}<p class="max-w-md text-muted-foreground">{page.error.message}</p>{/if}
-  <div class="flex gap-3">
-    <Button href="/">{t('common.home')}</Button>
-    {#if status === 401 || status === 403}<Button href="/auth/login" variant="outline">{t('nav.login')}</Button>{/if}
+{#if notFound}
+  <main class="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-12 text-center" data-testid="error-404">
+    <div class="w-full max-w-xl">
+      <Illustration404 />
+    </div>
+    <div class="max-w-lg">
+      <p class="font-mono text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">{t('error.root.not_found')}</p>
+      <h1 class="mt-2 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">{title}</h1>
+      <p class="mt-4 text-balance text-lg text-muted-foreground">{t('error.root.not_found_lead')}</p>
+    </div>
+    <div class="flex flex-wrap justify-center gap-3">
+      <Button href="/" class="rounded-full px-6"><Icon name="arrow-left" size={16} class="rtl:rotate-180" />{t('common.home')}</Button>
+    </div>
+  </main>
+{:else}
+  <div class="flex min-h-dvh flex-col items-center justify-center gap-4 px-4 text-center">
+    <Icon name={status === 403 || status === 401 ? 'lock' : 'error'} size={40} class="text-muted-foreground" />
+    <p class="font-mono text-5xl font-semibold text-muted-foreground">{status}</p>
+    <h1>{title}</h1>
+    {#if page.error?.message}<p class="max-w-md text-muted-foreground">{page.error.message}</p>{/if}
+    <div class="flex gap-3">
+      <Button href="/">{t('common.home')}</Button>
+      {#if status === 401 || status === 403}<Button href="/auth/login" variant="outline">{t('nav.login')}</Button>{/if}
+    </div>
   </div>
-</div>
+{/if}
