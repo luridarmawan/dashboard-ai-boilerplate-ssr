@@ -6,16 +6,20 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 |---|---|
 | ![Home](docs/screenshot/og-image.jpg) | ![Settings](docs/screenshot/settings.png) |
 
-## Fitur unggulan
-
-- **Pelacakan email (J-6)** — setiap email keluar bisa diikuti dari `/outbox`: **dibuka** (pixel 1×1), **diklik** (tombol CTA lewat tautan pelacak yang selalu mengarah ke tautan tersimpan, bukan open redirect), dan **ditindaklanjuti** (token sekali pakai dari verifikasi, reset kata sandi, atau undangan benar-benar dipakai — satu-satunya sinyal yang tidak bisa dipalsukan proxy gambar). Baris terkirim tampil dengan **centang ganda** begitu ada tanda dibaca. Pixel dan klik **opsional per tenant** lewat **Pengaturan → Email → Lacak pembukaan & klik email** (baku mati); tidak ada IP atau user agent yang disimpan, dan tautan cadangan serta versi teks email tetap mentah bagi pembaca yang tidak ingin dilacak. Email uji SMTP ikut dilacak, jadi fitur ini bisa dicoba dalam satu menit.
-
 ## Architecture
 
 [![architecture](docs/screenshot/architecture.png)](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/)
 
 Diagram interaktif: komponen, jalur permintaan, dan pekerjaan latar — tiap node tertaut ke berkas sumber yang dibacanya.
 **[Lihat arsitektur — English](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/architecture.html)** · **[Bahasa Indonesia](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/architecture.id.html)**
+
+## Fitur unggulan
+
+- **Identity & access** — Login, verifikasi email, reset kata sandi, 2FA, login dengan Google, dan undangan anggota tim. Hak akses diatur per grup, sampai ke tiap tindakan.
+- **AI Ready Module** — Asisten AI dengan chat real-time dan riwayat percakapan, bisa memakai alat dari modul lain, terhubung ke MCP, lengkap dengan catatan pemakaian. Ganti penyedia AI cukup dari halaman pengaturan.
+- **Multi-tenant** — Satu aplikasi untuk banyak perusahaan atau cabang. Data tiap tenant terpisah rapi, pengguna bisa bergabung ke beberapa tenant, dan setiap tenant punya pengaturannya sendiri.
+- **Multi-Module** — Tambah, aktifkan, atau matikan fitur sebagai modul tanpa mengubah inti aplikasi. Modul bisa dibuat di repositori terpisah, dan aplikasi tetap utuh saat sebuah modul dimatikan.
+- **Email tracker** — Ketahui kapan email dibuka, kapan tombolnya diklik, dan kapan penerima benar-benar menindaklanjutinya, misalnya memverifikasi akun atau menerima undangan. Semua email keluar tercatat di satu log outbox dan bisa dikirim ulang kapan saja. Pelacakan bisa dinyalakan per tenant, dan data pribadi seperti alamat IP tidak disimpan.
 
 ## Document
 
