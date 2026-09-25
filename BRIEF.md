@@ -8,6 +8,8 @@ Boilerplate **dashboard admin ber-AI** yang dipakai sebagai template proyek baru
 
 Lima tujuan produk: **API-first · SSR · Modular · Database-agnostic · Self-hosted**.
 
+Fitur unggulan yang ditonjolkan di README dan landing bawaan: **pelacakan email** (J-6) — outbox mencatat email dibuka (pixel), diklik (tautan pelacak), dan ditindaklanjuti (token sekali pakai dipakai), tampil sebagai centang ganda di `/outbox`. Pixel & klik opsional per tenant (`mail.track_opens`, baku mati), tanpa menyimpan IP/user agent. Perubahan di jalur email tidak boleh memutus ketiga sinyal ini.
+
 ## 2. Stack & topologi
 
 | | |

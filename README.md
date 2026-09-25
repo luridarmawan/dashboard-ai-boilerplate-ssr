@@ -6,6 +6,10 @@ Boilerplate dashboard multi-tenant yang **modular**, ter-SSR, dan siap dipasang 
 |---|---|
 | ![Home](docs/screenshot/og-image.jpg) | ![Settings](docs/screenshot/settings.png) |
 
+## Fitur unggulan
+
+- **Pelacakan email (J-6)** — setiap email keluar bisa diikuti dari `/outbox`: **dibuka** (pixel 1×1), **diklik** (tombol CTA lewat tautan pelacak yang selalu mengarah ke tautan tersimpan, bukan open redirect), dan **ditindaklanjuti** (token sekali pakai dari verifikasi, reset kata sandi, atau undangan benar-benar dipakai — satu-satunya sinyal yang tidak bisa dipalsukan proxy gambar). Baris terkirim tampil dengan **centang ganda** begitu ada tanda dibaca. Pixel dan klik **opsional per tenant** lewat **Pengaturan → Email → Lacak pembukaan & klik email** (baku mati); tidak ada IP atau user agent yang disimpan, dan tautan cadangan serta versi teks email tetap mentah bagi pembaca yang tidak ingin dilacak. Email uji SMTP ikut dilacak, jadi fitur ini bisa dicoba dalam satu menit.
+
 ## Architecture
 
 [![architecture](docs/screenshot/architecture.png)](https://luridarmawan.github.io/dashboard-ai-boilerplate-ssr/architecture/)
