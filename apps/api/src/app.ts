@@ -8,6 +8,7 @@ import { configuration } from './domains/configuration.ts';
 import { filesDomain } from './domains/files.ts';
 import { groups } from './domains/groups.ts';
 import { invitationsDomain, joinDomain } from './domains/invitations.ts';
+import { mailTrack } from './domains/mail-track.ts';
 import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
@@ -109,6 +110,7 @@ export const app = new Elysia()
       .use(moduleDomain)
       .use(menuDomain)
       .use(outbox)
+      .use(mailTrack)
       .use(notificationsDomain)
       .use(filesDomain)
       .use(tokensDomain)

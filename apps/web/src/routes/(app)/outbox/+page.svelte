@@ -271,6 +271,7 @@ const paramOf = (location: string, key: string) => {
         <th><a href={sortHref('status')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.status')} <Icon name={sortIcon('status')} size={14} /></a></th>
         <th class="text-end"><a href={sortHref('attempts')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.attempts')} <Icon name={sortIcon('attempts')} size={14} /></a></th>
         <th><a href={sortHref('sent')} class="inline-flex items-center gap-1 no-underline hover:no-underline">{t('outbox.sent_at')} <Icon name={sortIcon('sent')} size={14} /></a></th>
+        <th>{t('outbox.engagement')}</th>
         <th></th>
       </tr>
     </thead>
@@ -288,6 +289,14 @@ const paramOf = (location: string, key: string) => {
           </td>
           <td class="text-end">{r.attempts}</td>
           <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.sentAt)}>{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
+          <!-- Engagement (J-6), strongest signal first: the token was used > the button was
+               clicked > the image loaded. Each line carries its own time; none is a status. -->
+          <td class="whitespace-nowrap text-xs" data-testid="outbox-engagement">
+            {#if r.actedAt}<span class="flex items-center gap-1 text-success" title={fmtFull(r.actedAt)}><Icon name="check" size={12} />{t('outbox.acted')} {fmt(r.actedAt)}</span>{/if}
+            {#if r.clickedAt}<span class="flex items-center gap-1" title={fmtFull(r.clickedAt)}><Icon name="link" size={12} />{t('outbox.clicked')} {fmt(r.clickedAt)}</span>{/if}
+            {#if r.openedAt}<span class="flex items-center gap-1 text-muted-foreground" title={fmtFull(r.openedAt)}><Icon name="eye" size={12} />{t('outbox.opened')} {fmt(r.openedAt)}{#if r.openCount > 1} ×{r.openCount}{/if}</span>{/if}
+            {#if !r.actedAt && !r.clickedAt && !r.openedAt}<span class="text-muted-foreground">—</span>{/if}
+          </td>
           <td class="text-end whitespace-nowrap">
             {#if can('mail.manage') && (r.status === 'failed' || r.status === 'sent')}
               <!-- Send again: a failed row gets another go, a delivered one goes out once more —
@@ -319,7 +328,7 @@ const paramOf = (location: string, key: string) => {
           </td>
         </tr>
       {:else}
-        <tr><td colspan="8" class="py-8 text-center text-muted-foreground">{filtered ? t('outbox.empty_filtered') : t('outbox.empty')}</td></tr>
+        <tr><td colspan="9" class="py-8 text-center text-muted-foreground">{filtered ? t('outbox.empty_filtered') : t('outbox.empty')}</td></tr>
       {/each}
     </tbody>
   </Table>

@@ -152,6 +152,12 @@ export async function runOutboxOnce() {
     brand: await brandFor(null),
     allowLogTransport: e.NODE_ENV !== 'production',
     limit: 25,
+    // J-6: per tenant (global fallback), read at delivery so a flip applies to the next pass.
+    tracking: {
+      enabled: async (clientId) =>
+        (await settings.get<boolean | null>(clientId, 'mail.track_opens')) === true,
+      origin: publicOrigin(null),
+    },
   });
 }
 

@@ -36,6 +36,11 @@ const Row = t.Object({
   nextAttemptAt: t.Nullable(t.String()),
   sentAt: t.Nullable(t.String()),
   createdAt: t.String(),
+  /** Engagement (J-6): pixel, tracked button, one-time token used. Null = no signal yet. */
+  openedAt: t.Nullable(t.String()),
+  openCount: t.Integer(),
+  clickedAt: t.Nullable(t.String()),
+  actedAt: t.Nullable(t.String()),
 });
 
 const STATUSES = ['pending', 'sending', 'sent', 'failed'] as const;
@@ -133,6 +138,10 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
           nextAttemptAt: r.next_attempt_at?.toISOString() ?? null,
           sentAt: r.sent_at?.toISOString() ?? null,
           createdAt: r.created_at.toISOString(),
+          openedAt: r.opened_at?.toISOString() ?? null,
+          openCount: r.open_count,
+          clickedAt: r.clicked_at?.toISOString() ?? null,
+          actedAt: r.acted_at?.toISOString() ?? null,
         })),
         p.meta(Number(tot?.n ?? 0)),
       );

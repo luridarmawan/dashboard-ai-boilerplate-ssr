@@ -90,6 +90,9 @@ export const load: PageServerLoad = async (event) => {
       nextAttemptAt: r.nextAttemptAt ? new Date(r.nextAttemptAt).toISOString() : null,
       sentAt: r.sentAt ? new Date(r.sentAt).toISOString() : null,
       createdAt: new Date(r.createdAt).toISOString(),
+      openedAt: r.openedAt ? new Date(r.openedAt).toISOString() : null,
+      clickedAt: r.clickedAt ? new Date(r.clickedAt).toISOString() : null,
+      actedAt: r.actedAt ? new Date(r.actedAt).toISOString() : null,
     })),
     meta: list.data.meta,
     counts: stats.data?.success

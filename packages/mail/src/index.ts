@@ -12,8 +12,24 @@ import {
   schema,
 } from '@core/db';
 import { logger } from '@core/logger';
+import { ensureOpenToken } from './engagement.ts';
 import { buildTestMessage, createSmtpTransport, formatFrom } from './smtp-test.ts';
-import { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
+import {
+  type Brand,
+  type Rendered,
+  renderTemplate,
+  type TemplateId,
+  type Tracking,
+} from './templates/index.ts';
+
+export {
+  type ActedInput,
+  ensureOpenToken,
+  markActed,
+  markOpened,
+  newOpenToken,
+  resolveClick,
+} from './engagement.ts';
 
 export {
   buildTestMessage,
@@ -29,7 +45,13 @@ export {
   type TransportOptions,
   tlsMode,
 } from './smtp-test.ts';
-export { type Brand, type Rendered, renderTemplate, type TemplateId } from './templates/index.ts';
+export {
+  type Brand,
+  type Rendered,
+  renderTemplate,
+  type TemplateId,
+  type Tracking,
+} from './templates/index.ts';
 
 /**
  * The outbox (PRD J-1, J-2). `enqueue()` is all a request does — one INSERT, no SMTP on the
@@ -92,6 +114,15 @@ export interface DeliverOptions {
   readonly brand: Brand;
   /** Without SMTP outside production, emails are "sent" to the log so flows stay testable. */
   readonly allowLogTransport: boolean;
+  /**
+   * Engagement tracking (J-6), decided per row at delivery time so a setting flipped later
+   * applies to the next delivery — and to a re-send. `origin` is the public origin the pixel
+   * and click URLs are built on, the same one links in the mail use.
+   */
+  readonly tracking?: {
+    readonly enabled: (clientId: string | null) => Promise<boolean>;
+    readonly origin: string;
+  };
   /** Injectable sender for tests. */
   readonly send?: (msg: OutboundMessage) => Promise<void>;
 }
@@ -249,7 +280,13 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
       const rendered: Rendered =
         row.template === SMTP_TEST_TEMPLATE
           ? renderSmtpTest(opts.smtp, opts.brand, row.to_address, payload as SmtpTestPayload)
-          : renderTemplate(row.template as TemplateId, row.locale, payload, opts.brand);
+          : renderTemplate(
+              row.template as TemplateId,
+              row.locale,
+              payload,
+              opts.brand,
+              await trackingFor(db, row, payload, opts.tracking),
+            );
       await send({
         to: row.to_name ? `"${row.to_name.replace(/"/g, '')}" <${row.to_address}>` : row.to_address,
         from,
@@ -290,6 +327,25 @@ export async function deliverOutbox(db: Db, opts: DeliverOptions): Promise<Deliv
     }
   }
   return { picked: due.length, sent, failed, deferred };
+}
+
+/**
+ * Pixel and click URLs for one delivery, when the row's tenant opted in. The token is minted
+ * on first tracked delivery and reused by every re-send, so the row keeps one identity.
+ */
+async function trackingFor(
+  db: Db,
+  row: { id: string; client_id: string | null; open_token: string | null },
+  payload: Record<string, unknown>,
+  tracking: DeliverOptions['tracking'],
+): Promise<Tracking> {
+  if (!tracking || !(await tracking.enabled(row.client_id))) return {};
+  const token = await ensureOpenToken(db, row.id, row.open_token);
+  const base = tracking.origin.replace(/\/$/, '');
+  return {
+    pixelUrl: `${base}/v1/mail/o/${token}.gif`,
+    ...(typeof payload.link === 'string' ? { buttonUrl: `${base}/v1/mail/c/${token}` } : {}),
+  };
 }
 
 /**
