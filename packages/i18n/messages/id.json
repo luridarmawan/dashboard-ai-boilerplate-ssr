@@ -781,6 +781,7 @@
   "outbox.opened": "Dibuka",
   "outbox.clicked": "Diklik",
   "outbox.acted": "Ditindaklanjuti",
+  "outbox.not_opened": "Belum ada tanda dibuka",
   "outbox.deliver": "Kirim sekarang",
   "outbox.delivered": "Worker dijalankan: {picked} diambil, {sent} terkirim, {failed} gagal, {deferred} ditunda.",
   "outbox.empty": "Belum ada email di outbox.",

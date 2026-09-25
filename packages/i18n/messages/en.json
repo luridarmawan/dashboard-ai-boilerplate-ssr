@@ -781,6 +781,7 @@
   "outbox.opened": "Opened",
   "outbox.clicked": "Clicked",
   "outbox.acted": "Acted on",
+  "outbox.not_opened": "No sign of it being opened yet",
   "outbox.deliver": "Deliver now",
   "outbox.delivered": "Worker run: {picked} picked, {sent} sent, {failed} failed, {deferred} deferred.",
   "outbox.empty": "The outbox is empty.",

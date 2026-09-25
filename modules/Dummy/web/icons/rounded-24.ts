@@ -15,6 +15,7 @@ import ChartBarGlyph from '@lucide/svelte/icons/chart-bar';
 import ChartLineGlyph from '@lucide/svelte/icons/chart-line';
 import ChartPieGlyph from '@lucide/svelte/icons/chart-pie';
 import CheckGlyph from '@lucide/svelte/icons/check';
+import CheckDoubleGlyph from '@lucide/svelte/icons/check-check';
 import ChevronDownGlyph from '@lucide/svelte/icons/chevron-down';
 import ChevronLeftGlyph from '@lucide/svelte/icons/chevron-left';
 import ChevronRightGlyph from '@lucide/svelte/icons/chevron-right';
@@ -119,6 +120,7 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   'more-horizontal': MoreHorizontalGlyph as unknown as Component<Record<string, unknown>>,
   'more-vertical': MoreVerticalGlyph as unknown as Component<Record<string, unknown>>,
   check: CheckGlyph as unknown as Component<Record<string, unknown>>,
+  'check-double': CheckDoubleGlyph as unknown as Component<Record<string, unknown>>,
   x: XGlyph as unknown as Component<Record<string, unknown>>,
   info: InfoGlyph as unknown as Component<Record<string, unknown>>,
   warning: WarningGlyph as unknown as Component<Record<string, unknown>>,

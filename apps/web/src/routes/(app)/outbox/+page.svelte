@@ -283,7 +283,19 @@ const paramOf = (location: string, key: string) => {
           <td class="max-w-[22rem] truncate" title={r.subject}>{r.subject}</td>
           <td><code>{r.template}</code> <span class="text-xs text-muted-foreground">{r.locale}</span></td>
           <td>
-            <Badge variant={badge(r.status)}>{label(r.status)}</Badge>
+            <span class="inline-flex items-center gap-1">
+              <Badge variant={badge(r.status)}>{label(r.status)}</Badge>
+              <!-- Read ticks, the way a chat app shows them: one grey tick = delivered, two
+                   coloured ticks = opened (pixel, click or the link's token being used). -->
+              {#if r.status === 'sent'}
+                {@const readAt = r.actedAt ?? r.clickedAt ?? r.openedAt}
+                {#if readAt}
+                  <span class="inline-flex text-success" title={`${t('outbox.opened')} ${fmtFull(readAt)}`} aria-label={`${t('outbox.opened')} ${fmtFull(readAt)}`} data-testid="outbox-read" data-read="true"><Icon name="check-double" size={16} /></span>
+                {:else}
+                  <span class="inline-flex text-muted-foreground" title={t('outbox.not_opened')} aria-label={t('outbox.not_opened')} data-testid="outbox-read" data-read="false"><Icon name="check" size={16} /></span>
+                {/if}
+              {/if}
+            </span>
             {#if r.lastError}<span class="block max-w-[18rem] truncate text-xs text-destructive" title={r.lastError}>{r.lastError}</span>{/if}
             {#if r.status === 'pending' && r.nextAttemptAt}<span class="block text-xs text-muted-foreground" title={fmtFull(r.nextAttemptAt)}>{t('outbox.next_attempt')} {fmt(r.nextAttemptAt)}</span>{/if}
           </td>
