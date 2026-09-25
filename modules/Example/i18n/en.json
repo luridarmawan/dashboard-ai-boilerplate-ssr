@@ -128,5 +128,22 @@
   "example.resolve.products_in": "products in this category",
   "example.resolve.empty": "No products in this category yet.",
   "example.resolve.all_products": "All products",
-  "example.resolve.categories": "Categories"
+  "example.resolve.categories": "Categories",
+  "example.trap.category_demo": "This is a trap demo for the {name} category URL",
+  "example.trap.item_demo": "This is a trap demo for the {name} page",
+  "example.trap.eyebrow": "404 trapper demo (F-11)",
+  "example.trap.lead": "This URL has no SvelteKit route. The core handed it to the Example module through the 404 handler setting, and a rule in modules/Example/trap.ts recognised it. This page shows the mechanism on purpose.",
+  "example.trap.wiring": "What happened",
+  "example.trap.requested": "Requested URL",
+  "example.trap.rule": "Matched rule",
+  "example.trap.params": "Parameters",
+  "example.trap.status": "Status",
+  "example.trap.status_note": "under the original address, no redirect",
+  "example.trap.how": "How it works",
+  "example.trap.step1": "A visitor opens a URL no route knows.",
+  "example.trap.step2": "The core reads the app.not_found_route setting and forwards that URL to this module's /resolve page.",
+  "example.trap.step3": "The page reads the original URL with trappedPath(event) and matches it: the rule table first (trap.ts), then the database (categories/products).",
+  "example.trap.step4": "A match renders with status 200 under the original address. No match → error(404), and the built-in 404 page shows as usual.",
+  "example.trap.try": "Try another URL",
+  "example.trap.try_note": "The first two are answered by the rule table, the next two by the database, and the last one belongs to nobody and falls through to the built-in 404."
 }

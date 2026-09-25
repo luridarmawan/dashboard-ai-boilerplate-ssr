@@ -128,5 +128,22 @@
   "example.resolve.products_in": "produk dalam kategori ini",
   "example.resolve.empty": "Belum ada produk di kategori ini.",
   "example.resolve.all_products": "Semua produk",
-  "example.resolve.categories": "Kategori"
+  "example.resolve.categories": "Kategori",
+  "example.trap.category_demo": "Ini contoh trap URL kategori {name}",
+  "example.trap.item_demo": "Ini contoh trap halaman {name}",
+  "example.trap.eyebrow": "Contoh penangkap 404 (F-11)",
+  "example.trap.lead": "URL ini tidak punya route SvelteKit. Core menyerahkannya ke modul Example lewat setelan Penangkap halaman 404, dan sebuah aturan di modules/Example/trap.ts mengenalinya. Halaman ini sengaja memperlihatkan mekanismenya.",
+  "example.trap.wiring": "Apa yang terjadi",
+  "example.trap.requested": "URL diminta",
+  "example.trap.rule": "Aturan cocok",
+  "example.trap.params": "Parameter",
+  "example.trap.status": "Status",
+  "example.trap.status_note": "di bawah alamat asli, tanpa redirect",
+  "example.trap.how": "Cara kerjanya",
+  "example.trap.step1": "Pengunjung membuka URL yang tidak dikenal route mana pun.",
+  "example.trap.step2": "Core membaca setelan app.not_found_route dan meneruskan URL itu ke halaman /resolve milik modul ini.",
+  "example.trap.step3": "Halaman membaca URL asli lewat trappedPath(event), lalu mencocokkannya: tabel aturan dulu (trap.ts), kemudian database (kategori/produk).",
+  "example.trap.step4": "Cocok → dirender 200 di alamat asli. Tidak cocok → error(404), dan halaman 404 bawaan tampil seperti biasa.",
+  "example.trap.try": "Coba URL lain",
+  "example.trap.try_note": "Dua yang pertama dijawab tabel aturan, dua berikutnya oleh database, yang terakhir bukan milik siapa pun dan jatuh ke 404 bawaan."
 }

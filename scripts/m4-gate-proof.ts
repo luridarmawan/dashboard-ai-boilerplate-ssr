@@ -354,6 +354,26 @@ const admin = new Jar();
       prod.html.includes('href="/single-origin"'),
     `${prod.res.status}`,
   );
+  // The rule table (modules/Example/trap.ts) answers before the database does.
+  const ruleCat = await get(anon, '/category-food');
+  const ruleItem = await get(anon, '/food/nasi-goreng');
+  check(
+    'F-11 rule table: /category-food and /food/nasi-goreng are the demo pages, 200, wired up visibly',
+    ruleCat.res.status === 200 &&
+      ruleCat.res.headers.get('x-not-found-route') === '/resolve' &&
+      ruleCat.html.includes('data-testid="trap-title"') &&
+      ruleCat.html.includes('>category-prefix<') &&
+      ruleCat.html.includes('name=Food') &&
+      ruleItem.res.status === 200 &&
+      ruleItem.html.includes('>category-item<') &&
+      ruleItem.html.includes('name=Nasi Goreng') &&
+      ruleItem.html.includes('name="robots" content="noindex"'),
+    `${ruleCat.res.status} ${ruleItem.res.status}`,
+  );
+  check(
+    'F-11 a page served under a deeper URL still links its assets absolutely (paths.relative=false)',
+    ruleItem.html.includes('href="/_app/') && !ruleItem.html.includes('href="./_app/'),
+  );
   const withQuery = await get(anon, '/single-origin?utm=x');
   check('F-11 a query string does not break the match', withQuery.res.status === 200);
   const miss = await get(anon, '/tidak-ada-halaman-ini');

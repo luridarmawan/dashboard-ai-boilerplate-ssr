@@ -308,6 +308,18 @@ export const load: ServerLoad = async (event) => {
 };
 ```
 
+**Mulai dari tabel aturan — `modules/Example/trap.ts`.** Situs yang direvamp harus mempertahankan URL lamanya (`/category-food`, `/food/nasi-goreng`, `/promo/2026/lebaran.html`, apa pun yang dulu dikeluarkan situs itu). Bentuk seperti itu tidak bisa dideklarasikan sebagai route, tetapi bisa dideskripsikan sebagai **tabel pola**: setiap aturan adalah satu regex terjangkar atas pathname yang sudah dinormalkan (decode, tanpa query, tanpa slash akhir, huruf kecil) plus fungsi kecil yang mengubah hasil cocok menjadi *hit* bertipe. Aturan dicoba dari atas ke bawah, yang paling spesifik ditaruh paling atas; aturan boleh menolak (`null`) supaya jatuh ke aturan berikutnya. `matchTrap(pathname)` murni dan sinkron — tanpa I/O — jadi bisa diuji unit (`modules/Example/test/trap.test.ts`). Baru bila tabel tidak mengenali URL, loader bertanya ke database (`GET /v1/m/example/resolve`), dan terakhir `error(404)`.
+
+```ts
+// modules/Example/trap.ts (ringkas)
+export const TRAP_RULES: readonly TrapRule[] = [
+  { id: 'category-prefix', pattern: /^\/category-([a-z0-9-]+)$/, resolve: (m) => ({ kind: 'category-demo', slug: m[1], name: titleFromSlug(m[1]) }) },
+  { id: 'category-item',   pattern: /^\/([a-z0-9-]+)\/([a-z0-9-]+)$/, resolve: (m) => ({ kind: 'item-demo', category: m[1], slug: m[2], name: titleFromSlug(m[2]) }) },
+];
+```
+
+Dua aturan demo itu menjawab `/category-food` ("Ini contoh trap URL kategori Food") dan `/food/nasi-goreng` ("Ini contoh trap halaman Nasi Goreng") dengan halaman yang **memperlihatkan mekanismenya sendiri**: URL yang diminta, aturan yang cocok, parameter yang diekstrak, dan langkah-langkahnya — supaya developer lain memahami konsepnya sebelum mengganti aturan demo dengan bentuk URL situs yang sedang dimigrasi. Untuk modul e-commerce yang merevamp situs lama: salin `trap.ts`, tulis satu aturan per bentuk URL lama, dan biarkan `resolve` mengembalikan id/slug yang dicari di tabel modul Anda.
+
 Aturan mainnya:
 
 - **`trappedPath(event)` adalah satu-satunya sumber URL asli.** `event.url` di halaman ini adalah `/resolve`, bukan yang dilihat pengunjung — jangan dipakai untuk canonical, `og:url`, atau tautan. Layout publik core sudah memakai `trappedPath` untuk tujuan kembali form bahasa/tema.
