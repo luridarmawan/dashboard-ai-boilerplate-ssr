@@ -1,0 +1,13 @@
+pada module Example, buatkan cuntoh fungsi untuk trap url 404.
+tujuan: developer lain bisa memahami maksud konsep ini.
+contoh url:
+- category-food
+  tampilkan halaman: "ini contoh trap url kategori food"
+- food/nasi-goreng
+  tampilkan halaman: "ini contoh trap halaman nasi goreng"
+
+sesuaikan visualnya.
+
+pengembangan berikutnya:
+saya akan membuat module ecommerce. revamp dari situs yang sudah ada. tapi tetap dengan mempertahankan url aslinya.
+

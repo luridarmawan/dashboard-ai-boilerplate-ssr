@@ -23,11 +23,17 @@ const title = $derived(
 
 <div class="page items-center py-8 text-center" data-testid={notFound ? 'error-404' : undefined}>
   {#if notFound}
-    <!-- The same scene as the root 404, the full width of the content area, height following. -->
-    <img src="/404.png" alt="" width="1672" height="941" class="block h-auto w-full rounded-2xl" />
-    <p class="font-mono text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">{t('error.app.not_found')}</p>
-    <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-    <p class="mx-auto max-w-lg text-balance text-muted-foreground">{t('error.root.not_found_lead')}</p>
+    <!-- The same scene as the root 404 as the background of the content area, copy in its centre. -->
+    <section
+      class="flex min-h-[60dvh] w-full items-center justify-center rounded-2xl bg-cover bg-center bg-no-repeat px-4 py-10"
+      style="background-image: url('/404.png')"
+    >
+      <div class="flex w-full max-w-lg flex-col items-center gap-3 rounded-3xl border border-border/60 bg-background/65 px-6 py-8 shadow-lg backdrop-blur-[2px]">
+        <p class="font-mono text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">{t('error.app.not_found')}</p>
+        <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
+        <p class="text-balance text-muted-foreground">{t('error.root.not_found_lead')}</p>
+      </div>
+    </section>
   {:else}
     <Icon name={status === 403 ? 'lock' : 'error'} size={36} class="mx-auto text-muted-foreground" />
     <p class="font-mono text-4xl font-semibold text-muted-foreground">{status}</p>
