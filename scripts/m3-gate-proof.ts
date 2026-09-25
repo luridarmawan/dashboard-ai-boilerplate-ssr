@@ -125,7 +125,7 @@ const anon = new Jar();
 {
   const before = await get(anon, '/');
   check(
-    'default landing → 200 (the Example storefront when installed, else the built-in page)',
+    'default landing → 200 (the built-in page, or the route LANDING_ROUTE names)',
     before.res.status === 200 &&
       ['/example', null].includes(before.res.headers.get('x-landing-route')),
   );

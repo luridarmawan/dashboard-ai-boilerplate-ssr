@@ -359,7 +359,7 @@ Keduanya wajib bisa dinonaktifkan tanpa menyisakan route yatim, menu rusak, atau
 `Example` bukan sekadar demo CRUD. Ia punya tiga peran:
 
 1. **Referensi kontrak** — satu-satunya tempat yang perlu dilihat developer untuk tahu bentuk setiap titik perluasan. Kodenya ditulis untuk dibaca dan disalin, dengan komentar yang menjelaskan *kenapa*, bukan *apa*.
-2. **Isi baku halaman `/`** — instalasi bersih tidak boleh menyajikan halaman kosong atau langsung melempar ke `/login`. Landing page `Example` adalah tujuan baku dari root (§4.7).
+2. **Landing siap pakai untuk halaman `/`** — instalasi bersih tidak boleh menyajikan halaman kosong atau langsung melempar ke `/login`. Sejak 2026-09-26 isi baku root adalah **halaman depan bawaan** core (`app.landing_route` = `/`); landing `Example` (`/example`) tetap tersedia dan tinggal dipilih admin di Pengaturan (§4.7).
 3. **Bukti bahwa boilerplate ini sanggup melayani sisi publik**, bukan hanya dashboard di balik login.
 
 **Bentuk landing page-nya adalah situs komersil yang meyakinkan** — setara company profile atau etalase e-commerce sederhana, bukan halaman "Hello World" bergaya template:
@@ -384,11 +384,11 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 
 | Kunci | Tempat | Nilai baku | Keterangan |
 |---|---|---|---|
-| `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
+| `app.landing_route` | Database (per tenant, fallback global) | `/` (halaman depan bawaan; ikut `LANDING_ROUTE`) | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
 | `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil |
 | `app.not_found_route` | Database (per tenant, fallback global) | kosong | **Penangkap 404** (F-11): **modul** yang ditanya untuk setiap URL yang tidak cocok route mana pun — kategori/produk toko, slug artikel blog. Bertipe `not_found_route`: hanya halaman yang dideklarasikan modul sebagai penangkapnya (`notFound: true` di `public.ts`) yang ditawarkan, dilabeli nama modul; halaman publik lain (landing, katalog) ditolak karena akan menjawab semua URL asing dengan 200. Kosong = halaman 404 bawaan |
 | `app.favicon_url` | Database (per tenant, fallback global) | kosong | URL/path favicon tenant untuk `<link rel="icon">` semua shell; kosong = favicon bawaan `static/favicon.svg`. Favicon tema kustom (L-24) menimpanya selama tema itu aktif |
-| `LANDING_ROUTE` | `.env` | `/m/example` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
+| `LANDING_ROUTE` | `.env` | `/` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):
 
@@ -663,7 +663,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | ID | Kebutuhan |
 |---|---|
 | R-1 | **[P0]** Modul `Example` tersedia sebagai modul bawaan yang dibangun **memakai kontrak §4.5 yang sama** dengan modul pihak ketiga — tanpa jalur istimewa dari core. |
-| R-2 | **[P0]** `Example` menyediakan **landing page komersil publik** dengan seluruh bagian pada §4.6, dan menjadi isi baku dari `/` pada instalasi bersih. |
+| R-2 | **[P0]** `Example` menyediakan **landing page komersil publik** dengan seluruh bagian pada §4.6, yang bisa dipilih sebagai isi `/` lewat `app.landing_route` (baku instalasi bersih: halaman depan bawaan core, sejak 2026-09-26). |
 | R-3 | **[P0]** Etalase produk/portofolio pada landing page mengambil data dari **tabel milik modul**, ter-SSR, dengan halaman detail `/product/:slug`. |
 | R-4 | **[P0]** SEO: metadata per halaman (title, description, canonical, Open Graph, JSON-LD), sitemap, dan `robots.txt`. Halaman publik terindeks tanpa JavaScript. |
 | R-5 | **[P0]** Form kontak/inquiry berfungsi **tanpa JavaScript** (form action), menulis ke tabel modul, mengirim email lewat outbox, dan terlindung rate limit + proteksi spam sederhana. Dua email keluar per kiriman: pemberitahuan ke alamat kontak tenant (`example.contact_email`, bila diisi) dan **tanda terima ke pengirimnya** (template `contact-ack`, berisi salinan pesannya) — keduanya lewat outbox, dalam bahasa permintaan yang mengirim form. |

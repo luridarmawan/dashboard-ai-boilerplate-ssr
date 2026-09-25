@@ -148,7 +148,7 @@ Bisa paralel dengan M5.
 **Isi:** modul `Example` (R-1…R-8) · landing komersil dengan data dari DB (§4.6) · SEO per halaman + sitemap (R-4) · form kontak tanpa JavaScript (R-5) · email + outbox (J-1…J-3)
 
 **Gate keluar:**
-1. `/` menyajikan landing komersil ter-SSR pada instalasi bersih
+1. `/` menyajikan landing komersil ter-SSR (sejak 2026-09-26 setelah `app.landing_route=/example`; instalasi bersih menyajikan halaman depan bawaan)
 2. Lighthouse **≥ 90 pada keempat kategori** di landing — Performance, Accessibility, Best Practices, **dan SEO** (persis kriteria §8 #8, jangan disempitkan); terindeks dengan JavaScript dimatikan
 3. Form kontak bekerja tanpa JavaScript, tersimpan, dan emailnya masuk outbox
 4. `Example` dinonaktifkan → aplikasi tetap utuh, `/` jatuh ke fallback
@@ -366,6 +366,7 @@ P2 (2FA, SSO tambahan, impersonasi, job queue, marketplace modul) sebaiknya menu
 57. **Halaman 500 dengan adegan robot korslet** (L-19, §4.8; diminta pemilik 2026-09-26) — **selesai**: status **5xx** kini memakai layout yang sama dengan 404 (butir 53), baik di halaman error akar maupun di dalam shell dasbor: gambar `apps/web/static/500.png` (robot memegangi kepala dengan layar "500", asap, server terguling) sebagai latar `cover`, salinannya di panel tembus pandang di bagian atas — `error.root.server_error` (label), `error.root.server_error_title` ("{status} Error.", jadi 502/503 ikut menampilkan kodenya sendiri), `error.root.server_error_lead`, lewat i18n. Pesan dari `error()` (mis. `Example: internal error`) tetap tampil di bawahnya dalam ukuran kecil, dan ada tombol **Coba lagi** berupa tautan biasa ke URL yang sama (tanpa JS). `data-testid="error-500"`. 401/403 tetap tampilan polos. Diverifikasi di `/examples/errors?code=500` pada 1280 dan 390 px (tanpa overflow).
 
 ---
+58. **Landing baku instalasi baru = `/`** (F-5, §4.7; diminta pemilik 2026-09-26) — **selesai**: nilai awal *Halaman depan (anonim)* (`app.landing_route`) kini `/` — halaman depan bawaan core — bukan `/example`. Tidak ada baris seed untuk setelan ini; nilainya jatuh ke `LANDING_ROUTE`, jadi yang diubah adalah fallback-nya: default zod di `@core/config`, `landingFallback()` di `@core/settings` dan web, `.env.example`, `.env.prod.example`, `compose.prod.yml`, `deploy/systemd/api.env.example`. **Tanpa migrasi**: instalasi lama yang `.env`-nya masih `LANDING_ROUTE=/example` atau punya baris setelan tetap seperti semula. Gate M4 kini mengarahkan `/` ke `/example` secara eksplisit di awal dan, setelah setelan dikosongkan di akhir, menuntut halaman bawaan; Lighthouse CI mengaudit `/example` langsung. `docs/PRD.md` §4.6/§4.7/R-2 ikut diperbarui.
 
 ## 9. Cara membaca kemajuan
 

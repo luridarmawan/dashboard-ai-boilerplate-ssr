@@ -27,7 +27,7 @@ export interface PublicConfig {
  */
 export function landingFallback(): string {
   const v = env.LANDING_ROUTE?.trim();
-  return v?.startsWith('/') && !v.startsWith('//') ? v : '/example';
+  return v?.startsWith('/') && !v.startsWith('//') ? v : '/';
 }
 
 function defaults(): Record<string, unknown> {

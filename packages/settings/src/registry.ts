@@ -9,7 +9,7 @@ import { moduleConfig } from '@core/module-kit/registry';
  */
 function landingFallback(): string {
   const v = rawEnv('LANDING_ROUTE');
-  return v?.startsWith('/') && !v.startsWith('//') ? v : '/example';
+  return v?.startsWith('/') && !v.startsWith('//') ? v : '/';
 }
 
 /**

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * M4 gate proof over plain HTTP (no browser, no JavaScript):
- *   #1 `/` serves the Example commercial landing, server-rendered, on a clean install
+ *   #1 `/` serves the Example commercial landing, server-rendered, once `app.landing_route=/example`
  *   #3 the contact form works without JavaScript, is stored, and its email lands in the outbox
  *   #4 Example disabled → the app stays whole and `/` falls back (F-6)
  *   + R-3/R-4: product detail from the module table, SEO meta + JSON-LD, sitemap.xml, robots.txt
@@ -76,7 +76,8 @@ const admin = new Jar();
     next: '/dashboard',
   });
   check('admin login', r.res.status === 303, `${r.res.status}`);
-  // make sure Example is enabled and the landing route is the default
+  // make sure Example is enabled and `/` forwards to its landing — a clean install serves the
+  // built-in page at `/` (LANDING_ROUTE defaults to `/`), so the proof points it at `/example`
   const modules = await get(admin, '/modules');
   await post(admin, '/modules?/toggle', {
     _csrf: csrfOf(modules.html),
@@ -90,7 +91,7 @@ const admin = new Jar();
     _scope: 'global',
     _section: 'app',
     _keys: ['app.landing_route'],
-    'app.landing_route': '',
+    'app.landing_route': '/example',
   });
   // the contact recipient, so the inquiry produces an outbox row (#3)
   const s2 = await get(admin, '/settings?scope=global');
@@ -103,7 +104,7 @@ const admin = new Jar();
   });
 }
 
-// ---- #1: clean install → / is the commercial landing, SSR ----
+// ---- #1: `/` → the commercial landing, SSR ----
 {
   const { res, html } = await get(anon, '/');
   check(
@@ -294,10 +295,10 @@ const admin = new Jar();
     _scope: 'global',
     _section: 'app',
     _keys: ['app.landing_route'],
-    'app.landing_route': '',
+    'app.landing_route': '/example',
   });
   check(
-    'R-9 back to the default landing for whatever runs next',
+    'R-9 back to the Example landing for whatever runs next',
     (await get(anon, '/')).res.headers.get('x-landing-route') === '/example',
   );
 }
@@ -518,9 +519,14 @@ const admin = new Jar();
     _keys: ['app.landing_route'],
     'app.landing_route': '',
   });
+  // Cleared: the default (LANDING_ROUTE, `/` on a clean install) is the built-in page again.
+  const cleared = await get(anon, '/');
   check(
-    'back to the default landing for whatever runs next',
-    (await get(anon, '/')).res.headers.get('x-landing-route') === '/example',
+    'back to the default landing (built-in page) for whatever runs next',
+    cleared.res.status === 200 &&
+      !cleared.res.headers.get('x-landing-route') &&
+      cleared.html.includes('data-testid="landing-hero"'),
+    `${cleared.res.status} ${cleared.res.headers.get('x-landing-route')}`,
   );
 }
 
