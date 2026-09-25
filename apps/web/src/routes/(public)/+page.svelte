@@ -175,13 +175,13 @@ const stats = $derived([
 </section>
 
 <!-- features -->
-<section class="mx-auto max-w-6xl px-4 py-20" aria-labelledby="features-title">
+<section id="features-container" class="mx-auto max-w-6xl px-4 py-20" aria-labelledby="features-title">
   <div class="max-w-2xl">
     <p class="text-xs font-medium uppercase tracking-[0.18em] text-primary">{t('landing.features.eyebrow')}</p>
     <h2 id="features-title" class="mt-3 text-3xl font-semibold leading-tight tracking-tight">{t('landing.features.title')}</h2>
     <p class="mt-4 text-muted-foreground">{t('landing.features.lead')}</p>
   </div>
-  <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  <ul id="features-items" class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
     {#each features as f (f.k)}
       <li class="flex flex-col rounded-2xl border bg-card p-6 shadow-sm transition-transform hover:-translate-y-0.5">
         <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon name={f.icon} size={22} /></span>
