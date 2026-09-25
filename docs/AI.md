@@ -64,7 +64,7 @@ Pemakaian ditulis setelah respons selesai, jadi satu panggilan bisa melampaui ba
 
 ## Analitik penggunaan (H-15)
 
-**Analitik AI** (`/m/ai/analytics`, izin `ai.log.read`) merangkum log panggilan: total panggilan (ok/gagal/dibatalkan), token masuk/keluar, biaya estimasi; grafik token per hari (CSS, tanpa pustaka, jalan tanpa JavaScript); tabel per penyedia & model dan per pengguna, diurutkan biaya. Rentang 7/30/90 hari (`GET /v1/m/ai/analytics?days=`; hari kalender UTC, batang terakhir = hari ini). Agregasi dilakukan di API dari baris `ai_calls` tenant aktif — netral dialect — dengan batas 100.000 baris terbaru per rentang (`truncated: true` bila terpotong). Retensi log (M-3) membatasi seberapa jauh analitik bisa melihat ke belakang.
+**Analitik AI** (`/m/ai/analytics`, izin `ai.log.read`; tanpa `ai.log.manage` hanya panggilan milik sendiri dan tabel per pengguna disembunyikan) merangkum log panggilan: total panggilan (ok/gagal/dibatalkan), token masuk/keluar, biaya estimasi; grafik token per hari (CSS, tanpa pustaka, jalan tanpa JavaScript); tabel per penyedia & model dan per pengguna, diurutkan biaya. Rentang 7/30/90 hari (`GET /v1/m/ai/analytics?days=`; hari kalender UTC, batang terakhir = hari ini). Agregasi dilakukan di API dari baris `ai_calls` tenant aktif — netral dialect — dengan batas 100.000 baris terbaru per rentang (`truncated: true` bila terpotong). Retensi log (M-3) membatasi seberapa jauh analitik bisa melihat ke belakang.
 
 ## Lampiran (H-11) dan threading pesan (H-12)
 
@@ -102,7 +102,7 @@ Tool yang sama juga disajikan ke klien MCP eksternal (Claude Desktop, Claude Cod
 
 ## Log panggilan (H-9, M-3)
 
-Setiap panggilan dicatat ke `ai_calls` **setelah** respons selesai (`queueMicrotask`), jadi tidak menahan jalur panas: endpoint, model, token in/out/total, latensi, latensi token pertama, status (`ok`/`error`/`cancelled`), biaya estimasi. Job `ai.log_retention` (harian) menghapus baris yang lebih tua dari `ai.log_retention_days`. Halaman **Log AI** (`/m/ai/logs`) memerlukan izin `ai.log.read`.
+Setiap panggilan dicatat ke `ai_calls` **setelah** respons selesai (`queueMicrotask`), jadi tidak menahan jalur panas: endpoint, model, token in/out/total, latensi, latensi token pertama, status (`ok`/`error`/`cancelled`), biaya estimasi. Job `ai.log_retention` (harian) menghapus baris yang lebih tua dari `ai.log_retention_days`. Halaman **Log AI** (`/m/ai/logs`) memerlukan izin `ai.log.read`, yang hanya memperlihatkan panggilan milik pengguna itu sendiri; `ai.log.manage` (termasuk dalam `*.*` grup Administrator) memperlihatkan panggilan semua pengguna di tenant. Pembatasan yang sama berlaku untuk `GET /v1/m/ai/logs`, `/logs/models`, dan `/analytics`.
 
 ## Pengembangan tanpa kunci nyata
 

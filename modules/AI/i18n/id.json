@@ -32,6 +32,7 @@
   "ai.logs.to": "Sampai",
   "ai.logs.reset": "Reset filter",
   "ai.logs.empty_filtered": "Tidak ada log yang cocok dengan filter.",
+  "ai.logs.own_only": "Anda hanya melihat panggilan AI Anda sendiri.",
   "ai.logs.user": "Pengguna",
   "ai.logs.model": "Model",
   "ai.logs.tokens": "Token (in/out)",

@@ -267,6 +267,14 @@ function logCall(c: CallLog): void {
 
 const estimateTokens = (s: string) => Math.ceil(s.length / 4);
 
+/**
+ * The call log is personal by default: `ai.log.read` opens the log and analytics on your own
+ * calls, `ai.log.manage` (the Administrator group's `*.*` includes it) on the whole tenant's.
+ * Returns the user id to narrow to, or null when the caller may see every row.
+ */
+const ownLogsOnly = (a: AuthState, ts: TenantState): string | null =>
+  ts.can('ai.log.manage') ? null : a.user.id;
+
 // ---- external MCP servers (I-4, I-5) ----
 void mcpToolSource; // importing mcp-tools.ts registers the tool source with the core registry
 type McpRow = typeof schema.aiMcps.$inferSelect;
@@ -1657,8 +1665,9 @@ export default defineApiRoutes(
     // ---- call log (H-9) ----
     .get(
       '/logs/models',
-      async ({ tenantState }) => {
+      async ({ auth, tenantState }) => {
         if (!tenantState?.clientId) return ok([] as string[]);
+        const own = ownLogsOnly(auth as AuthState, tenantState);
         const rows = await unsafeAcrossTenants() // distinct; tenant condition explicit
           .selectDistinct({ model: schema.aiCalls.model })
           .from(schema.aiCalls)
@@ -1666,6 +1675,7 @@ export default defineApiRoutes(
             and(
               eq(schema.aiCalls.client_id, tenantState.clientId),
               isNotNull(schema.aiCalls.model),
+              own ? eq(schema.aiCalls.user_id, own) : undefined,
             ),
           )
           .orderBy(schema.aiCalls.model);
@@ -1681,8 +1691,9 @@ export default defineApiRoutes(
     )
     .get(
       '/logs',
-      async ({ query, tenantState }) => {
+      async ({ auth, query, tenantState }) => {
         if (!tenantState?.clientId) return page([], pageMeta(1, 20, 0));
+        const own = ownLogsOnly(auth as AuthState, tenantState);
         const db = unsafeAcrossTenants(); // paging; tenant condition explicit
         const p = Math.max(1, Number(query.page ?? 1));
         const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
@@ -1711,6 +1722,7 @@ export default defineApiRoutes(
         const like = q ? `%${q.toLowerCase().replace(/[%_\\]/g, (c) => `\\${c}`)}%` : '';
         const where = and(
           eq(schema.aiCalls.client_id, tenantState.clientId),
+          own ? eq(schema.aiCalls.user_id, own) : undefined,
           q
             ? inArray(
                 schema.aiCalls.user_id,
@@ -1797,7 +1809,10 @@ export default defineApiRoutes(
           ),
           ...errorResponses,
         },
-        detail: { summary: 'AI call log of the active tenant (tokens, latency, status, cost)' },
+        detail: {
+          summary:
+            'AI call log of the active tenant (tokens, latency, status, cost); only your own calls without ai.log.manage',
+        },
       },
     )
 
@@ -2392,7 +2407,7 @@ export default defineApiRoutes(
     // ---- analytics (H-15): tokens & cost per day / model / user over a window ----
     .get(
       '/analytics',
-      async ({ query, tenantState }) => {
+      async ({ auth, query, tenantState }) => {
         const days = Math.min(365, Math.max(1, Number(query.days ?? 30) || 30));
         // The window is `days` calendar days (UTC) ending today, so the chart's last bar is today.
         const from = new Date(Date.now() - (days - 1) * 86_400_000);
@@ -2418,6 +2433,7 @@ export default defineApiRoutes(
         };
         if (!tenantState?.clientId) return ok(empty);
         const db = unsafeAcrossTenants(); // aggregate over the tenant's rows; condition explicit
+        const own = ownLogsOnly(auth as AuthState, tenantState);
         const rows = await db
           .select({
             created_at: schema.aiCalls.created_at,
@@ -2435,6 +2451,7 @@ export default defineApiRoutes(
             and(
               eq(schema.aiCalls.client_id, tenantState.clientId),
               gte(schema.aiCalls.created_at, from),
+              own ? eq(schema.aiCalls.user_id, own) : undefined,
             ),
           )
           .orderBy(desc(schema.aiCalls.created_at))

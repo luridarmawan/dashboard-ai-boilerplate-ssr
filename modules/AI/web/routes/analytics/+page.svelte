@@ -38,6 +38,7 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
     </nav>
   </div>
   <p class="text-sm text-muted-foreground">{t('ai.analytics.intro')} <a href="/m/ai/logs">{t('ai.logs.title')} →</a></p>
+  {#if !can('ai.log.manage')}<p class="notice" data-testid="ai-own-only">{t('ai.logs.own_only')}</p>{/if}
   {#if s.truncated}<p class="notice">{t('ai.analytics.truncated')}</p>{/if}
 
   <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="ai-analytics-totals">
@@ -109,6 +110,7 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
         </tbody>
       </Table>
     </Card>
+    {#if can('ai.log.manage')}
     <Card title={t('ai.analytics.per_user')}>
       <Table caption={t('ai.analytics.per_user')}>
         <thead><tr><th>{t('ai.analytics.user')}</th><th class="text-end">{t('ai.analytics.calls')}</th><th class="text-end">Token</th><th class="text-end">{t('ai.analytics.cost')}</th></tr></thead>
@@ -121,5 +123,6 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
         </tbody>
       </Table>
     </Card>
+    {/if}
   </div>
 </div>

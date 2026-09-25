@@ -32,6 +32,7 @@
   "ai.logs.to": "To",
   "ai.logs.reset": "Reset filters",
   "ai.logs.empty_filtered": "No log entries match the filters.",
+  "ai.logs.own_only": "You are seeing only your own AI calls.",
   "ai.logs.user": "User",
   "ai.logs.model": "Model",
   "ai.logs.tokens": "Tokens (in/out)",

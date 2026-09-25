@@ -681,7 +681,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | H-6 | **[P0]** Percakapan dipersistensi: `conversations` + `messages`, dengan judul otomatis dari pesan pertama, arsip, dan hapus lunak. |
 | H-7 | **[P0]** Riwayat percakapan tampil di sidebar chat, dikelompokkan per waktu, bisa dicari. |
 | H-8 | **[P0]** Rendering markdown pada balasan AI dengan sanitasi. Blok kode ber-syntax-highlight dan tombol salin. |
-| H-9 | **[P0]** **Setiap panggilan AI dicatat** (endpoint, model, token in/out/total, latensi, status, biaya). **Penulisan log asinkron** — tidak menahan jalur panas request. Halaman log (`/m/ai/logs`) menampilkan nama pengguna tiap panggilan dan dapat difilter per nama/email pengguna, model, serta rentang tanggal (inklusif, menurut zona waktu tenant `app.timezone`). |
+| H-9 | **[P0]** **Setiap panggilan AI dicatat** (endpoint, model, token in/out/total, latensi, status, biaya). **Penulisan log asinkron** — tidak menahan jalur panas request. Pengguna dengan `ai.log.read` hanya melihat panggilan miliknya sendiri (log dan analitik); `ai.log.manage` (admin) melihat semua panggilan di tenant. Halaman log (`/m/ai/logs`) menampilkan nama pengguna tiap panggilan dan dapat difilter per nama/email pengguna, model, serta rentang tanggal (inklusif, menurut zona waktu tenant `app.timezone`). |
 | H-10 | **[P1]** Multi-provider: lebih dari satu profil provider tersimpan, bisa dipilih per percakapan. Perhitungan biaya per model dari tabel harga. |
 | H-11 | **[P1]** Lampiran pada pesan (`message_attachments`). |
 | H-12 | **[P1]** Threading pesan (`parent_id`) — regenerate & edit-lalu-cabang. |

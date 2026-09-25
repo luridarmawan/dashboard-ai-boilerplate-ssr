@@ -3,19 +3,22 @@ import { type ColumnDef, DataTable } from '$lib/components/table';
 import { Badge } from '$lib/components/ui';
 import { formatDateTime } from '$lib/format';
 import { useT } from '$lib/i18n';
+import { hasPermission } from '$lib/permissions';
 
 let { data } = $props();
 const t = useT();
 type Row = (typeof data.logs)[number];
+/** Without ai.log.manage the API returns only your own calls: the user column says nothing new. */
+const all = $derived(data.user.isSuperadmin || hasPermission(data.permissions, 'ai.log.manage'));
 
-const columns: ColumnDef<Row>[] = [
+const columns: ColumnDef<Row>[] = $derived([
   {
     key: 'time',
     label: t('ai.logs.time'),
     class: 'whitespace-nowrap',
     value: (r) => formatDateTime(r.createdAt),
   },
-  { key: 'user', label: t('ai.logs.user'), value: (r) => r.userName ?? '—' },
+  { key: 'user', label: t('ai.logs.user'), hidden: !all, value: (r) => r.userName ?? '—' },
   { key: 'model', label: t('ai.logs.model') },
   {
     key: 'tokens',
@@ -31,7 +34,7 @@ const columns: ColumnDef<Row>[] = [
     align: 'right',
     value: (r) => (r.costMicro === null ? '—' : (r.costMicro / 1_000_000).toFixed(4)),
   },
-];
+]);
 const filtered = $derived(
   !!(data.state.q || data.state.extra.model || data.state.extra.from || data.state.extra.to),
 );
@@ -42,12 +45,13 @@ const inputClass = 'h-9 rounded-md border border-input bg-background px-2 text-s
 
 <div class="page">
   <h1>{t('ai.logs.title')}</h1>
+  {#if !all}<p class="notice" data-testid="ai-own-only">{t('ai.logs.own_only')}</p>{/if}
   <DataTable
     rows={data.logs}
     {columns}
     state={data.state}
     caption={t('ai.logs.title')}
-    searchPlaceholder={t('ai.logs.search_user')}
+    searchPlaceholder={all ? t('ai.logs.search_user') : t('common.search')}
     emptyTitle={t('common.none')}
     emptyHint={filtered ? t('ai.logs.empty_filtered') : ''}
   >
