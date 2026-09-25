@@ -155,6 +155,8 @@ export class SettingsStore {
       routes?: readonly string[];
       /** The anonymous-reachable subset, for `public_route` fields (§4.7). */
       publicRoutes?: readonly string[];
+      /** Declared 404 handler pages, for `not_found_route` fields (F-11). */
+      notFoundRoutes?: readonly string[];
       allowedThemes?: readonly string[];
     } = {},
   ): Promise<SaveResult> {
@@ -176,6 +178,7 @@ export class SettingsStore {
       const v = validateValue(field, e.value === '__clear__' ? null : e.value, {
         routes: opts.routes,
         publicRoutes: opts.publicRoutes,
+        notFoundRoutes: opts.notFoundRoutes,
       });
       if (!v.ok) {
         errors[e.key] = v.message;

@@ -304,15 +304,21 @@ const admin = new Jar();
 
 // ---- F-11: the 404 trapper — a root URL nobody routes is the module's to answer ----
 {
+  // Both scopes: the storefront reads the admin's (default) tenant, and a tenant override left
+  // behind by a manual save would shadow the global value this proof sets.
   const setTrapper = async (value: string) => {
-    const settings = await get(admin, '/settings?scope=global');
-    return post(admin, '/settings?/save', {
-      _csrf: csrfOf(settings.html),
-      _scope: 'global',
-      _section: 'app',
-      _keys: ['app.not_found_route'],
-      'app.not_found_route': value,
-    });
+    let last: Awaited<ReturnType<typeof post>> | undefined;
+    for (const scope of ['tenant', 'global'] as const) {
+      const settings = await get(admin, `/settings?scope=${scope}`);
+      last = await post(admin, '/settings?/save', {
+        _csrf: csrfOf(settings.html),
+        _scope: scope,
+        _section: 'app',
+        _keys: ['app.not_found_route'],
+        'app.not_found_route': value,
+      });
+    }
+    return last as Awaited<ReturnType<typeof post>>;
   };
   await setTrapper('');
   const before = await get(anon, '/single-origin');

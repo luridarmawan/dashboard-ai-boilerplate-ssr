@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { and, eq, schema, unsafeAcrossTenants } from '@core/db';
-import { SettingsStore } from '@core/settings';
 import { app } from '../../src/app.ts';
+import { settings } from '../../src/services.ts';
 
 /** Integration: the Example module's PUBLIC API answers anonymously (R-2, R-3). */
 const enabled = process.env.INTEGRATION === '1';
@@ -80,20 +80,40 @@ describe.skipIf(!enabled)('Example public API', () => {
 
   /** F-11: root URLs exist only while the module answers unknown URLs — the sitemap follows. */
   test('sitemap lists root category/product URLs only while app.not_found_route is /resolve', async () => {
-    const store = new SettingsStore(unsafeAcrossTenants());
+    // Save through the app's OWN settings service: with CACHE_DRIVER=redis a second store would
+    // bump the database version while the app keeps reading its Redis copy until it expires.
+    const store = settings;
+    // The storefront is the DEFAULT tenant, and a tenant-scope override (an admin saving from
+    // /settings in that scope) shadows the global value this test sets — clear it for the test
+    // and put it back afterwards, so a shared dev database cannot turn this red.
+    const [tenant] = await unsafeAcrossTenants()
+      .select({ id: schema.clients.id })
+      .from(schema.clients)
+      .where(eq(schema.clients.code, 'default'));
+    const tid = tenant?.id ?? null;
+    const [override] = await unsafeAcrossTenants()
+      .select({ value: schema.configurations.value })
+      .from(schema.configurations)
+      .where(
+        and(
+          eq(schema.configurations.key, 'app.not_found_route'),
+          tid ? eq(schema.configurations.client_id, tid) : undefined,
+        ),
+      );
     const sitemap = async () => {
       const res = await app.handle(new Request('http://api.test/v1/m/example/sitemap'));
       expect(res.status).toBe(200);
       return ((await res.json()) as { data: { path: string }[] }).data.map((e) => e.path);
     };
     try {
+      if (tid) await store.save(tid, [{ key: 'app.not_found_route', value: '' }]);
       await store.save(null, [{ key: 'app.not_found_route', value: '' }]);
       const off = await sitemap();
       expect(off).toContain('/product/gayo-arabika');
       expect(off).not.toContain('/single-origin');
       expect(off).not.toContain('/gayo-arabika');
       const saved = await store.save(null, [{ key: 'app.not_found_route', value: '/resolve' }], {
-        publicRoutes: ['/resolve'],
+        notFoundRoutes: ['/resolve'],
       });
       expect(saved.errors).toEqual({});
       const on = await sitemap();
@@ -102,6 +122,10 @@ describe.skipIf(!enabled)('Example public API', () => {
       expect(on).toContain('/product/gayo-arabika');
     } finally {
       await store.save(null, [{ key: 'app.not_found_route', value: '' }]);
+      if (tid && override?.value)
+        await store.save(tid, [{ key: 'app.not_found_route', value: override.value }], {
+          notFoundRoutes: [override.value],
+        });
     }
   });
 

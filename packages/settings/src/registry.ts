@@ -88,11 +88,11 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'app.not_found_route',
-        type: 'public_route',
+        type: 'not_found_route',
         title: { id: 'Penangkap halaman 404', en: '404 handler' },
         note: {
-          id: 'Halaman publik modul yang dicoba untuk setiap URL yang tidak dikenal (kategori, produk, artikel). Modul menerima path aslinya; bila ia pun tidak mengenalnya, halaman 404 bawaan tampil. Kosongkan untuk memakai 404 bawaan.',
-          en: 'A module public page tried for every unknown URL (categories, products, posts). The module receives the original path; when it does not know it either, the built-in 404 shows. Leave empty for the built-in 404.',
+          id: 'Modul yang ditanya untuk setiap URL yang tidak dikenal (kategori, produk, artikel). Hanya halaman yang dideklarasikan modul sebagai penangkapnya yang ditawarkan; URL yang tidak dikenali modul tetap 404. Kosongkan untuk memakai 404 bawaan.',
+          en: 'The module asked about every unknown URL (categories, products, posts). Only pages a module declared as its handler are offered; a URL the module does not recognise stays 404. Leave empty for the built-in 404.',
         },
         default: null,
         public: true,

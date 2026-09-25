@@ -94,8 +94,12 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     // F-11: the 404 handler is the third route setting, right below the home route, and it
     // picks from the same anonymous-reachable subset the landing page does (§4.7 rule 6).
     expect(
-      app?.fields.some((f) => f.key === 'app.not_found_route' && f.type === 'public_route'),
+      app?.fields.some((f) => f.key === 'app.not_found_route' && f.type === 'not_found_route'),
     ).toBe(true);
+    // …and the form is told which pages modules declared as handlers, with the module's name.
+    expect(d(r).notFoundRoutes).toEqual(
+      expect.arrayContaining([{ path: '/resolve', module: 'Example' }]),
+    );
     // The favicon URL (owner's ask of 2026-09-24) is the field right below the default theme.
     const keys = app?.fields.map((f) => f.key) ?? [];
     expect(keys[keys.indexOf('app.home_route') + 1]).toBe('app.not_found_route');
@@ -110,6 +114,23 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
   });
 
   test('route values are validated against the route registry when saved (§4.7 rule 1)', async () => {
+    // F-11: the 404 handler must be a DECLARED handler page — a landing page is refused even
+    // though it is public, because it would answer every unknown URL with a 200.
+    const notHandler = await put(
+      '/v1/configuration',
+      { scope: 'global', values: { 'app.not_found_route': '/example' } },
+      [admin],
+    );
+    expect(notHandler.status).toBe(422);
+    const handler = await put(
+      '/v1/configuration',
+      { scope: 'global', values: { 'app.not_found_route': '/resolve' } },
+      [admin],
+    );
+    expect(handler.status).toBe(200);
+    await put('/v1/configuration', { scope: 'global', values: { 'app.not_found_route': '' } }, [
+      admin,
+    ]);
     const bad = await put('/v1/configuration', { values: { 'app.home_route': '/m/ghost' } }, [
       admin,
     ]);

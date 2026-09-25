@@ -157,6 +157,20 @@ async function trap404(event: Parameters<Handle>[0]['event']): Promise<Response 
     event.locals.config.enabledModules,
   );
   if (!target) return null;
+  // Only a page a module DECLARED as its 404 handler may answer here (F-11). A stored value that
+  // is any other public page (possible from before the flag existed) would turn every unknown
+  // URL into that page with a 200 — the opposite of a 404 handler — so it is refused, loudly.
+  if (!modulePublicRoutes.some((r) => r.path === target && r.notFound)) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        msg: 'app.not_found_route bukan halaman penangkap 404 yang dideklarasikan modul (notFound: true) — memakai 404 bawaan (F-11)',
+        route: target,
+        requestId: event.locals.requestId,
+      }),
+    );
+    return null;
+  }
   const forwarded = await event.fetch(new URL(target, event.url.origin), {
     headers: {
       accept: 'text/html',

@@ -357,6 +357,12 @@ $effect(() => {
                   <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
                   {#each f.type === 'public_route' ? data.publicRoutes : data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
                 </Select>
+              {:else if f.type === 'not_found_route'}
+                <!-- F-11: only a module's declared 404 handler page; labelled by module, the path is a detail. -->
+                <Select {id} name={f.key} value={strVal}>
+                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+                  {#each data.notFoundRoutes as r (r.path)}<option value={r.path} selected={strVal === r.path}>{r.module} — {r.path}</option>{/each}
+                </Select>
               {:else if f.type === 'locale'}
                 <Select {id} name={f.key} value={strVal}>
                   <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>

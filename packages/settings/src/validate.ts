@@ -1,4 +1,5 @@
 import type { ConfigFieldDef } from '@core/module-kit';
+import { modulePublicRoutes } from '@core/module-kit/public-routes';
 import { CUSTOM_PREFIX, CUSTOM_SLUG_RE, themeById } from '@core/ui-theme';
 import { publicWebRoutes, webRoutes } from './generated/routes.ts';
 
@@ -42,11 +43,15 @@ export function validateValue(
   ctx: {
     routes?: readonly string[] | undefined;
     publicRoutes?: readonly string[] | undefined;
+    /** Pages modules declared as 404 handlers (F-11); defaults to every declared one. */
+    notFoundRoutes?: readonly string[] | undefined;
     locales?: readonly string[] | undefined;
   } = {},
 ): ValidationOk | ValidationFail {
   const routes = ctx.routes ?? webRoutes;
   const publicRoutes = ctx.publicRoutes ?? publicWebRoutes;
+  const notFoundRoutes =
+    ctx.notFoundRoutes ?? modulePublicRoutes.filter((r) => r.notFound).map((r) => r.path);
   const locales = ctx.locales ?? LOCALES;
   const raw =
     input === undefined || input === null ? null : Array.isArray(input) ? input : String(input);
@@ -89,21 +94,31 @@ export function validateValue(
       return { ok: true, stored: list.length ? JSON.stringify(list) : null };
     }
     case 'route':
-    case 'public_route': {
+    case 'public_route':
+    case 'not_found_route': {
       if (empty) return { ok: true, stored: null };
       const s = String(raw);
       if (!s.startsWith('/') || s.startsWith('//'))
         return { ok: false, message: 'harus path yang diawali /' };
       // `public_route` is checked against the anonymous-reachable subset: a landing page behind
       // the sign-in wall would only redirect the visitor it was meant for (§4.7).
-      const allowed = field.type === 'public_route' ? publicRoutes : routes;
+      // `not_found_route` is narrower still: only a page a module declared as its 404 handler
+      // (`notFound: true`) — any other page would answer every unknown URL with a 200 (F-11).
+      const allowed =
+        field.type === 'not_found_route'
+          ? notFoundRoutes
+          : field.type === 'public_route'
+            ? publicRoutes
+            : routes;
       if (!allowed.includes(s))
         return {
           ok: false,
           message:
-            field.type === 'public_route'
-              ? `route ${s} bukan halaman publik — halaman depan harus bisa dibuka tanpa masuk (§4.7)`
-              : `route ${s} tidak ada di registry route (§4.7)`,
+            field.type === 'not_found_route'
+              ? `route ${s} bukan halaman penangkap 404 — hanya halaman yang dideklarasikan modul dengan notFound: true yang bisa dipilih (F-11)`
+              : field.type === 'public_route'
+                ? `route ${s} bukan halaman publik — halaman depan harus bisa dibuka tanpa masuk (§4.7)`
+                : `route ${s} tidak ada di registry route (§4.7)`,
         };
       return { ok: true, stored: s };
     }

@@ -286,13 +286,13 @@ Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebaga
 
 #### Menangkap URL tak dikenal — penangkap 404 (F-11, PRD §4.7 aturan 6)
 
-Toko dan blog memakai URL di akar domain tanpa awalan — `/furniture`, `/kotak-penyimpanan-…`, `/judul-artikel` — yang tidak bisa dideklarasikan lewat `public.ts` (bentuk `[...slug]` sengaja ditolak: hanya satu modul yang bisa memilikinya, dan modul lain akan bertabrakan). Jalannya: admin mengisi **Pengaturan → Aplikasi → Penangkap halaman 404** (`app.not_found_route`, tipe `public_route`, kosong = 404 bawaan) dengan **salah satu halaman publik Anda**. Sejak itu setiap request `GET` HTML yang tidak cocok route mana pun diteruskan core ke halaman itu, sebelum 404 bawaan dirender.
+Toko dan blog memakai URL di akar domain tanpa awalan — `/furniture`, `/kotak-penyimpanan-…`, `/judul-artikel` — yang tidak bisa dideklarasikan lewat `public.ts` (bentuk `[...slug]` sengaja ditolak: hanya satu modul yang bisa memilikinya, dan modul lain akan bertabrakan). Jalannya: modul mendeklarasikan **satu halaman penangkap** dengan `notFound: true` di `public.ts`, lalu admin memilih **modul itu** di **Pengaturan → Aplikasi → Penangkap halaman 404** (`app.not_found_route`, tipe `not_found_route`, pilihan dilabeli `Example — /resolve`, kosong = 404 bawaan). Halaman publik lain (landing, katalog) sengaja **tidak** ditawarkan dan ditolak saat disimpan: halaman semacam itu menjawab setiap URL asing dengan 200, padahal penangkap harus **memutuskan** — URL yang tidak dikenalinya tetap 404. Sejak itu setiap request `GET` HTML yang tidak cocok route mana pun diteruskan core ke halaman itu, sebelum 404 bawaan dirender.
 
 Halaman penangkap adalah route publik biasa yang **tidak punya isi sendiri**:
 
 ```ts
-// public.ts
-{ path: '/resolve', dir: 'web/public/resolve', sitemap: false },
+// public.ts — `notFound: true` is what makes this page selectable as the module's 404 handler
+{ path: '/resolve', dir: 'web/public/resolve', sitemap: false, notFound: true },
 
 // web/public/resolve/+page.server.ts
 import { error } from '@sveltejs/kit';
