@@ -1,5 +1,7 @@
 <script lang="ts">
+import type { SubmitFunction } from '@sveltejs/kit';
 import type { Snippet } from 'svelte';
+import { enhance as kitEnhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { useT } from '$lib/i18n';
@@ -58,6 +60,13 @@ interface Props {
   icon?: string;
   /** Extra hidden inputs the action needs (row id, current filter, …). */
   fields?: Snippet;
+  /**
+   * Submit handler for the enhanced path (`use:enhance`): the confirmed form then posts over
+   * fetch — the caller toasts the outcome and re-reads the page — and the modal closes on
+   * submit. Without it the form is a plain POST both ways, which is right for a step that
+   * leaves the page (a deletion that redirects to the list).
+   */
+  enhance?: SubmitFunction;
 }
 let {
   csrf,
@@ -79,6 +88,7 @@ let {
   compactLabel = false,
   icon = 'trash',
   fields,
+  enhance,
 }: Props = $props();
 const t = useT();
 let open = $state(false);
@@ -86,10 +96,21 @@ const heading = $derived(title ?? t('common.delete_confirm'));
 const lead = $derived(description ?? t('common.delete_confirm_lead'));
 const submitLabel = $derived(confirmLabel ?? t('common.delete_confirm_submit'));
 const post = $derived(`${action}${action.includes('?') ? '&' : '?'}confirm=${confirm}`);
+/**
+ * An action cannot be applied conditionally, so this one delegates to Kit's `enhance` only when
+ * the caller gave a submit handler; otherwise the form stays a plain POST.
+ */
+const submit = (node: HTMLFormElement) => {
+  if (!enhance) return;
+  return kitEnhance(node, (input) => {
+    open = false;
+    return enhance(input);
+  });
+};
 </script>
 
 {#snippet form(inDialog: boolean)}
-  <form method="POST" action={post} class={compact && !inDialog ? 'inline-flex flex-wrap items-center gap-2' : 'flex flex-wrap gap-2'}>
+  <form method="POST" action={post} use:submit class={compact && !inDialog ? 'inline-flex flex-wrap items-center gap-2' : 'flex flex-wrap gap-2'}>
     <Csrf token={csrf} />
     {@render fields?.()}
     <Button type="submit" variant={confirmVariant} size={compact && !inDialog ? 'sm' : 'default'}>

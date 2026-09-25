@@ -775,6 +775,8 @@
   "outbox.next_attempt": "coba lagi",
   "outbox.resend": "Kirim ulang",
   "outbox.resent": "Email dikembalikan ke antrean kirim; worker mengirimnya pada putaran berikutnya.",
+  "outbox.resend_confirm": "Kirim ulang email ini?",
+  "outbox.resend_confirm_lead": "Email «{subject}» akan dikirim sekali lagi ke {to} pada putaran worker berikutnya.",
   "outbox.deliver": "Kirim sekarang",
   "outbox.delivered": "Worker dijalankan: {picked} diambil, {sent} terkirim, {failed} gagal, {deferred} ditunda.",
   "outbox.empty": "Belum ada email di outbox.",

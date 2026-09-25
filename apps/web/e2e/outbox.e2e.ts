@@ -76,6 +76,35 @@ test('outbox: search, filter and deliver run over fetch, not page loads', async 
   });
   expect(page.url()).toBe(urlBefore);
   expect(await survived()).toBe(mark);
+
+  // "Send again" is never one click: the trigger is a link to `?confirm=resend` (the no-JS
+  // step), and with JavaScript it opens the same form in a modal. Cancelling changes nothing;
+  // confirming posts over fetch, toasts, and the URL still stays put.
+  await page.goto('/outbox?status=sent');
+  await page.evaluate((m) => {
+    window.__outboxMark = m;
+  }, mark);
+  const resendTrigger = page.locator('main a[href*="confirm=resend"]').first();
+  if (await resendTrigger.count()) {
+    await resendTrigger.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(/Kirim ulang email ini|Send this e-mail again/);
+    await dialog.getByRole('button', { name: /Batal|Cancel/ }).click();
+    await expect(dialog).toBeHidden();
+    expect(page.url()).toContain('/outbox?status=sent');
+
+    await resendTrigger.click();
+    await expect(dialog).toBeVisible();
+    await dialog.locator('form[action^="?/resend"] button[type="submit"]').click();
+    await expect(page.locator('[role="status"]')).toContainText(
+      /dikembalikan ke antrean kirim|back in the send queue/,
+      { timeout: 15_000 },
+    );
+    await expect(dialog).toBeHidden();
+    expect(page.url()).toContain('/outbox?status=sent');
+    expect(await survived()).toBe(mark);
+  }
 });
 
 /**

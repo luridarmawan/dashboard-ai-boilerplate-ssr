@@ -4,7 +4,7 @@ import { goto, invalidateAll } from '$app/navigation';
 import { navigating } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Table, toast } from '$lib/components/ui';
+import { Badge, Button, ConfirmDelete, Table, toast } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -18,8 +18,10 @@ import type { ActionData, PageData } from './$types';
  * JavaScript off, and the API does the filtering either way. The ENHANCED layer makes the same
  * controls answer over fetch — the filter bar applies as you type instead of on a submit, the
  * chips / sort / paging links are client-side navigations, and "send again" and "deliver now" post in
- * place, toast their outcome and re-read the rows. Nothing here invents behaviour the base
- * lacks; it only removes the full page reload between the operator and the answer.
+ * place, toast their outcome and re-read the rows. "Send again" asks first: without JavaScript
+ * the trigger links to `?confirm=resend&id=` and the row shows the question inline; with it the
+ * same form opens in a modal. Nothing here invents behaviour the base lacks; it only removes
+ * the full page reload between the operator and the answer.
  */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
@@ -288,25 +290,31 @@ const paramOf = (location: string, key: string) => {
           <td class="whitespace-nowrap text-muted-foreground" title={fmtFull(r.sentAt)}>{fmt(r.sentAt)}{#if r.transport}<span class="block text-xs">{r.transport}</span>{/if}</td>
           <td class="text-end whitespace-nowrap">
             {#if can('mail.manage') && (r.status === 'failed' || r.status === 'sent')}
-              <!-- Send again: a failed row gets another go, a delivered one goes out once more.
+              <!-- Send again: a failed row gets another go, a delivered one goes out once more —
+                   after a confirmation, since the second copy is what the recipient sees.
                    Pending rows are already queued ("deliver now" covers them); sending rows are leased. -->
-              <form
-                method="POST"
+              <ConfirmDelete
+                compact
+                csrf={data.csrf}
+                confirm="resend"
                 action="?/resend"
-                class="inline"
-                use:enhance={runAction(`resend:${r.id}`, () =>
+                icon="refresh"
+                confirmVariant="default"
+                variant="ghost"
+                size="sm"
+                href={`${href({ confirm: 'resend', id: r.id })}#confirm-resend`}
+                cancelHref={href()}
+                confirming={data.confirmResendId === r.id}
+                label={t('outbox.resend')}
+                title={t('outbox.resend_confirm')}
+                confirmLabel={t('outbox.resend')}
+                description={t('outbox.resend_confirm_lead', { to: r.to, subject: r.subject })}
+                enhance={runAction(`resend:${r.id}`, () =>
                   toast({ title: t('outbox.resent'), variant: 'success' }),
                 )}
               >
-                <Csrf token={data.csrf} />
-                <input type="hidden" name="id" value={r.id} />
-                <input type="hidden" name="query" value={currentQuery} />
-                <!-- Icon only: one row action per row, and the label rides along as tooltip and
-                     accessible name so nothing is lost for a screen reader. -->
-                <Button type="submit" variant="ghost" size="sm" disabled={busy !== null} title={t('outbox.resend')} aria-label={t('outbox.resend')} data-testid="outbox-resend">
-                  <Icon name="refresh" size={14} class={busy === `resend:${r.id}` ? 'animate-spin' : ''} />
-                </Button>
-              </form>
+                {#snippet fields()}<input type="hidden" name="id" value={r.id} /><input type="hidden" name="query" value={currentQuery} />{/snippet}
+              </ConfirmDelete>
             {/if}
           </td>
         </tr>
