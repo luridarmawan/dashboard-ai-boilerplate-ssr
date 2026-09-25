@@ -87,6 +87,18 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 3,
       },
       {
+        key: 'app.not_found_route',
+        type: 'public_route',
+        title: { id: 'Penangkap halaman 404', en: '404 handler' },
+        note: {
+          id: 'Halaman publik modul yang dicoba untuk setiap URL yang tidak dikenal (kategori, produk, artikel). Modul menerima path aslinya; bila ia pun tidak mengenalnya, halaman 404 bawaan tampil. Kosongkan untuk memakai 404 bawaan.',
+          en: 'A module public page tried for every unknown URL (categories, products, posts). The module receives the original path; when it does not know it either, the built-in 404 shows. Leave empty for the built-in 404.',
+        },
+        default: null,
+        public: true,
+        order: 4,
+      },
+      {
         key: 'app.default_theme',
         type: 'theme',
         title: { id: 'Tema baku', en: 'Default theme' },
@@ -96,7 +108,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: 'warm',
         public: true,
-        order: 4,
+        order: 5,
       },
       {
         key: 'app.favicon_url',
@@ -109,7 +121,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: null,
         public: true,
         max: 512,
-        order: 5,
+        order: 6,
       },
       {
         key: 'app.allowed_themes',
@@ -122,7 +134,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: [],
         public: true,
         options: [],
-        order: 6,
+        order: 7,
       },
       {
         key: 'app.default_locale',
@@ -130,7 +142,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         title: { id: 'Bahasa baku', en: 'Default language' },
         default: 'en',
         public: true,
-        order: 7,
+        order: 8,
       },
       {
         key: 'app.timezone',
@@ -143,7 +155,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: timezoneFallback(),
         public: true,
         max: 64,
-        order: 8,
+        order: 9,
       },
     ],
   },

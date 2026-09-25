@@ -302,6 +302,123 @@ const admin = new Jar();
   );
 }
 
+// ---- F-11: the 404 trapper — a root URL nobody routes is the module's to answer ----
+{
+  const setTrapper = async (value: string) => {
+    const settings = await get(admin, '/settings?scope=global');
+    return post(admin, '/settings?/save', {
+      _csrf: csrfOf(settings.html),
+      _scope: 'global',
+      _section: 'app',
+      _keys: ['app.not_found_route'],
+      'app.not_found_route': value,
+    });
+  };
+  await setTrapper('');
+  const before = await get(anon, '/single-origin');
+  check(
+    'F-11 with the setting empty, an unknown root URL is the built-in 404',
+    before.res.status === 404 && !before.res.headers.get('x-not-found-route'),
+    `${before.res.status}`,
+  );
+  const saved = await setTrapper('/resolve');
+  check(
+    'F-11 `app.not_found_route=/resolve` saves from the generated form (public_route, §4.7)',
+    saved.res.status === 303,
+    `${saved.res.status}`,
+  );
+  const cat = await get(anon, '/single-origin');
+  check(
+    'F-11 /<category> → 200 from the module, address unchanged, canonical is the root URL',
+    cat.res.status === 200 &&
+      cat.res.headers.get('x-not-found-route') === '/resolve' &&
+      cat.html.includes('data-testid="category-items"') &&
+      cat.html.includes(`rel="canonical" href="${WEB}/single-origin"`) &&
+      // Markup, not copy: the i18n catalogue (which names "House Blend") ships in every page.
+      cat.html.includes('href="/gayo-arabika"') &&
+      !cat.html.includes('href="/house-blend"'),
+    `${cat.res.status} ${cat.res.headers.get('x-not-found-route')}`,
+  );
+  check(
+    "F-11 the language form on a trapped page comes back to the visitor's URL, not to /resolve",
+    cat.html.includes('name="back" value="/single-origin"') &&
+      !cat.html.includes('name="back" value="/resolve"'),
+  );
+  const prod = await get(anon, '/gayo-arabika');
+  check(
+    'F-11 /<product-slug> → 200, the product detail with Product JSON-LD and a category crumb',
+    prod.res.status === 200 &&
+      prod.html.includes('data-testid="price"') &&
+      prod.html.includes('"@type":"Product"') &&
+      prod.html.includes(`rel="canonical" href="${WEB}/gayo-arabika"`) &&
+      prod.html.includes('href="/single-origin"'),
+    `${prod.res.status}`,
+  );
+  const withQuery = await get(anon, '/single-origin?utm=x');
+  check('F-11 a query string does not break the match', withQuery.res.status === 200);
+  const miss = await get(anon, '/tidak-ada-halaman-ini');
+  check(
+    'F-11 a URL the module does not know stays the built-in 404 (status 404, no forward header)',
+    miss.res.status === 404 && !miss.res.headers.get('x-not-found-route'),
+    `${miss.res.status}`,
+  );
+  const direct = await get(anon, '/resolve');
+  check(
+    'F-11 /resolve itself is 404: the handler has no page of its own',
+    direct.res.status === 404,
+    `${direct.res.status}`,
+  );
+  const json = await fetch(`${WEB}/single-origin`, { headers: { accept: 'application/json' } });
+  const sys = await get(anon, '/v1/does-not-exist');
+  check(
+    'F-11 non-HTML requests and system prefixes are never handed to the module',
+    json.status === 404 &&
+      !json.headers.get('x-not-found-route') &&
+      sys.res.status === 404 &&
+      !sys.res.headers.get('x-not-found-route'),
+    `${json.status} ${sys.res.status}`,
+  );
+  const known = await get(anon, '/product/does-not-exist');
+  check(
+    'F-11 a route that exists but answers 404 keeps its own 404 (not trapped)',
+    known.res.status === 404 && !known.res.headers.get('x-not-found-route'),
+  );
+  const sm = await get(anon, '/sitemap.xml', 'application/xml');
+  check(
+    'F-11 sitemap.xml lists the root category and product URLs while the trapper is on',
+    sm.html.includes(`<loc>${WEB}/single-origin</loc>`) &&
+      sm.html.includes(`<loc>${WEB}/gayo-arabika</loc>`),
+  );
+  // Module switched off after the setting was saved: safe fallback, no loop, no 500 (F-6).
+  const modules = await get(admin, '/modules');
+  await post(admin, '/modules?/toggle', {
+    _csrf: csrfOf(modules.html),
+    module: 'Example',
+    scope: 'global',
+    state: 'off',
+  });
+  const disabled = await get(anon, '/single-origin');
+  check(
+    'F-11 handler module disabled → built-in 404, not 500, not a loop',
+    disabled.res.status === 404 && !disabled.res.headers.get('x-not-found-route'),
+    `${disabled.res.status}`,
+  );
+  await post(admin, '/modules?/toggle', {
+    _csrf: csrfOf((await get(admin, '/modules')).html),
+    module: 'Example',
+    scope: 'global',
+    state: 'on',
+  });
+  await setTrapper('');
+  const after = await get(anon, '/single-origin');
+  const sm2 = await get(anon, '/sitemap.xml', 'application/xml');
+  check(
+    'F-11 setting cleared → built-in 404 again and the root URLs leave the sitemap',
+    after.res.status === 404 && !sm2.html.includes(`<loc>${WEB}/single-origin</loc>`),
+    `${after.res.status}`,
+  );
+}
+
 // ---- #4: Example disabled → app whole, / falls back ----
 {
   const modules = await get(admin, '/modules');
@@ -383,7 +500,7 @@ const admin = new Jar();
 
 console.log(
   failures === 0
-    ? '\nGATE M4 #1 #3 #4 (+R-3/R-4/R-9/F-7): LOLOS'
+    ? '\nGATE M4 #1 #3 #4 (+R-3/R-4/R-9/F-7/F-11): LOLOS'
     : `\nGATE M4: GAGAL (${failures})`,
 );
 process.exit(failures === 0 ? 0 : 1);

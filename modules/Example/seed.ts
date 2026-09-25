@@ -5,9 +5,24 @@ import { defineSeed } from '@core/module-kit';
  * Idempotent demo data for the storefront (R-3): a clean install shows a convincing landing.
  * Existing rows (matched by slug / author) are left alone — an admin's edits survive re-seeding.
  */
+const CATEGORIES = [
+  {
+    slug: 'single-origin',
+    name: 'Single origin',
+    description: 'Satu kebun, satu karakter. Dipanggang terang sampai medium.',
+    sort: 10,
+  },
+  {
+    slug: 'blend',
+    name: 'Blend',
+    description: 'Racikan harian yang konsisten untuk espresso dan susu.',
+    sort: 20,
+  },
+];
 const PRODUCTS = [
   {
     slug: 'gayo-arabika',
+    category: 'single-origin',
     name: 'Gayo Arabika',
     summary: 'Manis, body tebal, sedikit rempah. Ketinggian 1.400 mdpl.',
     price: 85000,
@@ -17,6 +32,7 @@ const PRODUCTS = [
   },
   {
     slug: 'toraja-sapan',
+    category: 'single-origin',
     name: 'Toraja Sapan',
     summary: 'Earthy dengan sentuhan cokelat gelap dan tembakau.',
     price: 92000,
@@ -26,6 +42,7 @@ const PRODUCTS = [
   },
   {
     slug: 'kintamani-natural',
+    category: 'single-origin',
     name: 'Kintamani Natural',
     summary: 'Proses natural: buah tropis, jeruk, dan madu.',
     price: 98000,
@@ -35,6 +52,7 @@ const PRODUCTS = [
   },
   {
     slug: 'flores-bajawa',
+    category: 'single-origin',
     name: 'Flores Bajawa',
     summary: 'Karamel, kacang, dan keasaman lembut.',
     price: 88000,
@@ -44,6 +62,7 @@ const PRODUCTS = [
   },
   {
     slug: 'house-blend',
+    category: 'blend',
     name: 'House Blend',
     summary: 'Racikan harian untuk espresso dan susu.',
     price: 72000,
@@ -76,9 +95,38 @@ const TESTIMONIALS = [
 export default defineSeed('Example', async ({ db: raw, tenantId, log }) => {
   const db = raw as Db;
   let created = 0;
+  // Categories first: the products below point at them by slug.
+  const categoryIds = new Map<string, string>();
+  for (const c of CATEGORIES) {
+    const [row] = await db
+      .select({ id: schema.exampleCategories.id })
+      .from(schema.exampleCategories)
+      .where(
+        and(
+          eq(schema.exampleCategories.client_id, tenantId),
+          eq(schema.exampleCategories.slug, c.slug),
+        ),
+      )
+      .limit(1);
+    if (row) {
+      categoryIds.set(c.slug, row.id);
+      continue;
+    }
+    const id = newId();
+    await db.insert(schema.exampleCategories).values({
+      id,
+      client_id: tenantId,
+      slug: c.slug,
+      name: c.name,
+      description: c.description,
+      sort: c.sort,
+    });
+    categoryIds.set(c.slug, id);
+    created++;
+  }
   for (const p of PRODUCTS) {
     const [row] = await db
-      .select({ id: schema.exampleProducts.id })
+      .select({ id: schema.exampleProducts.id, category_id: schema.exampleProducts.category_id })
       .from(schema.exampleProducts)
       .where(
         and(
@@ -87,11 +135,22 @@ export default defineSeed('Example', async ({ db: raw, tenantId, log }) => {
         ),
       )
       .limit(1);
-    if (row) continue;
+    if (row) {
+      // A product seeded before categories existed gets its category once; an admin's later
+      // choice (any non-null value) is left alone.
+      if (!row.category_id && categoryIds.get(p.category)) {
+        await db
+          .update(schema.exampleProducts)
+          .set({ category_id: categoryIds.get(p.category) ?? null })
+          .where(eq(schema.exampleProducts.id, row.id));
+      }
+      continue;
+    }
     await db.insert(schema.exampleProducts).values({
       id: newId(),
       client_id: tenantId,
       slug: p.slug,
+      category_id: categoryIds.get(p.category) ?? null,
       name: p.name,
       summary: p.summary,
       description: `${p.summary}\n\nDikemas 250 g, kantong katup satu arah. Tersedia biji utuh atau giling sesuai alat seduh Anda.`,

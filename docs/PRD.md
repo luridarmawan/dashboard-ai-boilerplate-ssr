@@ -386,6 +386,7 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 |---|---|---|---|
 | `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
 | `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil |
+| `app.not_found_route` | Database (per tenant, fallback global) | kosong | **Penangkap 404** (F-11): halaman publik modul yang dicoba untuk setiap URL yang tidak cocok route mana pun — kategori/produk toko, slug artikel blog. Bertipe `public_route` seperti landing. Kosong = halaman 404 bawaan |
 | `app.favicon_url` | Database (per tenant, fallback global) | kosong | URL/path favicon tenant untuk `<link rel="icon">` semua shell; kosong = favicon bawaan `static/favicon.svg`. Favicon tema kustom (L-24) menimpanya selama tema itu aktif |
 | `LANDING_ROUTE` | `.env` | `/m/example` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
 
@@ -396,6 +397,7 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 3. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
 4. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
 5. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
+6. **Penangkap 404** (`app.not_found_route`, F-11). Request `GET` yang meminta HTML dan **tidak cocok dengan route mana pun** ditawarkan ke halaman publik yang dipilih **sebelum** halaman 404 bawaan dirender, untuk semua pengunjung (bukan hanya anonim). Halaman itu menerima URL asli lewat header internal (`trappedPath(event)` di sisi modul), merender dengan status **200 di bawah alamat asli** (tanpa redirect) bila mengenalinya, atau menjawab 404 — dan 404 bawaan tampil seperti biasa, tanpa peringatan. Sasaran yang gagal (5xx) atau modulnya nonaktif jatuh ke 404 bawaan dengan satu peringatan (F-6); request yang diteruskan tidak pernah dijebak lagi. Aset, `/v1`, `/m`, `/auth`, prefix core lain, berkas titik, `robots.txt`/`sitemap.xml`, dan request non-HTML tidak pernah diteruskan. Halaman yang route-nya cocok tetapi loader-nya menjawab 404 **bukan** urusan penangkap — 404 itu miliknya sendiri. Sasaran hanya boleh halaman publik modul yang aktif di lingkup itu (aturan 1–2 berlaku); kosong berarti 404 bawaan, tanpa fallback `.env` (bukan kebutuhan bootstrap, E-6).
 
 ### 4.8 Anatomi tema: warna, ikon, dan layout
 
@@ -629,6 +631,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | F-7 | **[P0]** Route publik (dari modul, titik perluasan 13) terdaftar di sitemap dan menghormati `robots.txt` yang dapat dikonfigurasi. |
 | F-8 | **[P1]** Sidebar bisa diciutkan; state tersimpan per user. |
 | F-9 | **[P1]** Command palette (⌘K) untuk lompat antar halaman dan aksi. |
+| F-11 | **[P1]** **Penangkap 404 dari konfigurasi** (§4.7 aturan 6): `app.not_found_route` menunjuk halaman publik modul yang mencoba menjawab setiap URL yang tidak dikenal — kategori dan produk di akar domain (`/furniture`, `/<slug-produk>`), slug artikel — sebelum 404 bawaan; kosong = 404 bawaan. Modul `Example` memakainya lewat `/resolve` + `GET /v1/m/example/resolve`, dan sitemap-nya memuat URL akar hanya selama ia penangkapnya. |
 | F-10 | **[P1]** Tombol **kembali ke atas** di pojok bawah setiap halaman, muncul begitu pembaca menggulir jauh dan menggulir balik ke puncak halaman (mulus, kecuali pembaca meminta gerak minimal). Berbagi pojok dengan widget shell (H-13) tanpa saling menutupi. |
 
 ### FR-G · Sistem Modul

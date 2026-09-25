@@ -35,6 +35,7 @@ function defaults(): Record<string, unknown> {
     'app.name': 'Dashboard',
     'app.landing_route': landingFallback(),
     'app.home_route': '/dashboard',
+    'app.not_found_route': null,
     'app.default_theme': 'warm',
     'app.allowed_themes': [],
     'app.default_locale': 'en',

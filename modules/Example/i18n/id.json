@@ -124,5 +124,9 @@
   "example.admin.form.image_url": "URL gambar",
   "example.admin.form.summary": "Ringkasan",
   "example.admin.form.description": "Deskripsi",
-  "example.admin.form.slug_hint": "URL: /product/<slug>"
+  "example.admin.form.slug_hint": "URL: /product/<slug>",
+  "example.resolve.products_in": "produk dalam kategori ini",
+  "example.resolve.empty": "Belum ada produk di kategori ini.",
+  "example.resolve.all_products": "Semua produk",
+  "example.resolve.categories": "Kategori"
 }

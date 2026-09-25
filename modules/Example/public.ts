@@ -8,4 +8,8 @@ export default definePublicRoutes('Example', [
   // public page shape, and the admin picks which one answers `/` without a deploy (F-5).
   { path: '/catalog', dir: 'web/public/catalog', sitemap: true },
   { path: '/product/[slug]', dir: 'web/public/product/[slug]', sitemap: false },
+  // F-11: the module's 404 handler. Never a page of its own (a direct visit is 404): it renders
+  // whatever root URL the visitor asked for — `/<category>` or `/<product>` — once an admin sets
+  // `app.not_found_route` to `/resolve`. The page learns that URL from `trappedPath(event)`.
+  { path: '/resolve', dir: 'web/public/resolve', sitemap: false },
 ]);

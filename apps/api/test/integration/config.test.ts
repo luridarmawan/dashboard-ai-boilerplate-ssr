@@ -91,8 +91,14 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       app?.fields.some((f) => f.key === 'app.landing_route' && f.type === 'public_route'),
     ).toBe(true);
     expect(app?.fields.some((f) => f.key === 'app.home_route' && f.type === 'route')).toBe(true);
+    // F-11: the 404 handler is the third route setting, right below the home route, and it
+    // picks from the same anonymous-reachable subset the landing page does (§4.7 rule 6).
+    expect(
+      app?.fields.some((f) => f.key === 'app.not_found_route' && f.type === 'public_route'),
+    ).toBe(true);
     // The favicon URL (owner's ask of 2026-09-24) is the field right below the default theme.
     const keys = app?.fields.map((f) => f.key) ?? [];
+    expect(keys[keys.indexOf('app.home_route') + 1]).toBe('app.not_found_route');
     expect(keys[keys.indexOf('app.default_theme') + 1]).toBe('app.favicon_url');
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');
     expect((d(r).routes as string[]).includes('/dashboard')).toBe(true);

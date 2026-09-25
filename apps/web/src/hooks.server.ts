@@ -7,6 +7,7 @@ import { checkRequestOrigin, type OriginVerdict } from '$lib/server/origin';
 import { loadSession } from '$lib/server/session';
 import { resolveRequestSidebar } from '$lib/server/sidebar';
 import { resolveRequestTheme } from '$lib/server/theme';
+import { isNeverTrapped, ORIGINAL_PATH_HEADER, wantsHtml } from '$lib/server/trap';
 
 /**
  * Per-request plumbing:
@@ -43,10 +44,15 @@ export const handle: Handle = async ({ event, resolve }) => {
   // to the built-in landing page with a warning instead of a 404 on the front door.
   if (event.url.pathname === '/' && event.request.method === 'GET' && !event.locals.session) {
     const landing = cfgString(event.locals.config, 'app.landing_route', landingFallback());
-    const target = landingTarget(landing, event.locals.config.enabledModules);
+    const target = routeTarget('app.landing_route', landing, event.locals.config.enabledModules);
     if (target) {
       const forwarded = await event.fetch(new URL(target + event.url.search, event.url.origin), {
-        headers: { accept: 'text/html', cookie: event.request.headers.get('cookie') ?? '' },
+        headers: {
+          accept: 'text/html',
+          cookie: event.request.headers.get('cookie') ?? '',
+          // The page renders as `/`: its language/theme forms must come back here, not to itself.
+          [ORIGINAL_PATH_HEADER]: `/${event.url.search}`,
+        },
       });
       if (forwarded.ok) {
         const headers = new Headers(forwarded.headers);
@@ -67,6 +73,23 @@ export const handle: Handle = async ({ event, resolve }) => {
         }),
       );
     }
+  }
+
+  // 404 trapper (§4.7 rule 6, F-11): a path that matches NO route is offered to the module page
+  // named by `app.not_found_route` before the built-in 404 renders — category and product URLs
+  // at the root of a shop, article slugs of a blog. Same forward pattern as the landing route;
+  // the module learns the visitor's URL from a header, so its own URL never leaks into the page.
+  // Checked BEFORE resolve(): a route that exists but whose loader answers 404 keeps its own 404.
+  if (
+    event.route.id === null &&
+    event.request.method === 'GET' &&
+    wantsHtml(event.request) &&
+    !isNeverTrapped(event.url.pathname) &&
+    // Loop guard: the forwarded request goes through this hook again and must not be trapped.
+    !event.request.headers.has(ORIGINAL_PATH_HEADER)
+  ) {
+    const trapped = await trap404(event);
+    if (trapped) return trapped;
   }
 
   const response = await resolve(event, {
@@ -121,32 +144,84 @@ function refuseOrigin(
   });
 }
 
-/** A landing route is usable when it is a real page and, for `/m/<ns>/…`, its module is enabled. */
-function landingTarget(landing: string, enabledModules: ReadonlySet<string>): string | null {
-  if (!landing || landing === '/' || !landing.startsWith('/') || landing.startsWith('//'))
-    return null;
-  if (!webRoutes.includes(landing)) {
+/**
+ * Hand an unmatched request to the configured 404 handler page. Returns the page's response when
+ * it rendered (200) or redirected; null when the setting is empty, the page said 404 ("not
+ * mine" — the normal answer, logged nowhere), or it failed (5xx — logged, never surfaced: the
+ * built-in 404 is always a valid page, F-6).
+ */
+async function trap404(event: Parameters<Handle>[0]['event']): Promise<Response | null> {
+  const target = routeTarget(
+    'app.not_found_route',
+    cfgString(event.locals.config, 'app.not_found_route', ''),
+    event.locals.config.enabledModules,
+  );
+  if (!target) return null;
+  const forwarded = await event.fetch(new URL(target, event.url.origin), {
+    headers: {
+      accept: 'text/html',
+      cookie: event.request.headers.get('cookie') ?? '',
+      [ORIGINAL_PATH_HEADER]: event.url.pathname + event.url.search,
+    },
+    redirect: 'manual',
+  });
+  if (forwarded.ok || (forwarded.status >= 300 && forwarded.status < 400)) {
+    const headers = new Headers(forwarded.headers);
+    headers.set('x-request-id', event.locals.requestId);
+    headers.set('x-not-found-route', target);
+    return new Response(await forwarded.text(), { status: forwarded.status, headers });
+  }
+  if (forwarded.status >= 500) {
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'landing route tidak ada di registry — memakai halaman depan bawaan (F-6)',
-        landing,
+        msg: 'penangkap 404 gagal merender — memakai halaman 404 bawaan (F-6)',
+        target,
+        status: forwarded.status,
+        path: event.url.pathname,
+        requestId: event.locals.requestId,
+      }),
+    );
+  }
+  return null;
+}
+
+/**
+ * A configured route (`app.landing_route`, `app.not_found_route`) is usable when it is a real
+ * page and, for a module page, its module is enabled for this tenant. `/` and non-paths mean
+ * "use the built-in"; a route that is gone or disabled is logged, because a front door quietly
+ * showing something else is impossible to explain from the outside (F-6).
+ */
+function routeTarget(
+  setting: string,
+  route: string,
+  enabledModules: ReadonlySet<string>,
+): string | null {
+  if (!route || route === '/' || !route.startsWith('/') || route.startsWith('//')) return null;
+  if (!webRoutes.includes(route)) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        msg: 'route pengaturan tidak ada di registry — memakai halaman bawaan (F-6)',
+        setting,
+        route,
       }),
     );
     return null;
   }
-  const owner = moduleOwning(landing);
+  const owner = moduleOwning(route);
   if (owner && !enabledModules.has(owner)) {
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'landing route milik modul nonaktif — memakai halaman depan bawaan (F-6)',
-        landing,
+        msg: 'route pengaturan milik modul nonaktif — memakai halaman bawaan (F-6)',
+        setting,
+        route,
       }),
     );
     return null;
   }
-  return landing;
+  return route;
 }
 
 /** Namespace of the module that owns a public path (`/m/<ns>/…` or a route from public.ts), else null. */

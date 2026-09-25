@@ -124,5 +124,9 @@
   "example.admin.form.image_url": "Image URL",
   "example.admin.form.summary": "Summary",
   "example.admin.form.description": "Description",
-  "example.admin.form.slug_hint": "URL: /product/<slug>"
+  "example.admin.form.slug_hint": "URL: /product/<slug>",
+  "example.resolve.products_in": "products in this category",
+  "example.resolve.empty": "No products in this category yet.",
+  "example.resolve.all_products": "All products",
+  "example.resolve.categories": "Categories"
 }

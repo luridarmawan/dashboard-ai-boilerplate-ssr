@@ -79,6 +79,47 @@ const view = (p: ProductRow) => ({
   sort: p.sort,
   updatedAt: p.updated_at.toISOString(),
 });
+type CategoryRow = typeof schema.exampleCategories.$inferSelect;
+const Category = t.Object({
+  id: t.String(),
+  slug: t.String(),
+  name: t.String(),
+  description: t.Nullable(t.String()),
+  sort: t.Integer(),
+});
+const categoryView = (c: CategoryRow) => ({
+  id: c.id,
+  slug: c.slug,
+  name: c.name,
+  description: c.description,
+  sort: c.sort,
+});
+/** What `/resolve` answers: the kind of thing a root URL names, with what the page needs to render it. */
+const Resolved = t.Union([
+  t.Object({ kind: t.Literal('category'), category: Category, products: t.Array(Product) }),
+  t.Object({ kind: t.Literal('product'), product: Product, category: t.Nullable(Category) }),
+]);
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/**
+ * The one path segment a root URL may name (`/furniture`, `/furniture/`, `/Furniture`,
+ * `/kotak%2Dpenyimpanan`); null for anything deeper, empty, or not slug-shaped — the trapper
+ * hands us every unknown URL, and most of them are not ours.
+ */
+function rootSlug(path: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(path);
+  } catch {
+    return null;
+  }
+  const segments = decoded.split('?')[0]?.split('/').filter(Boolean) ?? [];
+  if (segments.length !== 1) return null;
+  const slug = (segments[0] ?? '').toLowerCase();
+  return slug.length <= 120 && SLUG_RE.test(slug) ? slug : null;
+}
+const byMerchandising = (a: ProductRow, b: ProductRow) =>
+  a.sort - b.sort || a.name.localeCompare(b.name);
+
 const Testimonial = t.Object({
   id: t.String(),
   author: t.String(),
@@ -199,17 +240,112 @@ export default defineApiRoutes(
       },
     )
     .get(
-      '/sitemap',
+      '/categories',
       async ({ tenantState }) => {
         const tid = await storefrontTenant(tenantState?.clientId ?? null);
         if (!tid) return ok([]);
         const rows = await forTenant(tid).select(
+          schema.exampleCategories,
+          isNull(schema.exampleCategories.deleted_at),
+        );
+        return ok(
+          rows.sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name)).map(categoryView),
+        );
+      },
+      {
+        response: { 200: OkSchema(t.Array(Category)), ...errorResponses },
+        detail: { summary: 'Product categories (public)' },
+      },
+    )
+    .get(
+      '/resolve',
+      async ({ query, set, requestId, tenantState }) => {
+        // F-11: the web's 404 trapper asks "is this root URL yours?" — categories first, then
+        // products, both by slug within the storefront tenant. Two indexed lookups at most.
+        const tid = await storefrontTenant(tenantState?.clientId ?? null);
+        const slug = rootSlug(query.path);
+        if (!tid || !slug) {
+          set.status = 404;
+          return fail('not_found', 'Halaman tidak ditemukan', requestId);
+        }
+        const tenant = forTenant(tid);
+        const category = await tenant.selectOne(
+          schema.exampleCategories,
+          and(eq(schema.exampleCategories.slug, slug), isNull(schema.exampleCategories.deleted_at)),
+        );
+        if (category) {
+          const rows = await tenant.select(
+            schema.exampleProducts,
+            and(
+              eq(schema.exampleProducts.category_id, category.id),
+              isNull(schema.exampleProducts.deleted_at),
+            ),
+          );
+          return ok({
+            kind: 'category' as const,
+            category: categoryView(category),
+            products: rows.sort(byMerchandising).map(view),
+          });
+        }
+        const product = await tenant.selectOne(
+          schema.exampleProducts,
+          and(eq(schema.exampleProducts.slug, slug), isNull(schema.exampleProducts.deleted_at)),
+        );
+        if (product) {
+          const parent = product.category_id
+            ? await tenant.selectOne(
+                schema.exampleCategories,
+                and(
+                  eq(schema.exampleCategories.id, product.category_id),
+                  isNull(schema.exampleCategories.deleted_at),
+                ),
+              )
+            : null;
+          return ok({
+            kind: 'product' as const,
+            product: view(product),
+            category: parent ? categoryView(parent) : null,
+          });
+        }
+        set.status = 404;
+        return fail('not_found', 'Halaman tidak ditemukan', requestId);
+      },
+      {
+        query: t.Object({ path: t.String({ maxLength: 512 }) }),
+        response: { 200: OkSchema(Resolved), ...errorResponses },
+        detail: {
+          summary: 'Resolve a root URL (/<category> or /<product>) for the 404 trapper (F-11)',
+        },
+      },
+    )
+    .get(
+      '/sitemap',
+      async ({ tenantState }) => {
+        const tid = await storefrontTenant(tenantState?.clientId ?? null);
+        if (!tid) return ok([]);
+        const tenant = forTenant(tid);
+        const rows = await tenant.select(
           schema.exampleProducts,
           isNull(schema.exampleProducts.deleted_at),
         );
-        return ok(
-          rows.map((r) => ({ path: `/product/${r.slug}`, lastmod: r.updated_at.toISOString() })),
-        );
+        const entries = rows.map((r) => ({
+          path: `/product/${r.slug}`,
+          lastmod: r.updated_at.toISOString(),
+        }));
+        // Root URLs exist only while this module is the tenant's 404 handler (F-11): listing
+        // `/furniture` in a sitemap that answers it with 404 would be worse than not listing it.
+        const trapper = await settings.get<string | null>(tid, 'app.not_found_route');
+        if (trapper === '/resolve') {
+          const categories = await tenant.select(
+            schema.exampleCategories,
+            isNull(schema.exampleCategories.deleted_at),
+          );
+          for (const c of categories)
+            entries.push({ path: `/${c.slug}`, lastmod: c.updated_at.toISOString() });
+          for (const r of rows)
+            entries.push({ path: `/${r.slug}`, lastmod: r.updated_at.toISOString() });
+        }
+        return ok(entries);
       },
       {
         response: {
