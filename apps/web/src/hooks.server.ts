@@ -38,15 +38,22 @@ export const handle: Handle = async ({ event, resolve }) => {
   const { theme, mode, css } = event.locals.theme;
   const themeCss = css ? `<style data-custom-theme="${theme.id}">${css}</style>` : '';
 
-  // Decision I / F-5 / F-6: `/` for an anonymous visitor serves the configured landing route —
-  // rendered server-side and returned as `/` (no redirect, no flicker; search engines see the
+  // Decision I / F-5 / F-6: `/` serves the configured landing route — to anonymous visitors AND
+  // signed-in users alike (`app.home_route` is only where sign-in lands, never a redirect off `/`)
+  // — rendered server-side and returned as `/` (no redirect, no flicker; search engines see the
   // content). A landing route that no longer exists, or belongs to a disabled module, falls back
   // to the built-in landing page with a warning instead of a 404 on the front door.
-  if (event.url.pathname === '/' && event.request.method === 'GET' && !event.locals.session) {
+  if (
+    event.url.pathname === '/' &&
+    event.request.method === 'GET' &&
+    // Loop guard: a landing page that forwards back to `/` must not be forwarded again.
+    !event.request.headers.has(ORIGINAL_PATH_HEADER)
+  ) {
     const landing = cfgString(event.locals.config, 'app.landing_route', landingFallback());
     const target = routeTarget('app.landing_route', landing, event.locals.config.enabledModules);
     if (target) {
       const forwarded = await event.fetch(new URL(target + event.url.search, event.url.origin), {
+        redirect: 'manual',
         headers: {
           accept: 'text/html',
           cookie: event.request.headers.get('cookie') ?? '',
@@ -59,6 +66,21 @@ export const handle: Handle = async ({ event, resolve }) => {
         headers.set('x-request-id', event.locals.requestId);
         headers.set('x-landing-route', target);
         return new Response(await forwarded.text(), { status: 200, headers });
+      }
+      // A landing that sends a signed-in user elsewhere (`/auth/login` → home after sign-in) keeps
+      // doing so — unless it points back at `/`, which would loop; then the built-in page answers.
+      const location = forwarded.headers.get('location');
+      if (forwarded.status >= 300 && forwarded.status < 400 && location) {
+        const next = new URL(location, event.url.origin);
+        if (next.origin === event.url.origin && next.pathname !== '/') {
+          return new Response(null, {
+            status: 303,
+            headers: {
+              location: next.pathname + next.search,
+              'x-request-id': event.locals.requestId,
+            },
+          });
+        }
       }
       // The route exists but would not render (its module disabled for this tenant → 404, its
       // loader failing → 500). Say so: the front door quietly showing the built-in page instead

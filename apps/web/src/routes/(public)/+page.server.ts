@@ -1,12 +1,11 @@
 import { LOCALES } from '@core/i18n';
 import { themes } from '@core/ui-theme';
-import { redirect } from '@sveltejs/kit';
 import { api } from '$lib/api/client';
-import { cfgString, isSignupEnabled } from '$lib/server/config';
+import { isSignupEnabled } from '$lib/server/config';
 import type { PageServerLoad } from './$types';
 
 /**
- * The built-in landing page (F-6): what `/` serves to an anonymous visitor when no landing route is
+ * The built-in landing page (F-6): what `/` serves — signed in or not — when no landing route is
  * configured, when the configured one points at `/` itself, or when it cannot be rendered (module
  * disabled, route gone). Server-side load → typed API call → HTML with the data already in it
  * (Decision B). Everything it shows is generic — the core never names a module (§4.4): the module
@@ -16,7 +15,6 @@ import type { PageServerLoad } from './$types';
  * not be read, `enabledModules` already holds every module, so nothing is hidden by accident.
  */
 export const load: PageServerLoad = async ({ locals, url }) => {
-  if (locals.session) redirect(303, cfgString(locals.config, 'app.home_route', '/dashboard'));
   const { data, error } = await api(locals.requestId).v1.version.get();
   const api_ = data?.success
     ? {

@@ -79,7 +79,7 @@ Satu tema menetapkan **token** (warna, radius, tipografi) + **set ikon** + **lay
 
 `.env` **hanya** untuk yang dibutuhkan sebelum database bisa dibaca (koneksi DB/Redis, port, secret sesi, mode, fallback bootstrap). Selebihnya di database, per tenant dengan fallback global, diubah admin tanpa restart.
 
-Contoh yang sering salah tempat: `app.landing_route` (isi `/` untuk anonim, baku `/` = halaman depan bawaan) dan `app.home_route` (tujuan setelah login) ada di **database**; `LANDING_ROUTE` di `.env` hanya fallback bootstrap. Nilainya divalidasi terhadap registry route **saat disimpan** — route tidak ada ditolak di UI. Kalau modul pemiliknya dinonaktifkan, resolusi turun ke fallback aman + peringatan, **bukan 404 di `/`**.
+Contoh yang sering salah tempat: `app.landing_route` (isi `/` untuk semua pengunjung, bersesi atau tidak; baku `/` = halaman depan bawaan) dan `app.home_route` (tujuan setelah login, bukan pengalihan dari `/`) ada di **database**; `LANDING_ROUTE` di `.env` hanya fallback bootstrap. Nilainya divalidasi terhadap registry route **saat disimpan** — route tidak ada ditolak di UI. Kalau modul pemiliknya dinonaktifkan, resolusi turun ke fallback aman + peringatan, **bukan 404 di `/`**.
 
 ## 8. Prioritas & urutan kerja
 
