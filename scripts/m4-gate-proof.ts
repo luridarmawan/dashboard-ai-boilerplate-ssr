@@ -111,16 +111,16 @@ const admin = new Jar();
     res.status === 200 && res.headers.get('x-landing-route') === '/example',
     `${res.status} ${res.headers.get('x-landing-route')}`,
   );
+  // The default language is English (K-3, since 2026-09-18); the Indonesian section titles below
+  // need an explicit `accept-language`, like a visitor's browser would send.
+  const id = await fetch(`${WEB}/`, {
+    headers: { accept: 'text/html', 'accept-language': 'id' },
+  }).then((r) => r.text());
   check(
     '#1 hero, features, products from the DB, testimonials, pricing, contact — all in the first HTML',
-    [
-      'data-testid="products"',
-      'id="products"',
-      'id="contact"',
-      'Gayo Arabika',
-      'Kata mereka',
-      'Paket langganan',
-    ].every((m) => html.includes(m)),
+    ['data-testid="products"', 'id="products"', 'id="contact"', 'Gayo Arabika'].every((m) =>
+      html.includes(m),
+    ) && ['Kata mereka', 'Paket langganan'].every((m) => id.includes(m)),
   );
   check(
     'R-4 SEO: title, description, canonical, Open Graph, JSON-LD without JavaScript',
@@ -321,6 +321,10 @@ const admin = new Jar();
       front.html.includes('data-testid="api-status"') &&
       !front.html.includes('data-testid="products"'),
   );
+  check(
+    '#4 platform status lists only enabled modules: Example gone while disabled',
+    front.html.includes('data-testid="api-status"') && !front.html.includes('<code>example</code>'),
+  );
   const gone = await get(anon, '/example');
   check(
     '#4 /example → 404 while disabled; /product/<slug> too',
@@ -345,6 +349,35 @@ const admin = new Jar();
     're-enable → landing back on the next request',
     on.res.status === 303 &&
       (await get(anon, '/')).res.headers.get('x-landing-route') === '/example',
+  );
+  // `/` forwards to Example again now, so point it at the built-in landing for one request to
+  // see the re-enabled module back in the platform status list — then restore the default.
+  const settings = await get(admin, '/settings?scope=global');
+  await post(admin, '/settings?/save', {
+    _csrf: csrfOf(settings.html),
+    _scope: 'global',
+    _section: 'app',
+    _keys: ['app.landing_route'],
+    'app.landing_route': '/',
+  });
+  const built = await get(anon, '/');
+  check(
+    'platform status lists Example again once re-enabled',
+    built.res.status === 200 &&
+      built.html.includes('data-testid="api-status"') &&
+      built.html.includes('<code>example</code>'),
+  );
+  const back = await get(admin, '/settings?scope=global');
+  await post(admin, '/settings?/save', {
+    _csrf: csrfOf(back.html),
+    _scope: 'global',
+    _section: 'app',
+    _keys: ['app.landing_route'],
+    'app.landing_route': '',
+  });
+  check(
+    'back to the default landing for whatever runs next',
+    (await get(anon, '/')).res.headers.get('x-landing-route') === '/example',
   );
 }
 
