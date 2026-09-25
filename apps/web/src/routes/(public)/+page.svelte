@@ -1,4 +1,5 @@
 <script lang="ts">
+import { autoSlide } from '$lib/actions/auto-slide';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -8,7 +9,7 @@ import type { PageData } from './$types';
  * The built-in landing page — the safe front door (F-6). It lives by the same rules as a module's
  * landing (R-7): no literal colours, only theme tokens; no literal copy, only i18n keys (the
  * headline and lead are the deploy-time `APP_LANDING_TITLE` / `APP_LANDING_LEAD` overrides); fully
- * server-rendered, no state, nothing on the render path needs JavaScript. The dashboard "preview" is
+ * server-rendered, no state, nothing on the render path needs JavaScript (the feature row's autoplay is an enhancement). The dashboard "preview" is
  * drawn from tokens, so it restyles with every theme and costs no image request.
  */
 let { data }: { data: PageData } = $props();
@@ -181,9 +182,10 @@ const stats = $derived([
     <h2 id="features-title" class="mt-3 text-3xl font-semibold leading-tight tracking-tight">{t('landing.features.title')}</h2>
     <p class="mt-4 text-muted-foreground">{t('landing.features.lead')}</p>
   </div>
-  <!-- auto-sliding row, pure CSS (no JS on this page): the list is drawn twice so the loop is
-       seamless; the second copy is hidden from assistive tech and dropped under reduced motion -->
-  <div class="marquee mt-10" style="--marquee-duration: {features.length * 6}s">
+  <!-- a swipeable row (CSS, works without JS); use:autoSlide adds one-card autoplay, mouse drag
+       and a seamless loop. The list is drawn twice for that loop; the copy is aria-hidden and
+       only shown once the action runs -->
+  <div class="marquee mt-10" use:autoSlide>
     <ul id="features-items" class="marquee-track">
       {#each [false, true] as copy (copy)}
         {#each features as f (f.k)}
