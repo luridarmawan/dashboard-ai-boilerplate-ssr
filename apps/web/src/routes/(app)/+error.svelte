@@ -25,7 +25,7 @@ const title = $derived(
   {#if notFound}
     <!-- The same scene as the root 404 as the background of the content area, copy in its centre. -->
     <section
-      class="flex min-h-[60dvh] w-full items-center justify-center rounded-2xl bg-cover bg-center bg-no-repeat px-4 py-10"
+      class="flex min-h-[60dvh] w-full items-start justify-center rounded-2xl bg-cover bg-center bg-no-repeat px-4 pt-6 pb-10"
       style="background-image: url('/404.png')"
     >
       <div class="flex w-full max-w-lg flex-col items-center gap-3 rounded-3xl border border-border/60 bg-background/65 px-6 py-8 shadow-lg backdrop-blur-[2px]">

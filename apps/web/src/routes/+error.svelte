@@ -27,14 +27,14 @@ const title = $derived(
 <svelte:head><title>{status} · {notFound ? t('error.root.not_found') : title}</title></svelte:head>
 
 {#if notFound}
-  <!-- The picture is the whole screen (cover, centred); the copy sits in the middle of it on a
-       translucent panel so it reads over the robot on any viewport, desktop or phone. -->
+  <!-- The picture is the whole screen (cover, centred); the copy sits in the upper part of it,
+       above the robot's head, on a translucent panel so it reads on any viewport. -->
   <main
-    class="flex min-h-dvh items-center justify-center bg-background bg-cover bg-center bg-no-repeat px-4 py-10"
+    class="flex min-h-dvh items-start justify-center bg-background bg-cover bg-center bg-no-repeat px-4 pt-[5dvh] pb-10 sm:pt-[7dvh]"
     style="background-image: url('/404.png')"
     data-testid="error-404"
   >
-    <div class="flex w-full max-w-lg flex-col items-center gap-4 rounded-3xl border border-border/60 bg-background/65 px-6 py-10 text-center shadow-lg backdrop-blur-[2px] sm:px-10">
+    <div class="flex w-full max-w-lg flex-col items-center gap-3 rounded-3xl border border-border/60 bg-background/65 px-6 py-7 text-center shadow-lg backdrop-blur-[2px] sm:px-10">
       <p class="font-mono text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">{t('error.root.not_found')}</p>
       <h1 class="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">{title}</h1>
       <p class="text-balance text-lg text-muted-foreground">{t('error.root.not_found_lead')}</p>
