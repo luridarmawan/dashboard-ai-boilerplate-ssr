@@ -7,6 +7,9 @@ import type { PageServerLoad } from './$types';
  * the server. A widget the user may not see is not in the HTML and its component is never
  * downloaded — the same rule as the menu (F-1, F-2). Order and size are metadata from the module.
  * A widget with a `data` path gets that API response (fetched here, as this user) as its `data` prop.
+ *
+ * The "effective permissions" card is a developer aid: it is only rendered under an explicit
+ * `NODE_ENV=development` (decided here, on the server, so other environments never ship its markup).
  */
 export const load: PageServerLoad = async (event) => {
   const s = event.locals.session;
@@ -25,5 +28,5 @@ export const load: PageServerLoad = async (event) => {
       data: w.data ? await apiFetchData(event, w.data, event.locals.session?.clientId) : null,
     })),
   );
-  return { widgets };
+  return { widgets, showPermissions: process.env.NODE_ENV === 'development' };
 };
