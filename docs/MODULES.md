@@ -397,7 +397,24 @@ export default defineConfig('Billing', [
 ]);
 ```
 
-Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di bawah field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di penutup blok field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+
+**Pengelompokan & lebar field (`groups`, `group`, `width`).** Section yang panjang boleh dipecah menjadi blok berjudul tanpa halaman Pengaturan core tahu modul apa pun:
+
+```ts
+{ section: 'billing', title: …,
+  groups: [                                        // urutan deklarasi = urutan tampil
+    { key: 'account', title: { id: 'Akun', en: 'Account' } },
+    { key: 'tax', title: { id: 'Pajak', en: 'Tax' }, note: { id: '…', en: '…' } },
+  ],
+  fields: [
+    { key: 'billing.provider', …, group: 'account', width: 'half' },
+    { key: 'billing.api_key',  …, group: 'account', width: 'half' },
+    { key: 'billing.tax_rate', …, group: 'tax',     width: 'third' },
+  ] }
+```
+
+Murni tampilan: nilai, validasi, dan tombol **Simpan** tetap satu per section. `width` berlaku di layar lebar — `full` satu baris penuh, `half` dua per baris, `third` tiga per baris (mulai `lg`; di bawahnya dua) — dan ponsel selalu satu per baris; tanpa `width`, `text`/`markdown`/`list` penuh, selebihnya `half`. Field tanpa `group` digambar lebih dulu, di atas grup pertama; grup tanpa field tidak digambar. `defineConfig` menolak `group` yang tidak dideklarasikan section-nya, key grup ganda, dan key yang bukan slug. Jam milik field `timezone` digambar di **penutup blok** tempat field itu berada. Contoh nyata: section `app` core (`packages/settings/src/registry.ts`) — *Aplikasi* · *Halaman baku* · *Tema & tata letak*.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
 

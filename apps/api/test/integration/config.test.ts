@@ -100,10 +100,23 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(d(r).notFoundRoutes).toEqual(
       expect.arrayContaining([{ path: '/resolve', module: 'Example' }]),
     );
-    // The favicon URL (owner's ask of 2026-09-24) is the field right below the default theme.
-    const keys = app?.fields.map((f) => f.key) ?? [];
-    expect(keys[keys.indexOf('app.home_route') + 1]).toBe('app.not_found_route');
-    expect(keys[keys.indexOf('app.default_theme') + 1]).toBe('app.favicon_url');
+    // The Application tab is drawn in three groups (owner's ask of 2026-09-26): identity
+    // (name | lead, logo | favicon), default handlers (three per row), theme & layout.
+    expect(app?.groups.map((g) => g.key)).toEqual(['identity', 'handlers', 'appearance']);
+    const layout = (app?.fields ?? []).map((f) => `${f.key}:${f.group}:${f.width}`);
+    expect(layout).toEqual([
+      'app.name:identity:half',
+      'app.landing_lead:identity:half',
+      'app.logo_url:identity:half',
+      'app.favicon_url:identity:half',
+      'app.landing_route:handlers:third',
+      'app.home_route:handlers:third',
+      'app.not_found_route:handlers:third',
+      'app.default_theme:appearance:third',
+      'app.default_locale:appearance:third',
+      'app.timezone:appearance:third',
+      'app.allowed_themes:appearance:full',
+    ]);
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');
     expect((d(r).routes as string[]).includes('/dashboard')).toBe(true);
     // §4.7: the landing page picks from the anonymous-reachable subset only.

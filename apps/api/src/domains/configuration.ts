@@ -44,6 +44,10 @@ const Field = t.Object({
   public: t.Boolean(),
   min: t.Nullable(t.Number()),
   max: t.Nullable(t.Number()),
+  /** Key of the section group the field is drawn under; null = before every group. */
+  group: t.Nullable(t.String()),
+  /** Layout hint for wide screens; the registry default is already applied. */
+  width: t.Union([t.Literal('full'), t.Literal('half'), t.Literal('third')]),
   source: t.Union([t.Literal('tenant'), t.Literal('global'), t.Literal('default')]),
   value: t.Unknown(),
   secretSet: t.Nullable(t.Boolean()),
@@ -66,12 +70,15 @@ const SectionAction = t.Object({
   note: t.Nullable(Localized),
   input: t.Nullable(ActionInput),
 });
+/** A titled block inside a section's form — presentation only. */
+const FieldGroup = t.Object({ key: t.String(), title: Localized, note: t.Nullable(Localized) });
 const Section = t.Object({
   section: t.String(),
   module: t.String(),
   title: Localized,
   note: t.Nullable(Localized),
   order: t.Integer(),
+  groups: t.Array(FieldGroup),
   actions: t.Array(SectionAction),
   fields: t.Array(Field),
 });
@@ -152,6 +159,11 @@ export const configuration = new Elysia({
         title: { ...s.title },
         note: s.note ? { ...s.note } : null,
         order: s.order,
+        groups: s.groups.map((g) => ({
+          key: g.key,
+          title: { ...g.title },
+          note: g.note ? { ...g.note } : null,
+        })),
         actions: s.actions.map((a) => ({
           key: a.key,
           label: { ...a.label },
@@ -185,6 +197,8 @@ export const configuration = new Elysia({
             public: f.public,
             min: f.min,
             max: f.max,
+            group: f.group,
+            width: f.width,
             source: f.source,
             value: f.value,
             secretSet: f.secretSet,

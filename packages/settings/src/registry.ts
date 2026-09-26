@@ -39,6 +39,12 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       en: 'Identity, default pages, theme and language.',
     },
     order: 0,
+    // Presentation only: the three blocks the Application tab is drawn in.
+    groups: [
+      { key: 'identity', title: { id: 'Aplikasi', en: 'Application' } },
+      { key: 'handlers', title: { id: 'Halaman baku', en: 'Default handler' } },
+      { key: 'appearance', title: { id: 'Tema & tata letak', en: 'Theme & layout' } },
+    ],
     fields: [
       {
         key: 'app.name',
@@ -52,6 +58,23 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         public: true,
         max: 120,
         order: 0,
+        group: 'identity',
+        width: 'half',
+      },
+      {
+        key: 'app.landing_lead',
+        type: 'string',
+        title: { id: 'Kalimat pembuka', en: 'Landing lead' },
+        note: {
+          id: 'Satu kalimat di bawah nama aplikasi: footer halaman publik dan panel layout masuk split-hero. Kosongkan untuk memakai APP_LANDING_LEAD dari .env, atau teks bawaan.',
+          en: 'One line under the application name: the public footer and the split-hero sign-in panel. Leave empty to fall back to APP_LANDING_LEAD from .env, or the built-in copy.',
+        },
+        default: null,
+        public: true,
+        max: 500,
+        order: 1,
+        group: 'identity',
+        width: 'half',
       },
       {
         key: 'app.logo_url',
@@ -64,7 +87,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: null,
         public: true,
         max: 512,
-        order: 1,
+        order: 2,
+        group: 'identity',
+        width: 'half',
       },
       {
         key: 'app.landing_route',
@@ -76,7 +101,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: landingFallback(),
         public: true,
-        order: 2,
+        order: 4,
+        group: 'handlers',
+        width: 'third',
       },
       {
         key: 'app.home_route',
@@ -84,7 +111,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         title: { id: 'Halaman setelah masuk', en: 'Home after sign-in' },
         default: '/dashboard',
         public: true,
-        order: 3,
+        order: 5,
+        group: 'handlers',
+        width: 'third',
       },
       {
         key: 'app.not_found_route',
@@ -96,7 +125,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: null,
         public: true,
-        order: 4,
+        order: 6,
+        group: 'handlers',
+        width: 'third',
       },
       {
         key: 'app.default_theme',
@@ -108,7 +139,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: 'warm',
         public: true,
-        order: 5,
+        order: 7,
+        group: 'appearance',
+        width: 'third',
       },
       {
         key: 'app.favicon_url',
@@ -121,7 +154,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: null,
         public: true,
         max: 512,
-        order: 6,
+        order: 3,
+        group: 'identity',
+        width: 'half',
       },
       {
         key: 'app.allowed_themes',
@@ -134,7 +169,9 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: [],
         public: true,
         options: [],
-        order: 7,
+        order: 10,
+        group: 'appearance',
+        width: 'full',
       },
       {
         key: 'app.default_locale',
@@ -143,6 +180,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: 'en',
         public: true,
         order: 8,
+        group: 'appearance',
+        width: 'third',
       },
       {
         key: 'app.timezone',
@@ -156,6 +195,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         public: true,
         max: 64,
         order: 9,
+        group: 'appearance',
+        width: 'third',
       },
     ],
   },
