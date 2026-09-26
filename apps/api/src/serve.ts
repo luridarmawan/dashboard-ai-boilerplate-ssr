@@ -14,7 +14,7 @@ export async function serve(): Promise<void> {
   // provider, a long tool round) is cut off, leaving the caller with a bare "fetch failed". Streams
   // also send a keep-alive comment; this covers the non-streaming routes. 255 s is Bun's maximum.
   app.listen({ port: e.API_PORT, hostname: e.API_HOST, idleTimeout: 255 });
-  bindServer(() => app.server); // http_requests_in_flight (M-6)
+  bindServer(() => app.server); // http_requests_in_flight
 
   // Event bus + scheduler live for the life of the process; stop cleanly so a running job can
   // finish (or abort) before the port closes.

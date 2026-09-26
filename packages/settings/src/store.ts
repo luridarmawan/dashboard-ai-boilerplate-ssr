@@ -1,5 +1,5 @@
 import { and, type Db, eq, inArray, newId, schema } from '@core/db';
-import type { ConfigFieldDef } from '@core/module-kit';
+import type { ConfigFieldDef, ConfigFieldWidth } from '@core/module-kit';
 import { type CacheAdapter, DatabaseVersionCache } from './cache.ts';
 import { configFields, configSections, type RegistryField } from './registry.ts';
 import { type ConfigValue, parseValue, validateValue } from './validate.ts';
@@ -99,6 +99,8 @@ export class SettingsStore {
       title: s.title,
       note: s.note ?? null,
       order: s.order ?? 100,
+      // Presentation only: titled blocks the form draws the fields in (declaration order).
+      groups: (s.groups ?? []).map((g) => ({ key: g.key, title: g.title, note: g.note ?? null })),
       // Extension point 6: buttons the section offers beside "Save" (e.g. "test connection").
       // The page renders them generically; it never learns what a module's action does.
       actions: (s.actions ?? []).map((a) => ({
@@ -134,6 +136,11 @@ export class SettingsStore {
             public: !!f.public,
             min: f.min ?? null,
             max: f.max ?? null,
+            group: f.group ?? null,
+            width: (f.width ??
+              (f.type === 'text' || f.type === 'markdown' || f.type === 'list'
+                ? 'full'
+                : 'half')) as ConfigFieldWidth,
             source: e?.source ?? 'default',
             // E-4: a secret is only ever "set" or "empty" outside the process.
             value: f.type === 'secret' ? null : value,

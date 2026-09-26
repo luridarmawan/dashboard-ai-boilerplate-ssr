@@ -21,6 +21,6 @@ export async function recentAuditForTenant(db: Db, clientId: string, limit = 50)
     .select()
     .from(schema.auditLog)
     .where(eq(schema.auditLog.client_id, clientId))
-    .orderBy(desc(schema.auditLog.id)) // UUIDv7 is time-ordered — the id itself is the cursor (N-5)
+    .orderBy(desc(schema.auditLog.id)) // UUIDv7 is time-ordered — the id itself is the cursor
     .limit(limit);
 }

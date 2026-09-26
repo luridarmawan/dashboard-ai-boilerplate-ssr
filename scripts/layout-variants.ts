@@ -44,7 +44,7 @@ const map: Record<string, string> = {};
 const asides: Record<string, string> = {};
 const concretePaths = new Set<string>();
 const publicPaths = new Set<string>(); // subset of the above: reachable without a session (§4.7)
-const concreteIds = new Set<string>(); // lint: a page must never name a concrete layout (L-9)
+const concreteIds = new Set<string>(); // lint: a page must never name a concrete layout
 const layoutIds = new Set(
   (
     JSON.parse(readFileSync(join(root, 'packages/ui-theme/layouts/registry.json'), 'utf8')) as {

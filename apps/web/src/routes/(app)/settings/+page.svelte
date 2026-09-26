@@ -25,6 +25,42 @@ const sourceLabel = {
   global: t('settings.source_global'),
   default: t('settings.source_default'),
 } as const;
+type Section = PageData['sections'][number];
+type SettingField = Section['fields'][number];
+
+/**
+ * Field width on wide screens (the form is a 6-column grid; phones stack). A `third` only turns
+ * into three-per-row from `lg`: with the sidebar open, three selects at `sm` would be cramped.
+ */
+const WIDTH: Record<SettingField['width'], string> = {
+  // `content-start`: a row is as tall as its longest hint; the label and input stay at the top.
+  full: 'content-start sm:col-span-6',
+  half: 'content-start sm:col-span-3',
+  third: 'content-start sm:col-span-3 lg:col-span-2',
+};
+
+/**
+ * A section's fields as drawn: ungrouped ones first (key `null`), then each declared group in
+ * declaration order. A group no field points at is not drawn; neither is a field whose group the
+ * API did not send — it falls into the ungrouped block instead of disappearing.
+ */
+function blocksOf(s: Section) {
+  const known = new Set(s.groups.map((g) => g.key));
+  const loose = s.fields.filter((f) => !f.group || !known.has(f.group));
+  const blocks: {
+    key: string | null;
+    title: Section['title'] | null;
+    note: Section['note'];
+    fields: SettingField[];
+  }[] = [];
+  if (loose.length) blocks.push({ key: null, title: null, note: null, fields: loose });
+  for (const g of s.groups) {
+    const fields = s.fields.filter((f) => f.group === g.key);
+    if (fields.length) blocks.push({ key: g.key, title: g.title, note: g.note, fields });
+  }
+  return blocks;
+}
+
 const locales = [
   { value: 'id', label: t('lang.id') },
   { value: 'en', label: t('lang.en') },
@@ -224,6 +260,83 @@ $effect(() => {
 
 <svelte:head><title>{t('nav.settings')}</title></svelte:head>
 
+{#snippet fieldRow(s: Section, f: SettingField)}
+  {@const id = `f-${f.key}`}
+  {@const err = fieldErrors[f.key]}
+  {@const strVal = f.value === null || f.value === undefined ? '' : String(f.value)}
+  <input type="hidden" name="_keys" value={f.key} />
+  {#if f.type === 'list'}<input type="hidden" name="_lists" value={f.key} />{/if}
+  {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
+  {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
+  <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={WIDTH[f.width]}>
+    {#if f.type === 'boolean'}
+      <div class="flex flex-wrap items-center gap-4 text-sm">
+        <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="set" checked={f.source !== 'default' || f.value !== null} class="accent-primary" /> {t('settings.bool_set')}</label>
+        <label class="flex items-center gap-2"><Checkbox {id} name={f.key} checked={f.value === true} /> {t('common.active')}</label>
+        <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="inherit" checked={f.source === 'default' && f.value === null} class="accent-primary" /> {data.scope === 'global' ? t('settings.inherit_default') : t('settings.inherit_global')}</label>
+      </div>
+    {:else if f.type === 'secret'}
+      <Input {id} type="password" name={f.key} placeholder={f.secretSet ? t('settings.secret_set_placeholder') : t('settings.secret_unset_placeholder')} autocomplete="off" />
+      {#if f.secretSet}<label class="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox name={`${f.key}__clear`} /> {t('settings.secret_clear')}</label>{/if}
+    {:else if f.type === 'select' || f.type === 'theme'}
+      <Select {id} name={f.key} value={strVal}>
+        <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+        {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={strVal === o.value}>{L(o.label)}</option>{/each}
+      </Select>
+    {:else if f.type === 'route' || f.type === 'public_route'}
+      <!-- §4.7: a `public_route` (the landing page) offers only the pages an anonymous visitor can open. -->
+      <Select {id} name={f.key} value={strVal}>
+        <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+        {#each f.type === 'public_route' ? data.publicRoutes : data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
+      </Select>
+    {:else if f.type === 'not_found_route'}
+      <!-- F-11: only a module's declared 404 handler page; labelled by module, the path is a detail. -->
+      <Select {id} name={f.key} value={strVal}>
+        <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+        {#each data.notFoundRoutes as r (r.path)}<option value={r.path} selected={strVal === r.path}>{r.module} — {r.path}</option>{/each}
+      </Select>
+    {:else if f.type === 'locale'}
+      <Select {id} name={f.key} value={strVal}>
+        <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
+        {#each locales as o (o.value)}<option value={o.value} selected={strVal === o.value}>{o.label}</option>{/each}
+      </Select>
+    {:else if f.type === 'list'}
+      <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
+        {#each f.options ?? [] as o (o.value)}
+          <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
+        {:else}<span class="text-muted-foreground">—</span>{/each}
+      </div>
+    {:else if f.type === 'timezone'}
+      <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} placeholder="Asia/Jakarta" autocomplete="off" oninput={(e) => (zones[zoneId(s.section, f.key)] = e.currentTarget.value)} />
+    {:else if f.type === 'text' || f.type === 'markdown'}
+      <Textarea {id} name={f.key} rows={f.type === 'markdown' ? 6 : 3} value={strVal} maxlength={f.max ?? undefined} />
+    {:else if f.type === 'number'}
+      <Input {id} type="number" name={f.key} value={strVal} min={f.min ?? undefined} max={f.max ?? undefined} step="any" />
+    {:else}
+      <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
+    {/if}
+  </Field>
+{/snippet}
+
+{#snippet clocks(s: Section, fields: readonly SettingField[])}
+  <!--
+    Extension point 6 stays honest: the clock hangs off the field TYPE, not off `app.timezone`.
+    It closes the block its field sits in, under a divider, so it never breaks a row of inputs.
+  -->
+  {#each fields.filter((f) => f.type === 'timezone') as f (f.key)}
+    {@const strVal = f.value === null || f.value === undefined ? '' : String(f.value)}
+    <div class="col-span-full border-t border-dashed border-border pt-4">
+      <TimezoneClock
+        timezone={zones[zoneId(s.section, f.key)] ?? strVal}
+        fallback={strVal}
+        {locale}
+        label={t('settings.timezone_now')}
+        invalidText={t('settings.timezone_unknown')}
+      />
+    </div>
+  {/each}
+{/snippet}
+
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('nav.settings')}</h1>
@@ -303,7 +416,7 @@ $effect(() => {
         <form
           method="POST"
           action="?/save"
-          class="grid gap-4 sm:grid-cols-2"
+          class="grid gap-4 sm:grid-cols-6"
           use:enhance={() => {
             saving = s.section;
             clientError = null;
@@ -328,75 +441,21 @@ $effect(() => {
           <Csrf token={data.csrf} />
           <input type="hidden" name="_scope" value={data.scope} />
           <input type="hidden" name="_section" value={s.section} />
-          {#each s.fields as f (f.key)}
-            {@const id = `f-${f.key}`}
-            {@const err = fieldErrors[f.key]}
-            {@const strVal = f.value === null || f.value === undefined ? '' : String(f.value)}
-            <input type="hidden" name="_keys" value={f.key} />
-            {#if f.type === 'list'}<input type="hidden" name="_lists" value={f.key} />{/if}
-            {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
-            {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
-            <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={f.type === 'text' || f.type === 'markdown' || f.type === 'list' ? 'sm:col-span-2' : ''}>
-              {#if f.type === 'boolean'}
-                <div class="flex flex-wrap items-center gap-4 text-sm">
-                  <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="set" checked={f.source !== 'default' || f.value !== null} class="accent-primary" /> {t('settings.bool_set')}</label>
-                  <label class="flex items-center gap-2"><Checkbox {id} name={f.key} checked={f.value === true} /> {t('common.active')}</label>
-                  <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="inherit" checked={f.source === 'default' && f.value === null} class="accent-primary" /> {data.scope === 'global' ? t('settings.inherit_default') : t('settings.inherit_global')}</label>
-                </div>
-              {:else if f.type === 'secret'}
-                <Input {id} type="password" name={f.key} placeholder={f.secretSet ? t('settings.secret_set_placeholder') : t('settings.secret_unset_placeholder')} autocomplete="off" />
-                {#if f.secretSet}<label class="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox name={`${f.key}__clear`} /> {t('settings.secret_clear')}</label>{/if}
-              {:else if f.type === 'select' || f.type === 'theme'}
-                <Select {id} name={f.key} value={strVal}>
-                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                  {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={strVal === o.value}>{L(o.label)}</option>{/each}
-                </Select>
-              {:else if f.type === 'route' || f.type === 'public_route'}
-                <!-- §4.7: a `public_route` (the landing page) offers only the pages an anonymous visitor can open. -->
-                <Select {id} name={f.key} value={strVal}>
-                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                  {#each f.type === 'public_route' ? data.publicRoutes : data.routes as r (r)}<option value={r} selected={strVal === r}>{r}</option>{/each}
-                </Select>
-              {:else if f.type === 'not_found_route'}
-                <!-- F-11: only a module's declared 404 handler page; labelled by module, the path is a detail. -->
-                <Select {id} name={f.key} value={strVal}>
-                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                  {#each data.notFoundRoutes as r (r.path)}<option value={r.path} selected={strVal === r.path}>{r.module} — {r.path}</option>{/each}
-                </Select>
-              {:else if f.type === 'locale'}
-                <Select {id} name={f.key} value={strVal}>
-                  <option value="">{data.scope === 'global' ? t('settings.option_default') : t('settings.option_inherit_global')}</option>
-                  {#each locales as o (o.value)}<option value={o.value} selected={strVal === o.value}>{o.label}</option>{/each}
-                </Select>
-              {:else if f.type === 'list'}
-                <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-4 gap-y-1 rounded-md border p-3 text-sm">
-                  {#each f.options ?? [] as o (o.value)}
-                    <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
-                  {:else}<span class="text-muted-foreground">—</span>{/each}
-                </div>
-              {:else if f.type === 'timezone'}
-                <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} placeholder="Asia/Jakarta" autocomplete="off" oninput={(e) => (zones[zoneId(s.section, f.key)] = e.currentTarget.value)} />
-              {:else if f.type === 'text' || f.type === 'markdown'}
-                <Textarea {id} name={f.key} rows={f.type === 'markdown' ? 6 : 3} value={strVal} maxlength={f.max ?? undefined} />
-              {:else if f.type === 'number'}
-                <Input {id} type="number" name={f.key} value={strVal} min={f.min ?? undefined} max={f.max ?? undefined} step="any" />
-              {:else}
-                <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
-              {/if}
-            </Field>
-            {#if f.type === 'timezone'}
-              <!-- Extension point 6 stays honest: this hangs off the field TYPE, not off `app.timezone`. -->
-              <TimezoneClock
-                class="sm:col-span-2"
-                timezone={zones[zoneId(s.section, f.key)] ?? strVal}
-                fallback={strVal}
-                {locale}
-                label={t('settings.timezone_now')}
-                invalidText={t('settings.timezone_unknown')}
-              />
+          {#each blocksOf(s) as b (b.key ?? '')}
+            {#if b.key === null}
+              {#each b.fields as f (f.key)}{@render fieldRow(s, f)}{/each}
+              {@render clocks(s, b.fields)}
+            {:else}
+              <!-- A field group (extension point 6): heading + divider, same form, same Save. -->
+              <section class="col-span-full grid min-w-0 gap-4 border-t border-border pt-4 sm:grid-cols-6" data-group={b.key} aria-labelledby={`group-${s.section}-${b.key}`}>
+                <h3 id={`group-${s.section}-${b.key}`} class="col-span-full text-base font-semibold">{L(b.title)}</h3>
+                {#if b.note}<p class="col-span-full -mt-2 text-xs text-muted-foreground">{L(b.note)}</p>{/if}
+                {#each b.fields as f (f.key)}{@render fieldRow(s, f)}{/each}
+                {@render clocks(s, b.fields)}
+              </section>
             {/if}
           {/each}
-          <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+          <div class="col-span-full flex flex-wrap items-center gap-2">
             <Button type="submit" disabled={saving === s.section}>
               <Icon name={saving === s.section ? 'refresh' : 'save'} size={16} class={saving === s.section ? 'animate-spin' : ''} />
               {saving === s.section ? t('common.running') : t('settings.save_section', { section: L(s.title) })}
@@ -433,7 +492,7 @@ $effect(() => {
           {#each s.actions as a (a.key)}
             {@const r = results[`${s.section}:${a.key}`]}
             {#if r}
-              <div class="sm:col-span-2" data-testid={`action-result-${s.section}-${a.key}`}>
+              <div class="col-span-full" data-testid={`action-result-${s.section}-${a.key}`}>
                 <p class={r.ok ? 'notice' : 'error'} role={r.ok ? undefined : 'alert'}>{actionText(r)}</p>
                 {#if r.details?.length}
                   <ul class="mt-1 text-xs text-muted-foreground">

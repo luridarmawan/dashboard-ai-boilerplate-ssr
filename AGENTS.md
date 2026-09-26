@@ -27,6 +27,8 @@ Bila sebuah perubahan mengubah perilaku yang tertulis di PRD, **PRD ikut diperba
 
 Aturan praktisnya: kalau teks itu dibaca **developer dari dalam kode**, Inggris; kalau dibaca **pemakai atau pembaca dokumen**, ikuti baris di atas. Komentar berbahasa Indonesia di kode adalah cacat review, bukan preferensi gaya.
 
+**Kode kebutuhan PRD (`A-1`, `C-4`, `L-24`, …) hanya untuk dokumen dan pelacakan internal.** Jangan menaruhnya di teks yang dibaca pemakai atau developer luar: `summary`/`description` OpenAPI, katalog i18n, pesan galat, keluaran CLI, dan galat `modules:sync`. Tulis apa maksudnya, bukan nomornya. OpenAPI dan katalog i18n dijaga tes (`apps/api/test/openapi.test.ts`, `packages/i18n/test/catalog-copy.test.ts`). Summary route cukup satu frasa pendek; rinciannya di `description`, dan baris izin terisi otomatis dari guard (lihat `docs/MODULES.md`).
+
 ## Tentang Project
 
 Ini adalah boillerplate untuk membuat app/webapp/dashboard

@@ -91,7 +91,7 @@ const shellContext = $derived({
 })}
   <!-- F-3: a short top level, then collapsible groups. <details> needs no JavaScript; a group holding
        the current page is rendered open. Horizontal (top-nav layouts): each group is a dropdown.
-       In a COLLAPSED rail (F-8) the labels are only readable as tooltips, and no group is rendered
+       In a COLLAPSED rail the labels are only readable as tooltips, and no group is rendered
        open — an open group is what tells the layout's CSS the reader asked for the full width back,
        so it must mean "just clicked", not "you happen to be on a page inside it". -->
   <!-- `rail` is the layout speaking, so it is never stale; `railed` follows the data and is only
@@ -141,7 +141,7 @@ const shellContext = $derived({
   <!-- Bell (J-4): the badge is still rendered server-side; the newest unread open in a <details>
        dropdown, the same no-JS pattern as the account menu (`use:dropdown` only adds outside-click
        and Escape closing). Every control inside is a form posting to the /notifications actions —
-       opening a row marks it read and lands on its link — so the shell needs no JavaScript (L-22). -->
+       opening a row marks it read and lands on its link — so the shell needs no JavaScript. -->
   <details class="group relative" data-testid="bell-menu" use:dropdown>
     <summary class="relative flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md hover:bg-accent" aria-label={data.unreadNotifications ? `${t('shell.notifications')} (${data.unreadNotifications})` : t('shell.notifications')} data-testid="bell">
       <Icon name="bell" size={18} />
@@ -267,7 +267,7 @@ const shellContext = $derived({
 {/snippet}
 
 {#snippet footer()}
-  <span>{t('shell.footer')} · theme <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
+  <span>{t('shell.footer')} v{__APP_VERSION__} · theme <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
 {/snippet}
 
 {#snippet aside()}

@@ -101,7 +101,7 @@ export function validateTool(ns: string, tool: Partial<ToolDef> | null | undefin
       `nama tool "${String(name)}" tidak valid — bentuknya "<ns>.<nama>" huruf kecil`,
     );
   if (!name.startsWith(`${ns}.`))
-    throw new ModuleContractError(`nama tool "${name}" harus diawali "${ns}." (G-9)`);
+    throw new ModuleContractError(`nama tool "${name}" harus diawali "${ns}."`);
   if (toolWireName(name).length > TOOL_WIRE_MAX)
     throw new ModuleContractError(`tool "${name}": nama lebih dari ${TOOL_WIRE_MAX} karakter`);
   const d = tool.description;

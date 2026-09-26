@@ -79,7 +79,8 @@ export const notificationsDomain = new Elysia({
         ...errorResponses,
       },
       detail: {
-        summary: 'My notifications in the active tenant, newest first (?unread=1 to filter)',
+        summary: 'List my notifications',
+        description: 'Newest first. `?unread=1` shows only unread ones.',
       },
     },
   )
@@ -98,7 +99,7 @@ export const notificationsDomain = new Elysia({
     {
       beforeHandle: requireSession,
       response: { 200: OkSchema(t.Object({ unread: t.Integer() })), ...errorResponses },
-      detail: { summary: 'Unread count for the bell' },
+      detail: { summary: 'Count unread notifications' },
     },
   )
   .put(
@@ -139,7 +140,7 @@ export const notificationsDomain = new Elysia({
       beforeHandle: requireSession,
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ read: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Mark one of my notifications read (idempotent)' },
+      detail: { summary: 'Mark a notification read' },
     },
   )
   .post(
@@ -159,7 +160,7 @@ export const notificationsDomain = new Elysia({
     {
       beforeHandle: requireSession,
       response: { 200: OkSchema(t.Object({ marked: t.Integer() })), ...errorResponses },
-      detail: { summary: 'Mark all my notifications in this tenant read' },
+      detail: { summary: 'Mark all notifications read' },
     },
   )
   .get(
@@ -185,6 +186,6 @@ export const notificationsDomain = new Elysia({
       beforeHandle: requireSession,
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(View), ...errorResponses },
-      detail: { summary: 'One of my notifications' },
+      detail: { summary: 'Get a notification' },
     },
   );

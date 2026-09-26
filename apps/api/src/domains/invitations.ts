@@ -249,7 +249,10 @@ export const invitationsDomain = new Elysia({
     {
       beforeHandle: permission('user.create'),
       response: { 200: OkSchema(t.Array(InvitationView)), ...errorResponses },
-      detail: { summary: 'Pending invitations into the active tenant (A-13)' },
+      detail: {
+        summary: 'List invitations',
+        description: 'Pending invitations into the active tenant.',
+      },
     },
   )
   .post(
@@ -423,8 +426,9 @@ export const invitationsDomain = new Elysia({
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Invite an e-mail into the active tenant (A-13): new address → invitation link by e-mail (returned once); known address → added to the tenant and told to sign in. groupId = the group they join (default: Regular User)',
+        summary: 'Invite a user',
+        description:
+          'A new address gets an invitation link by email (also returned once in the response); a known address is added to the tenant and told to sign in. `groupId` is the group they join (default: Regular User).',
       },
     },
   )
@@ -467,7 +471,7 @@ export const invitationsDomain = new Elysia({
       beforeHandle: permission('user.create'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ revoked: t.Boolean() })), ...errorResponses },
-      detail: { summary: 'Revoke a pending invitation' },
+      detail: { summary: 'Revoke an invitation' },
     },
   );
 
@@ -498,7 +502,10 @@ export const joinDomain = new Elysia({ name: 'join', prefix: '/auth', tags: ['au
         ),
         ...errorResponses,
       },
-      detail: { summary: 'Whom an invitation code is for (A-13); 404/410 when unusable' },
+      detail: {
+        summary: 'Look up an invitation',
+        description: 'Who the invitation code is for. 404 when unknown, 410 when expired or used.',
+      },
     },
   )
   .post(
@@ -642,8 +649,9 @@ export const joinDomain = new Elysia({ name: 'join', prefix: '/auth', tags: ['au
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Register through an invitation code (A-13): works with SIGNUP_ENABLED=false; joins the inviting tenant; sets the session cookie',
+        summary: 'Accept an invitation',
+        description:
+          'Registers through an invitation code, joins the inviting tenant and sets the session cookie. Works even when `SIGNUP_ENABLED=false`.',
       },
     },
   );

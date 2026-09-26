@@ -123,8 +123,8 @@ export function createRuntime(): Runtime {
     every: '1d',
     lease: 900,
     description: {
-      id: 'Pangkas audit log, riwayat job, dan outbox sesuai retensi (M-3)',
-      en: 'Prune audit log, job history and outbox per retention policy (M-3)',
+      id: 'Pangkas audit log, riwayat job, dan outbox sesuai retensi',
+      en: 'Prune audit log, job history and outbox per retention policy',
     },
     run: async () => {
       await runLogRetentionOnce();

@@ -57,6 +57,9 @@ export const menuDomain = new Elysia({ name: 'menu', prefix: '/menu', tags: ['me
         ),
         ...errorResponses,
       },
-      detail: { summary: 'Module menu entries the caller may see in the active tenant' },
+      detail: {
+        summary: 'Get the menu',
+        description: 'Module menu entries you can see in the active tenant.',
+      },
     },
   );

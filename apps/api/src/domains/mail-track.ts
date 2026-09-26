@@ -52,7 +52,10 @@ export const mailTrack = new Elysia({ name: 'mail-track', prefix: '/mail', tags:
       params: t.Object({ token: Token }),
       // Always 200: the GIF bytes, whatever the token (documented like the file download).
       response: { 200: t.Unknown() },
-      detail: { summary: 'Tracking pixel: records an open, always answers a 1×1 GIF (J-6)' },
+      detail: {
+        summary: 'Email open pixel',
+        description: 'Records an open and always answers with a 1×1 GIF.',
+      },
     },
   )
   .get(
@@ -72,8 +75,8 @@ export const mailTrack = new Elysia({ name: 'mail-track', prefix: '/mail', tags:
       params: t.Object({ token: Token }),
       response: { 404: errorResponses[404] },
       detail: {
-        summary:
-          'Tracked call-to-action: records the click, redirects to the link the mail carried (J-6)',
+        summary: 'Email link redirect',
+        description: 'Records the click and redirects to the original link.',
       },
     },
   );

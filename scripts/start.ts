@@ -92,7 +92,7 @@ const procs = [
   {
     name: 'api',
     color: '\x1b[36m',
-    cwd: root, // package.json (core version) and modules.catalog.json are read from here (G-16)
+    cwd: root, // package.json (core version) and modules.catalog.json are read from here
     cmd: apiCmd,
     env: { NODE_ENV: 'production', API_HOST: apiHost, API_PORT: String(apiPort) },
   },

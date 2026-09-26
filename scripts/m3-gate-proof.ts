@@ -179,7 +179,7 @@ const anon = new Jar();
   await saveApp(admin, 'global', { 'app.home_route': '/profile' });
   const loginToHome = await get(admin, '/');
   check(
-    'landing `/auth/login` signed in → on to app.home_route (the login page\'s own redirect)',
+    "landing `/auth/login` signed in → on to app.home_route (the login page's own redirect)",
     loginToHome.res.status === 303 && loginToHome.res.headers.get('location') === '/profile',
     `${loginToHome.res.status} ${loginToHome.res.headers.get('location')}`,
   );

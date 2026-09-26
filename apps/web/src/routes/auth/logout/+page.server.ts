@@ -9,7 +9,7 @@ import {
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-  redirect(303, '/'); // logout is a POST (A-5, A-10) — a GET just goes home
+  redirect(303, '/'); // logout is a POST — a GET just goes home
 };
 
 export const actions: Actions = {

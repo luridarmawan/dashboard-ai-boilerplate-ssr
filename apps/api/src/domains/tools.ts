@@ -56,8 +56,8 @@ export const toolsDomain = new Elysia({ name: 'tools', prefix: '/tools', tags: [
       beforeHandle: requireSession,
       response: { 200: OkSchema(t.Array(Descriptor)), ...errorResponses },
       detail: {
-        summary:
-          'AI/MCP tools the caller may call in the active tenant (module enabled, permission held)',
+        summary: 'List tools',
+        description: 'AI/MCP tools you can call in the active tenant.',
       },
     },
   )
@@ -114,7 +114,8 @@ export const toolsDomain = new Elysia({ name: 'tools', prefix: '/tools', tags: [
         ...errorResponses,
       },
       detail: {
-        summary: 'Call a tool by name (<ns>.<name> or <ns>_<name>); permission and tenant enforced',
+        summary: 'Call a tool',
+        description: 'By name: `<ns>.<name>` or `<ns>_<name>`.',
       },
     },
   );

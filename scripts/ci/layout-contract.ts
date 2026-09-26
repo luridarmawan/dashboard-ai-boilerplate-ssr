@@ -28,7 +28,7 @@ for (const l of layouts().filter((x) => !x.id.includes('.'))) {
   }
 }
 if (failures) {
-  console.error(`\nlayout-contract: ${failures} layout melanggar kontrak region (L-8)`);
+  console.error(`\nlayout-contract: ${failures} layout melanggar kontrak region`);
   process.exit(1);
 }
 console.log('layout-contract: semua layout mengisi region yang diwajibkan jenisnya');
