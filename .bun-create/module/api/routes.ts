@@ -79,7 +79,7 @@ export default defineApiRoutes(
           limit: t.Optional(t.String()),
         }),
         response: { 200: PageSchema(Note), ...errorResponses },
-        detail: { summary: 'List notes of the active tenant' },
+        detail: { summary: 'List notes' },
       },
     )
     .get(
@@ -101,7 +101,7 @@ export default defineApiRoutes(
         beforeHandle: permission('hello.note.read'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(Note), ...errorResponses },
-        detail: { summary: 'One note' },
+        detail: { summary: 'Get a note' },
       },
     )
     .post(
@@ -181,7 +181,7 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         body: NoteUpdateBody,
         response: { 200: OkSchema(Note), ...errorResponses },
-        detail: { summary: 'Edit a note' },
+        detail: { summary: 'Update a note' },
       },
     )
     .delete(
@@ -219,7 +219,7 @@ export default defineApiRoutes(
         beforeHandle: permission('hello.note.manage'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-        detail: { summary: 'Soft-delete a note' },
+        detail: { summary: 'Delete a note' },
       },
     ),
 );

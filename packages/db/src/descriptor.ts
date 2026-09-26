@@ -234,7 +234,7 @@ export function defineTable(opts: DefineTableOptions): TableDef {
     // B-0: indexes on tenant tables ALWAYS start with client_id so they stay selective as tenants grow.
     if (tenant && ix.columns[0] !== 'client_id') {
       throw new DescriptorError(
-        `tabel ${name}: indeks (${ix.columns.join(', ')}) harus diawali client_id (B-0)`,
+        `tabel ${name}: indeks (${ix.columns.join(', ')}) harus diawali client_id`,
       );
     }
     const ixName = ix.name ?? `${name}_${ix.columns.join('_')}_${ix.unique ? 'uq' : 'idx'}`;

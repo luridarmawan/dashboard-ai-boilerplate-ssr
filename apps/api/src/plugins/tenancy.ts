@@ -109,23 +109,11 @@ export const tenantContext = new Elysia({ name: 'tenant-context' })
   });
 
 /** Route guard: 401 without a session, 403 `forbidden` without the permission (C-3, D3). */
-export function requirePermission(permission: string) {
-  return new Elysia({ name: `require:${permission}` })
+export function requirePermission(required: string) {
+  return new Elysia({ name: `require:${required}` })
     .use(tenantContext)
-    .onBeforeHandle({ as: 'scoped' }, ({ auth, tenantState, tenantRejection, set, request }) => {
-      if (tenantRejection) return tenantRejection;
-      const rid = String(
-        set.headers['x-request-id'] ?? request.headers.get('x-request-id') ?? newId(),
-      );
-      if (!auth) {
-        set.status = 401;
-        return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', rid);
-      }
-      if (!tenantState?.can(permission)) {
-        set.status = 403;
-        return fail('forbidden', `Anda tidak punya izin ${permission}`, rid, { permission });
-      }
-    });
+    .onBeforeHandle({ as: 'scoped' }, ({ tenantRejection }) => tenantRejection ?? undefined)
+    .onBeforeHandle({ as: 'scoped' }, permission(required));
 }
 
 interface GuardCtx {
@@ -140,7 +128,7 @@ interface GuardCtx {
  * different permissions (a plugin-level guard would stack on every route registered after it).
  */
 export function permission(required: string) {
-  return ({ auth, tenantState, set, request }: GuardCtx) => {
+  const guard = ({ auth, tenantState, set, request }: GuardCtx) => {
     const rid = String(
       set.headers['x-request-id'] ?? request.headers.get('x-request-id') ?? newId(),
     );
@@ -154,4 +142,33 @@ export function permission(required: string) {
     }
     return undefined;
   };
+  // Tag the guard so the OpenAPI document can state the permission (see documentPermissions).
+  return Object.assign(guard, { [PERMISSION]: required });
+}
+
+const PERMISSION = Symbol.for('app.permission');
+
+/**
+ * Append "Requires permission: `x`" to the OpenAPI description of every route guarded by
+ * `permission()` / `requirePermission()`, so the docs are derived from the guard and cannot drift.
+ * Call once on the assembled app; the spec is generated lazily on the first request.
+ */
+export function documentPermissions(app: { routes: readonly { hooks: object }[] }) {
+  for (const route of app.routes) {
+    const hooks = route.hooks as { beforeHandle?: unknown; detail?: Record<string, unknown> };
+    const handlers = [hooks.beforeHandle].flat() as ({ fn?: unknown } | undefined)[];
+    const required = new Set<string>();
+    for (const h of handlers) {
+      const fn = (typeof h === 'function' ? h : h?.fn) as { [PERMISSION]?: string } | undefined;
+      if (fn?.[PERMISSION]) required.add(fn[PERMISSION]);
+    }
+    if (required.size === 0) continue;
+    const line = `Requires permission: ${[...required].map((p) => `\`${p}\``).join(', ')}.`;
+    const description = hooks.detail?.description as string | undefined;
+    if (description?.includes(line)) continue;
+    hooks.detail = {
+      ...hooks.detail,
+      description: description ? `${description}\n\n${line}` : line,
+    };
+  }
 }

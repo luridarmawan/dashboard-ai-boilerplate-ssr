@@ -149,8 +149,9 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Begin Sign in with Google (A-8): authorization URL + state + PKCE verifier for the web app to hold',
+        summary: 'Start Google sign-in',
+        description:
+          'Returns the authorization URL, state and PKCE verifier for the client to keep.',
       },
     },
   )
@@ -363,8 +364,9 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Sign in with Google (A-8): exchange the code, link or auto-create the user, then a session cookie or an MFA challenge',
+        summary: 'Complete Google sign-in',
+        description:
+          'Exchanges the code, links or creates the user, then sets the session cookie or returns an MFA challenge.',
       },
     },
   );

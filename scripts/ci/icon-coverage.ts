@@ -28,7 +28,7 @@ for (const set of Object.keys(ICON_SETS).filter((id) => !id.includes('.'))) {
   }
 }
 if (failures) {
-  console.error(`\nicon-coverage: ${failures} set ikon bolong (L-5)`);
+  console.error(`\nicon-coverage: ${failures} set ikon bolong`);
   process.exit(1);
 }
 console.log('icon-coverage: semua set ikon menutup seluruh nama core');

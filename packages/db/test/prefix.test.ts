@@ -20,7 +20,7 @@ ALTER TABLE "outbox_email" ADD CONSTRAINT "outbox_email_client_id_clients_id_fk"
 CREATE INDEX "outbox_email_status_next_attempt_at_idx" ON "outbox_email" USING btree ("status","next_attempt_at");
 CREATE TABLE "outbox_email" ("id" uuid);`;
 
-const removal = `-- Uninstall modul AI (G-15)
+const removal = `-- Uninstall modul AI: dibuat oleh \`bun modules:remove AI\`.
 DROP TABLE IF EXISTS \`ai_messages\`;--> statement-breakpoint
 DROP TABLE IF EXISTS \`ai_conversations\`;--> statement-breakpoint
 DELETE FROM \`modules\` WHERE \`module\` = 'AI';--> statement-breakpoint

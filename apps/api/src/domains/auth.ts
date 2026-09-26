@@ -219,7 +219,11 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
   // ---- CSRF token for browser clients ------------------------------------------------------
   .get('/csrf-token', ({ cookie, request }) => ok({ token: issueCsrfToken(cookie, request) }), {
     response: OkSchema(t.Object({ token: t.String() })),
-    detail: { summary: 'Mint a CSRF token (double-submit cookie + value)' },
+    detail: {
+      summary: 'Get a CSRF token',
+      description:
+        'Sets the CSRF cookie and returns the matching value to send back in the `x-csrf-token` header.',
+    },
   })
 
   // ---- register --------------------------------------------------------------------------
@@ -321,7 +325,10 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         201: OkSchema(t.Object({ user: PublicUser, clientId: t.Nullable(t.String()) })),
         ...errorResponses,
       },
-      detail: { summary: 'Register with email + password (A-1); off when SIGNUP_ENABLED=false' },
+      detail: {
+        summary: 'Register an account',
+        description: 'Email and password sign-up. Disabled when `SIGNUP_ENABLED=false`.',
+      },
     },
   )
 
@@ -386,8 +393,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Login (A-2, A-3): rate-limited; sets the httpOnly session cookie, or returns an MFA challenge (A-11)',
+        summary: 'Log in',
+        description:
+          'Sets the httpOnly session cookie, or returns an MFA challenge when the account has 2FA. Rate-limited per IP and per account.',
       },
     },
   )
@@ -493,8 +501,9 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Second login step (A-11): challenge from /auth/login + TOTP or recovery code → session cookie',
+        summary: 'Complete a 2FA login',
+        description:
+          'Exchanges the challenge from `/auth/login` plus a TOTP or recovery code for the session cookie.',
       },
     },
   )
@@ -534,7 +543,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
     {
       query: t.Object({ token: t.String({ minLength: 43, maxLength: 43 }) }),
       response: { 200: OkSchema(t.Object({ verified: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Confirm an email address (A-6)' },
+      detail: { summary: 'Verify an email address' },
     },
   )
 
@@ -583,7 +592,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       body: t.Object({ email: Email }),
       response: { 200: OkSchema(t.Object({ requested: t.Literal(true) })), ...errorResponses },
       detail: {
-        summary: 'Request a reset link; identical response whether or not the email exists',
+        summary: 'Request a password reset',
+        description: 'The response is identical whether or not the email exists.',
       },
     },
   )
@@ -604,7 +614,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
     {
       body: t.Object({ token: t.String({ minLength: 43, maxLength: 43 }) }),
       response: OkSchema(t.Object({ valid: t.Boolean() })),
-      detail: { summary: 'Check a reset token before showing the form' },
+      detail: { summary: 'Validate a reset token' },
     },
   )
   .post(
@@ -655,7 +665,10 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
     {
       body: t.Object({ token: t.String({ minLength: 43, maxLength: 43 }), password: Password }),
       response: { 200: OkSchema(t.Object({ reset: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Set a new password with a one-time token; revokes all sessions' },
+      detail: {
+        summary: 'Reset the password',
+        description: 'Uses a one-time token and signs out every session of the account.',
+      },
     },
   )
 
@@ -689,7 +702,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         },
         {
           response: { 200: OkSchema(t.Object({ loggedOut: t.Literal(true) })), ...errorResponses },
-          detail: { summary: 'Invalidate the session server-side (A-5)' },
+          detail: { summary: 'Log out', description: 'Invalidates the session on the server.' },
         },
       )
       .get(
@@ -755,7 +768,11 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             ),
             ...errorResponses,
           },
-          detail: { summary: 'The current user, active tenant, and reachable tenants' },
+          detail: {
+            summary: 'Current session',
+            description:
+              'The signed-in user, the active tenant, and the tenants they can switch to.',
+          },
         },
       )
       .use(tenantContext)
@@ -781,7 +798,8 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             ...errorResponses,
           },
           detail: {
-            summary: `Effective permissions in the active tenant (C-7); honours ${TENANT_HEADER}`,
+            summary: 'Get my permissions',
+            description: `Effective permissions in the active tenant; honours the \`${TENANT_HEADER}\` header.`,
           },
         },
       )
@@ -831,7 +849,10 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             200: OkSchema(t.Object({ clientId: t.String(), permissions: t.Array(t.String()) })),
             ...errorResponses,
           },
-          detail: { summary: 'Make another tenant the active one for this session (B-4)' },
+          detail: {
+            summary: 'Switch tenant',
+            description: 'Makes another tenant the active one for this session.',
+          },
         },
       )
       // The first permission-guarded route: the registry the permission editor lists (C-4, C-7).
@@ -863,7 +884,11 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
             ),
             ...errorResponses,
           },
-          detail: { summary: 'Every resource/action that exists (C-4); needs group.read' },
+          detail: {
+            summary: 'List all permissions',
+            description:
+              'Every resource and action registered by the core and the installed modules.',
+          },
         },
       ),
   );

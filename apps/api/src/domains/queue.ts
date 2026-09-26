@@ -156,8 +156,9 @@ export const queueDomain = new Elysia({ name: 'queue', prefix: '/queue', tags: [
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Queue jobs in my scope (?status=, ?name=, ?limit=), counts per status, and the registered tasks',
+        summary: 'List queue jobs',
+        description:
+          'Filter with `?status`, `?name`, `?limit`. Also returns counts per status and the registered tasks.',
       },
     },
   )
@@ -195,7 +196,10 @@ export const queueDomain = new Elysia({ name: 'queue', prefix: '/queue', tags: [
       beforeHandle: permission('queue.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ retried: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Put a dead-lettered job back in the queue (attempts reset)' },
+      detail: {
+        summary: 'Retry a queue job',
+        description: 'Puts a dead job back in the queue and resets its attempts.',
+      },
     },
   )
   .delete(
@@ -240,6 +244,6 @@ export const queueDomain = new Elysia({ name: 'queue', prefix: '/queue', tags: [
       beforeHandle: permission('queue.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Remove a pending, done or dead job' },
+      detail: { summary: 'Delete a queue job' },
     },
   );

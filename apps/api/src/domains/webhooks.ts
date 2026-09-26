@@ -89,7 +89,10 @@ export const webhooksDomain = new Elysia({
   .get('/events', () => ok({ events: [...CORE_EVENTS] }), {
     beforeHandle: permission('webhook.read'),
     response: { 200: OkSchema(t.Object({ events: t.Array(t.String()) })), ...errorResponses },
-    detail: { summary: 'Core event names a webhook can subscribe to (plus `*`)' },
+    detail: {
+      summary: 'List webhook events',
+      description: 'Event names a webhook can subscribe to, plus `*`.',
+    },
   })
   .get(
     '/',
@@ -102,7 +105,7 @@ export const webhooksDomain = new Elysia({
     {
       beforeHandle: permission('webhook.read'),
       response: { 200: OkSchema(t.Array(WebhookView)), ...errorResponses },
-      detail: { summary: 'Outgoing webhooks of the active tenant (J-5)' },
+      detail: { summary: 'List webhooks' },
     },
   )
   .post(
@@ -156,7 +159,7 @@ export const webhooksDomain = new Elysia({
         201: OkSchema(t.Intersect([WebhookView, t.Object({ secret: t.String() })])),
         ...errorResponses,
       },
-      detail: { summary: 'Register a webhook; the signing secret is returned once' },
+      detail: { summary: 'Create a webhook', description: 'The signing secret is returned once.' },
     },
   )
   .get(
@@ -193,7 +196,7 @@ export const webhooksDomain = new Elysia({
         200: OkSchema(t.Intersect([WebhookView, t.Object({ deliveries: t.Array(DeliveryView) })])),
         ...errorResponses,
       },
-      detail: { summary: 'One webhook with its last 50 deliveries' },
+      detail: { summary: 'Get a webhook', description: 'Includes its last 50 deliveries.' },
     },
   )
   .put(
@@ -249,7 +252,7 @@ export const webhooksDomain = new Elysia({
       params: t.Object({ id: Id }),
       body: WebhookUpdateBody,
       response: { 200: OkSchema(WebhookView), ...errorResponses },
-      detail: { summary: 'Update name, URL, events or enabled' },
+      detail: { summary: 'Update a webhook' },
     },
   )
   .post(
@@ -284,7 +287,10 @@ export const webhooksDomain = new Elysia({
       beforeHandle: permission('webhook.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ secret: t.String() })), ...errorResponses },
-      detail: { summary: 'Replace the signing secret; the new one is returned once' },
+      detail: {
+        summary: 'Rotate a webhook secret',
+        description: 'The new secret is returned once.',
+      },
     },
   )
   .post(
@@ -334,7 +340,10 @@ export const webhooksDomain = new Elysia({
         ),
         ...errorResponses,
       },
-      detail: { summary: 'Send a signed `webhook.test` ping now and report the response' },
+      detail: {
+        summary: 'Test a webhook',
+        description: 'Sends a signed `webhook.test` ping and reports the response.',
+      },
     },
   )
   .post(
@@ -375,7 +384,7 @@ export const webhooksDomain = new Elysia({
         200: OkSchema(t.Object({ outcome: t.String(), delivery: DeliveryView })),
         ...errorResponses,
       },
-      detail: { summary: 'Attempt one delivery again right now' },
+      detail: { summary: 'Retry a webhook delivery' },
     },
   )
   .delete(
@@ -414,6 +423,6 @@ export const webhooksDomain = new Elysia({
       beforeHandle: permission('webhook.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Remove a webhook (pending deliveries stop)' },
+      detail: { summary: 'Delete a webhook', description: 'Pending deliveries stop.' },
     },
   );

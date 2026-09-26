@@ -27,6 +27,7 @@ import { csrf } from './plugins/csrf.ts';
 import { demoMode } from './plugins/demo.ts';
 import { moduleGate } from './plugins/module-gate.ts';
 import { requestContext } from './plugins/request-context.ts';
+import { documentPermissions } from './plugins/tenancy.ts';
 
 /**
  * The API application, assembled but not listening — `index.ts` listens, tests call
@@ -74,10 +75,10 @@ export const app = new Elysia()
           { name: 'module', description: 'Installed modules and per-tenant state' },
           { name: 'menu', description: 'Menu entries for API clients' },
           { name: 'mail', description: 'Email outbox: status, retry, worker' },
-          { name: 'notifications', description: 'In-app notifications of the caller (J-4)' },
+          { name: 'notifications', description: 'In-app notifications of the caller' },
           {
             name: 'files',
-            description: 'Uploads: local volume or S3, validated, under RBAC and tenancy (Q-16)',
+            description: 'Uploads: local volume or S3, validated, under RBAC and tenancy',
           },
           {
             name: 'tools',
@@ -85,11 +86,11 @@ export const app = new Elysia()
           },
           {
             name: 'invitations',
-            description: 'Invitation links into the active tenant (A-13)',
+            description: 'Invitation links into the active tenant',
           },
           {
             name: 'webhooks',
-            description: 'Outgoing webhooks: signed core events per tenant (J-5)',
+            description: 'Outgoing webhooks: signed core events per tenant',
           },
         ],
       },
@@ -121,5 +122,8 @@ export const app = new Elysia()
       .use(moduleGate)
       .use(modulesPlugin),
   );
+
+// Permission lines in the OpenAPI document come from the route guards themselves.
+documentPermissions(app);
 
 export type App = typeof app;

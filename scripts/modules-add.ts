@@ -96,7 +96,7 @@ try {
 if (heads) {
   usage(
     `--ref ${ref} adalah nama branch di ${url}, bukan tag atau commit (Keputusan L).\n` +
-      '  Branch berpindah, sehingga modules.json berhenti menggambarkan satu build tertentu (Q-5).\n' +
+      '  Branch berpindah, sehingga modules.json berhenti menggambarkan satu build tertentu.\n' +
       `  Pakai tag (mis. --ref v1.4.2) atau commit: git ls-remote --tags ${url}`,
   );
 }

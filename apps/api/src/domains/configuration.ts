@@ -108,7 +108,9 @@ export const configuration = new Elysia({
     {
       response: { 200: OkSchema(t.Record(t.String(), t.Unknown())), ...errorResponses },
       detail: {
-        summary: 'Public values for the active tenant (anonymous allowed; secrets never) — E-4',
+        summary: 'Get public settings',
+        description:
+          'Public values for the active tenant. No session needed; secrets are never included.',
       },
     },
   )
@@ -232,8 +234,8 @@ export const configuration = new Elysia({
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Sections + fields + resolved values for one scope; the settings form is generated from this (E-3)',
+        summary: 'Get settings',
+        description: 'Sections, fields and resolved values for one scope.',
       },
     },
   )
@@ -268,7 +270,7 @@ export const configuration = new Elysia({
         ),
         ...errorResponses,
       },
-      detail: { summary: 'One resolved value (secrets masked)' },
+      detail: { summary: 'Get one setting', description: 'Secrets are masked.' },
     },
   )
   .put(
@@ -334,8 +336,8 @@ export const configuration = new Elysia({
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Save values for one scope; validated by type, audited, cache invalidated on every instance (E-5)',
+        summary: 'Save settings',
+        description: 'Validated by type and audited. Takes effect on every instance.',
       },
     },
   )
@@ -484,8 +486,9 @@ export const configuration = new Elysia({
         ...errorResponses,
       },
       detail: {
-        summary:
-          "Send one test e-mail with this scope's SMTP settings, straight through SMTP (J-1, E-3)",
+        summary: 'Send a test email',
+        description:
+          'Sends straight through the SMTP settings of this scope, bypassing the outbox queue.',
       },
     },
   );

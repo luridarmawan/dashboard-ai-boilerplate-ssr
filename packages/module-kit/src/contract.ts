@@ -61,7 +61,7 @@ const ACTION_RE = /^[a-z][a-z0-9_]*$/;
 
 function requirePrefix(kind: string, value: string, prefix: string): void {
   if (!value.startsWith(prefix)) {
-    throw new ModuleContractError(`${kind} "${value}" harus diawali "${prefix}" (G-9)`);
+    throw new ModuleContractError(`${kind} "${value}" harus diawali "${prefix}"`);
   }
 }
 
@@ -443,7 +443,7 @@ export function defineConfig(
       if (seen.has(f.key)) throw new ModuleContractError(`kunci konfigurasi "${f.key}" duplikat`);
       seen.add(f.key);
       if (f.type === 'secret' && f.public) {
-        throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public (E-4)`);
+        throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public`);
       }
       if ((f.type === 'select' || f.type === 'list') && !f.options?.length) {
         throw new ModuleContractError(`kunci "${f.key}": tipe ${f.type} butuh options`);

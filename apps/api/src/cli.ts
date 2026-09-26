@@ -38,9 +38,9 @@ export function usage(): string {
   return [
     'pemakaian: api [serve|migrate|seed|preflight|health|version|help]',
     '  serve      jalankan server HTTP + scheduler (baku)',
-    '  migrate    terapkan migrasi skema yang tersemat — langkah eksplisit (Q-4)',
-    '  seed       seed bootstrap idempoten: tenant baku, grup sistem, superadmin (O-3)',
-    '  preflight  periksa kesiapan sebelum start: env, database, migrasi, Redis, volume; keluar 0/1 (Q-13)',
+    '  migrate    terapkan migrasi skema yang tersemat — langkah eksplisit',
+    '  seed       seed bootstrap idempoten: tenant baku, grup sistem, superadmin',
+    '  preflight  periksa kesiapan sebelum start: env, database, migrasi, Redis, volume; keluar 0/1',
     '  health   cek /v1/health di port lokal, keluar 0/1 — dipakai HEALTHCHECK image',
     '  version  cetak identitas build (nama, versi, commit, waktu build)',
   ].join('\n');

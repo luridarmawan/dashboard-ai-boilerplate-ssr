@@ -114,12 +114,12 @@ describe('syncModules — every violation reported at once, naming the module', 
     has(/Naughty.*href menu "naughty\.a" harus di bawah \/m\/naughty/);
     has(/Naughty.*widget "naughty\.ghost": komponen web\/widgets\/Missing\.svelte tidak ada/);
     has(/Naughty.*id widget "other\.widget" harus diawali "naughty\."/);
-    has(/Naughty.*layout "naughty\.holey" \(auth\) belum mengisi region: brand, footer \(L-8\)/);
+    has(/Naughty.*layout "naughty\.holey" \(auth\) belum mengisi region: brand, footer$/);
     // Nothing valid slipped through.
     expect(p.length).toBeGreaterThanOrEqual(6);
   });
 
-  test('unknown icon is rejected with the L-5 reference', async () => {
+  test('unknown icon is rejected, naming the icon', async () => {
     let err: SyncError | undefined;
     try {
       await syncModules({ root: join(fixtures, 'bad'), write: false, coreIcons: CORE_ICONS });
@@ -135,7 +135,7 @@ describe('syncModules — every violation reported at once, naming the module', 
     } catch (e) {
       iconErr = e as SyncError;
     }
-    expect(iconErr?.problems.some((x) => /ikon "menu".*\(L-5\)/.test(x))).toBe(true);
+    expect(iconErr?.problems.some((x) => /ikon "menu" pada menu/.test(x))).toBe(true);
   });
 
   test('missing modules.json fails clearly', async () => {

@@ -134,8 +134,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'theme',
         title: { id: 'Tema baku', en: 'Default theme' },
         note: {
-          id: 'Dilihat pengunjung anonim dan pengguna yang belum memilih (L-10).',
-          en: 'Seen by anonymous visitors and users without a choice (L-10).',
+          id: 'Dilihat pengunjung anonim dan pengguna yang belum memilih.',
+          en: 'Seen by anonymous visitors and users without a choice.',
         },
         default: 'warm',
         public: true,
@@ -163,8 +163,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'list',
         title: { id: 'Tema yang boleh dipilih', en: 'Allowed themes' },
         note: {
-          id: 'Kosong = semua tema terdaftar. Satu tema = terkunci (L-11).',
-          en: 'Empty = every registered theme. One theme = locked (L-11).',
+          id: 'Kosong = semua tema terdaftar. Satu tema = terkunci.',
+          en: 'Empty = every registered theme. One theme = locked.',
         },
         default: [],
         public: true,
@@ -309,8 +309,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     section: 'logs',
     title: { id: 'Log & retensi', en: 'Logs & retention' },
     note: {
-      id: 'Tabel log tidak boleh tumbuh tanpa batas (M-3). Job core.logs.retention memangkasnya setiap hari; kebijakan berlaku global.',
-      en: 'Log tables must not grow without bound (M-3). The core.logs.retention job prunes them daily; the policy is global.',
+      id: 'Tabel log tidak boleh tumbuh tanpa batas. Job core.logs.retention memangkasnya setiap hari; kebijakan berlaku global.',
+      en: 'Log tables must not grow without bound. The core.logs.retention job prunes them daily; the policy is global.',
     },
     order: 15,
     fields: [
@@ -388,8 +388,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
           en: 'Read notification retention (days)',
         },
         note: {
-          id: 'Notifikasi yang sudah dibaca dihapus setelah usia ini; yang belum dibaca tidak pernah dihapus (J-4).',
-          en: 'Read notifications are removed past this age; unread ones are never removed (J-4).',
+          id: 'Notifikasi yang sudah dibaca dihapus setelah usia ini; yang belum dibaca tidak pernah dihapus.',
+          en: 'Read notifications are removed past this age; unread ones are never removed.',
         },
         default: 90,
         min: 7,
@@ -402,8 +402,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     section: 'files',
     title: { id: 'Berkas unggahan', en: 'Uploaded files' },
     note: {
-      id: 'Batas unggahan (Q-16). Penyimpanan (volume lokal atau S3) dipilih lewat STORAGE_DRIVER di .env — bukan di sini.',
-      en: 'Upload limits (Q-16). The store (local volume or S3) is chosen by STORAGE_DRIVER in .env — not here.',
+      id: 'Batas unggahan. Penyimpanan (volume lokal atau S3) dipilih lewat STORAGE_DRIVER di .env — bukan di sini.',
+      en: 'Upload limits. The store (local volume or S3) is chosen by STORAGE_DRIVER in .env — not here.',
     },
     order: 17,
     fields: [

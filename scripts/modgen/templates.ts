@@ -254,7 +254,7 @@ export default defineApiRoutes(
         const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
         return page(list.slice((p - 1) * limit, p * limit).map(view), pageMeta(p, limit, list.length));
       },
-      { beforeHandle: permission('${perm}.read'), query: t.Object({ q: t.Optional(t.String()), page: t.Optional(t.String()), limit: t.Optional(t.String()) }), response: { 200: PageSchema(${Res}), ...errorResponses }, detail: { summary: 'List ${plural} of the active tenant' } },
+      { beforeHandle: permission('${perm}.read'), query: t.Object({ q: t.Optional(t.String()), page: t.Optional(t.String()), limit: t.Optional(t.String()) }), response: { 200: PageSchema(${Res}), ...errorResponses }, detail: { summary: 'List ${plural}' } },
     )
     .get(
       '/${plural}/:id',
@@ -263,7 +263,7 @@ export default defineApiRoutes(
         if (!row) { set.status = 404; return fail('not_found', '${Res} tidak ditemukan', requestId); }
         return ok(view(row));
       },
-      { beforeHandle: permission('${perm}.read'), params: t.Object({ id: Id }), response: { 200: OkSchema(${Res}), ...errorResponses }, detail: { summary: 'One ${resource}' } },
+      { beforeHandle: permission('${perm}.read'), params: t.Object({ id: Id }), response: { 200: OkSchema(${Res}), ...errorResponses }, detail: { summary: 'Get a ${resource}' } },
     )
     .post(
       '/${plural}',
@@ -291,7 +291,7 @@ export default defineApiRoutes(
         await writeAudit(unsafeAcrossTenants(), { clientId: tenantState.clientId, actorId: (auth as AuthState | null)?.user.id ?? null, action: '${perm}.edit', resource: '${perm}', resourceId: before.id, ip: clientIp(request, server), requestId, before: view(before), after: view(after) });
         return ok(view(after));
       },
-      { beforeHandle: permission('${perm}.edit'), params: t.Object({ id: Id }), body: ${Res}UpdateBody, response: { 200: OkSchema(${Res}), ...errorResponses }, detail: { summary: 'Edit a ${resource}' } },
+      { beforeHandle: permission('${perm}.edit'), params: t.Object({ id: Id }), body: ${Res}UpdateBody, response: { 200: OkSchema(${Res}), ...errorResponses }, detail: { summary: 'Update a ${resource}' } },
     )
     .delete(
       '/${plural}/:id',
@@ -303,7 +303,7 @@ export default defineApiRoutes(
         await writeAudit(unsafeAcrossTenants(), { clientId: tenantState.clientId, actorId: (auth as AuthState | null)?.user.id ?? null, action: '${perm}.delete', resource: '${perm}', resourceId: row.id, ip: clientIp(request, server), requestId, before: view(row) });
         return ok({ deleted: true as const });
       },
-      { beforeHandle: permission('${perm}.manage'), params: t.Object({ id: Id }), response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses }, detail: { summary: 'Soft-delete a ${resource}' } },
+      { beforeHandle: permission('${perm}.manage'), params: t.Object({ id: Id }), response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses }, detail: { summary: 'Delete a ${resource}' } },
     ),
 );
 `;
@@ -574,7 +574,7 @@ ${translator}
     const form = await event.request.formData();
 ${normalize}
     if (!checkCsrf(event, form)) return actionFailure({ status: 403, code: 'csrf_failed', message: t('common.form_expired') }, raw);
-    const v = validateForm(${Res}Body, input); // the API's own schema (L-17)
+    const v = validateForm(${Res}Body, input); // the API's own schema
     if (!v.ok) return actionFailure({ status: 422, code: 'validation_failed', message: t('common.check_fields'), details: v.errors }, raw);
     const r = unwrap<{ success: true; data: { id: string } }>(await apiFor(event).v1.m.${ns}.${plural}.post(v.value));
     if (!r.ok) return actionFailure(r.failure, raw);

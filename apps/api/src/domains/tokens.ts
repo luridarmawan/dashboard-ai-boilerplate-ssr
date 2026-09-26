@@ -56,7 +56,7 @@ export const tokensDomain = new Elysia({ name: 'tokens', prefix: '/tokens', tags
     {
       beforeHandle: sessionOnly,
       response: { 200: OkSchema(t.Array(TokenView)), ...errorResponses },
-      detail: { summary: 'My API tokens (never the secret)' },
+      detail: { summary: 'List my API tokens', description: 'Secrets are never returned.' },
     },
   )
   .post(
@@ -134,7 +134,8 @@ export const tokensDomain = new Elysia({ name: 'tokens', prefix: '/tokens', tags
         ...errorResponses,
       },
       detail: {
-        summary: 'Mint an API token for myself; the secret is returned once (A-4)',
+        summary: 'Create an API token',
+        description: 'The secret is returned once.',
       },
     },
   )
@@ -162,6 +163,6 @@ export const tokensDomain = new Elysia({ name: 'tokens', prefix: '/tokens', tags
       beforeHandle: sessionOnly,
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ revoked: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Revoke one of my API tokens' },
+      detail: { summary: 'Revoke an API token' },
     },
   );
