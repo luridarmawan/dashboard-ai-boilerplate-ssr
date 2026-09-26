@@ -267,7 +267,7 @@ const shellContext = $derived({
 {/snippet}
 
 {#snippet footer()}
-  <span>{t('shell.footer')} · theme <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
+  <span>{t('shell.footer')} v{__APP_VERSION__} · theme <code>{data.theme.id}</code> · layout <code>{data.layoutId}</code>{#if data.layoutVariant !== 'default'} · varian <code>{data.layoutVariant}</code>{/if}</span>
 {/snippet}
 
 {#snippet aside()}
