@@ -81,7 +81,8 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     const r = await json(await call('/v1/configuration', {}, [admin]));
     const sections = r.data?.sections as {
       section: string;
-      fields: { key: string; type: string }[];
+      groups?: { key: string }[];
+      fields: { key: string; type: string; group?: string; width?: string }[];
     }[];
     expect(sections.map((s) => s.section)).toEqual(
       expect.arrayContaining(['app', 'security', 'mail', 'ai', 'dummy']),
@@ -102,7 +103,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     );
     // The Application tab is drawn in three groups (owner's ask of 2026-09-26): identity
     // (name | lead, logo | favicon), default handlers (three per row), theme & layout.
-    expect(app?.groups.map((g) => g.key)).toEqual(['identity', 'handlers', 'appearance']);
+    expect(app?.groups?.map((g) => g.key)).toEqual(['identity', 'handlers', 'appearance']);
     const layout = (app?.fields ?? []).map((f) => `${f.key}:${f.group}:${f.width}`);
     expect(layout).toEqual([
       'app.name:identity:half',

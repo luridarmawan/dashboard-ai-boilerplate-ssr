@@ -26,7 +26,15 @@ describe('defineConfig field groups (extension point 6)', () => {
     section: 'alpha',
     title,
     groups: groups.map((g) => ({ ...g, title })),
-    fields: [{ key: 'alpha.x', type: 'string' as const, title, group, width: 'third' as const }],
+    fields: [
+      {
+        key: 'alpha.x',
+        type: 'string' as const,
+        title,
+        width: 'third' as const,
+        ...(group ? { group } : {}),
+      },
+    ],
   });
 
   test('a field may point at a group its section declares', () => {
