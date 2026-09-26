@@ -8,11 +8,29 @@ import { defineTables } from '@core/module-kit';
  */
 export default defineTables('Example', [
   defineTable({
+    name: 'example_categories',
+    tenant: true,
+    columns: {
+      /** The category's public URL is `/<slug>` when the module is the tenant's 404 handler (F-11). */
+      slug: col.identifier(120),
+      name: col.varchar(191),
+      description: col.varchar(512).nullable(),
+      sort: col.int().default(100),
+    },
+    indexes: [{ columns: ['client_id', 'slug'], unique: true }, { columns: ['client_id', 'sort'] }],
+  }),
+  defineTable({
     name: 'example_products',
     tenant: true,
     columns: {
       slug: col.identifier(120),
       name: col.varchar(191),
+      /**
+       * Optional category. Deliberately NOT a foreign key: a category is soft-deleted, never
+       * cascaded into its products, and the generated constraint name would flirt with MySQL's
+       * 64-character identifier limit once TABLE_PREFIX is applied to both table names.
+       */
+      category_id: col.uuid().nullable(),
       summary: col.varchar(512).nullable(),
       description: col.text().nullable(),
       /** Minor units (e.g. rupiah) — never floats for money. */
@@ -25,6 +43,7 @@ export default defineTables('Example', [
     indexes: [
       { columns: ['client_id', 'slug'], unique: true },
       { columns: ['client_id', 'featured', 'sort'] },
+      { columns: ['client_id', 'category_id'] },
     ],
   }),
   defineTable({

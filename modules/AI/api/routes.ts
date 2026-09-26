@@ -1,4 +1,5 @@
 import { type FileRow, fileUrl, findFile, readFile, storeUpload } from '@app/api/files';
+import { instantOf, isValidTimeZone, systemTimeZone } from '@app/api/lib/datetime';
 import { publicLink } from '@app/api/mail';
 import { metrics } from '@app/api/metrics';
 import { type AuthState, clientIp } from '@app/api/plugins/auth';
@@ -32,8 +33,10 @@ import {
   inArray,
   isNotNull,
   isNull,
+  lt,
   newId,
   schema,
+  sql,
   type TenantDb,
   unsafeAcrossTenants,
 } from '@core/db';
@@ -263,6 +266,14 @@ function logCall(c: CallLog): void {
 }
 
 const estimateTokens = (s: string) => Math.ceil(s.length / 4);
+
+/**
+ * The call log is personal by default: `ai.log.read` opens the log and analytics on your own
+ * calls, `ai.log.manage` (the Administrator group's `*.*` includes it) on the whole tenant's.
+ * Returns the user id to narrow to, or null when the caller may see every row.
+ */
+const ownLogsOnly = (a: AuthState, ts: TenantState): string | null =>
+  ts.can('ai.log.manage') ? null : a.user.id;
 
 // ---- external MCP servers (I-4, I-5) ----
 void mcpToolSource; // importing mcp-tools.ts registers the tool source with the core registry
@@ -1653,13 +1664,80 @@ export default defineApiRoutes(
 
     // ---- call log (H-9) ----
     .get(
+      '/logs/models',
+      async ({ auth, tenantState }) => {
+        if (!tenantState?.clientId) return ok([] as string[]);
+        const own = ownLogsOnly(auth as AuthState, tenantState);
+        const rows = await unsafeAcrossTenants() // distinct; tenant condition explicit
+          .selectDistinct({ model: schema.aiCalls.model })
+          .from(schema.aiCalls)
+          .where(
+            and(
+              eq(schema.aiCalls.client_id, tenantState.clientId),
+              isNotNull(schema.aiCalls.model),
+              own ? eq(schema.aiCalls.user_id, own) : undefined,
+            ),
+          )
+          .orderBy(schema.aiCalls.model);
+        return ok(rows.map((r) => r.model).filter((m): m is string => !!m));
+      },
+      {
+        beforeHandle: permission('ai.log.read'),
+        response: { 200: OkSchema(t.Array(t.String())), ...errorResponses },
+        detail: {
+          summary: 'Distinct models in the call log of the active tenant (filter options)',
+        },
+      },
+    )
+    .get(
       '/logs',
-      async ({ query, tenantState }) => {
+      async ({ auth, query, tenantState }) => {
         if (!tenantState?.clientId) return page([], pageMeta(1, 20, 0));
+        const own = ownLogsOnly(auth as AuthState, tenantState);
         const db = unsafeAcrossTenants(); // paging; tenant condition explicit
         const p = Math.max(1, Number(query.page ?? 1));
         const limit = Math.min(100, Math.max(1, Number(query.limit ?? 20)));
-        const where = eq(schema.aiCalls.client_id, tenantState.clientId);
+        // `from`/`to` are calendar days of the tenant's clock (app.timezone), both inclusive:
+        // the window is [from 00:00, to + 1 day 00:00) in that zone, stored rows being UTC.
+        const configured =
+          (await settings.get<string | null>(tenantState.clientId, 'app.timezone')) ?? '';
+        const zone = isValidTimeZone(configured) ? configured : systemTimeZone();
+        const dayStart = (d: string, shift = 0) => {
+          const [y, m, day] = d.split('-').map(Number) as [number, number, number];
+          const u = new Date(Date.UTC(y, m - 1, day + shift));
+          return instantOf(
+            {
+              year: u.getUTCFullYear(),
+              month: u.getUTCMonth() + 1,
+              day: u.getUTCDate(),
+              hour: 0,
+              minute: 0,
+              second: 0,
+            },
+            zone,
+          );
+        };
+        const q = query.q?.trim();
+        // Name or e-mail contains `q`, case-insensitive and dialect-neutral (MySQL has no ilike).
+        const like = q ? `%${q.toLowerCase().replace(/[%_\\]/g, (c) => `\\${c}`)}%` : '';
+        const where = and(
+          eq(schema.aiCalls.client_id, tenantState.clientId),
+          own ? eq(schema.aiCalls.user_id, own) : undefined,
+          q
+            ? inArray(
+                schema.aiCalls.user_id,
+                db
+                  .select({ id: schema.users.id })
+                  .from(schema.users)
+                  .where(
+                    sql`(lower(${schema.users.name}) like ${like} or lower(${schema.users.email}) like ${like})`,
+                  ),
+              )
+            : undefined,
+          query.model ? eq(schema.aiCalls.model, query.model) : undefined,
+          query.from ? gte(schema.aiCalls.created_at, dayStart(query.from)) : undefined,
+          query.to ? lt(schema.aiCalls.created_at, dayStart(query.to, 1)) : undefined,
+        );
         const [tot] = await db.select({ n: count() }).from(schema.aiCalls).where(where);
         const rows = await db
           .select()
@@ -1668,9 +1746,19 @@ export default defineApiRoutes(
           .orderBy(desc(schema.aiCalls.created_at))
           .limit(limit)
           .offset((p - 1) * limit);
+        const userIds = [...new Set(rows.map((r) => r.user_id).filter((id): id is string => !!id))];
+        const names = new Map<string, string>();
+        if (userIds.length)
+          for (const u of await db
+            .select({ id: schema.users.id, name: schema.users.name, email: schema.users.email })
+            .from(schema.users)
+            .where(inArray(schema.users.id, userIds)))
+            names.set(u.id, u.name || u.email);
         return page(
           rows.map((r) => ({
             id: r.id,
+            userId: r.user_id,
+            userName: r.user_id ? (names.get(r.user_id) ?? null) : null,
             endpoint: r.endpoint,
             provider: r.provider,
             model: r.model,
@@ -1690,11 +1778,20 @@ export default defineApiRoutes(
       },
       {
         beforeHandle: permission('ai.log.read'),
-        query: t.Object({ page: t.Optional(t.String()), limit: t.Optional(t.String()) }),
+        query: t.Object({
+          page: t.Optional(t.String()),
+          limit: t.Optional(t.String()),
+          q: t.Optional(t.String({ maxLength: 100 })),
+          model: t.Optional(t.String({ maxLength: 120 })),
+          from: t.Optional(t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
+          to: t.Optional(t.String({ pattern: '^\\d{4}-\\d{2}-\\d{2}$' })),
+        }),
         response: {
           200: PageSchema(
             t.Object({
               id: t.String(),
+              userId: t.Nullable(t.String()),
+              userName: t.Nullable(t.String()),
               endpoint: t.String(),
               provider: t.Nullable(t.String()),
               model: t.Nullable(t.String()),
@@ -1712,7 +1809,10 @@ export default defineApiRoutes(
           ),
           ...errorResponses,
         },
-        detail: { summary: 'AI call log of the active tenant (tokens, latency, status, cost)' },
+        detail: {
+          summary:
+            'AI call log of the active tenant (tokens, latency, status, cost); only your own calls without ai.log.manage',
+        },
       },
     )
 
@@ -2307,7 +2407,7 @@ export default defineApiRoutes(
     // ---- analytics (H-15): tokens & cost per day / model / user over a window ----
     .get(
       '/analytics',
-      async ({ query, tenantState }) => {
+      async ({ auth, query, tenantState }) => {
         const days = Math.min(365, Math.max(1, Number(query.days ?? 30) || 30));
         // The window is `days` calendar days (UTC) ending today, so the chart's last bar is today.
         const from = new Date(Date.now() - (days - 1) * 86_400_000);
@@ -2333,6 +2433,7 @@ export default defineApiRoutes(
         };
         if (!tenantState?.clientId) return ok(empty);
         const db = unsafeAcrossTenants(); // aggregate over the tenant's rows; condition explicit
+        const own = ownLogsOnly(auth as AuthState, tenantState);
         const rows = await db
           .select({
             created_at: schema.aiCalls.created_at,
@@ -2350,6 +2451,7 @@ export default defineApiRoutes(
             and(
               eq(schema.aiCalls.client_id, tenantState.clientId),
               gte(schema.aiCalls.created_at, from),
+              own ? eq(schema.aiCalls.user_id, own) : undefined,
             ),
           )
           .orderBy(desc(schema.aiCalls.created_at))

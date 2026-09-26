@@ -52,6 +52,22 @@ export function publicRoutesForModules(enabled: ReadonlySet<string>): string[] {
   return narrow(publicWebRoutes, enabled);
 }
 
+/**
+ * The pages a module declared as its 404 HANDLER (`notFound: true` in public.ts, F-11), narrowed
+ * to enabled modules. `app.not_found_route` offers and accepts ONLY these: any other public page
+ * (a landing, a catalogue) would answer every unknown URL with a 200 instead of deciding, which
+ * is the opposite of a 404 handler (§4.7 rule 6). Each entry carries its module's name for the
+ * form's labels — the admin picks a module, the path is an implementation detail.
+ */
+export function notFoundRoutesForModules(
+  enabled: ReadonlySet<string>,
+): { path: string; module: string }[] {
+  const allowed = new Set(narrow(publicWebRoutes, enabled));
+  return modulePublicRoutes
+    .filter((r) => r.notFound && allowed.has(r.path))
+    .map((r) => ({ path: r.path, module: r.module }));
+}
+
 function narrow(list: readonly string[], enabled: ReadonlySet<string>): string[] {
   const examplePages = rawEnv('EXAMPLE_PAGE_ENABLE') !== 'false';
   return list.filter((path) => {

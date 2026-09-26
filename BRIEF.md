@@ -51,7 +51,7 @@ Ini pantangan desain (PRD §1.3) — pelanggarannya adalah cacat, bukan preferen
 - Sumber modul di `modules.json`: `local` / `submodule` (baku untuk lintas repo, `ref` selalu tag/commit) / `package`.
 - `@core/*` harus **paket nyata**, bukan alias tsconfig — kalau tidak, modul eksternal gagal dibangun sendiri.
 - Namespace divalidasi saat sync: tabel `<nama>_*`, API `/v1/m/<nama>/*`, halaman `/m/<nama>/*`, izin & i18n & tema `<nama>.*`. Bentrokan ditolak dengan pesan yang menyebut kedua modul.
-- Dua modul dogfooding wajib: **`AI`** (chat streaming, berat & internal) dan **`Example`** (CRUD referensi + landing page komersil publik, isi baku `/`). Keduanya memakai kontrak yang sama dengan modul pihak ketiga — tanpa jalur istimewa.
+- Dua modul dogfooding wajib: **`AI`** (chat streaming, berat & internal) dan **`Example`** (CRUD referensi + landing page komersil publik `/example`, bisa dipilih sebagai isi `/`). Keduanya memakai kontrak yang sama dengan modul pihak ketiga — tanpa jalur istimewa.
 - Penjaga CI (G-6): jalankan `modgen`, lalu `git diff` hanya boleh menyentuh `modules/`, `modules.json`, dan direktori hasil generate.
 
 ## 5. Tema = paket presentasi, bukan palet
@@ -79,7 +79,7 @@ Satu tema menetapkan **token** (warna, radius, tipografi) + **set ikon** + **lay
 
 `.env` **hanya** untuk yang dibutuhkan sebelum database bisa dibaca (koneksi DB/Redis, port, secret sesi, mode, fallback bootstrap). Selebihnya di database, per tenant dengan fallback global, diubah admin tanpa restart.
 
-Contoh yang sering salah tempat: `app.landing_route` (isi `/` untuk anonim, baku `/m/example`) dan `app.home_route` (tujuan setelah login) ada di **database**; `LANDING_ROUTE` di `.env` hanya fallback bootstrap. Nilainya divalidasi terhadap registry route **saat disimpan** — route tidak ada ditolak di UI. Kalau modul pemiliknya dinonaktifkan, resolusi turun ke fallback aman + peringatan, **bukan 404 di `/`**.
+Contoh yang sering salah tempat: `app.landing_route` (isi `/` untuk semua pengunjung, bersesi atau tidak; baku `/` = halaman depan bawaan) dan `app.home_route` (tujuan setelah login, bukan pengalihan dari `/`) ada di **database**; `LANDING_ROUTE` di `.env` hanya fallback bootstrap. Nilainya divalidasi terhadap registry route **saat disimpan** — route tidak ada ditolak di UI. Kalau modul pemiliknya dinonaktifkan, resolusi turun ke fallback aman + peringatan, **bukan 404 di `/`**.
 
 ## 8. Prioritas & urutan kerja
 
@@ -109,4 +109,4 @@ Target yang mengikat pilihan desain: TTFB < 200 ms p95 · API p95 < 150 ms · JS
 
 ## 11. Yang masih terbuka
 
-Pemilik registry harga model AI · aset merek per tema (token/ikon/layout sudah final) · gaya landing page `Example` (company profile vs e-commerce). Lisensi rilis sudah diputuskan: internal (`LICENSE`).
+Pemilik registry harga model AI · aset merek per tema (token/ikon/layout sudah final) · gaya landing page `Example` (company profile vs e-commerce). Lisensi rilis sudah diputuskan: MIT (`LICENSE`, PRD §11.1).

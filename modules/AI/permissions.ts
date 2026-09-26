@@ -6,7 +6,12 @@ export default definePermissions('AI', [
     actions: ['read', 'create', 'manage'],
     name: { id: 'Chat AI', en: 'AI chat' },
   },
-  { resource: 'ai.log', actions: ['read'], name: { id: 'Log panggilan AI', en: 'AI call log' } },
+  {
+    resource: 'ai.log',
+    /** read = your own calls in the log and analytics; manage = every user's calls in the tenant. */
+    actions: ['read', 'manage'],
+    name: { id: 'Log panggilan AI', en: 'AI call log' },
+  },
   {
     resource: 'ai.provider',
     /** read/manage the profiles (H-10); every chat user sees the enabled picker options. */

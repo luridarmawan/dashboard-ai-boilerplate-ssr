@@ -37,6 +37,12 @@ export default {
     // origin satu per satu bukan pilihan: daftarnya build-time, sedangkan APP_ORIGIN baru diketahui
     // saat deploy. Bila kelak `'*'` ikut hilang, pemeriksaan di hooks.server.ts sudah menutupi A-10.
     csrf: { trustedOrigins: ['*'] },
+    // F-11: pages are served under URLs that are not their own — `/` shows the landing route,
+    // `/food/nasi-goreng` shows the module's 404 handler. SvelteKit's default relative asset
+    // links (`./_app/…`) resolve against the VISITOR's URL and break as soon as that URL has
+    // more segments than the page's own path (`/food/_app/…` → 404, unstyled page). The app
+    // always lives at the origin root, so absolute links cost nothing and are right everywhere.
+    paths: { relative: false },
     alias: {
       '@core/ui-theme': '../../packages/ui-theme',
       // Extension point 10: modules import core components as `@core/ui` (see src/lib/components/index.ts).

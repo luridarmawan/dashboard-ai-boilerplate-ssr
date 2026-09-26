@@ -414,8 +414,10 @@ jobs:
         run: |
           # Three runs, the median by performance counts: a shared runner's momentary load has swung the
           # same commit between 81 and 100 — Lighthouse's own guidance for variance is to aggregate runs.
+          # The Example landing is audited by its own path: a clean install serves the built-in page at
+          # `/` (LANDING_ROUTE defaults to `/`).
           for i in 1 2 3; do
-            npx --yes lighthouse@12 http://127.0.0.1:5173/ --preset=desktop --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=/tmp/lh-$i.json
+            npx --yes lighthouse@12 http://127.0.0.1:5173/example --preset=desktop --quiet --chrome-flags="--headless=new --no-sandbox" --output=json --output-path=/tmp/lh-$i.json
           done
           node -e '
             const fs = require("fs");

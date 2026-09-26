@@ -125,7 +125,7 @@ const anon = new Jar();
 {
   const before = await get(anon, '/');
   check(
-    'default landing → 200 (the Example storefront when installed, else the built-in page)',
+    'default landing → 200 (the built-in page, or the route LANDING_ROUTE names)',
     before.res.status === 200 &&
       ['/example', null].includes(before.res.headers.get('x-landing-route')),
   );
@@ -151,6 +151,39 @@ const anon = new Jar();
       mod.res.headers.get('x-landing-route') === '/hello-dummy' &&
       mod.html.includes('data-testid="public-module-page"'),
   );
+  // A signed-in user sees the same `/` as an anonymous visitor: `app.home_route` is where sign-in
+  // lands, never a redirect off the front door — and `/` itself is a valid home (no loop).
+  await saveApp(admin, 'global', { 'app.home_route': '/profile' });
+  const signedIn = await get(admin, '/');
+  check(
+    '`/` signed in serves the landing too, not a redirect to app.home_route',
+    signedIn.res.status === 200 &&
+      signedIn.res.headers.get('x-landing-route') === '/hello-dummy' &&
+      signedIn.html.includes('data-testid="public-module-page"'),
+    `${signedIn.res.status} ${signedIn.res.headers.get('location')}`,
+  );
+  await saveApp(admin, 'global', { 'app.landing_route': '', 'app.home_route': '/' });
+  const homeRoot = await get(admin, '/');
+  check(
+    '`app.home_route=/` → `/` signed in renders the built-in page (200, no redirect loop)',
+    homeRoot.res.status === 200 && homeRoot.html.includes('data-testid="landing-hero"'),
+    `${homeRoot.res.status} ${homeRoot.res.headers.get('location')}`,
+  );
+  await saveApp(admin, 'global', { 'app.landing_route': '/auth/login' });
+  const loginOnly = await get(admin, '/');
+  check(
+    'landing `/auth/login` + home `/` signed in → the built-in page, not a loop',
+    loginOnly.res.status === 200 && loginOnly.html.includes('data-testid="landing-hero"'),
+    `${loginOnly.res.status} ${loginOnly.res.headers.get('location')}`,
+  );
+  await saveApp(admin, 'global', { 'app.home_route': '/profile' });
+  const loginToHome = await get(admin, '/');
+  check(
+    'landing `/auth/login` signed in → on to app.home_route (the login page\'s own redirect)',
+    loginToHome.res.status === 303 && loginToHome.res.headers.get('location') === '/profile',
+    `${loginToHome.res.status} ${loginToHome.res.headers.get('location')}`,
+  );
+  await saveApp(admin, 'global', { 'app.landing_route': '/hello-dummy', 'app.home_route': '' });
 }
 
 // ---- #3: landing points to a module that gets disabled → safe fallback ----

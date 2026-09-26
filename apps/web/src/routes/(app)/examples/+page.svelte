@@ -43,6 +43,12 @@ const items = [
     text: t('examples.aside.text'),
   },
   {
+    href: '/examples/not-found',
+    icon: 'link',
+    title: t('examples.not_found.title'),
+    text: t('examples.not_found.text'),
+  },
+  {
     href: '/examples/errors',
     icon: 'warning',
     title: '404 · 403 · 500',

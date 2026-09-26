@@ -8,7 +8,12 @@ export {
 export { webRoutes } from './generated/routes.ts';
 export { ModuleStateStore } from './modules.ts';
 export { CORE_CONFIG, configFields, configSections, type RegistryField } from './registry.ts';
-export { publicRoutesForModules, routeOwner, routesForModules } from './routes.ts';
+export {
+  notFoundRoutesForModules,
+  publicRoutesForModules,
+  routeOwner,
+  routesForModules,
+} from './routes.ts';
 export {
   GLOBAL,
   maskChanges,

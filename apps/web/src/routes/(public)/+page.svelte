@@ -89,8 +89,12 @@ const stats = $derived([
       <p class="mt-4 text-lg font-medium text-primary">{t('app.tagline')}</p>
       <p class="mt-4 max-w-xl text-lg leading-relaxed text-muted-foreground">{t('landing.hero.subtitle')}</p>
       <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Button href="/auth/login" size="lg" class="w-full rounded-full px-6 sm:w-auto"><Icon name="login" size={18} />{t('landing.hero.cta')}</Button>
-        {#if data.signupEnabled}
+        {#if data.loggedIn}
+          <Button href="/dashboard" size="lg" class="w-full rounded-full px-6 sm:w-auto"><Icon name="dashboard" size={18} />{t('nav.dashboard')}</Button>
+        {:else}
+          <Button href="/auth/login" size="lg" class="w-full rounded-full px-6 sm:w-auto"><Icon name="login" size={18} />{t('landing.hero.cta')}</Button>
+        {/if}
+        {#if data.signupEnabled && !data.loggedIn}
           <Button href="/auth/register" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto">{t('nav.register')}</Button>
         {/if}
         <Button href="/docs" size="lg" variant={data.signupEnabled ? 'ghost' : 'outline'} class="w-full rounded-full px-6 sm:w-auto">{t('landing.hero.cta2')}<Icon name="external-link" size={16} /></Button>
@@ -279,7 +283,11 @@ const stats = $derived([
         <p class="mt-3 max-w-xl text-primary-foreground/85">{t('landing.cta.lead')}</p>
       </div>
       <div class="flex flex-col gap-3 sm:flex-row md:justify-end">
-        <Button href="/auth/login" size="lg" variant="secondary" class="w-full rounded-full px-6 sm:w-auto"><Icon name="login" size={18} />{t('nav.login')}</Button>
+        {#if data.loggedIn}
+          <Button href="/dashboard" size="lg" variant="secondary" class="w-full rounded-full px-6 sm:w-auto"><Icon name="dashboard" size={18} />{t('nav.dashboard')}</Button>
+        {:else}
+          <Button href="/auth/login" size="lg" variant="secondary" class="w-full rounded-full px-6 sm:w-auto"><Icon name="login" size={18} />{t('nav.login')}</Button>
+        {/if}
         <Button href="/docs" size="lg" variant="outline" class="w-full rounded-full border-primary-foreground/40 bg-transparent px-6 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground sm:w-auto">{t('landing.hero.cta2')}</Button>
       </div>
     </div>

@@ -73,7 +73,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon, Img } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya; setiap gambar memakai `Img` (lazy bawaan browser, `priority` untuk LCP — lihat §3 "Gambar & lazy load") | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
 | 12 | Job terjadwal | `jobs.ts` (`defineJobs`) — sekali per interval di semua instance | `modules/AI/jobs.ts` | `bun scheduler:proof` (M0 #6), m6 proof: terdaftar saat boot |
-| 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap | `modules/Example/public.ts` | `scripts/m4-gate-proof.ts`, m6 proof |
+| 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap; termasuk **penangkap 404** (`app.not_found_route`, F-11) | `modules/Example/public.ts`, `web/public/resolve/` | `scripts/m4-gate-proof.ts` (F-11), m6 proof |
 | 14 | Tema | `themes/<id>/` | `modules/Dummy/themes/ocean/` | `bun theme:validate`, m2 proof #5 |
 | 15 | Layout | `layouts.ts` (`defineLayouts`) | `modules/Dummy/layouts.ts` | `scripts/ci/layout-contract.ts`, m2 proof #5 |
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
@@ -283,6 +283,51 @@ export default definePublicRoutes('Example', [
 Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data yang sama (R-9): modul `Example` mengapalkan `/example` (gaya toko: hero, cerita, paket harga) **dan** `/catalog` (gaya katalog: masthead tipis, bilah filter, daftar padat, form kontak satu baris). Keduanya route publik biasa, keduanya masuk `sitemap`, dan keduanya bisa dipilih sebagai landing — jadi bentuk halaman depan adalah keputusan admin, bukan deploy.
 
 Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7) — selama modulnya aktif untuk lingkup yang sedang disunting; route modul yang dinonaktifkan (G-8) tidak ditawarkan dan ditolak saat disimpan. Tabel pemiliknya dihasilkan sync di `packages/module-kit/src/generated/public-routes.ts` (`@core/module-kit/public-routes`) dan `apps/web/src/generated/public-routes.ts`. `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
+
+#### Menangkap URL tak dikenal — penangkap 404 (F-11, PRD §4.7 aturan 6)
+
+Toko dan blog memakai URL di akar domain tanpa awalan — `/furniture`, `/kotak-penyimpanan-…`, `/judul-artikel` — yang tidak bisa dideklarasikan lewat `public.ts` (bentuk `[...slug]` sengaja ditolak: hanya satu modul yang bisa memilikinya, dan modul lain akan bertabrakan). Jalannya: modul mendeklarasikan **satu halaman penangkap** dengan `notFound: true` di `public.ts`, lalu admin memilih **modul itu** di **Pengaturan → Aplikasi → Penangkap halaman 404** (`app.not_found_route`, tipe `not_found_route`, pilihan dilabeli `Example — /resolve`, kosong = 404 bawaan). Halaman publik lain (landing, katalog) sengaja **tidak** ditawarkan dan ditolak saat disimpan: halaman semacam itu menjawab setiap URL asing dengan 200, padahal penangkap harus **memutuskan** — URL yang tidak dikenalinya tetap 404. Sejak itu setiap request `GET` HTML yang tidak cocok route mana pun diteruskan core ke halaman itu, sebelum 404 bawaan dirender.
+
+Halaman penangkap adalah route publik biasa yang **tidak punya isi sendiri**:
+
+```ts
+// public.ts — `notFound: true` is what makes this page selectable as the module's 404 handler
+{ path: '/resolve', dir: 'web/public/resolve', sitemap: false, notFound: true },
+
+// web/public/resolve/+page.server.ts
+import { error } from '@sveltejs/kit';
+import { apiFor } from '$lib/server/session';
+import { trappedPath } from '$lib/server/trap';
+
+export const load: ServerLoad = async (event) => {
+  const trapped = trappedPath(event);          // { pathname, search } — the visitor's real URL
+  if (!trapped) error(404, 'Halaman tidak ditemukan'); // direct visit: this page does not exist
+  const res = await apiFor(event).v1.m.example.resolve.get({ query: { path: trapped.pathname } });
+  if (!res.data?.success) error(404, 'Halaman tidak ditemukan'); // "not mine" → built-in 404
+  return { hit: res.data.data, path: trapped.pathname, origin: event.url.origin };
+};
+```
+
+**Mulai dari tabel aturan — `modules/Example/trap.ts`.** Situs yang direvamp harus mempertahankan URL lamanya (`/category-food`, `/food/nasi-goreng`, `/promo/2026/lebaran.html`, apa pun yang dulu dikeluarkan situs itu). Bentuk seperti itu tidak bisa dideklarasikan sebagai route, tetapi bisa dideskripsikan sebagai **tabel pola**: setiap aturan adalah satu regex terjangkar atas pathname yang sudah dinormalkan (decode, tanpa query, tanpa slash akhir, huruf kecil) plus fungsi kecil yang mengubah hasil cocok menjadi *hit* bertipe. Aturan dicoba dari atas ke bawah, yang paling spesifik ditaruh paling atas; aturan boleh menolak (`null`) supaya jatuh ke aturan berikutnya. `matchTrap(pathname)` murni dan sinkron — tanpa I/O — jadi bisa diuji unit (`modules/Example/test/trap.test.ts`). Baru bila tabel tidak mengenali URL, loader bertanya ke database (`GET /v1/m/example/resolve`), dan terakhir `error(404)`.
+
+```ts
+// modules/Example/trap.ts (ringkas)
+export const TRAP_RULES: readonly TrapRule[] = [
+  { id: 'category-prefix', pattern: /^\/category-([a-z0-9-]+)$/, resolve: (m) => ({ kind: 'category-demo', slug: m[1], name: titleFromSlug(m[1]) }) },
+  { id: 'category-item',   pattern: /^\/([a-z0-9-]+)\/([a-z0-9-]+)$/, resolve: (m) => ({ kind: 'item-demo', category: m[1], slug: m[2], name: titleFromSlug(m[2]) }) },
+];
+```
+
+Dua aturan demo itu menjawab `/category-food` ("Ini contoh trap URL kategori Food") dan `/food/nasi-goreng` ("Ini contoh trap halaman Nasi Goreng") dengan halaman yang **memperlihatkan mekanismenya sendiri**: URL yang diminta, aturan yang cocok, parameter yang diekstrak, dan langkah-langkahnya — supaya developer lain memahami konsepnya sebelum mengganti aturan demo dengan bentuk URL situs yang sedang dimigrasi. Untuk modul e-commerce yang merevamp situs lama: salin `trap.ts`, tulis satu aturan per bentuk URL lama, dan biarkan `resolve` mengembalikan id/slug yang dicari di tabel modul Anda.
+
+Aturan mainnya:
+
+- **`trappedPath(event)` adalah satu-satunya sumber URL asli.** `event.url` di halaman ini adalah `/resolve`, bukan yang dilihat pengunjung — jangan dipakai untuk canonical, `og:url`, atau tautan. Layout publik core sudah memakai `trappedPath` untuk tujuan kembali form bahasa/tema.
+- **Kunjungan langsung wajib 404.** Tanpa header, halaman itu tidak ada. Begitu juga URL yang tidak Anda kenali: jawab `error(404)`, dan core menampilkan 404 bawaan tanpa mencatat apa pun — itu jawaban normal, bukan kegagalan.
+- **Status 200 di bawah alamat asli.** Core mengembalikan HTML Anda dengan status halaman Anda, tanpa redirect; canonical harus URL akar (`/furniture`), dan tautan di halaman harus absolut.
+- **Kategori vs produk vs artikel adalah urusan modul.** Core hanya menyerahkan path; `Example` mencocokkan slug kategori dulu, lalu slug produk (`GET /v1/m/example/resolve?path=…`, dua query terindeks) dan mengabaikan path bertingkat atau yang bukan slug.
+- **Sitemap bersyarat.** URL akar hanya ada selama modul Anda penangkapnya; `GET /v1/m/<ns>/sitemap` `Example` membaca `settings.get(tenantId, 'app.not_found_route')` dan menambahkan `/<slug>` hanya bila nilainya `/resolve`.
+- Yang **tidak pernah** sampai ke Anda: aset (`/_app`), `/v1`, `/m`, `/auth`, prefix halaman core, segmen berawalan titik, `robots.txt`, `sitemap.xml`, request non-HTML, dan halaman yang route-nya ada tapi menjawab 404 sendiri (`/product/slug-tak-ada`). Modul yang dinonaktifkan sesudah setelan disimpan → 404 bawaan + satu peringatan, tanpa loop.
 
 ### Gambar & lazy load — `<Img>` dan `class="lazy"`
 

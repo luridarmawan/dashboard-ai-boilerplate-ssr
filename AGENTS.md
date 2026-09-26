@@ -12,6 +12,7 @@ Wajib dibaca sebelum melakukan perubahan apa pun:
 4. [`docs/THEMES.md`](./docs/THEMES.md) — bila pekerjaanmu menyentuh tema, ikon, atau layout.
 5. [`docs/MODULES.md` · `docs/AI.md`](./docs/MODULES.md) — bila pekerjaanmu membuat atau mengubah modul; ini kontrak yang benar-benar berlaku hari ini, bukan rencana.
 6. [`docs/DEPLOY.md`](./docs/DEPLOY.md) · [`docs/RELEASE-CHECKLIST.md`](./docs/RELEASE-CHECKLIST.md) — bila pekerjaanmu menyentuh compose, image, backup, atau kriteria terima §8; daftar periksa memisahkan bukti CI dari langkah manual.
+7. [`docs/ADR.md`](./docs/ADR.md) — ringkasan keputusan arsitektur yang berlaku (turunan PRD; salinannya juga ada sebagai ADR di graph `codebase-memory-mcp`). Bila keputusan arsitektur berubah, perbarui berkas ini dan ADR di graph bersamaan.
 
 Bila sebuah perubahan mengubah perilaku yang tertulis di PRD, **PRD ikut diperbarui pada commit yang sama** (ROADMAP §7 butir 7).
 

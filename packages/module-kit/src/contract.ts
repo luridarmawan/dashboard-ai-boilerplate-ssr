@@ -305,6 +305,8 @@ export type ConfigFieldType =
   | 'route'
   /** Like `route`, but narrowed to the pages an anonymous visitor can reach (§4.7). */
   | 'public_route'
+  /** A module's declared 404 handler page (`notFound: true` in public.ts, F-11) — nothing else. */
+  | 'not_found_route'
   | 'theme'
   | 'locale'
   | 'timezone'
@@ -450,6 +452,13 @@ export interface PublicRouteDef {
   readonly dir: string;
   /** Include in sitemap.xml (F-7). Param routes need `sitemap: false` or a module-side lister. */
   readonly sitemap?: boolean;
+  /**
+   * This page is the module's 404 HANDLER (F-11, §4.7 rule 6): it has no content of its own and
+   * renders whatever unknown URL the core hands it (`trappedPath(event)`), or answers 404. Only
+   * pages flagged like this are offered by the `app.not_found_route` setting — a landing page
+   * would turn every unknown URL into a 200, which is not what "404 handler" means.
+   */
+  readonly notFound?: boolean;
 }
 
 const PUBLIC_PATH_RE =

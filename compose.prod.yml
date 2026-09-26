@@ -37,7 +37,7 @@ x-app-env: &app-env
   REDIS_URL: ${REDIS_URL:-}
   # One live session per user (A-5): a successful login revokes the account's other sessions
   SINGLE_LOGIN_ENABLE: ${SINGLE_LOGIN_ENABLE:-false}
-  LANDING_ROUTE: ${LANDING_ROUTE:-/example}
+  LANDING_ROUTE: ${LANDING_ROUTE:-/}
   # Branding (§4.7): the landing headline, its lead, and the footer line of every page. The
   # first also titles the OpenAPI document. Empty = the translated defaults.
   APP_LANDING_TITLE: ${APP_LANDING_TITLE:-}
@@ -127,7 +127,7 @@ services:
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
       # Branding and the landing fallback are rendered by web, so it needs them too (§4.7)
-      LANDING_ROUTE: ${LANDING_ROUTE:-/example}
+      LANDING_ROUTE: ${LANDING_ROUTE:-/}
       APP_LANDING_TITLE: ${APP_LANDING_TITLE:-}
       APP_LANDING_LEAD: ${APP_LANDING_LEAD:-}
       APP_FOOTER_TITLE: ${APP_FOOTER_TITLE:-}

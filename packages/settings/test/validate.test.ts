@@ -20,6 +20,24 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     expect(validateValue(f({ type: 'route' }), 'dashboard', { routes }).ok).toBe(false);
     expect(validateValue(f({ type: 'route' }), '/auth/login', { routes }).ok).toBe(true); // §4.7 rule 4
   });
+  test('not_found_route accepts only a declared 404 handler page (F-11)', () => {
+    const ctx = {
+      routes,
+      publicRoutes: ['/', '/example', '/resolve'],
+      notFoundRoutes: ['/resolve'],
+    };
+    expect(validateValue(f({ type: 'not_found_route' }), '/resolve', ctx)).toEqual({
+      ok: true,
+      stored: '/resolve',
+    });
+    // A landing page is public, but it is not a handler: it would answer every unknown URL with 200.
+    expect(validateValue(f({ type: 'not_found_route' }), '/example', ctx).ok).toBe(false);
+    expect(validateValue(f({ type: 'not_found_route' }), '', ctx)).toEqual({
+      ok: true,
+      stored: null,
+    });
+  });
+
   test('public_route accepts only the anonymous-reachable subset (§4.7)', () => {
     const ctx = { routes, publicRoutes: ['/', '/auth/login', '/example'] };
     expect(validateValue(f({ type: 'public_route' }), '/example', ctx)).toEqual({

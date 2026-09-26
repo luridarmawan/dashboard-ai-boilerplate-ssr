@@ -11,7 +11,13 @@ import {
   smtpHints,
   tlsMode,
 } from '@core/mail';
-import { GLOBAL, maskChanges, publicRoutesForModules, routesForModules } from '@core/settings';
+import {
+  GLOBAL,
+  maskChanges,
+  notFoundRoutesForModules,
+  publicRoutesForModules,
+  routesForModules,
+} from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
 import { publicOrigin, smtpFor } from '../mail.ts';
@@ -192,6 +198,7 @@ export const configuration = new Elysia({
         sections,
         routes: routesForModules(enabledModules),
         publicRoutes: publicRoutesForModules(enabledModules),
+        notFoundRoutes: notFoundRoutesForModules(enabledModules),
       });
     },
     {
@@ -204,6 +211,8 @@ export const configuration = new Elysia({
             sections: t.Array(Section),
             routes: t.Array(t.String()),
             publicRoutes: t.Array(t.String()),
+            /** F-11: declared 404 handler pages with their module, for the `not_found_route` select. */
+            notFoundRoutes: t.Array(t.Object({ path: t.String(), module: t.String() })),
           }),
         ),
         ...errorResponses,
@@ -270,6 +279,7 @@ export const configuration = new Elysia({
         // route here, and a page behind the sign-in wall is not a valid landing page.
         routes: routesForModules(enabled),
         publicRoutes: publicRoutesForModules(enabled),
+        notFoundRoutes: notFoundRoutesForModules(enabled).map((r) => r.path),
         ...(Array.isArray(allowed) ? { allowedThemes: allowed.map(String) } : {}),
       });
       if (Object.keys(result.errors).length) {

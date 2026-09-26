@@ -359,7 +359,7 @@ Keduanya wajib bisa dinonaktifkan tanpa menyisakan route yatim, menu rusak, atau
 `Example` bukan sekadar demo CRUD. Ia punya tiga peran:
 
 1. **Referensi kontrak** — satu-satunya tempat yang perlu dilihat developer untuk tahu bentuk setiap titik perluasan. Kodenya ditulis untuk dibaca dan disalin, dengan komentar yang menjelaskan *kenapa*, bukan *apa*.
-2. **Isi baku halaman `/`** — instalasi bersih tidak boleh menyajikan halaman kosong atau langsung melempar ke `/login`. Landing page `Example` adalah tujuan baku dari root (§4.7).
+2. **Landing siap pakai untuk halaman `/`** — instalasi bersih tidak boleh menyajikan halaman kosong atau langsung melempar ke `/login`. Sejak 2026-09-26 isi baku root adalah **halaman depan bawaan** core (`app.landing_route` = `/`); landing `Example` (`/example`) tetap tersedia dan tinggal dipilih admin di Pengaturan (§4.7).
 3. **Bukti bahwa boilerplate ini sanggup melayani sisi publik**, bukan hanya dashboard di balik login.
 
 **Bentuk landing page-nya adalah situs komersil yang meyakinkan** — setara company profile atau etalase e-commerce sederhana, bukan halaman "Hello World" bergaya template:
@@ -384,10 +384,11 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 
 | Kunci | Tempat | Nilai baku | Keterangan |
 |---|---|---|---|
-| `app.landing_route` | Database (per tenant, fallback global) | `/m/example` | Halaman yang disajikan untuk pengunjung anonim di `/`. Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
-| `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil |
+| `app.landing_route` | Database (per tenant, fallback global) | `/` (halaman depan bawaan; ikut `LANDING_ROUTE`) | Halaman yang disajikan di `/` — untuk pengunjung anonim **dan** pemakai yang sudah masuk (sejak 2026-09-26). Bertipe `public_route`: hanya halaman yang bisa dibuka **tanpa masuk** |
+| `app.home_route` | Database (per tenant, fallback global) | `/dashboard` | Tujuan setelah login berhasil — **bukan** pengalihan dari `/`: pemakai yang sudah masuk tetap melihat `/` yang sama. Boleh berisi `/` |
+| `app.not_found_route` | Database (per tenant, fallback global) | kosong | **Penangkap 404** (F-11): **modul** yang ditanya untuk setiap URL yang tidak cocok route mana pun — kategori/produk toko, slug artikel blog. Bertipe `not_found_route`: hanya halaman yang dideklarasikan modul sebagai penangkapnya (`notFound: true` di `public.ts`) yang ditawarkan, dilabeli nama modul; halaman publik lain (landing, katalog) ditolak karena akan menjawab semua URL asing dengan 200. Kosong = halaman 404 bawaan |
 | `app.favicon_url` | Database (per tenant, fallback global) | kosong | URL/path favicon tenant untuk `<link rel="icon">` semua shell; kosong = favicon bawaan `static/favicon.svg`. Favicon tema kustom (L-24) menimpanya selama tema itu aktif |
-| `LANDING_ROUTE` | `.env` | `/m/example` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
+| `LANDING_ROUTE` | `.env` | `/` | **Hanya** fallback bootstrap saat database belum terisi atau tidak terjangkau |
 
 **Aturan resolusi** (wajib — ini titik gagal yang mudah terlewat):
 
@@ -395,7 +396,8 @@ Pertanyaan "`.env` atau konfigurasi?" dijawab oleh aturan §3 prinsip 5: `.env` 
 2. `app.landing_route` dipersempit **sekali lagi**: ia bertipe `public_route`, jadi hanya halaman di luar grup `(app)` — yang bisa dibuka tanpa sesi — yang ditawarkan dan diterima. Halaman di balik dinding masuk hanya akan melempar pengunjung anonim ke `/auth/login`, jadi ia bukan halaman depan. `app.home_route` tetap memakai registry penuh: tujuannya justru pemakai yang sudah masuk.
 3. Bila modul pemilik route baku dinonaktifkan atau dihapus (G-8, G-13), resolusi turun ke fallback aman dan mencatat peringatan. Aplikasi tidak boleh mati atau menampilkan 404 di `/`.
 4. Landing page bisa diarahkan ke `/login` bagi pemakai template yang tidak ingin punya sisi publik sama sekali — cukup ubah satu nilai konfigurasi, tanpa mengubah kode.
-5. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya.
+5. Resolusi terjadi **di server saat SSR**, tanpa redirect di klien, agar tidak ada kedipan dan mesin pencari melihat isi sebenarnya. Berlaku sama untuk request bersesi: `/` tidak pernah dialihkan ke `app.home_route`. Satu-satunya pengecualian adalah halaman landing yang sendiri mengalihkan pemakai bersesi (mis. `/auth/login` → `app.home_route`) — pengalihan itu diteruskan, **kecuali** tujuannya `/` lagi; maka halaman depan bawaan yang menjawab, tanpa loop.
+6. **Penangkap 404** (`app.not_found_route`, F-11). Request `GET` yang meminta HTML dan **tidak cocok dengan route mana pun** ditawarkan ke halaman publik yang dipilih **sebelum** halaman 404 bawaan dirender, untuk semua pengunjung (bukan hanya anonim). Halaman itu menerima URL asli lewat header internal (`trappedPath(event)` di sisi modul), merender dengan status **200 di bawah alamat asli** (tanpa redirect) bila mengenalinya, atau menjawab 404 — dan 404 bawaan tampil seperti biasa, tanpa peringatan. Sasaran yang gagal (5xx) atau modulnya nonaktif jatuh ke 404 bawaan dengan satu peringatan (F-6); request yang diteruskan tidak pernah dijebak lagi. Aset, `/v1`, `/m`, `/auth`, prefix core lain, berkas titik, `robots.txt`/`sitemap.xml`, dan request non-HTML tidak pernah diteruskan. Halaman yang route-nya cocok tetapi loader-nya menjawab 404 **bukan** urusan penangkap — 404 itu miliknya sendiri. Sasaran hanya boleh halaman yang **dideklarasikan modul sebagai penangkap** (`notFound: true`, titik perluasan 13) dan modulnya aktif di lingkup itu (aturan 1 berlaku); halaman publik lain ditolak saat disimpan **dan** diabaikan hooks bila terlanjur tersimpan, karena landing yang menjawab setiap URL asing dengan 200 bukan penangkap 404. Kosong berarti 404 bawaan, tanpa fallback `.env` (bukan kebutuhan bootstrap, E-6).
 
 ### 4.8 Anatomi tema: warna, ikon, dan layout
 
@@ -608,7 +610,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 |---|---|
 | E-1 | **[P0]** Konfigurasi tersimpan di database dengan bentuk `section` / `sub` / `key` / `value` / `type` / `title` / `note` / `order` / `public`. |
 | E-2 | **[P0]** Konfigurasi bersifat per-tenant dengan fallback ke global (`client_id IS NULL`). Nilai global harus benar-benar terpakai saat tenant belum menimpanya. |
-| E-3 | **[P0]** Form konfigurasi **di-generate** dari metadata section + `type` field (`string`, `text`, `number`, `boolean`, `select`, `secret`, `markdown`, `route`, `public_route`, `theme`, `locale`, `timezone`, `list`). Tipe tervalidasi skema, bukan string bebas — dan tipe pula yang menentukan tambahan tampilannya (mis. `timezone` membawa jam berjalan di bawah fieldnya), tidak pernah nama kunci. |
+| E-3 | **[P0]** Form konfigurasi **di-generate** dari metadata section + `type` field (`string`, `text`, `number`, `boolean`, `select`, `secret`, `markdown`, `route`, `public_route`, `not_found_route`, `theme`, `locale`, `timezone`, `list`). Tipe tervalidasi skema, bukan string bebas — dan tipe pula yang menentukan tambahan tampilannya (mis. `timezone` membawa jam berjalan di bawah fieldnya), tidak pernah nama kunci. |
 | E-4 | **[P0]** Field `public` menentukan apakah nilai boleh dibaca klien yang belum login. Field bertipe `secret` **tidak pernah** dikirim ke klien dalam bentuk asli — hanya penanda "sudah diisi". |
 | E-5 | **[P0]** Cache konfigurasi lewat `CACHE_DRIVER` (Keputusan M), **bukan `Map` proses yang tak tervalidasi**. Adapter `database` (baku) memakai kolom versi: salinan di memori hanya dipakai selama versi masih cocok. Adapter `redis` memakai TTL + invalidasi eksplisit saat simpan. Menyimpan konfigurasi **selalu** menaikkan versi/menginvalidasi, di adapter mana pun — instance lain wajib melihat perubahan tanpa restart. Menutup D1. |
 | E-6 | **[P0]** Batas `.env` vs database ditulis eksplisit dan ditegakkan: `.env` hanya untuk hal yang dibutuhkan **sebelum** database bisa dibaca (koneksi DB, Redis, port, secret sesi, mode, fallback bootstrap). Selebihnya di database (§4.7). |
@@ -629,6 +631,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | F-7 | **[P0]** Route publik (dari modul, titik perluasan 13) terdaftar di sitemap dan menghormati `robots.txt` yang dapat dikonfigurasi. |
 | F-8 | **[P1]** Sidebar bisa diciutkan; state tersimpan per user. |
 | F-9 | **[P1]** Command palette (⌘K) untuk lompat antar halaman dan aksi. |
+| F-11 | **[P1]** **Penangkap 404 dari konfigurasi** (§4.7 aturan 6): `app.not_found_route` menunjuk halaman publik modul yang mencoba menjawab setiap URL yang tidak dikenal — kategori dan produk di akar domain (`/furniture`, `/<slug-produk>`), slug artikel — sebelum 404 bawaan; kosong = 404 bawaan. Modul `Example` memakainya lewat `/resolve` + `GET /v1/m/example/resolve`, dan sitemap-nya memuat URL akar hanya selama ia penangkapnya. |
 | F-10 | **[P1]** Tombol **kembali ke atas** di pojok bawah setiap halaman, muncul begitu pembaca menggulir jauh dan menggulir balik ke puncak halaman (mulus, kecuali pembaca meminta gerak minimal). Berbagi pojok dengan widget shell (H-13) tanpa saling menutupi. |
 
 ### FR-G · Sistem Modul
@@ -660,7 +663,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | ID | Kebutuhan |
 |---|---|
 | R-1 | **[P0]** Modul `Example` tersedia sebagai modul bawaan yang dibangun **memakai kontrak §4.5 yang sama** dengan modul pihak ketiga — tanpa jalur istimewa dari core. |
-| R-2 | **[P0]** `Example` menyediakan **landing page komersil publik** dengan seluruh bagian pada §4.6, dan menjadi isi baku dari `/` pada instalasi bersih. |
+| R-2 | **[P0]** `Example` menyediakan **landing page komersil publik** dengan seluruh bagian pada §4.6, yang bisa dipilih sebagai isi `/` lewat `app.landing_route` (baku instalasi bersih: halaman depan bawaan core, sejak 2026-09-26). |
 | R-3 | **[P0]** Etalase produk/portofolio pada landing page mengambil data dari **tabel milik modul**, ter-SSR, dengan halaman detail `/product/:slug`. |
 | R-4 | **[P0]** SEO: metadata per halaman (title, description, canonical, Open Graph, JSON-LD), sitemap, dan `robots.txt`. Halaman publik terindeks tanpa JavaScript. |
 | R-5 | **[P0]** Form kontak/inquiry berfungsi **tanpa JavaScript** (form action), menulis ke tabel modul, mengirim email lewat outbox, dan terlindung rate limit + proteksi spam sederhana. Dua email keluar per kiriman: pemberitahuan ke alamat kontak tenant (`example.contact_email`, bila diisi) dan **tanda terima ke pengirimnya** (template `contact-ack`, berisi salinan pesannya) — keduanya lewat outbox, dalam bahasa permintaan yang mengirim form. |
@@ -681,7 +684,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | H-6 | **[P0]** Percakapan dipersistensi: `conversations` + `messages`, dengan judul otomatis dari pesan pertama, arsip, dan hapus lunak. |
 | H-7 | **[P0]** Riwayat percakapan tampil di sidebar chat, dikelompokkan per waktu, bisa dicari. |
 | H-8 | **[P0]** Rendering markdown pada balasan AI dengan sanitasi. Blok kode ber-syntax-highlight dan tombol salin. |
-| H-9 | **[P0]** **Setiap panggilan AI dicatat** (endpoint, model, token in/out/total, latensi, status, biaya). **Penulisan log asinkron** — tidak menahan jalur panas request. |
+| H-9 | **[P0]** **Setiap panggilan AI dicatat** (endpoint, model, token in/out/total, latensi, status, biaya). **Penulisan log asinkron** — tidak menahan jalur panas request. Pengguna dengan `ai.log.read` hanya melihat panggilan miliknya sendiri (log dan analitik); `ai.log.manage` (admin) melihat semua panggilan di tenant. Halaman log (`/m/ai/logs`) menampilkan nama pengguna tiap panggilan dan dapat difilter per nama/email pengguna, model, serta rentang tanggal (inklusif, menurut zona waktu tenant `app.timezone`). |
 | H-10 | **[P1]** Multi-provider: lebih dari satu profil provider tersimpan, bisa dipilih per percakapan. Perhitungan biaya per model dari tabel harga. |
 | H-11 | **[P1]** Lampiran pada pesan (`message_attachments`). |
 | H-12 | **[P1]** Threading pesan (`parent_id`) — regenerate & edit-lalu-cabang. |
