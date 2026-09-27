@@ -68,7 +68,10 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
         200: OkSchema(t.Object({ maxBytes: t.Integer(), allowedTypes: t.Array(t.String()) })),
         ...errorResponses,
       },
-      detail: { summary: 'Upload limits of the active tenant (size cap, allowed MIME types)' },
+      detail: {
+        summary: 'Get upload limits',
+        description: 'Size cap and allowed MIME types of the active tenant.',
+      },
     },
   )
   .post(
@@ -119,8 +122,9 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
       }),
       response: { 201: OkSchema(FileView), ...errorResponses, 413: errorResponses[422] },
       detail: {
-        summary:
-          'Upload one file (multipart `file`); validated against the tenant’s size cap and type allowlist, content sniffed (Q-16)',
+        summary: 'Upload a file',
+        description:
+          "Multipart `file`. Checked against the tenant's size cap and allowed types; the content type is sniffed.",
       },
     },
   )
@@ -156,7 +160,9 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
       }),
       response: { 200: OkSchema(t.Array(FileView)), ...errorResponses },
       detail: {
-        summary: 'My files in the active tenant (?all=1 with file.manage lists everyone’s)',
+        summary: 'List files',
+        description:
+          "Your files in the active tenant. `?all=1` lists everyone's (needs `file.manage`).",
       },
     },
   )
@@ -176,7 +182,10 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
     {
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(FileView), ...errorResponses },
-      detail: { summary: 'File metadata (public files: anonymous with X-Client-ID)' },
+      detail: {
+        summary: 'Get file metadata',
+        description: 'Public files are readable without a session when `X-Client-ID` is sent.',
+      },
     },
   )
   .get(
@@ -220,7 +229,9 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
       params: t.Object({ id: Id }),
       response: { 200: t.Unknown(), ...errorResponses },
       detail: {
-        summary: 'The bytes; inline for safe images/PDF, attachment otherwise, sandboxed for SVG',
+        summary: 'Download a file',
+        description:
+          'Images and PDFs are served inline, SVGs sandboxed, everything else as an attachment.',
       },
     },
   )
@@ -252,7 +263,8 @@ export const filesDomain = new Elysia({ name: 'files', prefix: '/files', tags: [
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
       detail: {
-        summary: 'Delete my file (or any, with file.manage): row soft-deleted, object removed',
+        summary: 'Delete a file',
+        description: 'Your own files, or any file with `file.manage`.',
       },
     },
   );

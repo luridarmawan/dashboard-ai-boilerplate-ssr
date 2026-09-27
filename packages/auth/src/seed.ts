@@ -99,7 +99,7 @@ export async function runSeed(db: Db, opts: SeedOptions = {}): Promise<SeedResul
     for (const p of g.permissions) {
       if (!isValidPermission(p)) throw new Error(`seed: izin "${p}" tidak valid`);
       if (!p.includes('*') && !isRegistered(p))
-        throw new Error(`seed: izin "${p}" tidak terdaftar di registry (C-4)`);
+        throw new Error(`seed: izin "${p}" tidak terdaftar di registry`);
     }
   }
 

@@ -68,6 +68,21 @@ const unarchiveSubmit =
     toast({ title: t('ai.chat.unarchived'), variant: 'success' });
   };
 
+/**
+ * New conversation without a page load: follow the action's redirect client-side, then hand the
+ * cursor to the composer so the user can type straight away. The plain form still works without JS.
+ */
+const newSubmit =
+  () =>
+  async ({ result }: { result: { type: string; location?: string } }) => {
+    if (result.type !== 'redirect') {
+      toast({ title: t('common.action_failed'), variant: 'error' });
+      return;
+    }
+    await goto(result.location ?? '/m/ai/chat', { invalidateAll: true });
+    inputEl?.focus();
+  };
+
 // Every link inside the sidebar keeps the view the user is in, so opening an archived
 // conversation does not silently drop them back on the live list.
 const viewParam = $derived(data.archived ? '&archived=1' : '');
@@ -376,12 +391,12 @@ function copy(text: string) {
     </form>
     <!-- The sidebar's archive tab is desktop-only, so the narrow bar keeps its own way in and out. -->
     <Button href={data.archived ? '/m/ai/chat' : '/m/ai/chat?archived=1'} variant={data.archived ? 'secondary' : 'outline'} size="icon" class="shrink-0" title={data.archived ? t('ai.chat.filter_live') : t('ai.chat.archive_tab')} aria-label={data.archived ? t('ai.chat.filter_live') : t('ai.chat.archive_tab')}><Icon name={data.archived ? 'list' : 'archive'} size={18} /></Button>
-    <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" size="icon" class="shrink-0" title={t('ai.chat.new')} aria-label={t('ai.chat.new')}><Icon name="plus" size={18} /></Button></form>
+    <form method="POST" action="?/new" use:enhance={newSubmit}><Csrf token={data.csrf} /><Button type="submit" size="icon" class="shrink-0" title={t('ai.chat.new')} aria-label={t('ai.chat.new')}><Icon name="plus" size={18} /></Button></form>
   </div>
 
   <!-- sidebar (H-7) -->
   <aside id="conversation-list-sidebar" class="hidden min-h-0 flex-col gap-3 rounded-lg border bg-card p-3 lg:flex">
-    <form method="POST" action="?/new"><Csrf token={data.csrf} /><Button type="submit" class="w-full" size="sm"><Icon name="plus" size={16} />{t('ai.chat.new')}</Button></form>
+    <form method="POST" action="?/new" use:enhance={newSubmit}><Csrf token={data.csrf} /><Button type="submit" class="w-full" size="sm"><Icon name="plus" size={16} />{t('ai.chat.new')}</Button></form>
     <!-- Two views of the same list (H-6): live conversations, and the archive they came off. -->
     <div class="flex gap-1" role="group" aria-label={t('ai.chat.filter')}>
       <Button href={data.q ? `/m/ai/chat?q=${encodeURIComponent(data.q)}` : '/m/ai/chat'} variant={data.archived ? 'ghost' : 'secondary'} size="sm" class="flex-1" aria-current={data.archived ? undefined : 'page'}>{t('ai.chat.filter_live')}</Button>

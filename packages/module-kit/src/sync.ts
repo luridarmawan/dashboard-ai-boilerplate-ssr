@@ -320,7 +320,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       continue;
     }
     if (!satisfiesCore(coreVersion, manifest.engines.core)) {
-      problems.push(`${tag}: butuh core ${manifest.engines.core}, terpasang ${coreVersion} (G-11)`);
+      problems.push(`${tag}: butuh core ${manifest.engines.core}, terpasang ${coreVersion}`);
       continue;
     }
     const ns = namespaceOf(manifest.name);
@@ -347,7 +347,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
             continue;
           }
           if (!table.name.startsWith(`${ns}_`)) {
-            problems.push(`${tag}: tabel "${table.name}" harus diawali "${ns}_" (G-9)`);
+            problems.push(`${tag}: tabel "${table.name}" harus diawali "${ns}_"`);
             continue;
           }
           const owner = tableOwner.get(table.name);
@@ -373,7 +373,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       else {
         for (const perm of p) {
           if (!perm?.resource?.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: resource izin "${perm?.resource}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: resource izin "${perm?.resource}" harus diawali "${ns}."`);
             continue;
           }
           const owner = permOwner.get(perm.resource);
@@ -394,11 +394,11 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       else {
         for (const entry of m) {
           if (!entry?.id?.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: id menu "${entry?.id}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: id menu "${entry?.id}" harus diawali "${ns}."`);
             continue;
           }
           if (!entry.href?.startsWith(`/m/${ns}`)) {
-            problems.push(`${tag}: href menu "${entry.id}" harus di bawah /m/${ns} (G-9)`);
+            problems.push(`${tag}: href menu "${entry.id}" harus di bawah /m/${ns}`);
             continue;
           }
           if (
@@ -407,7 +407,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
             !entry.icon.startsWith(`${ns}.`)
           ) {
             problems.push(
-              `${tag}: ikon "${entry.icon}" pada menu "${entry.id}" bukan nama core dan bukan "${ns}.*" (L-5)`,
+              `${tag}: ikon "${entry.icon}" pada menu "${entry.id}" bukan nama core dan bukan "${ns}.*"`,
             );
           }
           if (
@@ -481,7 +481,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
             continue;
           }
           if (!job.name.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: job "${job.name}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: job "${job.name}" harus diawali "${ns}."`);
             continue;
           }
           try {
@@ -563,14 +563,14 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         for (const section of cfg) {
           if (section.section !== ns && !section.section?.startsWith(`${ns}.`)) {
             problems.push(
-              `${tag}: section konfigurasi "${section.section}" harus "${ns}" atau diawali "${ns}." (G-9)`,
+              `${tag}: section konfigurasi "${section.section}" harus "${ns}" atau diawali "${ns}."`,
             );
             continue;
           }
           let ok = true;
           for (const f of section.fields ?? []) {
             if (!f.key?.startsWith(`${ns}.`)) {
-              problems.push(`${tag}: kunci konfigurasi "${f.key}" harus diawali "${ns}." (G-9)`);
+              problems.push(`${tag}: kunci konfigurasi "${f.key}" harus diawali "${ns}."`);
               ok = false;
               continue;
             }
@@ -606,7 +606,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       else {
         for (const widget of w) {
           if (!widget?.id?.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: id widget "${widget?.id}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: id widget "${widget?.id}" harus diawali "${ns}."`);
             continue;
           }
           if (!existsSync(join(dir, widget.component))) {
@@ -636,7 +636,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       else {
         for (const l of lay) {
           if (!l?.id?.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: id layout "${l?.id}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: id layout "${l?.id}" harus diawali "${ns}."`);
             continue;
           }
           const file = join(dir, l.component);
@@ -653,7 +653,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           const missing = regions.filter((r) => !new RegExp(`\\{@render\\s+${r}\\s*\\(`).test(src));
           if (missing.length) {
             problems.push(
-              `${tag}: layout "${l.id}" (${l.kind}) belum mengisi region: ${missing.join(', ')} (L-8)`,
+              `${tag}: layout "${l.id}" (${l.kind}) belum mengisi region: ${missing.join(', ')}`,
             );
             continue;
           }
@@ -678,7 +678,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       else {
         for (const s of ic) {
           if (!s?.id?.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: id set ikon "${s?.id}" harus diawali "${ns}." (G-9)`);
+            problems.push(`${tag}: id set ikon "${s?.id}" harus diawali "${ns}."`);
             continue;
           }
           const file = join(dir, s.glyphs);
@@ -691,7 +691,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           const missing = [...coreIcons].filter((n) => !keys.has(n));
           if (missing.length) {
             problems.push(
-              `${tag}: set ikon "${s.id}" tidak memetakan ${missing.length} nama core (mis. ${missing.slice(0, 3).join(', ')}) (L-5)`,
+              `${tag}: set ikon "${s.id}" tidak memetakan ${missing.length} nama core (mis. ${missing.slice(0, 3).join(', ')})`,
             );
             continue;
           }
@@ -722,7 +722,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
           continue;
         }
         if (!theme?.id?.startsWith(`${ns}.`)) {
-          problems.push(`${tag}: id tema "${theme?.id}" harus diawali "${ns}." (G-9)`);
+          problems.push(`${tag}: id tema "${theme?.id}" harus diawali "${ns}."`);
           continue;
         }
         const tokens = join(tdir, (theme.tokens ?? './tokens.css').replace(/^\.\//, ''));
@@ -764,7 +764,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
             continue;
           }
           if (!k.startsWith(`${ns}.`)) {
-            problems.push(`${tag}: kunci terjemahan "${k}" harus diawali "${ns}." (K-6, G-9)`);
+            problems.push(`${tag}: kunci terjemahan "${k}" harus diawali "${ns}."`);
             continue;
           }
           flat[k] = v;
@@ -786,7 +786,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         if (!dict) {
           if (Object.keys(base).length)
             warnings.push(
-              `${tag}: i18n/${locale}.json tidak ada — memakai fallback ${I18N_LOCALES[0]} (K-4)`,
+              `${tag}: i18n/${locale}.json tidak ada — memakai fallback ${I18N_LOCALES[0]}`,
             );
           continue;
         }
@@ -881,16 +881,14 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   for (const th of themesContrib) {
     const m = th.manifest;
     if (!knownIconSets.has(m.icons))
-      problems.push(`tema "${m.id}": set ikon "${m.icons}" tidak terdaftar (L-5)`);
+      problems.push(`tema "${m.id}": set ikon "${m.icons}" tidak terdaftar`);
     for (const [kind, variants] of Object.entries(m.layouts ?? {})) {
       if (!variants?.default)
         problems.push(`tema "${m.id}"/${kind}: varian "default" wajib ada (Keputusan K)`);
       for (const [variant, layoutId] of Object.entries(variants ?? {})) {
         const k = knownLayouts.get(layoutId);
         if (!k)
-          problems.push(
-            `tema "${m.id}"/${kind}/${variant}: layout "${layoutId}" tidak terdaftar (L-8)`,
-          );
+          problems.push(`tema "${m.id}"/${kind}/${variant}: layout "${layoutId}" tidak terdaftar`);
         else if (k !== kind)
           problems.push(`tema "${m.id}"/${kind}/${variant}: layout "${layoutId}" ber-kind "${k}"`);
       }

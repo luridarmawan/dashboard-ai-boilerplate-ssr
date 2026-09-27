@@ -231,7 +231,10 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           beforeHandle: permission('group.read'),
           query: ListQuery,
           response: { 200: PageSchema(Group), ...errorResponses },
-          detail: { summary: 'Groups of the active tenant with permission/member counts (D-2)' },
+          detail: {
+            summary: 'List groups',
+            description: 'Groups of the active tenant with permission and member counts.',
+          },
         },
       )
       .get(
@@ -271,7 +274,10 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             ),
             ...errorResponses,
           },
-          detail: { summary: 'One group with its permissions and one page of its members' },
+          detail: {
+            summary: 'Get a group',
+            description: 'Includes its permissions and the first page of members.',
+          },
         },
       )
       .post(
@@ -299,12 +305,9 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           const bad = unknownPermissions(body.permissions ?? []);
           if (bad.length) {
             set.status = 422;
-            return fail(
-              'validation_failed',
-              'Ada izin yang tidak dikenal registry (C-4)',
-              requestId,
-              { unknown: bad },
-            );
+            return fail('validation_failed', 'Ada izin yang tidak dikenal registry', requestId, {
+              unknown: bad,
+            });
           }
           const id = buried?.id ?? newId();
           const values = {
@@ -348,7 +351,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           beforeHandle: permission('group.create'),
           body: GroupCreateBody,
           response: { 201: OkSchema(Group), ...errorResponses },
-          detail: { summary: 'Create a group in the active tenant, optionally with permissions' },
+          detail: { summary: 'Create a group' },
         },
       )
       .put(
@@ -392,7 +395,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           params: t.Object({ id: Id }),
           body: GroupUpdateBody,
           response: { 200: OkSchema(Group), ...errorResponses },
-          detail: { summary: 'Rename / describe a group (system groups keep their code)' },
+          detail: { summary: 'Update a group', description: 'System groups keep their code.' },
         },
       )
       .delete(
@@ -437,7 +440,9 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           params: t.Object({ id: Id }),
           response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
           detail: {
-            summary: 'Soft-delete a non-system group; members lose its permissions at once',
+            summary: 'Delete a group',
+            description:
+              'System groups cannot be deleted. Members lose its permissions immediately.',
           },
         },
       ),
@@ -461,7 +466,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             200: OkSchema(t.Object({ groupId: t.String(), permissions: t.Array(Permission) })),
             ...errorResponses,
           },
-          detail: { summary: 'Permissions of a group' },
+          detail: { summary: 'List group permissions' },
         },
       )
       .put(
@@ -474,12 +479,9 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           const bad = unknownPermissions(body.permissions);
           if (bad.length) {
             set.status = 422;
-            return fail(
-              'validation_failed',
-              'Ada izin yang tidak dikenal registry (C-4)',
-              requestId,
-              { unknown: bad },
-            );
+            return fail('validation_failed', 'Ada izin yang tidak dikenal registry', requestId, {
+              unknown: bad,
+            });
           }
           const before = (await permissionsOf(ts, g.id)).map((p) => p.permission);
           const next = normalizeGrants(body.permissions);
@@ -515,7 +517,8 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             ...errorResponses,
           },
           detail: {
-            summary: 'Replace the whole permission set of a group (validated against the registry)',
+            summary: 'Replace group permissions',
+            description: 'Validated against the permission registry.',
           },
         },
       )
@@ -529,7 +532,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           const [p] = normalizeGrants([body.permission]);
           if (!p || unknownPermissions([p]).length) {
             set.status = 422;
-            return fail('validation_failed', 'Izin tidak dikenal registry (C-4)', requestId, {
+            return fail('validation_failed', 'Izin tidak dikenal registry', requestId, {
               unknown: [body.permission],
             });
           }
@@ -565,7 +568,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             ),
             ...errorResponses,
           },
-          detail: { summary: 'Add one permission to a group' },
+          detail: { summary: 'Add a group permission' },
         },
       )
       .delete(
@@ -597,7 +600,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           beforeHandle: permission('group.edit'),
           params: t.Object({ id: Id }),
           response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-          detail: { summary: 'Remove one permission row from its group' },
+          detail: { summary: 'Remove a group permission' },
         },
       ),
   )
@@ -623,7 +626,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             200: PageSchema(Member),
             ...errorResponses,
           },
-          detail: { summary: "One page of a group's members (`?q` searches name and e-mail)" },
+          detail: { summary: 'List group members', description: '`?q` searches name and email.' },
         },
       )
       .post(
@@ -672,7 +675,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
             201: OkSchema(t.Object({ id: t.String(), groupId: t.String(), userId: t.String() })),
             ...errorResponses,
           },
-          detail: { summary: 'Add a tenant member to a group' },
+          detail: { summary: 'Add a group member' },
         },
       )
       .delete(
@@ -705,7 +708,7 @@ export const groups = new Elysia({ name: 'groups', tags: ['groups'] })
           beforeHandle: permission('group.edit'),
           params: t.Object({ id: Id, userId: Id }),
           response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-          detail: { summary: 'Remove a member from a group' },
+          detail: { summary: 'Remove a group member' },
         },
       ),
   );

@@ -112,8 +112,8 @@ export default defineConfig('AI', [
         type: 'text',
         title: { id: 'System prompt', en: 'System prompt' },
         note: {
-          id: 'Disuntikkan bila request belum punya pesan system (H-5).',
-          en: 'Injected when the request has no system message (H-5).',
+          id: 'Disuntikkan bila request belum punya pesan system.',
+          en: 'Injected when the request has no system message.',
         },
         default: 'Anda adalah asisten yang membantu, ringkas, dan menjawab dalam bahasa pengguna.',
         max: 4000,
@@ -176,8 +176,8 @@ export default defineConfig('AI', [
         type: 'number',
         title: { id: 'Kuota token tenant / bulan', en: 'Tenant token quota / month' },
         note: {
-          id: 'Total token (masuk + keluar) semua pengguna tenant per bulan kalender UTC; 0 = tanpa batas (H-14).',
-          en: 'Total tokens (in + out) of all tenant users per UTC calendar month; 0 = unlimited (H-14).',
+          id: 'Total token (masuk + keluar) semua pengguna tenant per bulan kalender UTC; 0 = tanpa batas.',
+          en: 'Total tokens (in + out) of all tenant users per UTC calendar month; 0 = unlimited.',
         },
         default: 0,
         min: 0,

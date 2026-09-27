@@ -150,7 +150,7 @@ export interface RemovalMigration {
 /** One SQL comment block at the top of the migration: what it is, why, how to read it. */
 export function removalHeader(m: RemovalMigration): string {
   const lines = [
-    `-- Uninstall modul ${m.name} (G-15): dibuat oleh \`bun modules:remove ${m.name}\`.`,
+    `-- Uninstall modul ${m.name}: dibuat oleh \`bun modules:remove ${m.name}\`.`,
     `-- Menjatuhkan tabel modul (anak dulu, lalu induk) dan membersihkan baris yang ditinggalkannya`,
     `-- di tabel core. Tidak bisa dibatalkan — pastikan backup sudah ada (deploy/backup.sh).`,
     `-- Tabel: ${m.tables.length ? m.tables.join(', ') : '(tidak ada di snapshot)'}`,

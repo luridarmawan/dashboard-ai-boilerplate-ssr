@@ -61,7 +61,7 @@ const ACTION_RE = /^[a-z][a-z0-9_]*$/;
 
 function requirePrefix(kind: string, value: string, prefix: string): void {
   if (!value.startsWith(prefix)) {
-    throw new ModuleContractError(`${kind} "${value}" harus diawali "${prefix}" (G-9)`);
+    throw new ModuleContractError(`${kind} "${value}" harus diawali "${prefix}"`);
   }
 }
 
@@ -328,6 +328,27 @@ export interface ConfigFieldDef {
   /** Numeric bounds / string length. */
   readonly min?: number;
   readonly max?: number;
+  /** Key of one of the section's `groups`; the field is drawn under that group's heading. */
+  readonly group?: string;
+  /**
+   * Layout hint for the generated form on wide screens: `full` takes the whole row, `half` two
+   * per row, `third` three per row. Unset = `full` for `text`/`markdown`/`list`, `half` otherwise.
+   * Phones always stack one per row.
+   */
+  readonly width?: ConfigFieldWidth;
+}
+
+export type ConfigFieldWidth = 'full' | 'half' | 'third';
+
+/**
+ * A titled block inside a section's form. Purely presentational: values, validation and the save
+ * button stay per section. Groups are drawn in declaration order, after any ungrouped fields.
+ */
+export interface ConfigFieldGroupDef {
+  /** Plain slug, unique per section. */
+  readonly key: string;
+  readonly title: LocalizedText;
+  readonly note?: LocalizedText;
 }
 
 /**
@@ -381,6 +402,8 @@ export interface ConfigSectionDef {
   readonly note?: LocalizedText;
   readonly order?: number;
   readonly fields: readonly ConfigFieldDef[];
+  /** Titled blocks the fields may be sorted into (`ConfigFieldDef.group`). */
+  readonly groups?: readonly ConfigFieldGroupDef[];
   /** Buttons beside "Save" for this section (extension point 6). */
   readonly actions?: readonly ConfigSectionActionDef[];
 }
@@ -400,14 +423,27 @@ export function defineConfig(
         `section konfigurasi "${s.section}" harus "${ns}" atau diawali "${ns}."`,
       );
     }
+    const groupKeys = new Set<string>();
+    for (const g of s.groups ?? []) {
+      if (!/^[a-z][a-z0-9_-]*$/.test(g.key))
+        throw new ModuleContractError(`grup konfigurasi "${g.key}" tidak valid`);
+      if (groupKeys.has(g.key))
+        throw new ModuleContractError(`grup konfigurasi "${g.key}" duplikat di "${s.section}"`);
+      groupKeys.add(g.key);
+    }
     for (const f of s.fields) {
+      if (f.group !== undefined && !groupKeys.has(f.group)) {
+        throw new ModuleContractError(
+          `kunci "${f.key}": grup "${f.group}" tidak dideklarasikan di section "${s.section}"`,
+        );
+      }
       if (!CONFIG_KEY_RE.test(f.key))
         throw new ModuleContractError(`kunci konfigurasi "${f.key}" tidak valid`);
       requirePrefix('kunci konfigurasi', f.key, `${ns}.`);
       if (seen.has(f.key)) throw new ModuleContractError(`kunci konfigurasi "${f.key}" duplikat`);
       seen.add(f.key);
       if (f.type === 'secret' && f.public) {
-        throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public (E-4)`);
+        throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public`);
       }
       if ((f.type === 'select' || f.type === 'list') && !f.options?.length) {
         throw new ModuleContractError(`kunci "${f.key}": tipe ${f.type} butuh options`);

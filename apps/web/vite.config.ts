@@ -1,6 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv } from 'vite';
+import rootPkg from '../../package.json' with { type: 'json' };
 
 export default defineConfig(({ mode }) => {
   // Dev-server address comes from the repo-root .env (WEB_HOST / WEB_PORT) so it can be changed
@@ -10,6 +11,9 @@ export default defineConfig(({ mode }) => {
   const env = { ...root, ...process.env };
   return {
     plugins: [tailwindcss(), sveltekit()],
+    // Product version shown in the dashboard footer: the root package.json, the same source as
+    // the API's /v1/version, inlined at build time.
+    define: { __APP_VERSION__: JSON.stringify(rootPkg.version) },
     server: {
       port: Number(env.WEB_PORT ?? 5173),
       strictPort: true,

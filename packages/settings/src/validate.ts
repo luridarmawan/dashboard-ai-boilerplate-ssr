@@ -115,7 +115,7 @@ export function validateValue(
           ok: false,
           message:
             field.type === 'not_found_route'
-              ? `route ${s} bukan halaman penangkap 404 — hanya halaman yang dideklarasikan modul dengan notFound: true yang bisa dipilih (F-11)`
+              ? `route ${s} bukan halaman penangkap 404 — hanya halaman yang dideklarasikan modul dengan notFound: true yang bisa dipilih`
               : field.type === 'public_route'
                 ? `route ${s} bukan halaman publik — halaman depan harus bisa dibuka tanpa masuk (§4.7)`
                 : `route ${s} tidak ada di registry route (§4.7)`,

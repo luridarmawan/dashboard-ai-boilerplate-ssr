@@ -42,7 +42,7 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
       response: OkSchema(
         t.Object({ status: t.Literal('ok'), uptime: t.Integer(), instance: t.String() }),
       ),
-      detail: { summary: 'Liveness — the process is up' },
+      detail: { summary: 'Liveness check', description: 'Answers as long as the process is up.' },
     },
   )
 
@@ -115,7 +115,10 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
           }),
         ),
       },
-      detail: { summary: 'Readiness — database (and Redis when enabled) answer' },
+      detail: {
+        summary: 'Readiness check',
+        description: 'Answers when the database (and Redis, when enabled) respond.',
+      },
     },
   )
 
@@ -130,5 +133,5 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
         modules: t.Array(ModuleInfo),
       }),
     ),
-    detail: { summary: 'Build identity and installed modules' },
+    detail: { summary: 'Build and module versions' },
   });

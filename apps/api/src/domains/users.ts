@@ -157,7 +157,7 @@ interface Presence {
 async function presenceOf(userIds: readonly string[]): Promise<Map<string, Presence>> {
   const out = new Map<string, Presence>();
   if (!userIds.length) return out;
-  const db = unsafeAcrossTenants(); // sessions is a global table (B-0)
+  const db = unsafeAcrossTenants(); // sessions is a global table
   const rows = await db
     .select({
       userId: schema.sessions.user_id,
@@ -321,7 +321,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         200: OkSchema(t.Object({ user: PublicUser, clientId: t.Nullable(t.String()) })),
         ...errorResponses,
       },
-      detail: { summary: 'My profile' },
+      detail: { summary: 'Get my profile' },
     },
   )
   .put(
@@ -362,7 +362,10 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       },
       body: ProfileBody,
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
-      detail: { summary: 'Edit my profile: name, locale, theme, sidebar, avatar (D-4)' },
+      detail: {
+        summary: 'Update my profile',
+        description: 'Name, locale, theme, sidebar state and avatar.',
+      },
     },
   )
   // ---- impersonation (D-6): acting as a user, with the account-menu mark + audit --------------
@@ -459,8 +462,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'user.impersonate: act as this user for one hour (second cookie; own session kept); audited (D-6)',
+        summary: 'Impersonate a user',
+        description:
+          'Acts as this user for one hour through a second cookie; your own session is kept. Audited.',
       },
     },
   )
@@ -492,7 +496,10 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         200: OkSchema(t.Object({ stopped: t.Literal(true), user: PublicUser })),
         ...errorResponses,
       },
-      detail: { summary: 'End impersonation: revoke the impersonated session, back to the admin' },
+      detail: {
+        summary: 'Stop impersonating',
+        description: 'Revokes the impersonated session and returns to your own.',
+      },
     },
   )
 
@@ -528,8 +535,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'My 2FA status: enabled, pending setup (with its secret + otpauth URL), recovery codes left',
+        summary: 'Get my 2FA status',
+        description:
+          'Whether 2FA is on, any pending setup (with its secret and otpauth URL), and recovery codes left.',
       },
     },
   )
@@ -573,8 +581,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Start 2FA setup: a new secret (base32) + otpauth URL; nothing is enforced until /enable',
+        summary: 'Start 2FA setup',
+        description:
+          'Returns a new base32 secret and otpauth URL. Nothing is enforced until `/enable`.',
       },
     },
   )
@@ -638,8 +647,8 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Confirm setup with a live code: 2FA becomes mandatory for my logins; recovery codes returned once',
+        summary: 'Enable 2FA',
+        description: 'Confirms setup with a live code. Recovery codes are returned once.',
       },
     },
   )
@@ -692,7 +701,10 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         200: OkSchema(t.Intersect([MfaStatus, t.Object({ recoveryCodes: t.Array(t.String()) })])),
         ...errorResponses,
       },
-      detail: { summary: 'Replace all recovery codes (needs a live TOTP code); returned once' },
+      detail: {
+        summary: 'Regenerate recovery codes',
+        description: 'Needs a live TOTP code. The new codes are returned once.',
+      },
     },
   )
   .post(
@@ -721,7 +733,8 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       body: MfaDisableBody,
       response: { 200: OkSchema(MfaStatus), ...errorResponses },
       detail: {
-        summary: 'Turn 2FA off (current password required); also discards a pending setup',
+        summary: 'Disable 2FA',
+        description: 'Needs the current password. Also discards a pending setup.',
       },
     },
   )
@@ -787,8 +800,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         413: errorResponses[422],
       },
       detail: {
-        summary:
-          'Upload my avatar (multipart `file`, PNG/JPEG/WebP/GIF ≤ 2 MB); replaces the previous one',
+        summary: 'Upload my avatar',
+        description:
+          'Multipart `file`: PNG, JPEG, WebP or GIF up to 2 MB. Replaces the previous avatar.',
       },
     },
   )
@@ -825,7 +839,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         return fail('unauthorized', 'Sesi tidak ada atau sudah berakhir', requestId);
       },
       response: { 200: OkSchema(t.Object({ user: PublicUser })), ...errorResponses },
-      detail: { summary: 'Remove my avatar (the uploaded file is deleted too)' },
+      detail: { summary: 'Remove my avatar' },
     },
   )
   .delete(
@@ -860,7 +874,10 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       beforeHandle: permission('user.edit'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ reset: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Admin: remove a user’s 2FA (lock-out recovery) and end their sessions' },
+      detail: {
+        summary: "Reset a user's 2FA",
+        description: 'For lock-out recovery. Also ends their sessions.',
+      },
     },
   )
   .put(
@@ -928,7 +945,8 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary: 'Admin: set a member’s password (not one’s own); ends all their sessions; audited',
+        summary: "Set a user's password",
+        description: 'Not for your own account. Ends all their sessions. Audited.',
       },
     },
   )
@@ -1007,8 +1025,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Admin: e-mail a member a password (re)set link valid 24 h; refused for .test/.invalid addresses',
+        summary: 'Send a password reset link',
+        description:
+          'The link is valid for 24 hours. Refused for `.test` and `.invalid` addresses.',
       },
     },
   )
@@ -1052,7 +1071,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         200: OkSchema(t.Object({ changed: t.Literal(true), revokedOtherSessions: t.Integer() })),
         ...errorResponses,
       },
-      detail: { summary: 'Change my password; signs out my other sessions (D-4)' },
+      detail: { summary: 'Change my password', description: 'Signs out your other sessions.' },
     },
   )
 
@@ -1117,8 +1136,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       query: UsersListQuery,
       response: { 200: PageSchema(TenantUser), ...errorResponses },
       detail: {
-        summary:
-          'Users of the active tenant: paginated, searchable, sortable, filterable by group (D-1)',
+        summary: 'List users',
+        description:
+          'Users of the active tenant; paginated, searchable, sortable and filterable by group.',
       },
     },
   )
@@ -1134,7 +1154,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       beforeHandle: permission('user.read'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(TenantUser), ...errorResponses },
-      detail: { summary: 'One user of the active tenant, with their groups' },
+      detail: { summary: 'Get a user' },
     },
   )
   .post(
@@ -1258,8 +1278,8 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Create a user in the active tenant, or add an existing account to it; optional groups',
+        summary: 'Create a user',
+        description: 'Creates the account, or adds an existing account to the active tenant.',
       },
     },
   )
@@ -1321,7 +1341,10 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       params: t.Object({ id: Id }),
       body: UserUpdateBody,
       response: { 200: OkSchema(TenantUser), ...errorResponses },
-      detail: { summary: 'Edit a user of the active tenant; groupIds replaces their groups here' },
+      detail: {
+        summary: 'Update a user',
+        description: '`groupIds` replaces their groups in the active tenant.',
+      },
     },
   )
   .delete(
@@ -1383,8 +1406,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Remove a user from the active tenant (soft); the account goes when no tenant remains',
+        summary: 'Remove a user',
+        description:
+          'Soft-removes them from the active tenant; the account is deleted once no tenant remains.',
       },
     },
   );

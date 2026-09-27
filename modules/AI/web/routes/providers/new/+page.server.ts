@@ -30,7 +30,7 @@ export const actions: Actions = {
         },
         values,
       );
-    const v = validateForm(ProviderBody, input); // the API's own schema (L-17)
+    const v = validateForm(ProviderBody, input); // the API's own schema
     if (!v.ok)
       return actionFailure(
         {

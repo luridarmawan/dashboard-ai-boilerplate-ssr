@@ -151,8 +151,9 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
       query: ListOutboxQuery,
       response: { 200: PageSchema(Row), ...errorResponses },
       detail: {
-        summary:
-          'Outbox rows, newest first; filter by ?status, ?template and ?from/?to (day range), search recipient/subject with ?q',
+        summary: 'List outbox emails',
+        description:
+          'Newest first. Filter with `?status`, `?template`, `?from`/`?to` (days); `?q` searches recipient and subject.',
       },
     },
   )
@@ -164,8 +165,9 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ requeued: t.Integer() })), ...errorResponses },
       detail: {
-        summary:
-          'Send an e-mail again — failed or already delivered; re-rendered with the SMTP in effect now (requeued 0 = unknown id or currently sending)',
+        summary: 'Resend an email',
+        description:
+          'Works for failed and delivered emails; re-rendered with the current SMTP settings. `requeued: 0` means the id is unknown or it is sending right now.',
       },
     },
   )
@@ -182,7 +184,10 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
       ),
       ...errorResponses,
     },
-    detail: { summary: 'Run one worker pass now (the scheduler does this every minute)' },
+    detail: {
+      summary: 'Deliver queued emails now',
+      description: 'Runs one worker pass; the scheduler also does this every minute.',
+    },
   })
   .get(
     '/stats',
@@ -227,6 +232,9 @@ export const outbox = new Elysia({ name: 'outbox', prefix: '/outbox', tags: ['ma
         ),
         ...errorResponses,
       },
-      detail: { summary: 'Counts per status, plus the templates that appear in the outbox' },
+      detail: {
+        summary: 'Outbox statistics',
+        description: 'Counts per status and the templates in use.',
+      },
     },
   );

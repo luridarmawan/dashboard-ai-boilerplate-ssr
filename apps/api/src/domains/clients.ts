@@ -119,7 +119,10 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         ),
         ...errorResponses,
       },
-      detail: { summary: 'Tenants the caller may act in (D-3, B-4) — drives the switcher' },
+      detail: {
+        summary: 'List my tenants',
+        description: 'Tenants you can act in; feeds the tenant switcher.',
+      },
     },
   )
   .get(
@@ -178,7 +181,10 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       beforeHandle: permission('client.read'),
       query: ListQuery,
       response: { 200: PageSchema(Client), ...errorResponses },
-      detail: { summary: 'Tenants: all for a superadmin, otherwise my memberships (D-3)' },
+      detail: {
+        summary: 'List tenants',
+        description: 'All tenants for a superadmin, otherwise your memberships.',
+      },
     },
   )
   .get(
@@ -194,7 +200,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       beforeHandle: permission('client.read'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(Client), ...errorResponses },
-      detail: { summary: 'One tenant I may act in' },
+      detail: { summary: 'Get a tenant' },
     },
   )
   .post(
@@ -264,7 +270,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       body: ClientCreateBody,
       response: { 201: OkSchema(Client), ...errorResponses },
       detail: {
-        summary: 'Create a tenant; seeds its system groups and makes the caller its admin',
+        summary: 'Create a tenant',
+        description: 'Seeds its system groups and makes you its admin.',
       },
     },
   )
@@ -309,7 +316,10 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       params: t.Object({ id: Id }),
       body: ClientUpdateBody,
       response: { 200: OkSchema(Client), ...errorResponses },
-      detail: { summary: 'Edit a tenant (name, parent, settings, status); the code is permanent' },
+      detail: {
+        summary: 'Update a tenant',
+        description: 'Name, parent, settings and status. The code cannot change.',
+      },
     },
   )
   .delete(
@@ -320,8 +330,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       const c = await live(params.id);
       if (!c || !(await canActInTenant(db, a.user, c.id)))
         return notFound(set, requestId, 'Tenant');
-      if (c.code === 'default')
-        return conflict(set, requestId, 'Tenant baku tidak bisa dihapus (B-5)');
+      if (c.code === 'default') return conflict(set, requestId, 'Tenant baku tidak bisa dihapus');
       const [children] = await db
         .select({ n: count() })
         .from(schema.clients)
@@ -350,6 +359,9 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       beforeHandle: permission('client.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-      detail: { summary: 'Soft-delete a tenant (never `default`, never one with sub-tenants)' },
+      detail: {
+        summary: 'Delete a tenant',
+        description: 'Refused for `default` and for tenants that have sub-tenants.',
+      },
     },
   );

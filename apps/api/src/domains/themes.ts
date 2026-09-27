@@ -118,8 +118,8 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Theme registry (core + modules) filtered by the tenant allowlist; anonymous allowed',
+        summary: 'List themes',
+        description: 'Core and module themes allowed for the tenant. No session needed.',
       },
     },
   )
@@ -146,7 +146,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
     {
       body: t.Object({ theme: t.String({ maxLength: 64 }) }),
       response: { 200: OkSchema(t.Object({ theme: t.String() })), ...errorResponses },
-      detail: { summary: 'My theme choice, within the tenant allowlist (L-11)' },
+      detail: { summary: 'Set my theme', description: 'Must be one the tenant allows.' },
     },
   )
   .put(
@@ -199,8 +199,8 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Set the default theme for the tenant (or globally) — L-10; takes effect on every instance at once',
+        summary: 'Set the default theme',
+        description: 'For the tenant or globally. Takes effect on every instance.',
       },
     },
   )
@@ -240,8 +240,9 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Custom themes usable by the active tenant with their CSS — the web app injects it per request (L-24); anonymous allowed',
+        summary: 'List custom themes',
+        description:
+          'Custom themes usable by the active tenant, with their CSS. No session needed.',
       },
     },
   )
@@ -280,7 +281,8 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         ...errorResponses,
       },
       detail: {
-        summary: 'Custom themes owned by the tenant (or global) plus the editor vocabulary',
+        summary: 'List editable custom themes',
+        description: 'Themes owned by the tenant (or global), plus the options the editor offers.',
       },
     },
   )
@@ -303,7 +305,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
       beforeHandle: permission('theme.manage'),
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(CustomThemeView), ...errorResponses },
-      detail: { summary: 'One custom theme for the editor' },
+      detail: { summary: 'Get a custom theme' },
     },
   )
   .post(
@@ -324,9 +326,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
         set.status = r.code === 'conflict' ? 409 : 422;
         return fail(
           r.code === 'conflict' ? 'conflict' : 'validation_failed',
-          r.code === 'conflict'
-            ? 'Slug sudah dipakai'
-            : 'Tema belum memenuhi kontrak (L-5, L-8, L-21)',
+          r.code === 'conflict' ? 'Slug sudah dipakai' : 'Tema belum memenuhi kontrak',
           requestId,
           { errors: r.errors, contrast: r.contrast },
         );
@@ -349,8 +349,9 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
       body: CustomThemeBody,
       response: { 201: OkSchema(CustomThemeView), ...errorResponses },
       detail: {
-        summary:
-          'Assemble a new theme from tokens + a registered icon set and layouts; refused unless it passes WCAG AA (L-24, L-21)',
+        summary: 'Create a custom theme',
+        description:
+          'Built from color tokens, a registered icon set and layouts. Refused unless it passes WCAG AA contrast.',
       },
     },
   )
@@ -377,7 +378,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
             ? 'Tema tidak ditemukan'
             : r.code === 'conflict'
               ? 'Slug sudah dipakai'
-              : 'Tema belum memenuhi kontrak (L-5, L-8, L-21)',
+              : 'Tema belum memenuhi kontrak',
           requestId,
           { errors: r.errors, contrast: r.contrast },
         );
@@ -399,7 +400,7 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
       params: t.Object({ id: Id }),
       body: CustomThemeBody,
       response: { 200: OkSchema(CustomThemeView), ...errorResponses },
-      detail: { summary: 'Update a custom theme; live on every instance at the next request' },
+      detail: { summary: 'Update a custom theme' },
     },
   )
   .delete(
@@ -432,7 +433,8 @@ export const themesDomain = new Elysia({ name: 'themes', prefix: '/themes', tags
       params: t.Object({ id: Id }),
       response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
       detail: {
-        summary: 'Remove a custom theme; users on it fall back through the resolution chain (L-12)',
+        summary: 'Delete a custom theme',
+        description: 'Users on it fall back to the tenant or global default.',
       },
     },
   );

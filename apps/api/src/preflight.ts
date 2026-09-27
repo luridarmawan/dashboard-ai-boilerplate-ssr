@@ -185,7 +185,7 @@ export async function runPreflight(
       status: 'fail',
       detail: `${mig.value.pending} migrasi belum diterapkan (${mig.value.applied}/${mig.value.embedded})`,
       ms: mig.ms,
-      hint: 'jalankan `dc run --rm migrate` sebelum menyalakan versi ini (Q-4)',
+      hint: 'jalankan `dc run --rm migrate` sebelum menyalakan versi ini',
     });
   } else {
     push({

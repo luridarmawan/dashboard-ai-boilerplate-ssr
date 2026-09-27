@@ -144,7 +144,7 @@ export function checkContrast(tokens: ThemeTokens): ContrastProblem[] {
           bg,
           ratio,
           minimum,
-          message: `${mode}: --${fg} pada --${bg} = ${ratio.toFixed(2)}, minimum ${minimum} (L-21)`,
+          message: `${mode}: --${fg} pada --${bg} = ${ratio.toFixed(2)}, minimum ${minimum}`,
         });
     }
   }

@@ -206,17 +206,18 @@ export const mcpDomain = new Elysia({ name: 'mcp', prefix: '/mcp', tags: ['mcp']
     body: t.Unknown(),
     response: { 200: t.Unknown(), ...errorResponses },
     detail: {
-      summary:
-        'MCP Streamable HTTP endpoint (JSON-RPC: initialize, tools/list, tools/call, resources/*, prompts/*) — bearer token or session required',
+      summary: 'MCP endpoint',
+      description:
+        'Streamable HTTP, JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/*`, `prompts/*`. Needs a bearer token or a session.',
     },
   })
   .get('/', (ctx) => handle(ctx), {
     beforeHandle: guard,
     response: { 200: t.Unknown(), ...errorResponses },
-    detail: { summary: 'MCP Streamable HTTP: server-initiated stream (stateless mode: 405)' },
+    detail: { summary: 'MCP server stream', description: 'Always 405: the server runs stateless.' },
   })
   .delete('/', (ctx) => handle(ctx), {
     beforeHandle: guard,
     response: { 200: t.Unknown(), ...errorResponses },
-    detail: { summary: 'MCP Streamable HTTP: end session (stateless mode: 405)' },
+    detail: { summary: 'End MCP session', description: 'Always 405: the server runs stateless.' },
   });

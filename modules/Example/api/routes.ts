@@ -185,7 +185,10 @@ export default defineApiRoutes(
           order: t.Optional(t.Union([t.Literal('asc'), t.Literal('desc')])),
         }),
         response: { 200: PageSchema(Product), ...errorResponses },
-        detail: { summary: 'Storefront products (public; default tenant unless X-Client-ID)' },
+        detail: {
+          summary: 'List products',
+          description: 'Public. Uses the default tenant unless `X-Client-ID` is sent.',
+        },
       },
     )
     .get(
@@ -210,7 +213,7 @@ export default defineApiRoutes(
       {
         params: t.Object({ slug: t.String({ maxLength: 120 }) }),
         response: { 200: OkSchema(Product), ...errorResponses },
-        detail: { summary: 'One product by slug (public)' },
+        detail: { summary: 'Get a product', description: 'Public.' },
       },
     )
     .get(
@@ -236,7 +239,7 @@ export default defineApiRoutes(
       },
       {
         response: { 200: OkSchema(t.Array(Testimonial)), ...errorResponses },
-        detail: { summary: 'Testimonials (public)' },
+        detail: { summary: 'List testimonials', description: 'Public.' },
       },
     )
     .get(
@@ -254,7 +257,7 @@ export default defineApiRoutes(
       },
       {
         response: { 200: OkSchema(t.Array(Category)), ...errorResponses },
-        detail: { summary: 'Product categories (public)' },
+        detail: { summary: 'List categories', description: 'Public.' },
       },
     )
     .get(
@@ -314,7 +317,8 @@ export default defineApiRoutes(
         query: t.Object({ path: t.String({ maxLength: 512 }) }),
         response: { 200: OkSchema(Resolved), ...errorResponses },
         detail: {
-          summary: 'Resolve a root URL (/<category> or /<product>) for the 404 trapper (F-11)',
+          summary: 'Resolve a root URL',
+          description: 'Maps `/<category>` or `/<product>` to its page for the 404 trapper.',
         },
       },
     )
@@ -352,7 +356,10 @@ export default defineApiRoutes(
           200: OkSchema(t.Array(t.Object({ path: t.String(), lastmod: t.String() }))),
           ...errorResponses,
         },
-        detail: { summary: 'Dynamic public paths for sitemap.xml (F-7, R-4)' },
+        detail: {
+          summary: 'Sitemap paths',
+          description: 'Dynamic public paths for `sitemap.xml`.',
+        },
       },
     )
     .post(
@@ -452,8 +459,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Contact form (public): rate limited, honeypot, stored, emailed via outbox (R-5)',
+          summary: 'Submit the contact form',
+          description: 'Public and rate-limited. Stored and emailed through the outbox.',
         },
       },
     )
@@ -473,7 +480,7 @@ export default defineApiRoutes(
       {
         beforeHandle: permission('example.product.read'),
         response: { 200: PageSchema(Product), ...errorResponses },
-        detail: { summary: 'All products of the active tenant (admin)' },
+        detail: { summary: 'List products (admin)' },
       },
     )
     .get(
@@ -498,7 +505,7 @@ export default defineApiRoutes(
         beforeHandle: permission('example.product.read'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(Product), ...errorResponses },
-        detail: { summary: 'One product (admin)' },
+        detail: { summary: 'Get a product (admin)' },
       },
     )
     .post(
@@ -619,7 +626,7 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         body: ProductUpdateBody,
         response: { 200: OkSchema(Product), ...errorResponses },
-        detail: { summary: 'Edit a product' },
+        detail: { summary: 'Update a product' },
       },
     )
     .delete(
@@ -660,7 +667,7 @@ export default defineApiRoutes(
         beforeHandle: permission('example.product.manage'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-        detail: { summary: 'Soft-delete a product' },
+        detail: { summary: 'Delete a product' },
       },
     )
 
@@ -705,7 +712,7 @@ export default defineApiRoutes(
           state: t.Optional(t.String()),
         }),
         response: { 200: PageSchema(Inquiry), ...errorResponses },
-        detail: { summary: 'Inquiries of the active tenant, newest first' },
+        detail: { summary: 'List inquiries', description: 'Newest first.' },
       },
     )
     .put(
@@ -733,7 +740,10 @@ export default defineApiRoutes(
           200: OkSchema(t.Object({ id: t.String(), state: t.String() })),
           ...errorResponses,
         },
-        detail: { summary: 'Set an inquiry state (new/read/replied/spam)' },
+        detail: {
+          summary: 'Set inquiry state',
+          description: 'One of `new`, `read`, `replied`, `spam`.',
+        },
       },
     ),
 );

@@ -37,7 +37,7 @@ export function resolveRequestTheme(event: RequestEvent, config: PublicConfig): 
   const resolution = resolveTheme({
     user: usable(event.locals.session?.user.theme),
     cookie: usable(event.cookies.get(THEME_COOKIE)),
-    tenantDefault: usable(cfgString(config, 'app.default_theme')), // tenant value or global fallback (E-2)
+    tenantDefault: usable(cfgString(config, 'app.default_theme')), // tenant value or global fallback
     globalDefault: null,
     allowed,
     extra,

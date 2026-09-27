@@ -57,4 +57,44 @@ describe('OpenAPI document (N-1, N-2, gate M3 #2)', () => {
     expect(text).toContain('demo_mode');
     expect(paths.length).toBeGreaterThanOrEqual(40);
   });
+
+  test('guarded routes state their permission, taken from the guard itself', async () => {
+    const res = await app.handle(new Request('http://api.test/openapi.json'));
+    const doc = (await res.json()) as {
+      paths: Record<string, Record<string, { description?: string }>>;
+    };
+    const op = (path: string, method: string) => doc.paths[path]?.[method]?.description ?? '';
+    // requirePermission() at plugin level, permission() on the route, and a module route.
+    expect(op('/v1/auth/permission-registry', 'get')).toContain(
+      'Requires permission: `group.read`.',
+    );
+    expect(op('/v1/groups/', 'post')).toContain('Requires permission: `group.create`.');
+    expect(op('/v1/m/example/admin/products', 'get')).toContain(
+      'Requires permission: `example.product.read`.',
+    );
+    // Public and session-only routes carry no such line.
+    expect(op('/v1/health', 'get')).not.toContain('Requires permission');
+    expect(op('/v1/users/profile/me', 'get')).not.toContain('Requires permission');
+  });
+
+  test('summaries and descriptions carry no internal spec codes like A-1 or C-4', async () => {
+    const res = await app.handle(new Request('http://api.test/openapi.json'));
+    const doc = (await res.json()) as {
+      info: { description?: string };
+      tags?: { name: string; description?: string }[];
+      paths: Record<string, Record<string, { summary?: string; description?: string }>>;
+    };
+    const texts: [string, string][] = [['info', doc.info.description ?? '']];
+    for (const tag of doc.tags ?? []) texts.push([`tag ${tag.name}`, tag.description ?? '']);
+    for (const [p, ops] of Object.entries(doc.paths)) {
+      for (const [method, o] of Object.entries(ops)) {
+        texts.push([`${method.toUpperCase()} ${p}`, `${o.summary ?? ''} ${o.description ?? ''}`]);
+      }
+    }
+    const offenders = texts.filter(([, text]) => SPEC_CODE.test(text)).map(([where]) => where);
+    expect(offenders).toEqual([]);
+  });
 });
+
+/** PRD requirement ids (A-1, FR-K, L-24, …) mean nothing to API consumers. */
+const SPEC_CODE = /\b(?:FR-)?[A-Z]{1,2}-\d+\b|\bPRD\b/;

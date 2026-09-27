@@ -1345,8 +1345,9 @@ export default defineApiRoutes(
         // The body is the provider's own shape (JSON, or an SSE stream): documented as opaque.
         response: { 200: t.Unknown(), ...errorResponses },
         detail: {
-          summary:
-            'OpenAI-compatible chat completions proxied to the configured provider; stream: true streams SSE (H-2, H-3)',
+          summary: 'Chat completions',
+          description:
+            'OpenAI-compatible, proxied to the configured provider. `stream: true` answers with SSE.',
         },
       },
     )
@@ -1399,8 +1400,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Upload a chat attachment (images, text, csv, json, markdown; 5 MB) owned by me; private (H-11)',
+          summary: 'Upload a chat attachment',
+          description: 'Images, text, CSV, JSON or Markdown up to 5 MB. Private to you.',
         },
       },
     )
@@ -1444,8 +1445,9 @@ export default defineApiRoutes(
         }),
         response: { 200: PageSchema(Conversation), ...errorResponses },
         detail: {
-          summary:
-            'My conversations, newest first; ?q= searches titles; ?archived=1 includes archived, ?archived=only lists just the archive',
+          summary: 'List conversations',
+          description:
+            'Newest first. `?q` searches titles; `?archived=1` includes archived ones, `?archived=only` lists only those.',
         },
       },
     )
@@ -1490,8 +1492,9 @@ export default defineApiRoutes(
         body: t.Optional(ConversationCreate),
         response: { 201: OkSchema(Conversation), ...errorResponses },
         detail: {
-          summary:
-            'Start a conversation (title is set from the first message); optional provider code + model (H-10)',
+          summary: 'Start a conversation',
+          description:
+            'The title is taken from the first message. Provider code and model are optional.',
         },
       },
     )
@@ -1558,7 +1561,7 @@ export default defineApiRoutes(
           200: OkSchema(t.Intersect([Conversation, t.Object({ messages: t.Array(Message) })])),
           ...errorResponses,
         },
-        detail: { summary: 'One conversation with its messages' },
+        detail: { summary: 'Get a conversation', description: 'Includes its messages.' },
       },
     )
     .patch(
@@ -1620,7 +1623,10 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         body: ConversationPatch,
         response: { 200: OkSchema(Conversation), ...errorResponses },
-        detail: { summary: 'Rename, (un)archive, or switch provider/model of a conversation' },
+        detail: {
+          summary: 'Update a conversation',
+          description: 'Rename, archive or unarchive, or switch provider and model.',
+        },
       },
     )
     .delete(
@@ -1658,7 +1664,7 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.chat.create'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-        detail: { summary: 'Soft-delete a conversation' },
+        detail: { summary: 'Delete a conversation' },
       },
     )
 
@@ -1685,7 +1691,8 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.log.read'),
         response: { 200: OkSchema(t.Array(t.String())), ...errorResponses },
         detail: {
-          summary: 'Distinct models in the call log of the active tenant (filter options)',
+          summary: 'List logged models',
+          description: 'Models seen in the AI call log, for filter options.',
         },
       },
     )
@@ -1810,8 +1817,9 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'AI call log of the active tenant (tokens, latency, status, cost); only your own calls without ai.log.manage',
+          summary: 'List AI calls',
+          description:
+            'Tokens, latency, status and cost. Without `ai.log.manage` you only see your own calls.',
         },
       },
     )
@@ -1846,8 +1854,9 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.chat.read'),
         response: { 200: OkSchema(t.Array(ProviderOption)), ...errorResponses },
         detail: {
-          summary:
-            'Enabled provider profiles + models a chat user may pick (H-10); empty = legacy ai.* settings apply',
+          summary: 'List provider choices',
+          description:
+            'Enabled providers and models a chat user can pick. Empty means the `ai.*` settings apply.',
         },
       },
     )
@@ -1866,7 +1875,7 @@ export default defineApiRoutes(
       {
         beforeHandle: permission('ai.provider.read'),
         response: { 200: OkSchema(t.Array(ProviderView)), ...errorResponses },
-        detail: { summary: 'Provider profiles of the active tenant with their price lists (H-10)' },
+        detail: { summary: 'List providers', description: 'Includes their price lists.' },
       },
     )
     .get(
@@ -1883,7 +1892,7 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.provider.read'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(ProviderView), ...errorResponses },
-        detail: { summary: 'One provider profile (API key masked)' },
+        detail: { summary: 'Get a provider', description: 'The API key is masked.' },
       },
     )
     .post(
@@ -1989,8 +1998,8 @@ export default defineApiRoutes(
         body: ProviderBody,
         response: { 201: OkSchema(ProviderView), ...errorResponses },
         detail: {
-          summary:
-            'Create a provider profile with its priced model list (H-10); the first one becomes the default',
+          summary: 'Create a provider',
+          description: 'With its priced model list. The first provider becomes the default.',
         },
       },
     )
@@ -2058,8 +2067,9 @@ export default defineApiRoutes(
         body: ProviderUpdateBody,
         response: { 200: OkSchema(ProviderView), ...errorResponses },
         detail: {
-          summary:
-            'Update a provider profile; apiKey omitted/*** keeps the stored secret; models replaces the price list',
+          summary: 'Update a provider',
+          description:
+            'Omit `apiKey` or send `***` to keep the stored key. `models` replaces the price list.',
         },
       },
     )
@@ -2101,7 +2111,8 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
         detail: {
-          summary: 'Remove a provider profile; pinned conversations fall back to the default',
+          summary: 'Delete a provider',
+          description: 'Conversations pinned to it fall back to the default provider.',
         },
       },
     )
@@ -2186,8 +2197,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Capability probe for the settings-based provider (Pengaturan → AI); answers the generic config-action shape',
+          summary: 'Test the settings provider',
+          description: 'Probes the provider configured under Settings → AI.',
         },
       },
     )
@@ -2297,8 +2308,9 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Capability probe with the stored key (AI-Roadmap §4.1): endpoints, stream, reasoning, tools + model ids to price (H-10)',
+          summary: 'Test a provider',
+          description:
+            'Probes endpoints, streaming, reasoning and tools with the stored key, and lists model ids to price.',
         },
       },
     )
@@ -2398,8 +2410,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Capability probe for ONE model of a provider (AI-Roadmap §4.1): each model has its own reasoning / tools / endpoint verdict',
+          summary: 'Test a provider model',
+          description: 'Probes one model for reasoning, tools and endpoint support.',
         },
       },
     )
@@ -2610,8 +2622,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'AI usage analytics of the active tenant: totals, per day, per provider/model, per user (H-15). ?days=7|30|90',
+          summary: 'AI usage analytics',
+          description: 'Totals per day, provider, model and user. `?days=7|30|90`.',
         },
       },
     )
@@ -2628,7 +2640,9 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.chat.read'),
         response: { 200: OkSchema(QuotaView), ...errorResponses },
         detail: {
-          summary: 'My AI quota this month: tenant + user token usage vs limits, tenant balance',
+          summary: 'Get my AI quota',
+          description:
+            "This month's token usage against tenant and user limits, plus the tenant balance.",
         },
       },
     )
@@ -2675,7 +2689,10 @@ export default defineApiRoutes(
           200: OkSchema(t.Object({ balanceMicro: t.Nullable(t.Number()), spentMicro: t.Number() })),
           ...errorResponses,
         },
-        detail: { summary: 'Top up or adjust the tenant’s AI balance (B-6); ledgered and audited' },
+        detail: {
+          summary: 'Adjust AI balance',
+          description: 'Top-up or adjustment. Recorded in the ledger and audited.',
+        },
       },
     )
     .get(
@@ -2711,7 +2728,10 @@ export default defineApiRoutes(
           ),
           ...errorResponses,
         },
-        detail: { summary: 'Last 50 balance changes (top-ups, adjustments)' },
+        detail: {
+          summary: 'List balance changes',
+          description: 'The last 50 top-ups and adjustments.',
+        },
       },
     )
 
@@ -2729,7 +2749,7 @@ export default defineApiRoutes(
       {
         beforeHandle: permission('ai.mcp.read'),
         response: { 200: OkSchema(t.Array(McpView)), ...errorResponses },
-        detail: { summary: 'External MCP servers registered for the active tenant (I-4)' },
+        detail: { summary: 'List MCP servers' },
       },
     )
     .get(
@@ -2759,7 +2779,10 @@ export default defineApiRoutes(
           200: OkSchema(t.Intersect([McpView, t.Object({ tools: t.Array(McpToolView) })])),
           ...errorResponses,
         },
-        detail: { summary: 'One MCP server with the tools discovered on it' },
+        detail: {
+          summary: 'Get an MCP server',
+          description: 'Includes the tools discovered on it.',
+        },
       },
     )
     .post(
@@ -2814,7 +2837,8 @@ export default defineApiRoutes(
         body: McpBody,
         response: { 201: OkSchema(McpView), ...errorResponses },
         detail: {
-          summary: 'Register an external MCP server (http or sse); headers are stored as secrets',
+          summary: 'Add an MCP server',
+          description: 'HTTP or SSE transport. Headers are stored as secrets.',
         },
       },
     )
@@ -2875,7 +2899,10 @@ export default defineApiRoutes(
         params: t.Object({ id: Id }),
         body: McpUpdateBody,
         response: { 200: OkSchema(McpView), ...errorResponses },
-        detail: { summary: 'Update an MCP server; a header value of *** keeps the stored secret' },
+        detail: {
+          summary: 'Update an MCP server',
+          description: 'A header value of `***` keeps the stored secret.',
+        },
       },
     )
     .put(
@@ -2927,8 +2954,9 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary:
-            'Enable or disable discovered tools of an MCP server; disabled tools are not offered to the assistant and survive a re-test',
+          summary: 'Enable or disable MCP tools',
+          description:
+            'Disabled tools are not offered to the assistant and stay disabled after a re-test.',
         },
       },
     )
@@ -2964,7 +2992,7 @@ export default defineApiRoutes(
         beforeHandle: permission('ai.mcp.manage'),
         params: t.Object({ id: Id }),
         response: { 200: OkSchema(t.Object({ deleted: t.Literal(true) })), ...errorResponses },
-        detail: { summary: 'Remove an MCP server and forget its tools' },
+        detail: { summary: 'Delete an MCP server' },
       },
     )
     .post(
@@ -3058,7 +3086,8 @@ export default defineApiRoutes(
           ...errorResponses,
         },
         detail: {
-          summary: 'Connect to the MCP server, (re)load its tool list, record status (I-5)',
+          summary: 'Test an MCP server',
+          description: 'Connects, reloads its tool list and records the status.',
         },
       },
     ),

@@ -12,6 +12,15 @@ const PUBLIC_MODULE_NS = [...new Set(modulePublicRoutes.map((r) => r.ns))];
 const usableAsset = (v: string | undefined) =>
   v && (v.startsWith('/') || /^https?:\/\//.test(v)) ? v : null;
 
+/**
+ * `app.landing_lead` (Pengaturan → Aplikasi) is the tenant's own line under the brand name. Set,
+ * it wins over APP_LANDING_LEAD and the translated copy — the same way `app.name` wins in the UI —
+ * so every shell that already renders `landing.lead` picks it up without learning a new prop.
+ */
+function withTenantLead(messages: Record<string, string>, lead: string): Record<string, string> {
+  return lead ? { ...messages, 'landing.lead': lead } : messages;
+}
+
 export const load: LayoutServerLoad = async ({ locals }) => ({
   theme: {
     id: locals.theme.theme.id,
@@ -43,9 +52,12 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
    * this correct under client-side navigation: signing in and out are full document loads, while
    * a client navigation can never change the session, so the catalogue can never be stale.
    */
-  messages: brandedMessages(
-    locals.session
-      ? messagesFor(locals.locale.locale)
-      : messagesFor(locals.locale.locale, [...ANONYMOUS_NAMESPACES, ...PUBLIC_MODULE_NS]),
+  messages: withTenantLead(
+    brandedMessages(
+      locals.session
+        ? messagesFor(locals.locale.locale)
+        : messagesFor(locals.locale.locale, [...ANONYMOUS_NAMESPACES, ...PUBLIC_MODULE_NS]),
+    ),
+    cfgString(locals.config, 'app.landing_lead', '').trim(),
   ),
 });

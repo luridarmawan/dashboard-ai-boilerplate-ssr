@@ -6,6 +6,9 @@ import type { ResolvedTheme } from '$lib/server/theme';
 
 // See https://svelte.dev/docs/kit/types#app.d.ts for what can be declared here.
 declare global {
+  /** Root package.json version, inlined by Vite (see vite.config.ts). */
+  const __APP_VERSION__: string;
+
   namespace App {
     interface Locals {
       requestId: string;

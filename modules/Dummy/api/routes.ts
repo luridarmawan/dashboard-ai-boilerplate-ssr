@@ -12,7 +12,7 @@ export default defineApiRoutes(
   new Elysia({ name: 'module:dummy', tags: ['module:dummy'] })
     .get('/ping', () => ok({ module: 'dummy' as const, at: new Date().toISOString() }), {
       response: OkSchema(t.Object({ module: t.Literal('dummy'), at: t.String() })),
-      detail: { summary: 'Proves the module is mounted under its namespace' },
+      detail: { summary: 'Ping', description: 'Proves the module is mounted under its namespace.' },
     })
     // Reaches the module's own table through the shared db instance (P-6). Tenant scoping
     // arrives with the data-layer guard in M1 (B-3); until then this stays a count.
@@ -24,7 +24,7 @@ export default defineApiRoutes(
       },
       {
         response: OkSchema(t.Object({ count: t.Integer() })),
-        detail: { summary: 'Number of rows in dummy_notes' },
+        detail: { summary: 'Count notes' },
       },
     ),
 );

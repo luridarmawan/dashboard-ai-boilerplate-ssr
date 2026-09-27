@@ -125,7 +125,7 @@ describe('renderRemovalMigration', () => {
     const keep = unrelatedStatements(generated, tables);
     expect(keep).toEqual(['ALTER TABLE `users` ADD `nickname` varchar(64);']);
     const sql = renderRemovalMigration({ dialect: 'mysql', name: 'AI', ns: 'ai', tables }, keep);
-    expect(sql.startsWith('-- Uninstall modul AI (G-15)')).toBe(true);
+    expect(sql.startsWith('-- Uninstall modul AI:')).toBe(true);
     const stmts = splitStatements(sql);
     // the header rides on the first statement; strip comment lines for the comparison
     const first = stmts[0]

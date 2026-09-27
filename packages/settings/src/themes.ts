@@ -150,7 +150,7 @@ export class CustomThemeStore {
       errors.slug = 'huruf kecil, angka, tanda hubung; maks. 40 karakter';
     if (!input.name?.id?.trim() || !input.name?.en?.trim())
       errors.name = 'nama id dan en wajib diisi';
-    if (!ICON_SETS[input.icons]) errors.icons = `set ikon "${input.icons}" tidak terdaftar (L-5)`;
+    if (!ICON_SETS[input.icons]) errors.icons = `set ikon "${input.icons}" tidak terdaftar`;
     for (const kind of Object.keys(REGIONS) as ShellKind[]) {
       const map = input.layouts[kind];
       if (!map?.default) {
@@ -159,7 +159,7 @@ export class CustomThemeStore {
       }
       for (const [variant, id] of Object.entries(map)) {
         const l = layoutById(id);
-        if (!l) errors[`layouts.${kind}`] = `layout "${id}" tidak terdaftar (L-8)`;
+        if (!l) errors[`layouts.${kind}`] = `layout "${id}" tidak terdaftar`;
         else if (l.kind !== kind)
           errors[`layouts.${kind}`] = `layout "${id}" bukan untuk ${kind} (${variant})`;
       }

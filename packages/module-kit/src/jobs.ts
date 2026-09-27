@@ -75,7 +75,7 @@ export function defineJobs(moduleName: string, jobs: readonly JobDef[]): readonl
   for (const j of jobs) {
     if (!NAME_RE.test(j.name)) throw new ModuleContractError(`nama job "${j.name}" tidak valid`);
     if (!j.name.startsWith(`${ns}.`)) {
-      throw new ModuleContractError(`nama job "${j.name}" harus diawali "${ns}." (G-9)`);
+      throw new ModuleContractError(`nama job "${j.name}" harus diawali "${ns}."`);
     }
     if (seen.has(j.name)) throw new ModuleContractError(`job "${j.name}" duplikat`);
     seen.add(j.name);

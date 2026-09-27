@@ -116,7 +116,7 @@ const allThemes = [...listThemes(THEMES), ...EXTRA_THEME_DIRS.flatMap(listThemes
 const themeDirs = allThemes.filter((t) => t.core).map((t) => t.id);
 
 if (themeDirs.length < 4) {
-  problems.push(`L-3: butuh minimal 4 tema bawaan, ditemukan ${themeDirs.length}`);
+  problems.push(`butuh minimal 4 tema bawaan, ditemukan ${themeDirs.length}`);
 }
 
 const layoutsUsed = new Set();
@@ -131,7 +131,7 @@ for (const { id, dir, core } of allThemes) {
 
   // L-5 — icon set is registered
   if (!knownIconSets.has(theme.icons)) {
-    problems.push(`${id}: set ikon "${theme.icons}" tidak terdaftar di icons/registry.json (L-5)`);
+    problems.push(`${id}: set ikon "${theme.icons}" tidak terdaftar di icons/registry.json`);
   } else {
     iconSetsUsed.add(theme.icons);
   }
@@ -146,11 +146,9 @@ for (const { id, dir, core } of allThemes) {
     for (const [variant, layoutId] of Object.entries(variants)) {
       const layout = layoutById.get(layoutId);
       if (!layout) {
-        problems.push(`${id}/${kind}/${variant}: layout "${layoutId}" tidak terdaftar (L-8)`);
+        problems.push(`${id}/${kind}/${variant}: layout "${layoutId}" tidak terdaftar`);
       } else if (layout.kind !== kind) {
-        problems.push(
-          `${id}/${kind}/${variant}: layout "${layoutId}" ber-kind "${layout.kind}" (L-8)`,
-        );
+        problems.push(`${id}/${kind}/${variant}: layout "${layoutId}" ber-kind "${layout.kind}"`);
       } else {
         layoutsUsed.add(layoutId);
       }
@@ -179,7 +177,7 @@ for (const { id, dir, core } of allThemes) {
       lowest = Math.min(lowest, r);
       if (r < min) {
         problems.push(
-          `${id}/${mode}: --${fg} pada --${bg} = ${r.toFixed(2)}, minimum ${min} (L-21)  [${fgv} / ${bgv}]`,
+          `${id}/${mode}: --${fg} pada --${bg} = ${r.toFixed(2)}, minimum ${min}  [${fgv} / ${bgv}]`,
         );
       }
     }
@@ -190,12 +188,10 @@ for (const { id, dir, core } of allThemes) {
 // L-3 — themes must genuinely differ in character, not just palette
 if (layoutsUsed.size < 2)
   problems.push(
-    `L-3: tema bawaan hanya memakai ${layoutsUsed.size} layout dashboard; minimal 2 harus berbeda`,
+    `tema bawaan hanya memakai ${layoutsUsed.size} layout dashboard; minimal 2 harus berbeda`,
   );
 if (iconSetsUsed.size < 2)
-  problems.push(
-    `L-3: tema bawaan hanya memakai ${iconSetsUsed.size} set ikon; minimal 2 harus berbeda`,
-  );
+  problems.push(`tema bawaan hanya memakai ${iconSetsUsed.size} set ikon; minimal 2 harus berbeda`);
 
 /* ---------- report ---------- */
 console.log(`\nTema diperiksa: ${allThemes.map((t) => t.id).join(', ')}`);

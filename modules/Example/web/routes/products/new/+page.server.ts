@@ -18,7 +18,7 @@ export const actions: Actions = {
         },
         raw,
       );
-    const v = validateForm(ProductBody, input); // the API's own schema (L-17)
+    const v = validateForm(ProductBody, input); // the API's own schema
     if (!v.ok)
       return actionFailure(
         {

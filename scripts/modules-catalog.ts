@@ -95,7 +95,7 @@ if (mode === 'search') {
   }
   if (view?.status === 'incompatible') {
     console.error(
-      `modules:install: ${entry.name} v${entry.version} butuh core ${entry.engines.core}, terpasang ${coreVersion()} (G-11).`,
+      `modules:install: ${entry.name} v${entry.version} butuh core ${entry.engines.core}, terpasang ${coreVersion()}.`,
     );
     process.exit(1);
   }

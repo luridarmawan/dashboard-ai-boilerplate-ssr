@@ -114,8 +114,8 @@ export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Module catalog vs installed modules: status per entry and the install command (G-16)',
+        summary: 'Module catalog',
+        description: 'Catalog entries with their install status and install command.',
       },
     },
   )
@@ -134,7 +134,9 @@ export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags
         ...errorResponses,
       },
       detail: {
-        summary: 'Modules enabled for the active tenant (names + namespaces); anonymous allowed',
+        summary: 'List enabled modules',
+        description:
+          'Names and namespaces of modules enabled for the active tenant. No session needed.',
       },
     },
   )
@@ -201,8 +203,8 @@ export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags
       beforeHandle: permission('module.read'),
       response: { 200: OkSchema(t.Array(ModuleView)), ...errorResponses },
       detail: {
-        summary:
-          'Installed modules: source, version, contributions, global/tenant state and health (G-8, G-14)',
+        summary: 'List installed modules',
+        description: 'Source, version, contributions, global/tenant state and health.',
       },
     },
   )
@@ -296,8 +298,8 @@ export const moduleDomain = new Elysia({ name: 'module', prefix: '/module', tags
         ...errorResponses,
       },
       detail: {
-        summary:
-          'Enable/disable a module for the tenant (or globally); its menu, routes, widgets and themes follow (G-8)',
+        summary: 'Enable or disable a module',
+        description: 'For the tenant or globally. Its menu, routes, widgets and themes follow.',
       },
     },
   );

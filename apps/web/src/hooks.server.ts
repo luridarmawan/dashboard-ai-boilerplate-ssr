@@ -88,7 +88,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       console.warn(
         JSON.stringify({
           level: 'warn',
-          msg: 'landing route tidak bisa dirender — memakai halaman depan bawaan (F-6)',
+          msg: 'landing route tidak bisa dirender — memakai halaman depan bawaan',
           landing: target,
           status: forwarded.status,
           requestId: event.locals.requestId,
@@ -141,7 +141,7 @@ function refuseOrigin(
   console.warn(
     JSON.stringify({
       level: 'warn',
-      msg: 'permintaan ditolak proteksi CSRF: origin tidak dikenal (A-10) — daftarkan origin publik di APP_ORIGIN, atau teruskan X-Forwarded-Proto/X-Forwarded-Host dari reverse proxy',
+      msg: 'permintaan ditolak proteksi CSRF: origin tidak dikenal — daftarkan origin publik di APP_ORIGIN, atau teruskan X-Forwarded-Proto/X-Forwarded-Host dari reverse proxy',
       reason: verdict.reason,
       method: event.request.method,
       path: event.url.pathname,
@@ -186,7 +186,7 @@ async function trap404(event: Parameters<Handle>[0]['event']): Promise<Response 
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'app.not_found_route bukan halaman penangkap 404 yang dideklarasikan modul (notFound: true) — memakai 404 bawaan (F-11)',
+        msg: 'app.not_found_route bukan halaman penangkap 404 yang dideklarasikan modul (notFound: true) — memakai 404 bawaan',
         route: target,
         requestId: event.locals.requestId,
       }),
@@ -211,7 +211,7 @@ async function trap404(event: Parameters<Handle>[0]['event']): Promise<Response 
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'penangkap 404 gagal merender — memakai halaman 404 bawaan (F-6)',
+        msg: 'penangkap 404 gagal merender — memakai halaman 404 bawaan',
         target,
         status: forwarded.status,
         path: event.url.pathname,
@@ -238,7 +238,7 @@ function routeTarget(
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'route pengaturan tidak ada di registry — memakai halaman bawaan (F-6)',
+        msg: 'route pengaturan tidak ada di registry — memakai halaman bawaan',
         setting,
         route,
       }),
@@ -250,7 +250,7 @@ function routeTarget(
     console.warn(
       JSON.stringify({
         level: 'warn',
-        msg: 'route pengaturan milik modul nonaktif — memakai halaman bawaan (F-6)',
+        msg: 'route pengaturan milik modul nonaktif — memakai halaman bawaan',
         setting,
         route,
       }),

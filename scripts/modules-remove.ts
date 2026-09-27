@@ -305,7 +305,7 @@ if (!fresh && tables.length) {
       '     dc run --rm migrate (produksi) — sesudah image baru tanpa modul ini di-deploy, karena kode lama\n' +
       '     masih membaca tabelnya sampai rollout selesai (DEPLOY.md §8).\n' +
       '  3. Commit modules.json, migrasi, dan penghapusan foldernya dalam satu perubahan.\n' +
-      'Yang sengaja tidak disentuh: audit_log (append-only, retensi M-3), baris `files` dan objeknya di storage\n' +
+      'Yang sengaja tidak disentuh: audit_log (append-only, retensi), baris `files` dan objeknya di storage\n' +
       `(kind '${ns}.*'), app.allowed_themes dan tema kustom yang merujuk set ikon/layout modul (L-14 sudah\n` +
       'menurunkannya ke baku saat hilang).',
   );
