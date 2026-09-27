@@ -26,6 +26,7 @@ import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
 import { demoMode } from './plugins/demo.ts';
 import { moduleGate } from './plugins/module-gate.ts';
+import { openapiModuleFilter } from './plugins/openapi-modules.ts';
 import { requestContext } from './plugins/request-context.ts';
 import { documentPermissions } from './plugins/tenancy.ts';
 
@@ -44,6 +45,7 @@ export const app = new Elysia()
   .use(metricsDomain)
   .use(csrf)
   .use(demoMode)
+  .use(openapiModuleFilter)
   .use(
     openapi({
       path: '/docs',

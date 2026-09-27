@@ -213,6 +213,7 @@ Aturan yang berlaku:
 
 - **Path relatif.** `/invoices/count` menjadi `/v1/m/billing/invoices/count`; sync yang me-mount, modul tidak bisa memilih atau keluar dari prefiksnya.
 - **Setiap route punya skema TypeBox** (`response`, `body`, `query`) — itulah yang membuat route Anda otomatis muncul di `/openapi.json` dan bertipe di klien Eden (N-1, N-2, N-3). Route tanpa skema bukan bagian kontrak.
+- **Modul nonaktif tidak didokumentasikan.** Route `/v1/m/<ns>/*` milik modul yang dinonaktifkan hilang dari `/openapi.json` dan `/docs`, memakai tenant yang sama dengan penolakan route-nya: sesi atau `X-Client-ID`, dan status global untuk pembaca anonim.
 - **`detail.summary` pendek, `detail.description` untuk rinciannya.** Summary satu frasa berbahasa Inggris (±3–6 kata, tanpa titik): `List invoices`, `Delete an invoice`. Syarat, efek samping, dan parameter query masuk ke `description` sebagai kalimat utuh. Jangan menulis izin di sana — baris *Requires permission: `x`* ditambahkan otomatis dari `beforeHandle: permission('x')` atau `requirePermission('x')`. Jangan pula menyelipkan kode kebutuhan PRD (`A-1`, `L-24`); pembaca `/docs` tidak mengenalnya, dan `apps/api/test/openapi.test.ts` menolaknya.
 - **Kembalikan amplop** `ok(data)` / `ok(data, meta)`. Galat dilempar saja; hook global mengubahnya jadi `{ success: false, error, requestId }` (N-4).
 - **Tabel Anda tersedia sebagai `schema.<camelCase>`** — `billing_invoices` → `schema.billingInvoices`.

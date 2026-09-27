@@ -299,6 +299,14 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       [admin],
     );
     expect(refused.status).toBe(422);
+    // The API docs drop its routes for this tenant; anonymous readers see the global state.
+    const docPaths = async (cookies: string[]) =>
+      Object.keys(
+        ((await (await call('/openapi.json', {}, cookies)).json()) as { paths: object }).paths,
+      );
+    expect((await docPaths([admin])).some((p) => p.startsWith('/v1/m/dummy/'))).toBe(false);
+    expect(await docPaths([admin])).toContain('/v1/m/example/products');
+    expect(await docPaths([])).toContain('/v1/m/dummy/ping');
     const list = await json(await call('/v1/module', {}, [admin]));
     expect(
       (d(list) as unknown as { name: string; effective: boolean }[]).find((m) => m.name === 'Dummy')
@@ -306,6 +314,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     ).toBe(false);
     expect((await put('/v1/module/Dummy/enabled', { enabled: null }, [admin])).status).toBe(200); // drop override
     expect((await call('/v1/m/dummy/ping', {}, [admin])).status).toBe(200);
+    expect(await docPaths([admin])).toContain('/v1/m/dummy/ping');
     expect(await sectionsOf()).toContain('dummy');
     expect(await routesOf()).toEqual(expect.arrayContaining(['/hello-dummy', '/m/dummy/notes']));
   });
