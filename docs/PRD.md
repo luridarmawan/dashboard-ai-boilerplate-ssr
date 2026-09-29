@@ -602,7 +602,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | D-2 | **[P0]** CRUD group + CRUD izin di dalam group + kelola anggota group. |
 | D-3 | **[P0]** CRUD tenant (`clients`), termasuk endpoint "scope" — daftar tenant yang boleh diakses user saat ini. |
 | D-4 | **[P0]** Halaman profil sendiri: info dasar, ubah password, avatar, dan preferensi (bahasa, **tema**). |
-| D-5 | **[P1]** Indikator status online berdasarkan `last_seen`. |
+| D-5 | **[P1]** Indikator status online berdasarkan `last_seen`. Di daftar `/users`, kolom **IP aktif terakhir** dan **IP login terakhir** diberi tanda `?` (superscript) di kanan atas alamat; mengetuknya menampilkan **lokasi kasar** IP itu — kota, wilayah, negara, jaringan/ASN — dalam popover (tanpa JavaScript: tautan ke halaman `/users/ip-info?ip=…` dengan jawaban yang sama). Sumbernya `GET /v1/users/ip-info?ip=` (izin `user.read`), yang hanya menjawab untuk alamat yang pernah tercatat sebagai IP login/aktif terakhir **anggota tenant aktif** (selain itu 404 — bukan layanan whois bebas). Alamat privat/loopback dijawab "jaringan lokal" tanpa keluar server; alamat publik dikirim ke layanan `IP_LOOKUP_URL` di `.env` (templat URL berisi `{ip}`, bentuk JSON ipwho.is atau ip-api.com; baku `https://ipwho.is/{ip}`, `off` mematikan → 503 `service_unavailable` dengan `details.reason = disabled`) dan jawabannya di-cache 24 jam per proses. |
 | D-6 | **[P2]** Impersonasi user oleh pemegang izin `user.impersonate` (superadmin selalu termasuk), dengan penanda peringatan di menu akun dan audit log. Non-superadmin hanya menjangkau anggota tenant aktifnya, dan tidak boleh memerankan user yang memegang izin di luar miliknya (C-5). |
 
 ### FR-E · Konfigurasi Runtime

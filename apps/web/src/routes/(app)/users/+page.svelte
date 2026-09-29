@@ -11,6 +11,7 @@ import { hasPermission } from '$lib/permissions';
 import { presenceText } from '$lib/presence';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
+import IpWhois from './IpWhois.svelte';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
@@ -207,7 +208,11 @@ const deactivateConfirm = {
       {/if}
     {/snippet}
     {#snippet cell(row, col)}
-      {#if col.key === 'status'}
+      {@const ip = col.key === 'lastActiveIp' ? row.lastActiveIp : col.key === 'lastLoginIp' ? row.lastLoginIp : null}
+      {#if ip}
+        <!-- "?" beside the address: where it is (city, country), fetched on demand. -->
+        <IpWhois {ip} />
+      {:else if col.key === 'status'}
         <Badge variant={row.statusId === 1 ? 'success' : 'secondary'}>{row.statusId === 1 ? t('common.active') : t('common.inactive')}</Badge>
       {:else if col.key === 'presence'}
         <Presence online={row.online} text={seen(row)} label />

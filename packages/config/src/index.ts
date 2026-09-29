@@ -169,6 +169,14 @@ const envSchema = z
     GOOGLE_OAUTH_TOKEN_URL: z.url().optional(),
     GOOGLE_OAUTH_USERINFO_URL: z.url().optional(),
     /**
+     * Where the user list looks up the city and country of a login / last-active IP: a URL
+     * template with `{ip}`, answering JSON in the ipwho.is or ip-api.com shape. The address is
+     * sent to that service, so `off` switches the lookup off (the "?" button then says so).
+     */
+    IP_LOOKUP_URL: z
+      .union([z.literal('off'), z.url().includes('{ip}')])
+      .default('https://ipwho.is/{ip}'),
+    /**
      * Dev web server address (also read by apps/web/vite.config.ts). The api uses it only as the
      * LAST fallback for links in e-mails when neither APP_ORIGIN nor a forwarding request is there.
      */
