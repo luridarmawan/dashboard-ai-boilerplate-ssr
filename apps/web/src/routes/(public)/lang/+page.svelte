@@ -10,7 +10,11 @@ let { data }: { data: PageData } = $props();
 const t = useT();
 </script>
 
-<svelte:head><title>{t('lang.title')}</title></svelte:head>
+<svelte:head>
+  <title>{t('lang.title')}</title>
+  <!-- A cookie form, not content: keep it out of search results (R-4). -->
+  <meta name="robots" content="noindex" />
+</svelte:head>
 
 <div class="mx-auto max-w-xl px-4 py-10">
   <h1>{t('lang.title')}</h1>

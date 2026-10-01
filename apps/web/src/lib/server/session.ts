@@ -237,6 +237,8 @@ export async function apiFetchData<T = unknown>(
   event: RequestEvent,
   path: string,
   clientId?: string | null,
+  /** Optional `AbortSignal` (e.g. `AbortSignal.timeout(ms)`) for callers that must not hang. */
+  init?: { signal?: AbortSignal },
 ): Promise<T | null> {
   if (!path.startsWith('/v1/')) return null;
   const headers: Record<string, string> = {
@@ -255,7 +257,10 @@ export async function apiFetchData<T = unknown>(
   const ip = clientAddress(event);
   if (ip) headers['x-forwarded-for'] = ip;
   try {
-    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, { headers });
+    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, {
+      headers,
+      ...(init?.signal ? { signal: init.signal } : {}),
+    });
     if (!res.ok) return null;
     const body = (await res.json()) as { success?: boolean; data?: T };
     return body.success ? (body.data ?? null) : null;

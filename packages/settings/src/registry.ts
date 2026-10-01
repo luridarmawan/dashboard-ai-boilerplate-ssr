@@ -45,6 +45,14 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       { key: 'handlers', title: { id: 'Halaman baku', en: 'Default handler' } },
       { key: 'appearance', title: { id: 'Tema & tata letak', en: 'Theme & layout' } },
       {
+        key: 'seo',
+        title: { id: 'SEO', en: 'SEO' },
+        note: {
+          id: 'Apa yang boleh dirayapi mesin pencari. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
+          en: 'What search engines may crawl. The sitemap (/sitemap.xml) is generated from the public pages.',
+        },
+      },
+      {
         key: 'availability',
         title: { id: 'Ketersediaan', en: 'Availability' },
         note: {
@@ -206,6 +214,23 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         group: 'appearance',
         width: 'third',
       },
+      // ---- robots.txt (F-7). The body `GET /robots.txt` serves; the handler always appends the
+      // `Sitemap:` line, so the setting only decides what crawlers may and may not visit.
+      {
+        key: 'app.robots_txt',
+        type: 'text',
+        title: { id: 'Isi robots.txt', en: 'robots.txt body' },
+        note: {
+          id: 'Aturan untuk perayap mesin pencari; baris Sitemap ditambahkan otomatis. Kosongkan untuk aturan bawaan: izinkan semua kecuali dasbor, halaman modul, halaman masuk, pemilih tema/bahasa, dan tautan undangan.',
+          en: 'Rules for search-engine crawlers; the Sitemap line is added automatically. Leave empty for the built-in rules: allow everything except the dashboard, module pages, sign-in, the theme/language pickers and invitation links.',
+        },
+        default: null,
+        public: true,
+        max: 4000,
+        order: 11,
+        group: 'seo',
+        width: 'full',
+      },
       // ---- Maintenance mode (E-10). The runtime switch, per tenant with global fallback like every
       // other setting; MAINTENANCE_MODE in .env is the deployment-wide switch for when the database
       // itself is the thing being worked on. Either one closes the doors to everyone outside the
@@ -222,7 +247,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: false,
         public: true,
-        order: 11,
+        order: 12,
         group: 'availability',
         width: 'full',
       },

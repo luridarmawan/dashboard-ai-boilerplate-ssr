@@ -108,6 +108,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'identity',
       'handlers',
       'appearance',
+      'seo',
       'availability',
     ]);
     const layout = (app?.fields ?? []).map((f) => `${f.key}:${f.group}:${f.width}`);
@@ -123,6 +124,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'app.default_locale:appearance:third',
       'app.timezone:appearance:third',
       'app.allowed_themes:appearance:full',
+      'app.robots_txt:seo:full',
       'app.maintenance_mode:availability:full',
     ]);
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');

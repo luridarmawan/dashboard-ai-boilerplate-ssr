@@ -105,11 +105,11 @@ function submitFilters(event: SubmitEvent) {
 <svelte:head>
   <title>{title}</title>
   <meta name="description" content={description} />
-  <link rel="canonical" href={`${data.origin}/catalog`} />
+  <link rel="canonical" href={data.canonical} />
   <meta property="og:type" content="website" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
-  <meta property="og:url" content={`${data.origin}/catalog`} />
+  <meta property="og:url" content={data.canonical} />
   <meta property="og:site_name" content={data.brand} />
   <meta name="twitter:card" content="summary" />
   {@html `<script type="application/ld+json">${ld}</script>`}

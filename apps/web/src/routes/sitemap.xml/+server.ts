@@ -1,50 +1,35 @@
 import type { RequestHandler } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
-import { webRoutes } from '$lib/../generated/routes';
+import { apiFetchData } from '$lib/server/session';
+import { mergeEntries, renderSitemap, type SitemapEntry, staticEntries } from '$lib/server/sitemap';
+import { landingTarget } from '../../hooks.server';
 
 /**
- * sitemap.xml (PRD F-7, R-4): public core pages + module public routes flagged `sitemap`, plus
- * dynamic entries a module exposes at `GET /v1/m/<ns>/sitemap` (convention: `{ path, lastmod }[]`).
- * Disabled modules (G-8) and their pages are left out.
+ * sitemap.xml (PRD F-7, R-4): `/`, the module public pages flagged `sitemap` (extension point
+ * 13) except the one that currently answers `/`, plus the dynamic entries a module exposes at
+ * `GET /v1/m/<ns>/sitemap` (convention: `{ path, lastmod }[]`). Disabled modules (G-8) and their
+ * pages are left out. The rules live in `$lib/server/sitemap`; this handler only gathers inputs.
  */
-const CORE_PUBLIC = new Set(['/', '/theme', '/lang']);
+const MODULE_TIMEOUT_MS = 3000;
 
 export const GET: RequestHandler = async (event) => {
-  const origin = event.url.origin;
   const enabled = event.locals.config.enabledModules;
-  const urls: { loc: string; lastmod?: string }[] = [];
-  for (const r of webRoutes) if (CORE_PUBLIC.has(r)) urls.push({ loc: `${origin}${r}` });
-  const seenNs = new Set<string>();
-  for (const r of modulePublicRoutes) {
-    if (!enabled.has(r.ns)) continue;
-    if (r.sitemap && !r.path.includes('[')) urls.push({ loc: `${origin}${r.path}` });
-    seenNs.add(r.ns);
-  }
-  for (const ns of seenNs) {
-    try {
-      // The API is a separate server (Caddy fronts both in production): call it directly, not via SvelteKit.
-      const r = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}/v1/m/${ns}/sitemap`, {
-        headers: { accept: 'application/json', 'x-request-id': event.locals.requestId },
-      });
-      if (r.ok) {
-        const body = (await r.json()) as {
-          success: boolean;
-          data?: { path: string; lastmod?: string }[];
-        };
-        for (const e of body.data ?? [])
-          urls.push({ loc: `${origin}${e.path}`, ...(e.lastmod ? { lastmod: e.lastmod } : {}) });
-      }
-    } catch {
-      /* a module without the convention simply contributes no dynamic entries */
-    }
-  }
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
-    .map(
-      (u) =>
-        `  <url><loc>${u.loc}</loc>${u.lastmod ? `<lastmod>${u.lastmod}</lastmod>` : ''}</url>`,
-    )
-    .join('\n')}\n</urlset>\n`;
+  const entries = staticEntries({
+    routes: modulePublicRoutes,
+    enabled,
+    landing: landingTarget(event),
+  });
+  const namespaces = new Set(modulePublicRoutes.filter((r) => enabled.has(r.ns)).map((r) => r.ns));
+  // One bounded call per module, through the same path loaders use (identity headers, request id).
+  // A module without the convention, a failing one or a slow one simply contributes nothing.
+  const dynamic = await Promise.all(
+    [...namespaces].map((ns) =>
+      apiFetchData<SitemapEntry[]>(event, `/v1/m/${ns}/sitemap`, null, {
+        signal: AbortSignal.timeout(MODULE_TIMEOUT_MS),
+      }),
+    ),
+  );
+  const xml = renderSitemap(event.url.origin, mergeEntries(entries, ...dynamic));
   return new Response(xml, {
     headers: {
       'content-type': 'application/xml; charset=utf-8',

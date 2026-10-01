@@ -1,4 +1,4 @@
-import type { Handle } from '@sveltejs/kit';
+import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
 import { cfgString, landingFallback, loadPublicConfig } from '$lib/server/config';
@@ -59,8 +59,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     // Loop guard: a landing page that forwards back to `/` must not be forwarded again.
     !event.request.headers.has(ORIGINAL_PATH_HEADER)
   ) {
-    const landing = cfgString(event.locals.config, 'app.landing_route', landingFallback());
-    const target = routeTarget('app.landing_route', landing, event.locals.config.enabledModules);
+    const target = landingTarget(event);
     if (target) {
       const forwarded = await event.fetch(new URL(target + event.url.search, event.url.origin), {
         redirect: 'manual',
@@ -321,6 +320,18 @@ async function trap404(event: Parameters<Handle>[0]['event']): Promise<Response 
     );
   }
   return null;
+}
+
+/**
+ * The page `/` currently serves for this tenant (F-5), or null when the built-in landing does —
+ * the same resolution the forward above uses, shared with the sitemap (one URL per content) and
+ * the canonical-URL helper (`$lib/server/seo`).
+ */
+export function landingTarget(
+  event: Pick<RequestEvent, 'locals'> & { locals: Pick<RequestEvent['locals'], 'config'> },
+): string | null {
+  const landing = cfgString(event.locals.config, 'app.landing_route', landingFallback());
+  return routeTarget('app.landing_route', landing, event.locals.config.enabledModules);
 }
 
 /**

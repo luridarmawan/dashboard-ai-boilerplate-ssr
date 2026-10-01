@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  canonicalPath,
   isNeverTrapped,
   ORIGINAL_PATH_HEADER,
   parseOriginalPath,
@@ -62,5 +63,41 @@ describe('404 trapper helpers (§4.7 rule 6)', () => {
     };
     expect(trappedPath(withHeader)).toEqual({ pathname: '/sanitary', search: '' });
     expect(trappedPath({ request: new Request('http://web.test/resolve') })).toBeNull();
+  });
+});
+
+describe('canonical path (R-4: one URL per content)', () => {
+  test('the landing target is canonical at `/`, reached directly or as `/`', () => {
+    expect(canonicalPath({ visible: '/example', route: '/example', landing: '/example' })).toBe(
+      '/',
+    );
+    expect(canonicalPath({ visible: '/', route: '/example', landing: '/example' })).toBe('/');
+    expect(canonicalPath({ visible: '/?utm=x', route: '/example', landing: '/example' })).toBe('/');
+  });
+
+  test('any other page is canonical at the visible address, without the query', () => {
+    expect(canonicalPath({ visible: '/catalog', route: '/catalog', landing: '/example' })).toBe(
+      '/catalog',
+    );
+    expect(
+      canonicalPath({
+        visible: '/catalog?q=kopi&sort=price',
+        route: '/catalog',
+        landing: '/example',
+      }),
+    ).toBe('/catalog');
+    // Built-in landing (`/`): the module page keeps its own address.
+    expect(canonicalPath({ visible: '/example', route: '/example', landing: null })).toBe(
+      '/example',
+    );
+    // Trapped (F-11): the visitor's root URL, not the handler page.
+    expect(canonicalPath({ visible: '/furniture', route: '/resolve', landing: '/example' })).toBe(
+      '/furniture',
+    );
+  });
+
+  test('a visible path that is not a path on this origin falls back to `/`', () => {
+    expect(canonicalPath({ visible: '//evil', route: '/x', landing: null })).toBe('/');
+    expect(canonicalPath({ visible: 'nope', route: '/x', landing: null })).toBe('/');
   });
 });

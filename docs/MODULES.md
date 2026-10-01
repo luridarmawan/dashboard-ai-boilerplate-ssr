@@ -507,7 +507,13 @@ import { defineSeed } from '@core/module-kit';
 export default defineSeed('Billing', async ({ db, tenantId, log }) => { /* cek dulu, insert bila belum ada */ });
 ```
 
-**Sitemap dinamis.** Modul dengan halaman publik ber-parameter (mis. `/product/[slug]`) menyediakan `GET /v1/m/<ns>/sitemap` yang mengembalikan `{ path, lastmod }[]`; `sitemap.xml` core memanggilnya untuk setiap modul aktif (F-7). Route publik tanpa parameter cukup diberi `sitemap: true` di `public.ts`.
+**Sitemap dinamis.** Modul dengan halaman publik ber-parameter (mis. `/product/[slug]`) menyediakan `GET /v1/m/<ns>/sitemap` yang mengembalikan `{ path, lastmod }[]`; `sitemap.xml` core memanggilnya untuk setiap modul aktif (F-7). Route publik tanpa parameter cukup diberi `sitemap: true` di `public.ts`. Yang perlu diketahui modul ([`Sitemap-SEO-Roadmap.md`](./Sitemap-SEO-Roadmap.md)):
+
+- `path` harus path absolut di origin ini (`/…`, bukan URL penuh, bukan `//…`); entri lain dibuang diam-diam. Core yang meng-escape XML — jangan escape sendiri.
+- Satu URL per isi: halaman yang sedang menjadi `app.landing_route` **tidak** muncul dengan path-nya sendiri (ia sudah ada sebagai `/`), dan entri yang path-nya sudah ada dibuang. Jadi jangan heran `/example` hilang dari sitemap saat ia landing.
+- Panggilan ke endpoint Anda dibatasi **3 detik**; lewat itu, 404, atau galat = modul Anda tidak menyumbang entri, tanpa merusak sitemap modul lain. Jangan menghitung mahal di sini — baca dari tabel, bukan dari API luar.
+- Canonical halaman publik: pakai `canonicalUrl(event)` dari `$lib/server/seo` (R-4) untuk `rel=canonical`, `og:url`, dan `url` JSON-LD — ia mengembalikan alamat yang dilihat pengunjung, tanpa query, dan `/` selama halaman Anda yang menjadi landing.
+- Belum ada sitemap index. Modul yang mendekati 50.000 URL perlu `/sitemap-<ns>.xml` sendiri dan index di `/sitemap.xml` — belum dibangun karena belum ada yang membutuhkannya.
 
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 
