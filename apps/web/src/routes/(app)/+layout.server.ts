@@ -97,5 +97,8 @@ export const load: LayoutServerLoad = async (event) => {
     unreadNotifications: bell.unread,
     recentNotifications: bell.items,
     shellWidgets,
+    /** E-10: whoever reaches the shell while maintenance is on is exempt — remind them it is on. */
+    maintenanceSource: event.locals.maintenance.active ? event.locals.maintenance.source : null,
+    canEditConfig: s.can('config.read'),
   };
 };

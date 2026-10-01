@@ -95,6 +95,17 @@ const envSchema = z
       .default('false')
       .transform((v) => v === 'true'),
     /**
+     * Maintenance mode, deployment-wide (E-10): every page and every API route answers 503 with the
+     * maintenance page — except signing in, and only members of the Administrator group (or a
+     * superadmin) may sign in. Lives in .env because it must hold while the database is being
+     * migrated or restored; the per-tenant switch an admin flips at runtime is `app.maintenance_mode`
+     * in Settings. Both processes read it: the web renders the page, the API refuses the calls.
+     */
+    MAINTENANCE_MODE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    /**
      * The built-in page-pattern gallery at `/examples` (L-19) — part of the boilerplate, not of
      * every deployment built from it. With `false` those pages answer 404, the sidebar entry is
      * gone, and the `route` settings (landing, home) no longer offer them.

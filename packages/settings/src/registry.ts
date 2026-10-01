@@ -44,6 +44,14 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       { key: 'identity', title: { id: 'Aplikasi', en: 'Application' } },
       { key: 'handlers', title: { id: 'Halaman baku', en: 'Default handler' } },
       { key: 'appearance', title: { id: 'Tema & tata letak', en: 'Theme & layout' } },
+      {
+        key: 'availability',
+        title: { id: 'Ketersediaan', en: 'Availability' },
+        note: {
+          id: 'Menutup aplikasi sementara untuk semua orang kecuali administrator.',
+          en: 'Temporarily closes the application to everyone but administrators.',
+        },
+      },
     ],
     fields: [
       {
@@ -197,6 +205,26 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 9,
         group: 'appearance',
         width: 'third',
+      },
+      // ---- Maintenance mode (E-10). The runtime switch, per tenant with global fallback like every
+      // other setting; MAINTENANCE_MODE in .env is the deployment-wide switch for when the database
+      // itself is the thing being worked on. Either one closes the doors to everyone outside the
+      // Administrator group; the .env one also hides every public page, this one leaves public
+      // pages up and lets modules decide what to switch off (`locals.maintenance` on the web,
+      // `maintenanceState()` in the API).
+      {
+        key: 'app.maintenance_mode',
+        type: 'boolean',
+        title: { id: 'Mode pemeliharaan', en: 'Maintenance mode' },
+        note: {
+          id: 'Aktif: hanya anggota group Administrator (dan superadmin) yang bisa masuk dan bekerja; pengguna lain melihat halaman pemeliharaan, pengunjung anonim masih bisa membuka halaman publik. Modul membaca nilai ini untuk mematikan fiturnya sendiri. MAINTENANCE_MODE=true di .env menutup seluruh aplikasi, termasuk halaman publik, kecuali halaman masuk.',
+          en: 'On: only members of the Administrator group (and superadmins) can sign in and work; other users see the maintenance page, anonymous visitors can still open public pages. Modules read this value to switch their own features off. MAINTENANCE_MODE=true in .env closes the whole application, public pages included, except the sign-in page.',
+        },
+        default: false,
+        public: true,
+        order: 11,
+        group: 'availability',
+        width: 'full',
       },
     ],
   },

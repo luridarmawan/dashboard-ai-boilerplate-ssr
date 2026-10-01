@@ -16,6 +16,7 @@ export {
   type TenantSummary,
   tenantsOf,
 } from './effective.ts';
+export { isMaintenanceExempt, MAINTENANCE_EXEMPT_GROUP } from './maintenance.ts';
 export {
   emailDomainAllowed,
   GOOGLE_AUTHORIZE_URL,

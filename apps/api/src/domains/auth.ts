@@ -2,12 +2,14 @@ import {
   canActInTenant,
   consumeRateLimit,
   createSession,
+  defaultTenantOf,
   effectivePermissions,
   findSession,
   hashPassword,
   hashRecoveryCode,
   hashToken,
   invalidateUserSessions,
+  isMaintenanceExempt,
   parseRateLimitRule,
   passwordProblems,
   permissionRegistry,
@@ -27,6 +29,7 @@ import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@co
 import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
+import { maintenanceState, refuseLoginDuringMaintenance } from '../maintenance.ts';
 import {
   authContext,
   clientIp,
@@ -377,6 +380,17 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return fail('invalid_credentials', 'Email atau kata sandi salah', requestId);
       }
 
+      // E-10: a closed door is announced before the second factor is asked for.
+      const refused = await refuseLoginDuringMaintenance({
+        db,
+        user,
+        clientId: await defaultTenantOf(db, user.id),
+        ip,
+        requestId,
+        set,
+      });
+      if (refused) return refused;
+
       const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
       if (challenge) return ok(challenge);
       return ok(await issueSession({ db, user, ip, request, cookie, requestId }));
@@ -491,6 +505,16 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return refuse('Kode 2FA salah', 'bad_code');
       }
       await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+      // E-10: maintenance may have been switched on between the two steps.
+      const refused = await refuseLoginDuringMaintenance({
+        db,
+        user,
+        clientId: await defaultTenantOf(db, user.id),
+        ip,
+        requestId,
+        set,
+      });
+      if (refused) return refused;
       const result = await issueSession({ db, user, ip, request, cookie, requestId, mfa: method });
       return ok(result);
     },
@@ -709,11 +733,19 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         '/me',
         async ({ auth }) => {
           const a = auth as NonNullable<typeof auth>;
-          const tenants = await tenantsOf(unsafeAcrossTenants(), a.user.id);
+          const db = unsafeAcrossTenants();
+          const tenants = await tenantsOf(db, a.user.id);
+          // E-10: the web decides from this whether to show the maintenance page or the app; the
+          // group lookup only runs while maintenance is on.
+          const maintenance = await maintenanceState(a.clientId);
+          const exempt = maintenance.active
+            ? await isMaintenanceExempt(db, a.user, a.clientId)
+            : true;
           return ok({
             user: publicUser(a.user),
             clientId: a.clientId,
             tenants,
+            maintenance: { active: maintenance.active, source: maintenance.source, exempt },
             impersonator: a.impersonator
               ? { id: a.impersonator.id, name: a.impersonator.name, email: a.impersonator.email }
               : null,
@@ -748,6 +780,12 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
                     isDefault: t.Boolean(),
                   }),
                 ),
+                maintenance: t.Object({
+                  active: t.Boolean(),
+                  source: t.Nullable(t.Union([t.Literal('env'), t.Literal('config')])),
+                  /** May this user keep working while maintenance is on? Always true while it is off. */
+                  exempt: t.Boolean(),
+                }),
                 token: t.Nullable(
                   t.Object({
                     id: t.String(),

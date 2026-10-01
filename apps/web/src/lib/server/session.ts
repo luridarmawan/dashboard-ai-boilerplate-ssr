@@ -46,11 +46,19 @@ export interface TenantSummary {
   name: string;
   isDefault: boolean;
 }
+/** What the API says about maintenance mode for this session (E-10; see lib/server/maintenance.ts). */
+export interface SessionMaintenance {
+  active: boolean;
+  source: 'env' | 'config' | null;
+  /** This user may keep working while maintenance is on (superadmin or Administrator group). */
+  exempt: boolean;
+}
 export interface Session {
   user: SessionUser;
   clientId: string | null;
   tenants: TenantSummary[];
   permissions: string[];
+  maintenance: SessionMaintenance;
   /** The superadmin acting as `user` (D-6); null normally. */
   impersonator: { id: string; name: string; email: string } | null;
   /** Cosmetic check for the UI (C-6b); the API is the authority. */
@@ -304,6 +312,7 @@ export async function loadSession(event: RequestEvent): Promise<Session | null> 
     clientId: me.data.data.clientId,
     tenants: me.data.data.tenants,
     permissions,
+    maintenance: me.data.data.maintenance,
     impersonator: me.data.data.impersonator ?? null,
     can,
   };

@@ -101,9 +101,15 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(d(r).notFoundRoutes).toEqual(
       expect.arrayContaining([{ path: '/resolve', module: 'Example' }]),
     );
-    // The Application tab is drawn in three groups (owner's ask of 2026-09-26): identity
-    // (name | lead, logo | favicon), default handlers (three per row), theme & layout.
-    expect(app?.groups?.map((g) => g.key)).toEqual(['identity', 'handlers', 'appearance']);
+    // The Application tab is drawn in four groups (owner's asks of 2026-09-26 and 2026-10-01):
+    // identity (name | lead, logo | favicon), default handlers (three per row), theme & layout,
+    // availability (maintenance mode, E-10).
+    expect(app?.groups?.map((g) => g.key)).toEqual([
+      'identity',
+      'handlers',
+      'appearance',
+      'availability',
+    ]);
     const layout = (app?.fields ?? []).map((f) => `${f.key}:${f.group}:${f.width}`);
     expect(layout).toEqual([
       'app.name:identity:half',
@@ -117,6 +123,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'app.default_locale:appearance:third',
       'app.timezone:appearance:third',
       'app.allowed_themes:appearance:full',
+      'app.maintenance_mode:availability:full',
     ]);
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');
     expect((d(r).routes as string[]).includes('/dashboard')).toBe(true);

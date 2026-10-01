@@ -262,6 +262,14 @@ const shellContext = $derived({
 {/snippet}
 
 {#snippet content()}
+  {#if data.maintenanceSource}
+    <!-- E-10: an administrator working during maintenance sees that the door is closed to everyone else. -->
+    <p class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground" role="status" data-testid="maintenance-banner">
+      <Icon name="warning" size={16} class="shrink-0" />
+      <span>{t('shell.maintenance_banner', { source: data.maintenanceSource === 'env' ? t('maintenance.source.env') : t('maintenance.source.config') })}</span>
+      {#if data.maintenanceSource === 'config' && data.canEditConfig}<a href="/settings" class="font-medium underline underline-offset-2">{t('shell.maintenance_banner_settings')}</a>{/if}
+    </p>
+  {/if}
   {#if data.tenantError}<p class="error mb-4">{t('shell.tenant_error')}</p>{/if}
   {@render children()}
 {/snippet}

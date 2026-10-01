@@ -55,6 +55,7 @@ describe('OpenAPI document (N-1, N-2, gate M3 #2)', () => {
     expect(text).toContain('"requestId"');
     expect(text).toContain('module_disabled');
     expect(text).toContain('demo_mode');
+    expect(text).toContain('maintenance');
     expect(paths.length).toBeGreaterThanOrEqual(40);
   });
 

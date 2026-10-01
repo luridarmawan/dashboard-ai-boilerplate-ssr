@@ -47,6 +47,7 @@ Lapisan menurut graph: `db`, `contracts`, `auth`, `config`, `i18n` adalah core (
 - **Kontrak API dari satu definisi.** Skema TypeBox ditulis bersama route → validasi, tipe, dan OpenAPI.
 - **Tema = paket presentasi** (Keputusan J, K). Token, set ikon, layout, dan aset merek; halaman menyebut `layoutVariant`, bukan id layout; resolusi di server saat SSR.
 - **Konfigurasi di database** (Keputusan I). `.env` hanya untuk bootstrap; `app.landing_route` dan `app.home_route` divalidasi terhadap registry route saat disimpan.
+- **Mode pemeliharaan: dua sakelar, satu pintu** (E-10). `app.maintenance_mode` di database (per tenant, tanpa restart; halaman publik tetap tayang, modul mematikan fiturnya sendiri) dan `MAINTENANCE_MODE` di `.env` (seluruh deployment, untuk saat database sendiri dikerjakan). Pengecualian terikat ke **group Administrator**, bukan ke izin — izin adalah hal yang sedang diperbaiki saat pemeliharaan. Keputusan ditegakkan di API (503 `maintenance`); web hanya memilih halaman yang dirender.
 
 ## DATA
 

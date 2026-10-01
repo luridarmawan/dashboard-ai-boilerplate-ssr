@@ -129,6 +129,7 @@ export const ANONYMOUS_NAMESPACES: readonly string[] = [
   'join',
   'landing',
   'lang',
+  'maintenance',
   'nav',
   'shell',
   'table',

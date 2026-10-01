@@ -38,6 +38,8 @@ export const ERROR_CODES = [
   // configuration & modules (FR-E, G-8)
   'demo_mode',
   'module_disabled',
+  // maintenance (E-10): the deployment or the tenant is closed to everyone but administrators
+  'maintenance',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
@@ -144,6 +146,8 @@ export const errorResponses = {
   422: FailSchema,
   429: FailSchema,
   500: FailSchema,
+  // Any route may answer 503 while maintenance mode is on (E-10).
+  503: FailSchema,
 } as const;
 
 export { clientIpFromForwarded, isPrivateAddress } from './client-ip.ts';

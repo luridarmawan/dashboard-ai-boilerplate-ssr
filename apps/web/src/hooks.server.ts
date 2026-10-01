@@ -3,6 +3,7 @@ import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
 import { cfgString, landingFallback, loadPublicConfig } from '$lib/server/config';
 import { resolveRequestDirection, resolveRequestLocale } from '$lib/server/locale';
+import { MAINTENANCE_PATH, requestMaintenance } from '$lib/server/maintenance';
 import { checkRequestOrigin, type OriginVerdict } from '$lib/server/origin';
 import { loadSession } from '$lib/server/session';
 import { resolveRequestSidebar } from '$lib/server/sidebar';
@@ -35,6 +36,15 @@ export const handle: Handle = async ({ event, resolve }) => {
   // F-8: the rail state belongs on <html> for the same reason theme does — the layout must be
   // right in the first byte, without JavaScript.
   event.locals.sidebar = resolveRequestSidebar(event);
+  // E-10: maintenance mode — decided here, once, from .env, the tenant's setting and what the API
+  // said about the session. A blocked request gets the maintenance page (503) whatever it asked
+  // for; everything else proceeds and may read `locals.maintenance.active` to degrade gracefully.
+  event.locals.maintenance = requestMaintenance(
+    event.url.pathname,
+    event.locals.config,
+    event.locals.session,
+  );
+  if (event.locals.maintenance.blocked) return maintenanceResponse(event);
   const { theme, mode, css } = event.locals.theme;
   const themeCss = css ? `<style data-custom-theme="${theme.id}">${css}</style>` : '';
 
@@ -125,8 +135,99 @@ export const handle: Handle = async ({ event, resolve }) => {
         .replace('%theme_css%', themeCss),
   });
   response.headers.set('x-request-id', event.locals.requestId);
+  // The maintenance page itself says 503 while maintenance is on — also on a direct visit, and
+  // also to an exempt administrator previewing it — so monitors and crawlers read the truth.
+  if (event.url.pathname === MAINTENANCE_PATH && event.locals.maintenance.active) {
+    return maintenanceStatus(response, event.locals.requestId);
+  }
   return response;
 };
+
+/** Re-status a rendered response as 503 with the headers a maintenance answer carries. */
+function maintenanceStatus(response: Response, requestId: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set('x-request-id', requestId);
+  headers.set('retry-after', '300');
+  headers.set('cache-control', 'no-store');
+  return new Response(response.body, { status: 503, headers });
+}
+
+/**
+ * What a blocked request gets (E-10): the maintenance page, rendered by `/maintenance` on behalf
+ * of the requested URL (same forward pattern as the landing route and the 404 trapper, so the
+ * page knows the address the visitor sees), as a 503 with `Retry-After`. A caller that did not
+ * ask for HTML — a fetch from an enhanced form, a monitor — gets the API's failure envelope
+ * instead, so the client code that already understands `error.code` understands this too.
+ */
+async function maintenanceResponse(event: Parameters<Handle>[0]['event']): Promise<Response> {
+  const { requestId } = event.locals;
+  if (wantsHtml(event.request)) {
+    try {
+      const forwarded = await event.fetch(new URL(MAINTENANCE_PATH, event.url.origin), {
+        headers: {
+          accept: 'text/html',
+          cookie: event.request.headers.get('cookie') ?? '',
+          [ORIGINAL_PATH_HEADER]: event.url.pathname + event.url.search,
+        },
+        redirect: 'manual',
+      });
+      if (forwarded.ok || forwarded.status === 503) {
+        return maintenanceStatus(
+          new Response(await forwarded.text(), { headers: forwarded.headers }),
+          requestId,
+        );
+      }
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          msg: 'halaman pemeliharaan gagal dirender — memakai jawaban polos',
+          status: forwarded.status,
+          path: event.url.pathname,
+          requestId,
+        }),
+      );
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          level: 'warn',
+          msg: 'halaman pemeliharaan gagal dirender — memakai jawaban polos',
+          error: err instanceof Error ? err.message : String(err),
+          path: event.url.pathname,
+          requestId,
+        }),
+      );
+    }
+    return new Response('503 — Sedang dalam pemeliharaan. Coba lagi sebentar lagi.\n', {
+      status: 503,
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        'retry-after': '300',
+        'cache-control': 'no-store',
+        'x-request-id': requestId,
+      },
+    });
+  }
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: {
+        code: 'maintenance',
+        message: 'Sedang dalam pemeliharaan — hanya administrator yang bisa masuk untuk sementara',
+        details: { source: event.locals.maintenance.source },
+      },
+      requestId,
+    }),
+    {
+      status: 503,
+      headers: {
+        'content-type': 'application/json',
+        'retry-after': '300',
+        'cache-control': 'no-store',
+        'x-request-id': requestId,
+      },
+    },
+  );
+}
 
 /**
  * 403 untuk request pengubah-keadaan dari origin yang tidak dikenal. Pesannya menyebut origin yang

@@ -1,5 +1,6 @@
 import {
   consumeRateLimit,
+  defaultTenantOf,
   emailDomainAllowed,
   GOOGLE_TOKEN_URL,
   GOOGLE_USERINFO_URL,
@@ -18,6 +19,7 @@ import { env } from '@core/config';
 import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
+import { refuseLoginDuringMaintenance } from '../maintenance.ts';
 import { authContext, clientIp } from '../plugins/auth.ts';
 import { allowedOrigins } from '../plugins/csrf.ts';
 import { requestContext } from '../plugins/request-context.ts';
@@ -343,6 +345,17 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
           after: { provider: PROVIDER, email: identity.email },
         });
       }
+
+      // E-10: Google vouches for the identity; maintenance still decides who may enter.
+      const refused = await refuseLoginDuringMaintenance({
+        db,
+        user,
+        clientId: await defaultTenantOf(db, user.id),
+        ip,
+        requestId,
+        set,
+      });
+      if (refused) return refused;
 
       const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
       if (challenge) return ok(challenge);

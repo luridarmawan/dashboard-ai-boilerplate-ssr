@@ -25,6 +25,7 @@ import { modulesPlugin } from './generated/modules.ts';
 import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
 import { demoMode } from './plugins/demo.ts';
+import { maintenanceMode } from './plugins/maintenance.ts';
 import { moduleGate } from './plugins/module-gate.ts';
 import { openapiModuleFilter } from './plugins/openapi-modules.ts';
 import { requestContext } from './plugins/request-context.ts';
@@ -45,6 +46,8 @@ export const app = new Elysia()
   .use(metricsDomain)
   .use(csrf)
   .use(demoMode)
+  // E-10: after the session is known, before any route — /docs and /openapi.json included.
+  .use(maintenanceMode)
   .use(openapiModuleFilter)
   .use(
     openapi({
