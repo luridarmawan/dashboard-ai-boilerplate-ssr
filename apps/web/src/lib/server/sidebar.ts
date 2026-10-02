@@ -9,7 +9,9 @@ import type { RequestEvent } from '@sveltejs/kit';
  * shell right if writing the profile fails. The state is stamped on <html> as `data-sidebar`, so
  * the rail is already narrow in the first byte — no flash of a wide sidebar, no JavaScript.
  */
-export const SIDEBAR_COOKIE = 'crk_sidebar';
+export { SIDEBAR_COOKIE } from './cookies.ts';
+
+import { SIDEBAR_COOKIE } from './cookies.ts';
 
 export type SidebarState = 'expanded' | 'collapsed';
 

@@ -16,10 +16,9 @@ import { checkRequestOrigin, forwardedOrigin } from '$lib/server/origin';
  *   - `forwardSetCookies()` copies cookies the API set (login, logout) onto the browser.
  */
 
-export const SESSION_COOKIE = 'crk_session';
-/** Impersonation (D-6): rides along with the admin's own session cookie. */
-export const IMPERSONATE_COOKIE = 'crk_impersonate';
-export const CSRF_COOKIE = 'crk_csrf';
+export { CSRF_COOKIE, IMPERSONATE_COOKIE, SESSION_COOKIE } from './cookies.ts';
+
+import { CSRF_COOKIE, IMPERSONATE_COOKIE, SESSION_COOKIE } from './cookies.ts';
 export const CSRF_FIELD = '_csrf';
 
 export interface SessionUser {

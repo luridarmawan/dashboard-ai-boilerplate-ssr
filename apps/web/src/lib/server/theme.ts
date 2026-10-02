@@ -10,8 +10,9 @@ import { cfgList, cfgString, type PublicConfig } from './config.ts';
  * `app.allowed_themes`, per tenant with global fallback — E-2), never from .env (E-6). A theme
  * contributed by a module that is disabled for the tenant is treated as absent (L-14).
  */
-export const THEME_COOKIE = 'crk_theme';
-export const MODE_COOKIE = 'crk_mode';
+export { MODE_COOKIE, THEME_COOKIE } from './cookies.ts';
+
+import { MODE_COOKIE, THEME_COOKIE } from './cookies.ts';
 
 export interface ResolvedTheme extends ThemeResolution {
   readonly mode: Mode;

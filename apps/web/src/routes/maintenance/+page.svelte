@@ -2,6 +2,7 @@
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
+import { forgetBrowserStorage } from '$lib/forget-browser';
 import { useT } from '$lib/i18n';
 import type { PageData } from './$types';
 
@@ -132,7 +133,7 @@ const loginHref = $derived(
           {/if}
         {:else if data.signedIn}
           <Button href={retryHref} class="rounded-full px-6"><Icon name="refresh" size={16} />{t('maintenance.retry')}</Button>
-          <form method="POST" action="/auth/logout">
+          <form method="POST" action="/auth/logout" onsubmit={() => forgetBrowserStorage()}>
             <Csrf token={data.csrf} />
             <Button type="submit" variant="outline" class="rounded-full px-6"><Icon name="logout" size={16} />{t('maintenance.logout')}</Button>
           </form>

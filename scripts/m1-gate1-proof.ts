@@ -444,6 +444,19 @@ const member = new Jar();
   const dash = await get(admin, '/dashboard');
   const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });
   check('logout → 303 /auth/login', r.res.status === 303 && location(r.res) === '/auth/login');
+  // A-5: a deliberate logout leaves nothing behind in the browser — every app cookie is expired
+  // in the same response, and Clear-Site-Data wipes Web Storage without JavaScript.
+  const expired = r.res.headers
+    .getSetCookie()
+    .filter((c) => /max-age=0|expires=Thu, 01 Jan 1970/i.test(c))
+    .map((c) => c.split('=')[0]?.trim());
+  for (const name of ['crk_session', 'crk_csrf', 'crk_theme', 'crk_lang', 'crk_sidebar'])
+    check(`logout expires ${name}`, expired.includes(name), expired.join(','));
+  check(
+    'logout sends Clear-Site-Data: "storage"',
+    r.res.headers.get('clear-site-data') === '"storage"',
+    String(r.res.headers.get('clear-site-data')),
+  );
   const again = await get(admin, '/dashboard');
   check(
     'dashboard afterwards redirects to login',

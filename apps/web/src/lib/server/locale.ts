@@ -14,7 +14,9 @@ import { cfgString, type PublicConfig } from './config.ts';
  * Decided before render, so the first HTML is already in the right language — never "always the
  * default first, then switch".
  */
-export const LANG_COOKIE = 'crk_lang';
+export { DIR_COOKIE, LANG_COOKIE } from './cookies.ts';
+
+import { DIR_COOKIE, LANG_COOKIE } from './cookies.ts';
 
 export function resolveRequestLocale(event: RequestEvent, config: PublicConfig): LocaleResolution {
   return resolveLocale({
@@ -29,7 +31,6 @@ export function resolveRequestLocale(event: RequestEvent, config: PublicConfig):
  * K-9: the direction follows the locale; the `crk_dir` cookie forces `rtl` so themes and layouts
  * can be checked without a right-to-left translation installed (the picker's "RTL preview").
  */
-export const DIR_COOKIE = 'crk_dir';
 export function resolveRequestDirection(event: RequestEvent, locale: Locale): Direction {
   return event.cookies.get(DIR_COOKIE) === 'rtl' ? 'rtl' : directionOf(locale);
 }
