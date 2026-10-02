@@ -68,7 +68,7 @@ export const CORE_GROUPS: readonly GroupDef[] = [
   },
   {
     id: 'monitoring',
-    label: { id: 'Pemantauan', en: 'Monitoring' },
+    label: { id: 'Monitoring', en: 'Monitoring' },
     icon: 'chart-line',
     order: 900,
   },
@@ -155,7 +155,7 @@ export const CORE_MENU: readonly Entry[] = [
   },
   {
     id: 'core.queue',
-    label: { id: 'Antrean pekerjaan', en: 'Job queue' },
+    label: { id: 'Job queue', en: 'Job queue' },
     href: '/queue',
     icon: 'clock',
     permission: 'queue.read',
@@ -173,7 +173,7 @@ export const CORE_MENU: readonly Entry[] = [
   },
   {
     id: 'core.permissions',
-    label: { id: 'Panduan izin', en: 'Permission guide' },
+    label: { id: 'Permission guide', en: 'Permission guide' },
     href: '/permissions',
     icon: 'help',
     permission: 'group.read',
@@ -190,7 +190,7 @@ export const CORE_MENU: readonly Entry[] = [
    */
   {
     id: 'core.apidocs',
-    label: { id: 'Dokumentasi API', en: 'API Docs' },
+    label: { id: 'API Docs', en: 'API Docs' },
     href: '/docs',
     icon: 'external-link',
     permission: 'config.read',
