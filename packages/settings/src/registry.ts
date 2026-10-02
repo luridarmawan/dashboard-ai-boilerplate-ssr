@@ -284,8 +284,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'string',
         title: { id: 'Rate limit login', en: 'Login rate limit' },
         note: {
-          id: 'Bentuk <jumlah>/<detik>, mis. 10/900.',
-          en: '<count>/<seconds>, e.g. 10/900.',
+          id: 'Percobaan login gagal per IP dan per akun, bentuk <jumlah>/<detik>, mis. 10/900. Login yang berhasil tidak dihitung.',
+          en: 'Failed login attempts per IP and per account, <count>/<seconds>, e.g. 10/900. Successful logins do not count.',
         },
         default: null,
         max: 20,

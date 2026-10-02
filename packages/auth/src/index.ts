@@ -43,6 +43,7 @@ export {
 export {
   consume as consumeRateLimit,
   parseRule as parseRateLimitRule,
+  peek as peekRateLimit,
   type RateLimitResult,
   type RateLimitRule,
   rateLimitHeaders,

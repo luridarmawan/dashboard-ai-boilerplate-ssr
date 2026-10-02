@@ -12,7 +12,9 @@ import {
   isMaintenanceExempt,
   parseRateLimitRule,
   passwordProblems,
+  peekRateLimit,
   permissionRegistry,
+  type RateLimitResult,
   randomToken,
   rateLimitHeaders,
   revokeAllSessions,
@@ -349,11 +351,20 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       );
 
       // Stricter than the general limit (A-2): per IP and per account, whichever trips first.
-      const byIp = await consumeRateLimit(db, `login:ip:${ip}`, rule);
-      const byEmail = await consumeRateLimit(db, `login:email:${email}`, rule);
-      const tightest = byIp.remaining <= byEmail.remaining ? byIp : byEmail;
-      Object.assign(set.headers, rateLimitHeaders(tightest));
-      if (!byIp.allowed || !byEmail.allowed) {
+      // Only FAILED attempts spend from the budget — the door is checked before the password,
+      // but the counters move in the wrong-password branch below. Someone signing in and out of
+      // several accounts from one address (a tester, a shared office machine) never locks the
+      // address; ten wrong guesses in a window still do.
+      const ipKey = `login:ip:${ip}`;
+      const emailKey = `login:email:${email}`;
+      const tightestOf = (a: RateLimitResult, b: RateLimitResult) =>
+        a.remaining <= b.remaining ? a : b;
+      const seen = tightestOf(
+        await peekRateLimit(db, ipKey, rule),
+        await peekRateLimit(db, emailKey, rule),
+      );
+      Object.assign(set.headers, rateLimitHeaders(seen));
+      if (!seen.allowed) {
         set.status = 429;
         return fail('rate_limited', 'Terlalu banyak percobaan masuk — coba lagi nanti', requestId);
       }
@@ -367,6 +378,12 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         user?.status_id === STATUS.ACTIVE &&
         (await verifyPassword(body.password, user?.password_hash ?? null));
       if (!user || !valid) {
+        // The failed guess is what costs: spend one from both counters and report what is left.
+        const spent = tightestOf(
+          await consumeRateLimit(db, ipKey, rule),
+          await consumeRateLimit(db, emailKey, rule),
+        );
+        Object.assign(set.headers, rateLimitHeaders({ ...spent, allowed: true }));
         await writeAudit(db, {
           clientId: null,
           actorId: user?.id ?? null,
@@ -409,7 +426,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       detail: {
         summary: 'Log in',
         description:
-          'Sets the httpOnly session cookie, or returns an MFA challenge when the account has 2FA. Rate-limited per IP and per account.',
+          'Sets the httpOnly session cookie, or returns an MFA challenge when the account has 2FA. Failed attempts are rate-limited per IP and per account; successful logins do not count.',
       },
     },
   )

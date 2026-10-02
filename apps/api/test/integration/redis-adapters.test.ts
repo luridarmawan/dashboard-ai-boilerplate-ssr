@@ -58,7 +58,14 @@ describe.skipIf(!enabled)('Redis adapters for sessions and rate limits (M7 #4)',
     });
     expect(login.status).toBe(200);
     const cookie = sessionCookie(login);
-    // The rate-limit window for this IP lives in Redis (INCR), not only in the table.
+    // Only failed attempts spend from the login budget (A-2): a good login leaves no window
+    // behind, a wrong password opens one — in Redis (INCR), not only in the table.
+    expect((await keys(`crk:rl:login:ip:${RUN_IP}:*`)).length).toBe(0);
+    const bad = await call('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: adminEmail, password: 'nope-nope-nope' }),
+    });
+    expect(bad.status).toBe(401);
     expect((await keys(`crk:rl:login:ip:${RUN_IP}:*`)).length).toBeGreaterThan(0);
 
     // First authenticated request resolves from the database and caches; the second is a cache hit.

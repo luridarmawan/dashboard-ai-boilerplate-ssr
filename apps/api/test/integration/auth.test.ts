@@ -94,12 +94,50 @@ describe.skipIf(!enabled)('auth flow (A-1…A-7, A-10, A-12)', () => {
     });
     expect(bad.status).toBe(401);
     expect(bad.headers.get('ratelimit-limit')).toBe('10');
+    // The wrong guess spent one; a right password costs nothing (A-2 counts failures only).
+    const afterBad = Number(bad.headers.get('ratelimit-remaining'));
     const good = await call('/v1/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
     expect(good.status).toBe(200);
     expect(sessionCookie(good)).not.toBe(cookie);
+    expect(Number(good.headers.get('ratelimit-remaining'))).toBe(afterBad);
+  });
+
+  test('signing in and out of accounts from one address never locks it: 12 good logins → all 200 (A-2)', async () => {
+    const ip = `198.51.100.${run % 250}`;
+    // The per-account counter may already hold the wrong guess from the test above; what matters
+    // is that twelve good logins leave the remaining budget exactly where it was.
+    let remaining: string | null = null;
+    for (let i = 0; i < 12; i++) {
+      const res = await call('/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': ip },
+        body: JSON.stringify({ email, password }),
+      });
+      expect(res.status).toBe(200);
+      remaining ??= res.headers.get('ratelimit-remaining');
+      expect(res.headers.get('ratelimit-remaining')).toBe(remaining);
+      const out = await call('/v1/auth/logout', { method: 'POST' }, [sessionCookie(res)]);
+      expect(out.status).toBe(200);
+    }
+    // Ten wrong guesses from that address, on another account, still close the door for everyone there.
+    for (let i = 0; i < 10; i++) {
+      const res = await call('/v1/auth/login', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': ip },
+        body: JSON.stringify({ email: `guess-${run}-${i}@example.test`, password: 'x'.repeat(12) }),
+      });
+      expect(res.status).toBe(401);
+    }
+    const locked = await call('/v1/auth/login', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': ip },
+      body: JSON.stringify({ email, password }),
+    });
+    expect(locked.status).toBe(429);
+    expect(Number(locked.headers.get('retry-after'))).toBeGreaterThan(0);
   });
 
   test('behind NAT / a proxy chain the recorded login IP is the visitor, not the LAN hop', async () => {
