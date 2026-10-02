@@ -464,5 +464,26 @@ const member = new Jar();
   );
 }
 
+// 11. developer "clear cache" on the login page (NODE_ENV=development only): the same sweep as
+// logout, without a session. Skipped — not failed — when the web runs in another NODE_ENV.
+{
+  const fresh = new Jar();
+  const page = await get(fresh, '/auth/login');
+  if (page.html.includes('data-testid="clear-cache"')) {
+    fresh.cookies.set('crk_theme', 'base');
+    const r = await post(fresh, '/auth/clear-cache', {});
+    check(
+      'clear-cache → 303 /auth/login',
+      r.res.status === 303 && location(r.res) === '/auth/login',
+    );
+    check(
+      'clear-cache expires the theme cookie and sends Clear-Site-Data',
+      !fresh.cookies.has('crk_theme') && r.res.headers.get('clear-site-data') === '"storage"',
+    );
+  } else {
+    console.log('  - clear-cache control not rendered (NODE_ENV is not development) — skipped');
+  }
+}
+
 console.log(failures === 0 ? '\nGATE M1 #1: LOLOS' : `\nGATE M1 #1: GAGAL (${failures})`);
 process.exit(failures === 0 ? 0 : 1);

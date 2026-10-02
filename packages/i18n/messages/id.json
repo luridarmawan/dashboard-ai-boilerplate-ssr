@@ -200,6 +200,7 @@
   "auth.mfa.err.bad_code": "Kode 2FA salah.",
   "auth.mfa.err.challenge_invalid": "Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi.",
   "auth.mfa.err.too_many_attempts": "Terlalu banyak kode salah — masuk lagi.",
+  "auth.clear_cache": "Bersihkan cache",
   "shell.impersonating": "Anda melihat sebagai {name} — impersonasi oleh {admin}",
   "shell.impersonate_stop": "Berhenti",
   "shell.maintenance_banner": "Mode pemeliharaan aktif ({source}) — hanya administrator yang bisa masuk; pengguna lain melihat halaman pemeliharaan.",

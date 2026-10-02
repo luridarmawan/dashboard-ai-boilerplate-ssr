@@ -42,6 +42,7 @@ export const MAINTENANCE_ALLOWED: readonly string[] = [
   MAINTENANCE_PATH,
   '/auth/login',
   '/auth/logout',
+  '/auth/clear-cache',
   '/auth/google',
   '/auth/stop-impersonate',
   '/theme',

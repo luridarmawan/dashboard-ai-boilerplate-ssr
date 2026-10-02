@@ -200,6 +200,7 @@
   "auth.mfa.err.bad_code": "That 2FA code is wrong.",
   "auth.mfa.err.challenge_invalid": "The 2FA challenge is invalid or has expired — sign in again.",
   "auth.mfa.err.too_many_attempts": "Too many wrong codes — sign in again.",
+  "auth.clear_cache": "Clear cache",
   "shell.impersonating": "Viewing as {name} — impersonated by {admin}",
   "shell.impersonate_stop": "Stop",
   "shell.maintenance_banner": "Maintenance mode is on ({source}) — only administrators can sign in; other users see the maintenance page.",
