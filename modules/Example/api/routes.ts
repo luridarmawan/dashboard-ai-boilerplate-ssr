@@ -4,7 +4,14 @@ import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
 import { settings } from '@app/api/services';
-import { consumeRateLimit, parseRateLimitRule, rateLimitHeaders, writeAudit } from '@core/auth';
+import { sign } from '@app/api/webhooks';
+import {
+  consumeRateLimit,
+  parseRateLimitRule,
+  rateLimitHeaders,
+  timingSafeEqual,
+  writeAudit,
+} from '@core/auth';
 import {
   errorResponses,
   fail,
@@ -50,6 +57,25 @@ async function storefrontTenant(clientId: string | null): Promise<string | null>
     .limit(1);
   defaultTenantId = row?.id ?? null;
   return defaultTenantId;
+}
+
+/** Signed inbound inquiries older than this are refused (replay window). */
+const INBOUND_MAX_AGE_S = 300;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The JSON body of an inbound inquiry, checked by hand: it arrives as raw text (see the route). */
+function inboundInquiry(
+  v: unknown,
+): { name: string; email: string; message: string; source: string | null } | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const str = (x: unknown, min: number, max: number) =>
+    typeof x === 'string' && x.trim().length >= min && x.trim().length <= max ? x.trim() : null;
+  const name = str(o.name, 2, 191);
+  const email = str(o.email, 3, 191)?.toLowerCase() ?? null;
+  const message = str(o.message, 10, 5000);
+  if (!name || !email || !EMAIL_RE.test(email) || !message) return null;
+  return { name, email, message, source: str(o.source, 1, 191) };
 }
 
 type ProductRow = typeof schema.exampleProducts.$inferSelect;
@@ -461,6 +487,88 @@ export default defineApiRoutes(
         detail: {
           summary: 'Submit the contact form',
           description: 'Public and rate-limited. Stored and emailed through the outbox.',
+        },
+      },
+    )
+    // Extension point 17: declared in ../csrf-exempt.ts, so an external system can post here
+    // without the CSRF pair. The request is anonymous (cookies are ignored); the HMAC signature
+    // over "<timestamp>.<raw body>" — the same scheme as outgoing webhooks — is the only proof.
+    .post(
+      '/inbound/inquiries',
+      async ({ body: raw, set, request, requestId, tenantState }) => {
+        const tid = await storefrontTenant(tenantState?.clientId ?? null);
+        const secret = tid
+          ? await settings.get<string | null>(tid, 'example.inbound_secret')
+          : null;
+        if (!tid || typeof secret !== 'string' || !secret.trim()) {
+          set.status = 503;
+          return fail('service_unavailable', 'Endpoint inquiry masuk belum diaktifkan', requestId);
+        }
+        const timestamp = request.headers.get('x-example-timestamp') ?? '';
+        const signature = request.headers.get('x-example-signature') ?? '';
+        const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+        const expected = await sign(secret.trim(), timestamp, raw);
+        if (
+          !/^\d+$/.test(timestamp) ||
+          age > INBOUND_MAX_AGE_S ||
+          !timingSafeEqual(signature, expected)
+        ) {
+          set.status = 401;
+          return fail('unauthorized', 'Tanda tangan tidak valid atau kedaluwarsa', requestId);
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = null;
+        }
+        const body = inboundInquiry(parsed);
+        if (!body) {
+          set.status = 422;
+          return fail('validation_failed', 'Isi inquiry tidak valid', requestId);
+        }
+        const id = newId();
+        await forTenant(tid).insert(schema.exampleInquiries, {
+          id,
+          name: body.name,
+          email: body.email,
+          message: body.message,
+          source: body.source ?? 'inbound',
+          ip: null,
+        });
+        await notify({
+          clientId: tid,
+          permission: 'example.inquiry.read',
+          type: 'example.inquiry',
+          title: `Pesan baru dari ${body.name}`,
+          body: body.message.slice(0, 200),
+          link: '/m/example/inquiries',
+          data: { inquiryId: id },
+        });
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId: tid,
+          actorId: null,
+          action: 'example.inquiry.create',
+          resource: 'example.inquiry',
+          resourceId: id,
+          ip: null,
+          requestId,
+          after: { email: body.email, source: body.source ?? 'inbound' },
+        });
+        set.status = 201;
+        return ok({ id });
+      },
+      {
+        // The raw text is what was signed; it is parsed only after the signature checks out.
+        parse: 'text',
+        body: t.String({ maxLength: 20_000 }),
+        response: { 201: OkSchema(t.Object({ id: t.String() })), ...errorResponses },
+        detail: {
+          summary: 'Receive an inquiry from an external system',
+          description:
+            'Signed with `X-Example-Timestamp` (Unix seconds) and `X-Example-Signature: sha256=<hex>` = ' +
+            'HMAC-SHA256 of `"<timestamp>.<raw body>"` with the `example.inbound_secret` setting; ' +
+            'older than 5 minutes is refused. Body: `{ name, email, message, source? }`.',
         },
       },
     )

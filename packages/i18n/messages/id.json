@@ -322,6 +322,7 @@
   "modules.catalog.title": "Katalog modul",
   "modules.chip.api": "API",
   "modules.chip.config": "konfigurasi",
+  "modules.chip.csrf_exempt": "route tanpa CSRF",
   "modules.chip.hooks": "hook",
   "modules.chip.icon_sets": "set ikon",
   "modules.chip.jobs": "job",

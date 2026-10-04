@@ -315,6 +315,7 @@ modules/<Nama>/
 ├── themes/              # tema yang disumbangkan modul (opsional) — titik perluasan 14
 ├── layouts/             # layout shell kustom (opsional) — titik perluasan 15
 ├── icons/               # set ikon / pemetaan ikon (opsional) — titik perluasan 16
+├── csrf-exempt.ts       # route API yang dipanggil sistem luar tanpa CSRF (opsional) — titik perluasan 17
 ├── permissions.ts       # resource + action yang dimiliki modul
 ├── menu.ts              # entri menu (dengan syarat izin)
 ├── config.ts            # section konfigurasi milik modul (opsional)
@@ -342,6 +343,7 @@ modules/<Nama>/
 | 14 | **Tema** | Menyumbang tema lengkap ke registry — token warna, tipografi, set ikon, aset merek, dan pilihan layout; langsung muncul di pemilih tema admin & user (§4.8, FR-L) |
 | 15 | **Layout** | Menyumbang layout shell kustom (dashboard / publik / auth) yang memenuhi kontrak region, dan bisa dipakai tema mana pun — termasuk tema bawaan core |
 | 16 | **Set ikon** | Menyumbang pemetaan nama ikon semantik → glyph, sehingga seluruh aplikasi bisa berganti bahasa visual tanpa menyentuh komponen |
+| 17 | **Route tanpa CSRF** | Menandai route API miliknya sendiri (method + path persis, dengan alasan) yang dipanggil sistem luar yang tidak bisa mengirim token bearer maupun pasangan CSRF — callback/webhook pihak ketiga. Request ke route itu **selalu anonim** (cookie sesi diabaikan), jadi route wajib memverifikasi pemanggilnya sendiri (A-10) |
 
 **Keputusan G — modul dirakit saat build, tapi kontraknya bersifat data.**
 `bun modules:sync` membaca `modules.json` dan `module.json` tiap modul, lalu meng-generate registry (route API, route web, route publik, skema DB, menu, izin, i18n, tool, tema). Menambah modul = daftarkan sumbernya + `bun modules:sync`. Core tetap tidak berubah; yang berubah hanya berkas hasil generate, yang tidak pernah diedit tangan.
@@ -565,7 +567,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | A-7 | **[P0]** Lupa password: minta reset → validasi token → konfirmasi password baru. Token sekali pakai, punya `expires_at` dan penanda `used`. |
 | A-8 | **[P1]** Google OAuth. Opsi auto-create akun saat login pertama, dikendalikan flag. |
 | A-9 | **[P1]** Single-session login — satu user hanya boleh punya satu sesi aktif; login baru mematikan yang lama. Dikendalikan flag. |
-| A-10 | **[P0]** **Proteksi CSRF berlaku untuk seluruh endpoint yang mengubah state, tanpa pengecualian.** Mekanismenya: `SameSite=Lax` + validasi header `Origin`/`Referer` + token double-submit untuk form. Endpoint publik ditandai eksplisit lewat daftar putih, bukan dengan mematikan middleware (D6). |
+| A-10 | **[P0]** **Proteksi CSRF berlaku untuk seluruh endpoint yang mengubah state, tanpa pengecualian.** Mekanismenya: `SameSite=Lax` + validasi header `Origin`/`Referer` + token double-submit untuk form. Endpoint publik ditandai eksplisit lewat daftar putih, bukan dengan mematikan middleware (D6). Pengecualiannya struktural dan hanya dua: (a) request ber-token bearer (A-4) — tidak membawa cookie; (b) route modul yang dideklarasikan di `csrf-exempt.ts` modul itu (titik perluasan 17) untuk pemanggil luar yang tidak bisa mengirim bearer — method + path persis di bawah `/v1/m/<ns>/`, wajib beralasan, dan harus cocok dengan route yang benar-benar dilayani modul (diperiksa `modules:sync`). Request ke route (b) **selalu anonim**: plugin auth mengabaikan cookie sesi dan impersonasi, sehingga tidak ada sesi yang bisa ditumpangi situs lain; route itu memverifikasi pemanggilnya sendiri (tanda tangan HMAC, secret, token sekali pakai). Route core tidak pernah dikecualikan. |
 | A-11 | **[P2]** 2FA TOTP + recovery codes. |
 | A-12 | **[P0]** Rekam `last_seen`, `ip`, dan `device` per sesi. |
 | A-13 | **[P1]** Registrasi lewat **tautan undangan** per tenant (`/join/<kode>`): admin dengan `user.create` mengundang alamat email; tautan berlaku `security.invitation_hours` (baku 72 jam) dan **tetap bisa dipakai saat `SIGNUP_ENABLED=false`** (flag itu hanya mengatur pendaftaran mandiri). Email yang sudah terdaftar tidak diundang: akunnya ditambahkan ke tenant dan dikirimi informasi untuk masuk. Undangan bisa dicabut; mengundang ulang alamat yang sama mencabut yang lama. Setiap undangan menyebut **grup** yang akan dimasuki undangan (`groupId`, grup hidup tenant aktif; baku grup sistem `user` / Regular User; boleh tanpa grup): alamat baru mendapatkannya saat menerima tautan, alamat yang sudah terdaftar mendapatkannya langsung tanpa melepas grup lain. |
@@ -645,7 +647,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | G-2 | **[P0]** **Registrasi simetris.** Satu perintah `bun modules:sync` meng-generate registry untuk API *dan* web *dan* route publik *dan* skema DB *dan* menu *dan* tema *dan* seed izin. Perintah ini jalan otomatis sebelum `dev` dan `build`. Menutup D8. |
 | G-3 | **[P0]** Modul mengimpor core lewat **paket** (`@core/ui`, `@core/db`, `@core/module-kit`), bukan path relatif. Memindahkan folder modul — atau memindahkannya ke repositori lain — tidak boleh merusak apa pun (§4.9 poin 1). |
 | G-4 | **[P0]** Generator modul CLI (`bun modgen`) — hasilkan CRUD lengkap: tabel, migrasi, route API dengan skema, halaman list+form, entri menu, seed izin, berkas i18n. Mode interaktif dan non-interaktif. |
-| G-5 | **[P0]** **16 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
+| G-5 | **[P0]** **17 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
 | G-6 | **[P0]** **Menambah atau menghapus modul tidak mengubah berkas core mana pun.** Ditegakkan di CI: pipeline menjalankan `modgen`, lalu memeriksa bahwa `git diff` hanya menyentuh `modules/`, `modules.json`, dan direktori hasil generate. Ini mengubah janji modularitas dari niat menjadi sesuatu yang terukur. |
 | G-7 | **[P0]** Kegagalan satu modul saat inisialisasi tidak boleh mematikan aplikasi; catat galatnya, tandai modul sebagai gagal di UI admin, lanjutkan. |
 | G-8 | **[P0]** Modul bisa diaktifkan/nonaktifkan **per tenant** lewat tabel `modules`. Modul nonaktif: menu hilang, section-nya di Pengaturan hilang (nilai tersimpan tidak disentuh), route menolak dan hilang dari dokumen API (`/openapi.json`, `/docs`) untuk tenant itu, tema & route publiknya tidak terdaftar, tabelnya tetap ada. |

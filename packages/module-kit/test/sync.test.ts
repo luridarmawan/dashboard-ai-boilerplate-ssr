@@ -256,6 +256,46 @@ describe('syncModules — API routes & web pages (extension points 2 & 3)', () =
   });
 });
 
+describe('syncModules — CSRF-exempt routes (extension point 17)', () => {
+  test('csrf-exempt.ts entries are mounted under /v1/m/<ns> and keep their reason', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.csrfExempt).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/m/alpha/hooks/:provider',
+        module: 'Alpha',
+        ns: 'alpha',
+        reason: 'Signed by the provider with HMAC-SHA256.',
+      },
+    ]);
+  });
+
+  test('safe methods, wildcards, a missing reason and unserved routes are all rejected', async () => {
+    let err: SyncError | undefined;
+    try {
+      await syncModules({ root: join(fixtures, 'bad'), write: false, coreIcons: CORE_ICONS });
+    } catch (e) {
+      err = e as SyncError;
+    }
+    const p = err?.problems ?? [];
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "GET \/feed" tidak valid/.test(x))).toBe(true);
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "POST \/hooks\/\*" tidak valid/.test(x))).toBe(
+      true,
+    );
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "POST \/inbound" tanpa reason/.test(x))).toBe(
+      true,
+    );
+    // Naughty's routes.ts is not an Elysia instance, so no route can match.
+    expect(p.some((x) => /Naughty.*"POST \/ghost" tidak cocok dengan route mana pun/.test(x))).toBe(
+      true,
+    );
+  });
+});
+
 describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
   test('hooks.ts and jobs.ts are registered with their declared names', async () => {
     const r = await syncModules({

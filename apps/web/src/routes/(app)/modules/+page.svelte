@@ -28,6 +28,7 @@ const chips = (c: Mod['contributes']): [string, number, string][] =>
       ['link', c.api ? 1 : 0, t('modules.chip.api')],
       ['file', c.pages, t('modules.chip.pages')],
       ['external-link', c.publicRoutes, t('modules.chip.public')],
+      ['unlock', c.csrfExempt, t('modules.chip.csrf_exempt')],
       ['menu', c.menu, t('modules.chip.menu')],
       ['shield', c.permissions, t('modules.chip.permissions')],
       ['settings', c.config, t('modules.chip.config')],

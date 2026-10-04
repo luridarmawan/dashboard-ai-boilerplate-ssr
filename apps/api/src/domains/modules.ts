@@ -27,6 +27,7 @@ const Contributes = t.Object({
   api: t.Boolean(),
   pages: t.Integer(),
   publicRoutes: t.Integer(),
+  csrfExempt: t.Integer(),
   widgets: t.Integer(),
   hooks: t.Array(t.String()),
   jobs: t.Array(t.String()),

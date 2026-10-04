@@ -3,6 +3,7 @@ import { env } from '@core/config';
 import { fail } from '@core/contracts';
 import { newId } from '@core/db';
 import { Elysia } from 'elysia';
+import { isCsrfExempt } from './csrf-exempt.ts';
 
 /**
  * CSRF protection for EVERY state-changing request (PRD A-10, anti-pattern D6).
@@ -16,11 +17,14 @@ import { Elysia } from 'elysia';
  * Runs in `onRequest`, BEFORE body parsing and schema validation, so a cross-origin request is
  * refused first and learns nothing — not even which fields were invalid.
  * Together with `SameSite=Lax` on the session cookie, a cross-site page cannot forge a
- * mutation. Requests that authenticate with a Bearer token (A-4) carry no cookie and are
- * exempt — that is the only exemption, and it is structural, not a per-route opt-out.
+ * mutation. Two exemptions, both structural:
+ *   - Requests that authenticate with a Bearer token (A-4) carry no cookie.
+ *   - Module routes declared in a module's `csrf-exempt.ts` (extension point 17) — for external
+ *     callers that can send neither a bearer token nor the CSRF pair. The auth plugin strips the
+ *     cookie session from those requests, so they are anonymous and there is nothing to forge.
  *
- * There is no allowlist of "public" mutations: login and registration are protected too
- * (login CSRF is real). The web app fetches a token during SSR and posts it back.
+ * Core routes are never exempt: login and registration are protected too (login CSRF is real).
+ * The web app fetches a token during SSR and posts it back.
  */
 
 export const CSRF_COOKIE = 'crk_csrf';
@@ -127,6 +131,7 @@ export function cookieValue(request: Request, name: string): string | null {
 }
 
 export const csrf = new Elysia({ name: 'csrf' }).onRequest(({ request, set }) => {
+  if (isCsrfExempt(request)) return;
   const verdict = checkCsrf({
     method: request.method,
     origin: request.headers.get('origin'),

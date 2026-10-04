@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { and, eq, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { settings } from '../../src/services.ts';
+import { sign } from '../../src/webhooks.ts';
 
 /** Integration: the Example module's PUBLIC API answers anonymously (R-2, R-3). */
 const enabled = process.env.INTEGRATION === '1';
@@ -193,5 +194,79 @@ describe.skipIf(!enabled)('Example public API', () => {
       .from(schema.outboxEmail)
       .where(eq(schema.outboxEmail.to_address, bot));
     expect(botRows).toHaveLength(0);
+  });
+
+  /**
+   * Extension point 17: an external system posts an inquiry with no CSRF pair and from a foreign
+   * origin. The route is declared in modules/Example/csrf-exempt.ts; the HMAC signature is the
+   * only thing that lets it in.
+   */
+  test('inbound inquiries: no CSRF needed, but the signature is', async () => {
+    const db = unsafeAcrossTenants();
+    const [tenant] = await db
+      .select({ id: schema.clients.id })
+      .from(schema.clients)
+      .where(eq(schema.clients.code, 'default'));
+    const tid = tenant?.id ?? null;
+    expect(tid).not.toBeNull();
+    const secret = `inbound-secret-${Date.now()}`;
+    const post = (raw: string, headers: Record<string, string>) =>
+      app.handle(
+        new Request('http://api.test/v1/m/example/inbound/inquiries', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            origin: 'https://partner.example',
+            ...headers,
+          },
+          body: raw,
+        }),
+      );
+    const signed = async (raw: string, ts = Math.floor(Date.now() / 1000)) =>
+      post(raw, {
+        'x-example-timestamp': String(ts),
+        'x-example-signature': await sign(secret, String(ts), raw),
+      });
+    const email = `inbound-${Date.now()}@example.test`;
+    const raw = JSON.stringify({
+      name: 'Sistem Mitra',
+      email,
+      message: 'Pesanan grosir 50 kg dari portal mitra.',
+      source: 'partner-portal',
+    });
+    try {
+      // Saved in the tenant scope: a tenant override would shadow a global value.
+      const saved = await settings.save(tid, [{ key: 'example.inbound_secret', value: secret }]);
+      expect(saved.errors).toEqual({});
+
+      const unsigned = await post(raw, {});
+      expect(unsigned.status).toBe(401);
+      expect(((await unsigned.json()) as { error: { code: string } }).error.code).toBe(
+        'unauthorized',
+      );
+      const ts = Math.floor(Date.now() / 1000);
+      const forged = await post(raw, {
+        'x-example-timestamp': String(ts),
+        'x-example-signature': await sign('wrong-secret', String(ts), raw),
+      });
+      expect(forged.status).toBe(401);
+      expect((await signed(raw, ts - 600)).status).toBe(401); // outside the replay window
+      expect((await signed('{"name":"x"}')).status).toBe(422); // signed, but not an inquiry
+
+      const res = await signed(raw);
+      expect(res.status, await res.clone().text()).toBe(201);
+      const id = ((await res.json()) as { data: { id: string } }).data.id;
+      const [row] = await db
+        .select()
+        .from(schema.exampleInquiries)
+        .where(eq(schema.exampleInquiries.id, id));
+      expect(row?.email).toBe(email);
+      expect(row?.source).toBe('partner-portal');
+      expect(row?.client_id ?? null).toBe(tid);
+    } finally {
+      await settings.save(tid, [{ key: 'example.inbound_secret', value: '__clear__' }]);
+    }
+    // No secret, no endpoint — even a correctly signed request is refused.
+    expect((await signed(raw)).status).toBe(503);
   });
 });

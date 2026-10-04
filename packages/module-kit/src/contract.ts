@@ -542,6 +542,67 @@ export function definePublicRoutes(
 }
 
 /**
+ * A module API route that external machines call WITHOUT the CSRF pair (extension point 17,
+ * PRD A-10): a third-party callback or integration that cannot send `Authorization: Bearer`
+ * nor the `x-csrf-token` header. The path is relative to the module's mount, like the route in
+ * `api/routes.ts` it names: `{ method: 'POST', path: '/inbound/inquiries' }` exempts exactly
+ * `POST /v1/m/<ns>/inbound/inquiries` and nothing else.
+ *
+ * An exempt request is ANONYMOUS by construction: the API ignores every session cookie on it, so
+ * a cross-site page can never ride a visitor's login through it. The handler must authenticate
+ * its caller itself — an HMAC signature, a shared secret, a one-time token in the body.
+ */
+export interface CsrfExemptDef {
+  readonly method: CsrfExemptMethod;
+  /** Path inside the module's API, Elysia notation: `/hooks/:provider`. No wildcards. */
+  readonly path: string;
+  /** Why this route may skip CSRF and how it authenticates its caller; shown in reviews and docs. */
+  readonly reason: string;
+}
+
+export const CSRF_EXEMPT_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'] as const;
+export type CsrfExemptMethod = (typeof CSRF_EXEMPT_METHODS)[number];
+
+/** `/segment` or `/:param` repeated; no `*`, no trailing slash, no query. */
+export const CSRF_EXEMPT_PATH_RE =
+  /^\/(?:[a-z0-9][a-z0-9_-]*|:[a-zA-Z][a-zA-Z0-9]*)(?:\/(?:[a-z0-9][a-z0-9_-]*|:[a-zA-Z][a-zA-Z0-9]*))*$/;
+
+/** Declare the module API routes that skip the CSRF check (extension point 17). */
+export function defineCsrfExempt(
+  moduleName: string,
+  list: readonly CsrfExemptDef[],
+): readonly CsrfExemptDef[] {
+  namespaceOf(moduleName);
+  const seen = new Set<string>();
+  for (const r of list) {
+    if (!(CSRF_EXEMPT_METHODS as readonly string[]).includes(r.method)) {
+      throw new ModuleContractError(
+        `pengecualian CSRF "${r.path}": method harus salah satu dari ${CSRF_EXEMPT_METHODS.join(', ')}`,
+      );
+    }
+    if (!CSRF_EXEMPT_PATH_RE.test(r.path)) {
+      throw new ModuleContractError(
+        `pengecualian CSRF "${r.path}" tidak valid — pakai bentuk /segmen/:param tanpa wildcard`,
+      );
+    }
+    if (r.path === '/v1' || r.path.startsWith('/v1/')) {
+      throw new ModuleContractError(
+        `pengecualian CSRF "${r.path}": tulis path relatif terhadap modul (mis. /hooks), bukan /v1/m/…`,
+      );
+    }
+    if (typeof r.reason !== 'string' || r.reason.trim().length < 10) {
+      throw new ModuleContractError(
+        `pengecualian CSRF ${r.method} ${r.path}: reason wajib diisi (cara route ini memverifikasi pemanggilnya)`,
+      );
+    }
+    const key = `${r.method} ${r.path}`;
+    if (seen.has(key)) throw new ModuleContractError(`pengecualian CSRF ${key} duplikat`);
+    seen.add(key);
+  }
+  return list;
+}
+
+/**
  * Module seed (PRD O-3, R-3): idempotent demo/reference data for the default tenant, run by
  * `bun db:seed` after the core seed. Receives a raw `db` (the seed writes several tables) and the
  * default tenant id; MUST be safe to run on every deploy.

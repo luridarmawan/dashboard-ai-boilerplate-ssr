@@ -322,6 +322,7 @@
   "modules.catalog.title": "Module catalog",
   "modules.chip.api": "API",
   "modules.chip.config": "config",
+  "modules.chip.csrf_exempt": "routes without CSRF",
   "modules.chip.hooks": "hooks",
   "modules.chip.icon_sets": "icon sets",
   "modules.chip.jobs": "jobs",

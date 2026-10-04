@@ -4,7 +4,7 @@ Tutorial berurutan: dari repo bersih sampai sebuah modul jalan di dashboard, len
 
 Kalau modul Anda milik tim lain, punya siklus rilis sendiri, atau akan dipasang ke beberapa instalasi, pakai [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) — modul di repositori sendiri, dipasang sebagai submodule terkunci.
 
-Referensi kontraknya (setiap berkas modul, 16 titik perluasan, aturan yang dijaga `modules:sync`) ada di [`MODULES.md`](./MODULES.md). Dokumen ini alurnya; dokumen itu spesifikasinya.
+Referensi kontraknya (setiap berkas modul, 17 titik perluasan, aturan yang dijaga `modules:sync`) ada di [`MODULES.md`](./MODULES.md). Dokumen ini alurnya; dokumen itu spesifikasinya.
 
 ## 0. Prasyarat
 
@@ -102,7 +102,7 @@ Lalu ikutkan kolom itu di `api/schemas.ts` (skema TypeBox yang dipakai API **dan
 | `config.ts` | Setelan modul yang muncul sebagai form di **Pengaturan** |
 | `seed.ts` | Data awal, idempoten |
 
-Daftar lengkap 16 titik perluasan beserta kontraknya ada di [`MODULES.md` §3](./MODULES.md).
+Daftar lengkap 17 titik perluasan beserta kontraknya ada di [`MODULES.md` §3](./MODULES.md).
 
 ## 6. Tes, lint, typecheck
 

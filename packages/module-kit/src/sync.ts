@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type {
   ConfigSectionDef,
+  CsrfExemptDef,
   IconSetContribDef,
   LayoutContribDef,
   MenuEntryDef,
@@ -20,7 +21,7 @@ import type {
   PublicRouteDef,
   WidgetDef,
 } from './contract.ts';
-import { CORE_MENU_GROUPS } from './contract.ts';
+import { CORE_MENU_GROUPS, CSRF_EXEMPT_METHODS, CSRF_EXEMPT_PATH_RE } from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
 import { parseEvery } from './jobs.ts';
 import {
@@ -116,6 +117,17 @@ export interface SyncResult {
   readonly themesContrib: readonly ThemeContrib[];
   readonly configSections: readonly (ConfigSectionDef & { module: string })[];
   readonly publicRoutes: readonly (PublicRouteDef & { module: string; ns: string })[];
+  readonly csrfExempt: readonly CsrfExemptRecord[];
+}
+
+/** A module API route exempt from CSRF (extension point 17), with its full mounted path. */
+export interface CsrfExemptRecord {
+  readonly method: string;
+  /** Full path, Elysia notation: `/v1/m/<ns>/inbound/:id`. */
+  readonly path: string;
+  readonly module: string;
+  readonly ns: string;
+  readonly reason: string;
 }
 
 /** A theme folder contributed by a module (extension point 14). */
@@ -144,6 +156,7 @@ export interface ModuleContributions {
   readonly api: boolean;
   readonly pages: number;
   readonly publicRoutes: number;
+  readonly csrfExempt: number;
   readonly widgets: number;
   readonly hooks: readonly string[];
   readonly jobs: readonly string[];
@@ -240,6 +253,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const publicRoutes: (PublicRouteDef & { module: string; ns: string })[] = [];
   const publicOwner = new Map<string, string>();
   const corePublicPaths = readCoreRoutePaths(root);
+  const csrfExempt: CsrfExemptRecord[] = [];
   const seedModules: { module: string; file: string }[] = [];
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
@@ -444,6 +458,57 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         );
       } else {
         apiModules.push({ name: manifest.name, ns, file: 'api/routes.ts' });
+      }
+    }
+
+    // ---- csrf-exempt.ts (extension point 17, A-10) ----
+    const ce = await loadDefault<readonly CsrfExemptDef[]>(
+      join(dir, 'csrf-exempt.ts'),
+      problems,
+      tag,
+    );
+    if (ce !== undefined) {
+      if (!Array.isArray(ce))
+        problems.push(
+          `${tag}: csrf-exempt.ts harus meng-export default array (pakai defineCsrfExempt)`,
+        );
+      else {
+        // Each entry must name a route the module really serves: an exemption for a path that
+        // does not exist yet is a hole waiting for the route that later lands on it.
+        const served = new Set(
+          looksLikeElysia(r)
+            ? (r as { routes: { method?: string; path?: string }[] }).routes.map(
+                (x) => `${String(x.method).toUpperCase()} ${x.path}`,
+              )
+            : [],
+        );
+        for (const e of ce) {
+          const key = `${e?.method} ${e?.path}`;
+          if (
+            !(CSRF_EXEMPT_METHODS as readonly string[]).includes(e?.method) ||
+            !CSRF_EXEMPT_PATH_RE.test(e?.path ?? '')
+          ) {
+            problems.push(`${tag}: pengecualian CSRF "${key}" tidak valid`);
+            continue;
+          }
+          if (typeof e.reason !== 'string' || e.reason.trim().length < 10) {
+            problems.push(`${tag}: pengecualian CSRF "${key}" tanpa reason`);
+            continue;
+          }
+          if (!served.has(key)) {
+            problems.push(
+              `${tag}: pengecualian CSRF "${key}" tidak cocok dengan route mana pun di api/routes.ts`,
+            );
+            continue;
+          }
+          csrfExempt.push({
+            method: e.method,
+            path: `/v1/m/${ns}${e.path}`,
+            module: manifest.name,
+            ns,
+            reason: e.reason.trim(),
+          });
+        }
       }
     }
 
@@ -920,6 +985,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         api: apiModules.some((a) => a.name === m.name),
         pages: webRoutes.filter((w) => w.module === m.name && w.kind === 'svelte').length,
         publicRoutes: publicRoutes.filter((p) => p.module === m.name).length,
+        csrfExempt: csrfExempt.filter((c) => c.module === m.name).length,
         widgets: widgets.filter((w) => w.module === m.name).length,
         hooks: hookModules.find((h) => h.name === m.name)?.items ?? [],
         jobs: jobModules.find((j) => j.name === m.name)?.items ?? [],
@@ -960,6 +1026,13 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       await writeFile(
         join(root, 'packages/module-kit/src/generated/public-routes.ts'),
         emitPublicRoutes(publicRoutes),
+      ),
+    );
+    // Read by the API's CSRF and auth plugins through `@core/module-kit/csrf-exempt`.
+    files.push(
+      await writeFile(
+        join(root, 'packages/module-kit/src/generated/csrf-exempt.ts'),
+        emitCsrfExempt(csrfExempt),
       ),
     );
     files.push(
@@ -1004,6 +1077,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     widgets,
     configSections,
     publicRoutes,
+    csrfExempt,
     layoutsContrib,
     iconSetsContrib,
     themesContrib,
@@ -1178,6 +1252,7 @@ function emitRegistry(
     api: false,
     pages: 0,
     publicRoutes: 0,
+    csrfExempt: 0,
     widgets: 0,
     hooks: [],
     jobs: [],
@@ -1574,6 +1649,18 @@ export const modulePublicRoutes: readonly { path: string; module: string; ns: st
 }
 
 /** Module seeds in init order, imported statically so `bun db:seed` runs them after the core seed. */
+/** Module API routes that skip CSRF (extension point 17); requests on them are anonymous. */
+function emitCsrfExempt(list: readonly CsrfExemptRecord[]): string {
+  return `${GEN_HEADER}
+/** Module API routes exempt from CSRF (extension point 17): method, full path, owner, reason. */
+export const moduleCsrfExempt: readonly { method: string; path: string; module: string; ns: string; reason: string }[] = ${JSON.stringify(
+    list,
+    null,
+    2,
+  )};
+`;
+}
+
 function emitSeeds(
   seeds: readonly { module: string; file: string }[],
   root: string,
@@ -1619,6 +1706,8 @@ export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = 
 export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [];
 `,
     'packages/module-kit/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean }[] = [];
+`,
+    'packages/module-kit/src/generated/csrf-exempt.ts': `${H}export const moduleCsrfExempt: readonly { method: string; path: string; module: string; ns: string; reason: string }[] = [];
 `,
     'packages/i18n/src/generated/messages.ts': `${H}export const LOCALES = ${JSON.stringify(I18N_LOCALES)} as const;
 export type Locale = (typeof LOCALES)[number];

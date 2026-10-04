@@ -46,7 +46,7 @@ Ini pantangan desain (PRD §1.3) — pelanggarannya adalah cacat, bukan preferen
 
 > Kalau sebuah kebutuhan modul memaksa perubahan di core, itu **cacat pada kontrak modul**. Yang diperbaiki adalah kontraknya — jangan ditambal di core.
 
-- Bentuk modul & **16 titik perluasan**: PRD §4.5. Daftar itu tertutup. Tiga di antaranya adalah kontrak fondasi yang dibangun di M0: **event bus** (G-17), **penjadwal core** (G-18), dan **registry widget dashboard** (G-19).
+- Bentuk modul & **17 titik perluasan**: PRD §4.5. Daftar itu tertutup. Tiga di antaranya adalah kontrak fondasi yang dibangun di M0: **event bus** (G-17), **penjadwal core** (G-18), dan **registry widget dashboard** (G-19).
 - Modul dirakit **saat build** (`bun modules:sync`), bukan ditemukan saat runtime.
 - Sumber modul di `modules.json`: `local` / `submodule` (baku untuk lintas repo, `ref` selalu tag/commit) / `package`.
 - `@core/*` harus **paket nyata**, bukan alias tsconfig — kalau tidak, modul eksternal gagal dibangun sendiri.

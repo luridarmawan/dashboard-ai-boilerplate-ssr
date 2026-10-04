@@ -24,6 +24,7 @@ import { webhooksDomain } from './domains/webhooks.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
+import { documentCsrfExempt } from './plugins/csrf-exempt.ts';
 import { demoMode } from './plugins/demo.ts';
 import { maintenanceMode } from './plugins/maintenance.ts';
 import { moduleGate } from './plugins/module-gate.ts';
@@ -130,5 +131,7 @@ export const app = new Elysia()
 
 // Permission lines in the OpenAPI document come from the route guards themselves.
 documentPermissions(app);
+// …and so do the CSRF-exempt notes, from the list `modules:sync` generated.
+documentCsrfExempt(app);
 
 export type App = typeof app;

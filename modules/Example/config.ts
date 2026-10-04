@@ -57,6 +57,16 @@ export default defineConfig('Example', [
         max: 20,
         order: 4,
       },
+      {
+        key: 'example.inbound_secret',
+        type: 'secret',
+        title: { id: 'Secret inquiry dari sistem luar', en: 'Inbound inquiry secret' },
+        note: {
+          id: 'Sistem luar mengirim inquiry ke POST /v1/m/example/inbound/inquiries, ditandatangani HMAC-SHA256 dengan secret ini. Kosong = endpoint itu menolak semua.',
+          en: 'External systems post inquiries to POST /v1/m/example/inbound/inquiries, signed with HMAC-SHA256 using this secret. Empty = that endpoint refuses everything.',
+        },
+        order: 5,
+      },
     ],
   },
 ]);
