@@ -190,7 +190,7 @@ describe.skipIf(!enabled)('custom themes (L-24, L-21, L-5, L-8)', () => {
       admin,
     ]);
     expect(badIcons.status).toBe(422);
-    expect((await details(badIcons)).errors?.icons).toContain('L-5');
+    expect((await details(badIcons)).errors?.icons).toContain('nope-24');
 
     const wrongKind = await post(
       '/v1/themes/custom',

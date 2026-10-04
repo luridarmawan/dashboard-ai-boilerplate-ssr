@@ -16,7 +16,7 @@ export const actions: Actions = {
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
         raw,
       );
-    const v = validateForm(NoteBody, input); // the API's own schema (L-17)
+    const v = validateForm(NoteBody, input); // the API's own schema
     if (!v.ok)
       return actionFailure(
         {
