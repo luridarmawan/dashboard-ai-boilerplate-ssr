@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Versi 2 — kontrak M6. Semua titik perluasan yang bisa dipakai hari ini ada di §2a; yang belum ada ditandai di §6 dan tidak boleh diasumsikan |
-| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (17 titik perluasan), §4.9 (modul lintas repositori), FR-G |
+| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (18 titik perluasan), §4.9 (modul lintas repositori), FR-G |
 | **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
 | **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
 | **Tutorial** | Langkah demi langkah, dengan penjelasan tiap perintah: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) (modul di dalam repo ini) · [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) (repositori sendiri, termasuk repo privat). Dokumen ini kontraknya; keduanya alurnya |
@@ -57,7 +57,7 @@ INTEGRATION=1 bun test modules/Billing/test
 
 Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langkah "regenerate" yang akan menimpanya.
 
-### 2a. Peta 17 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
+### 2a. Peta 18 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
 
 | # | Titik perluasan | Berkas di modul | Contoh hidup | Dibuktikan oleh |
 |---|---|---|---|---|
@@ -78,6 +78,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 15 | Layout | `layouts.ts` (`defineLayouts`) | `modules/Dummy/layouts.ts` | `scripts/ci/layout-contract.ts`, m2 proof #5 |
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
 | 17 | Route tanpa CSRF | `csrf-exempt.ts` (`defineCsrfExempt`) — route API yang dipanggil sistem luar tanpa bearer maupun pasangan CSRF; request-nya selalu anonim | `modules/Example/csrf-exempt.ts` → `POST /v1/m/example/inbound/inquiries` | `apps/api/test/csrf.test.ts`, `apps/api/test/integration/example.test.ts` |
+| 18 | Langganan MQTT | `mqtt.ts` (`defineMqtt`) — topik yang dilanggan lewat klien MQTT **inti** (satu per proses, sakelar di **Pengaturan → MQTT**); `shared: true` = satu pesan diproses satu instance; publish lewat `publish()` dari `@app/api/mqtt` ([`MQTT.md`](./MQTT.md)) | `modules/Example/mqtt.ts` → `example/<tenant>/inquiries` | `apps/api/test/mqtt.test.ts`, `packages/module-kit/test/mqtt.test.ts`, `scripts/ci/mqtt-smoke.ts`, `apps/api/test/integration/example.test.ts` |
 
 ### 2b. Secara manual (kalau ingin memahami tiap berkas)
 
@@ -580,6 +581,30 @@ export default defineJobs('Billing', [
 
 Yang dijamin penjadwal core (G-18): dengan berapa pun instance API (`--scale api=3`), sebuah job berjalan **tepat sekali per interval** — lock diambil lewat satu `UPDATE` bersyarat di tabel `scheduler_jobs`, jadi jalur bakunya tidak butuh Redis (Keputusan M). Setiap eksekusi tercatat di `scheduler_runs`. Job yang melebihi `lease`-nya boleh dimulai ulang di instance lain — buat run pendek atau pecah pekerjaannya. Modul **tidak pernah** membuat timer sendiri.
 
+### `mqtt.ts` — langganan MQTT (titik perluasan 18)
+
+```ts
+import { defineMqtt } from '@core/module-kit';
+
+export default defineMqtt('Billing', [
+  {
+    name: 'billing.meter_readings',      // wajib "billing.*"
+    topic: 'meter/+/reading',            // filter MQTT; tanpa $share/ dan tanpa awalan deployment
+    qos: 1,                              // baku 1
+    shared: true,                        // baku: satu pesan → satu instance (MQTT 5)
+    handler: async (message, ctx) => {
+      const [meterId] = message.params;  // tangkapan wildcard
+      const reading = message.json<{ kwh: number }>();
+      if (!reading) return;              // payload rusak: buang, jangan lempar
+      await enqueue('billing.reading.store', { meterId, ...reading });
+      await ctx.publish(`meter/${meterId}/ack`, 'ok');
+    },
+  },
+]);
+```
+
+Core memegang **satu** klien MQTT per proses API — broker, kredensial, versi protokol, dan sakelar on/off ada di **Pengaturan → MQTT** (lingkup global; `MQTT_*` di `.env` sebagai bootstrap), berlaku tanpa restart. Modul tidak mengimpor pustaka MQTT dan tidak mengelola koneksi. Awalan topik deployment (`mqtt.topic_prefix`) ditambahkan ke langganan dan publish, dan dihilangkan sebelum pesan sampai ke handler. Handler berjalan tanpa request, di instance yang menerima pesan; yang melempar dicatat dan dihitung, tidak menjatuhkan klien (G-7). Tenant tidak ikut dalam sesi broker — bawa di topik atau isi pesan. Menerbitkan dari mana saja: `publish(topic, payload, { qos, retain })` dari `@app/api/mqtt`, tidak pernah melempar (`{ ok: false, reason: 'disabled' }` saat klien mati), dan `mqttState()` untuk status. Rincian, metrik, dan broker dev/prod di [`MQTT.md`](./MQTT.md).
+
 ### Notifikasi dari modul (J-4)
 
 Modul memberi tahu pengguna lewat bel di header dengan memanggil layanan core — bukan menulis tabelnya sendiri:
@@ -731,6 +756,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Event tak dikenal / job tanpa prefiks / interval < 1 s | `… hooks.ts berlangganan event "invoice.paid" yang tidak dikenal core` · `… job "cleanup" harus diawali "billing." (G-9)` · `… job "billing.fast": interval 0s harus bilangan bulat ≥ 1 detik` |
 | Tool tanpa prefiks / izin tak dideklarasikan / skema bukan objek | `… nama tool "other.thing" harus diawali "billing." (G-9)` · `… tool "billing.ghost" menuntut izin "billing.nothing.read" yang tidak ada di permissions.ts` · `… tool "billing.bare": input harus JSON Schema bertipe object` |
 | Pengecualian CSRF salah bentuk / tanpa route | `… pengecualian CSRF "GET /feed" tidak valid` · `… pengecualian CSRF "POST /inbound" tanpa reason` · `… pengecualian CSRF "POST /ghost" tidak cocok dengan route mana pun di api/routes.ts` |
+| Langganan MQTT tanpa prefiks / filter rusak / `$share/` tulisan tangan | `… langganan MQTT "readings" harus diawali "billing."` · `… langganan MQTT "billing.broken": filter topik tidak valid — "#" hanya boleh di level terakhir` · `… jangan tulis $share/ — pakai \`shared: true\`` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -760,7 +786,7 @@ Mencabut modul (G-15): `bun modules:remove <Nama>` — tampilkan rencananya lebi
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua 17 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
+Semua 18 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
 
 | Hal | Status |
 |---|---|

@@ -593,6 +593,123 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
     ],
   },
+  {
+    section: 'mqtt',
+    title: { id: 'MQTT', en: 'MQTT' },
+    note: {
+      id: 'Satu klien MQTT per proses API untuk seluruh deployment: modul berlangganan topik lewat mqtt.ts dan menerbitkan lewat publish(). Berlaku tanpa restart; kolom yang kosong memakai MQTT_* dari .env.',
+      en: 'One MQTT client per API process for the whole deployment: modules subscribe through mqtt.ts and publish through publish(). Applies without a restart; empty fields fall back to MQTT_* from .env.',
+    },
+    order: 25,
+    // One broker per deployment: the section lives in the global scope only (see ConfigSectionDef.scope).
+    scope: 'global',
+    // Extension point 6: a round trip through the stored broker — connect, subscribe to a private
+    // probe topic, publish to it, wait for the echo — so the verdict covers URL, credentials, ACL
+    // and the protocol version, not only "the port answered".
+    actions: [
+      {
+        key: 'test',
+        label: { id: 'Uji koneksi', en: 'Test connection' },
+        endpoint: '/v1/configuration/mqtt/test',
+        permission: 'config.edit',
+        note: {
+          id: 'Menguji broker yang tersimpan (bukan yang belum disimpan di formulir ini) — simpan dulu, lalu uji. Satu pesan dikirim ke topik uji dan ditunggu kembali.',
+          en: 'Tests the stored broker (not unsaved edits in this form) — save first, then test. One message is published to a probe topic and awaited back.',
+        },
+      },
+    ],
+    fields: [
+      {
+        key: 'mqtt.enabled',
+        type: 'boolean',
+        title: { id: 'Aktifkan klien MQTT', en: 'Enable the MQTT client' },
+        note: {
+          id: 'Mati = tidak ada koneksi ke broker; langganan modul tidak aktif dan publish() menjawab "disabled". Menyala = setiap instance API tersambung dan berlangganan.',
+          en: 'Off = no broker connection; module subscriptions are inactive and publish() answers "disabled". On = every API instance connects and subscribes.',
+        },
+        default: false,
+        order: 0,
+      },
+      {
+        key: 'mqtt.url',
+        type: 'string',
+        title: { id: 'URL broker', en: 'Broker URL' },
+        note: {
+          id: 'mqtt://host:1883, mqtts://host:8883, ws://host:9001/mqtt atau wss://…. Kosong = MQTT_URL dari .env.',
+          en: 'mqtt://host:1883, mqtts://host:8883, ws://host:9001/mqtt or wss://…. Empty = MQTT_URL from .env.',
+        },
+        default: null,
+        max: 512,
+        order: 1,
+      },
+      {
+        key: 'mqtt.username',
+        type: 'string',
+        title: { id: 'Username', en: 'Username' },
+        note: { id: 'Kosong = MQTT_USERNAME dari .env.', en: 'Empty = MQTT_USERNAME from .env.' },
+        default: null,
+        max: 191,
+        order: 2,
+      },
+      {
+        key: 'mqtt.password',
+        type: 'secret',
+        title: { id: 'Password', en: 'Password' },
+        note: { id: 'Kosong = MQTT_PASSWORD dari .env.', en: 'Empty = MQTT_PASSWORD from .env.' },
+        order: 3,
+      },
+      {
+        key: 'mqtt.protocol_version',
+        type: 'select',
+        title: { id: 'Versi protokol', en: 'Protocol version' },
+        note: {
+          id: 'MQTT 5 diperlukan agar langganan bersama ($share) membuat satu pesan diproses sekali di banyak instance. Pilih 3.1.1 hanya untuk broker lama; di sana setiap instance menerima setiap pesan.',
+          en: 'MQTT 5 is required for shared subscriptions ($share) so that one message is processed once across instances. Choose 3.1.1 only for old brokers; there every instance receives every message.',
+        },
+        default: '5',
+        options: [
+          { value: '5', label: { id: 'MQTT 5 (disarankan)', en: 'MQTT 5 (recommended)' } },
+          { value: '4', label: { id: 'MQTT 3.1.1', en: 'MQTT 3.1.1' } },
+        ],
+        order: 4,
+      },
+      {
+        key: 'mqtt.client_id_prefix',
+        type: 'string',
+        title: { id: 'Awalan client id', en: 'Client id prefix' },
+        note: {
+          id: 'Client id tiap instance = <awalan>-<instance>. Huruf, angka, - dan _. Kosong = MQTT_CLIENT_ID_PREFIX dari .env, lalu "crk".',
+          en: 'Each instance connects as <prefix>-<instance>. Letters, digits, - and _. Empty = MQTT_CLIENT_ID_PREFIX from .env, then "crk".',
+        },
+        default: null,
+        max: 32,
+        order: 5,
+      },
+      {
+        key: 'mqtt.topic_prefix',
+        type: 'string',
+        title: { id: 'Awalan topik', en: 'Topic prefix' },
+        note: {
+          id: 'Namespace deployment ini di broker bersama, mis. "acme/prod": ditambahkan ke setiap langganan dan publish, dan dihilangkan sebelum pesan sampai ke modul. Kosong = MQTT_TOPIC_PREFIX dari .env, lalu tanpa awalan.',
+          en: 'This deployment\'s namespace on a shared broker, e.g. "acme/prod": prepended to every subscription and publish, and stripped before a message reaches a module. Empty = MQTT_TOPIC_PREFIX from .env, then no prefix.',
+        },
+        default: null,
+        max: 191,
+        order: 6,
+      },
+      {
+        key: 'mqtt.publish_events',
+        type: 'boolean',
+        title: { id: 'Terbitkan event inti ke broker', en: 'Publish core events to the broker' },
+        note: {
+          id: 'Setiap event inti (user.created, job.finished, …) diterbitkan sebagai JSON ke events/<nama event> — padanan webhook keluar untuk sistem yang mendengarkan MQTT.',
+          en: 'Every core event (user.created, job.finished, …) is published as JSON to events/<event name> — the MQTT counterpart of outgoing webhooks.',
+        },
+        default: false,
+        order: 7,
+      },
+    ],
+  },
 ];
 
 export interface RegistryField extends ConfigFieldDef {

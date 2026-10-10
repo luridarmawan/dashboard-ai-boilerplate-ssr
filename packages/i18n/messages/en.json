@@ -328,6 +328,7 @@
   "modules.chip.jobs": "jobs",
   "modules.chip.layouts": "layouts",
   "modules.chip.menu": "menu",
+  "modules.chip.mqtt": "MQTT subscriptions",
   "modules.chip.pages": "pages",
   "modules.chip.permissions": "permissions",
   "modules.chip.public": "public",

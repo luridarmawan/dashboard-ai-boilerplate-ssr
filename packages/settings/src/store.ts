@@ -99,6 +99,8 @@ export class SettingsStore {
       title: s.title,
       note: s.note ?? null,
       order: s.order ?? 100,
+      // Deployment-wide sections (one broker, one client per process) exist in the global scope only.
+      scope: s.scope ?? null,
       // Presentation only: titled blocks the form draws the fields in (declaration order).
       groups: (s.groups ?? []).map((g) => ({ key: g.key, title: g.title, note: g.note ?? null })),
       // Extension point 6: buttons the section offers beside "Save" (e.g. "test connection").
@@ -168,6 +170,11 @@ export class SettingsStore {
     } = {},
   ): Promise<SaveResult> {
     const fields = configFields();
+    const globalOnlySections = new Set(
+      configSections()
+        .filter((s) => s.scope === 'global')
+        .map((s) => s.section),
+    );
     const errors: Record<string, string> = {};
     const plan: {
       key: string;
@@ -178,6 +185,11 @@ export class SettingsStore {
       const field = fields.get(e.key);
       if (!field) {
         errors[e.key] = 'kunci tidak dikenal';
+        continue;
+      }
+      // A global-only section has no tenant layer: a tenant override would be read by nobody.
+      if (clientId !== null && globalOnlySections.has(field.section)) {
+        errors[e.key] = 'hanya bisa diubah di lingkup global';
         continue;
       }
       // Secrets: an empty submit means "keep"; the literal `__clear__` clears.

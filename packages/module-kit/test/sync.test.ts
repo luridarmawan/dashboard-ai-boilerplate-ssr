@@ -312,6 +312,10 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     expect(r.toolModules).toEqual([
       { name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] },
     ]);
+    // mqtt.ts (extension point 18) rides the same registration path.
+    expect(r.mqttModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] },
+    ]);
   });
 
   test('unknown event, unprefixed job and sub-second interval are all reported', async () => {
@@ -335,6 +339,14 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       ),
     ).toBe(true);
     expect(p.some((x) => /Naughty.*tool "naughty\.bare".*bertipe object/.test(x))).toBe(true);
+    // mqtt.ts (extension point 18): foreign prefix, `#` not last, a hand-written $share/ prefix
+    expect(
+      p.some((x) => /Naughty.*langganan MQTT "readings" harus diawali "naughty\."/.test(x)),
+    ).toBe(true);
+    expect(
+      p.some((x) => /Naughty.*"naughty\.broken".*"#" hanya boleh di level terakhir/.test(x)),
+    ).toBe(true);
+    expect(p.some((x) => /Naughty.*"naughty\.shared".*\$share/.test(x))).toBe(true);
   });
 
   test('emitApiModules exports moduleHooks and moduleJobs from the module files', () => {
@@ -355,11 +367,14 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       '/repo/apps/api/src/generated/modules.ts',
       [{ name: 'Alpha', ns: 'alpha', file: 'hooks.ts', items: ['system.ping'] }],
       [{ name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] }],
+      [{ name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] }],
     );
     expect(out).toContain("import hooks_alpha from '../../../../modules/Alpha/hooks.ts';");
     expect(out).toContain("import jobs_alpha from '../../../../modules/Alpha/jobs.ts';");
+    expect(out).toContain("import mqtt_alpha from '../../../../modules/Alpha/mqtt.ts';");
     expect(out).toContain('export const moduleHooks = [hooks_alpha];');
     expect(out).toContain("{ module: 'Alpha', jobs: jobs_alpha },");
+    expect(out).toContain("{ module: 'Alpha', subscriptions: mqtt_alpha },");
     // Tools live in their own generated file (no import cycle through the route mounts).
     const tools = emitApiTools(
       [{ name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] }],

@@ -328,6 +328,7 @@
   "modules.chip.jobs": "job",
   "modules.chip.layouts": "layout",
   "modules.chip.menu": "menu",
+  "modules.chip.mqtt": "langganan MQTT",
   "modules.chip.pages": "halaman",
   "modules.chip.permissions": "izin",
   "modules.chip.public": "publik",

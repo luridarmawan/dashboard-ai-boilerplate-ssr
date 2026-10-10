@@ -100,7 +100,7 @@ bun modules:add <git-url> --ref v0.1.0
 
 Semua titik perluasan yang dipakai berjalan: \`db/tables.ts\`, \`permissions.ts\`, \`menu.ts\`, \`config.ts\`, \`i18n/\`,
 \`api/\` (route + skema bersama), \`web/routes/\` (list, baru, ubah), \`web/public/\` (halaman publik), \`widgets.ts\`,
-\`hooks.ts\`, \`jobs.ts\`, \`seed.ts\`, \`test/\`. Panduan lengkap: \`docs/MODULES.md\` di core.
+\`hooks.ts\`, \`jobs.ts\`, \`mqtt.ts\`, \`seed.ts\`, \`test/\`. Panduan lengkap: \`docs/MODULES.md\` di core.
 
 Tiga kebiasaan yang sudah terpasang dan sebaiknya Anda teruskan:
 

@@ -22,7 +22,7 @@ backup ──► mysqldump harian ──► ./backups (host)
 
 - **Satu origin** (Keputusan E): web dan API dari domain yang sama lewat path. Tidak ada CORS, tidak ada cookie lintas-domain.
 - **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. Replika `api` diresolusi lewat DNS Docker (*dynamic upstream*).
-- **`api` stateless** (Keputusan F): `--scale api=N` langsung bekerja; state bersama di database, Valkey hanya percepatan opsional (`--profile redis`).
+- **`api` stateless** (Keputusan F): `--scale api=N` langsung bekerja; state bersama di database, Valkey hanya percepatan opsional (`--profile redis`). Broker MQTT juga opsional (`--profile mqtt`, Mosquitto 2) untuk modul yang berlangganan perangkat atau menerbitkan event — sakelarnya di **Pengaturan → MQTT**, dan dengan MQTT 5 setiap pesan diproses satu replika saja ([`MQTT.md`](./MQTT.md)).
 - **Migrasi eksplisit** (Q-4): service `migrate` dijalankan operator, tidak pernah otomatis saat container start.
 - **Konfigurasi runtime di database** (E-6): tema, bahasa, landing, SMTP, retensi log, modul — dari halaman **Pengaturan**, berlaku ke semua replika tanpa restart.
 
@@ -172,6 +172,12 @@ dc run --rm -e CONFIRM_RESTORE=yes restore latest
 #     RATELIMIT_DRIVER=redis  jendela rate limit dihitung INCR+PEXPIREAT, tabel rate_limits tidak tumbuh
 #   Redis mati = perilaku database biasa (fail-open ke database, satu peringatan per menit di log).
 dc --profile redis up -d --wait --scale api=3
+
+# MQTT opsional (titik perluasan 18) — broker untuk modul yang berlangganan perangkat/gateway
+#   di .env.prod: MQTT_URL=mqtt://mosquitto:1883 MQTT_USERNAME=app MQTT_PASSWORD=<rahasia>
+#   lalu nyalakan di Pengaturan → MQTT (lingkup global) — tanpa restart. Listener hanya di jaringan
+#   stack; perangkat di luar host butuh `ports:` atau route layer4 yang Anda tambahkan sendiri.
+dc --profile mqtt up -d --wait
 ```
 
 **Rotasi log (Q-7):** semua service memakai driver `json-file` dengan `max-size 10m`, `max-file 5` — maksimum ±50 MB per container. Log audit dan log aplikasi di database dipangkas job `core.logs.retention` sesuai **Pengaturan → Log & retensi** (M-3).
@@ -302,6 +308,7 @@ Bukti: `scripts/ci/rollout-proof.sh` (job CI `scale-proof`) menembakkan request 
 | `migrations` | ada migrasi tersemat yang belum diterapkan, atau database kosong | `dc run --rm migrate` |
 | `seed` | peringatan: belum ada tenant | `dc run --rm seed` |
 | `redis` | `PING` gagal saat ada `*_DRIVER=redis` | REDIS_URL / `--profile redis` |
+| `mqtt` | peringatan: `MQTT_URL` diisi tapi broker tidak menjawab uji pulang-pergi | MQTT_URL / kredensial / `--profile mqtt` |
 | `uploads` | `UPLOADS_DIR` tidak bisa ditulis, atau (`STORAGE_DRIVER=s3`) bucket tidak terjangkau | `chown 1000:1000` volume; periksa `S3_*` |
 | `modules` | (dari sumber) `modules.json` ≠ registry | `bun modules:sync` |
 

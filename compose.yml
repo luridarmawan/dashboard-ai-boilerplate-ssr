@@ -3,11 +3,12 @@
 #
 #   docker compose up -d                       MySQL 8 only (the default dialect)
 #   docker compose --profile redis up -d       + Valkey (optional accelerator, Decision M)
+#   docker compose --profile mqtt up -d        + Mosquitto 2 (MQTT broker, Settings → MQTT / MQTT_URL)
 #   docker compose --profile matrix up -d      + MariaDB 11 + PostgreSQL 16 (the tier-1 matrix, P-9)
 #
 # Host ports deliberately avoid the well-known ones (3306/5432/6379) so these containers
 # never collide with a database already installed on the machine. Override with
-# MYSQL_PORT / MARIADB_PORT / POSTGRES_PORT / VALKEY_PORT if needed.
+# MYSQL_PORT / MARIADB_PORT / POSTGRES_PORT / VALKEY_PORT / MQTT_PORT if needed.
 
 name: dashboard-ai-boilerplate
 
@@ -82,6 +83,21 @@ services:
       - '${VALKEY_PORT:-36379}:6379'
     healthcheck:
       test: ['CMD', 'valkey-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  # MQTT broker (extension point 18): anonymous, dev only — point MQTT_URL=mqtt://127.0.0.1:31883
+  # (or Settings → MQTT) at it. Production runs the authenticated config in compose.prod.yml.
+  mosquitto:
+    image: eclipse-mosquitto:2
+    profiles: ['mqtt']
+    ports:
+      - '${MQTT_PORT:-31883}:1883'
+    volumes:
+      - ./deploy/mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'mosquitto_sub -h 127.0.0.1 -p 1883 -t _health -C 1 -W 1 -E || exit 1']
       interval: 3s
       timeout: 3s
       retries: 30

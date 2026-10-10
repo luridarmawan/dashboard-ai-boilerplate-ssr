@@ -44,7 +44,7 @@ Prasyarat: [Bun](https://bun.sh) 1.4+, Docker (untuk database). Tidak ada yang l
 ```bash
 bun install
 cp .env.example .env                 # nilai bawaan sudah cocok dengan compose.yml
-docker compose up -d                 # MySQL 8 di port 33306
+docker compose up -d                 # MySQL 8 di port 33306 (+ `--profile mqtt` = Mosquitto di 31883)
 bun run --cwd packages/db migrate    # migrasi ter-versi — jalur yang sama dengan produksi
 bun run db:seed                      # tenant default, grup sistem, superadmin dari BOOTSTRAP_ADMIN_*
 bun dev                              # http://127.0.0.1:5170  (API di :5001, OpenAPI di /docs)

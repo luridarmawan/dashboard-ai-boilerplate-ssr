@@ -3,10 +3,11 @@ import { env } from '@core/config';
 import { getDb, unsafeAcrossTenants } from '@core/db';
 import { CORE_EVENTS } from '@core/module-kit';
 import { createEventBus, createScheduler, type EventBus, type Scheduler } from '@core/runtime';
-import { moduleHooks, moduleJobs } from './generated/modules.ts';
+import { moduleHooks, moduleJobs, moduleMqtt } from './generated/modules.ts';
 import { instanceId } from './instance.ts';
 import { runOutboxOnce } from './mail.ts';
 import { hookRunsTotal, jobDuration, jobRunsTotal } from './metrics.ts';
+import { MqttService, publishEventsEnabled, setMqttService } from './mqtt.ts';
 import { setQueueInstanceId, workQueueOnce } from './queue.ts';
 import { runLogRetentionOnce } from './retention.ts';
 import { deliverWebhooksOnce, enqueueEvent, nudgeDelivery } from './webhooks.ts';
@@ -15,6 +16,7 @@ import { deliverWebhooksOnce, enqueueEvent, nudgeDelivery } from './webhooks.ts'
  * Process-level runtime services, assembled once per API process:
  *   - the event bus, with every module's `hooks.ts` registered in init order (G-17)
  *   - the scheduler, with core jobs and every module's `jobs.ts` (G-18)
+ *   - the MQTT client, with every module's `mqtt.ts` (extension point 18), when switched on
  *
  * Kept out of `app.ts` so `app.handle()` in tests never starts timers or touches the DB.
  */
@@ -22,6 +24,7 @@ import { deliverWebhooksOnce, enqueueEvent, nudgeDelivery } from './webhooks.ts'
 export interface Runtime {
   readonly bus: EventBus;
   readonly scheduler: Scheduler;
+  readonly mqtt: MqttService;
   readonly instanceId: string;
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -42,6 +45,37 @@ export function createRuntime(): Runtime {
       async (payload, ctx) => {
         const n = await enqueueEvent(event, payload, { requestId: ctx.requestId });
         if (n) nudgeDelivery();
+      },
+      'core',
+    );
+
+  // MQTT (extension point 18): one client per process, following Settings → MQTT without a
+  // restart. The core-event bridge is the MQTT counterpart of outgoing webhooks: every core event
+  // goes to `events/<name>` under the deployment prefix when `mqtt.publish_events` is on.
+  const mqtt = new MqttService({ modules: moduleMqtt });
+  setMqttService(mqtt);
+  bus.on(
+    'config.saved',
+    (payload) => {
+      if (payload.section === 'mqtt' && payload.clientId === null) void mqtt.reload();
+    },
+    'core',
+  );
+  for (const event of CORE_EVENTS)
+    bus.on(
+      event,
+      async (payload, ctx) => {
+        if (!(await publishEventsEnabled())) return;
+        await mqtt.publish(
+          `events/${event}`,
+          JSON.stringify({
+            event,
+            occurredAt: new Date().toISOString(),
+            instanceId,
+            requestId: ctx.requestId ?? null,
+            data: payload ?? null,
+          }),
+        );
       },
       'core',
     );
@@ -136,8 +170,10 @@ export function createRuntime(): Runtime {
   return {
     bus,
     scheduler,
+    mqtt,
     instanceId,
     async start() {
+      await mqtt.start();
       if (e.SCHEDULER_ENABLED) await scheduler.start();
       else
         console.log(
@@ -151,6 +187,8 @@ export function createRuntime(): Runtime {
     },
     async stop() {
       await scheduler.stop();
+      await mqtt.stop();
+      setMqttService(null);
     },
   };
 }
