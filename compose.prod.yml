@@ -12,7 +12,7 @@
 #   docker compose -f compose.prod.yml run --rm -e CONFIRM_RESTORE=yes restore latest
 #
 # One origin: Caddy terminates TLS and routes / → web, /v1/* /docs /openapi.json → api (Decisions D, E).
-# Valkey is optional (Decision M): `--profile redis`. Everything restarts on crash and on reboot (Q-6).
+# Valkey is optional (Decision M): `--profile redis`. Mosquitto is optional too: `--profile mqtt`. Everything restarts on crash and on reboot (Q-6).
 # Every service is capped (Q-14, *_MEM_LIMIT / *_CPUS in .env.prod) so one runaway container cannot
 # take the VPS down; the defaults fit a 2 vCPU / 4 GB host with 3 api replicas (§8 #25).
 
@@ -47,6 +47,13 @@ x-app-env: &app-env
   APP_LANDING_LEAD: ${APP_LANDING_LEAD:-}
   APP_FOOTER_TITLE: ${APP_FOOTER_TITLE:-}
   # Email bootstrap (J-1): used when the matching mail.* setting is empty; admins can override in Settings
+  # MQTT bootstrap (extension point 18): used when the matching mqtt.* setting is empty; the client
+  # itself is switched on in Settings → MQTT. With `--profile mqtt`: MQTT_URL=mqtt://mosquitto:1883
+  MQTT_URL: ${MQTT_URL:-}
+  MQTT_USERNAME: ${MQTT_USERNAME:-}
+  MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+  MQTT_CLIENT_ID_PREFIX: ${MQTT_CLIENT_ID_PREFIX:-}
+  MQTT_TOPIC_PREFIX: ${MQTT_TOPIC_PREFIX:-}
   SMTP_HOST: ${SMTP_HOST:-}
   SMTP_PORT: ${SMTP_PORT:-}
   SMTP_USER: ${SMTP_USER:-}
@@ -336,6 +343,38 @@ services:
       retries: 30
     <<: *logging
 
+  # MQTT broker (extension point 18): `--profile mqtt`. One account from MQTT_USERNAME/MQTT_PASSWORD
+  # (hashed into the data volume at start), listener on the stack network only — gateways and
+  # devices outside the host reach it through a TCP route you add deliberately (ports: or Caddy
+  # layer4), never by default. Shared subscriptions (MQTT 5) let `--scale api=N` split the load.
+  mosquitto:
+    image: eclipse-mosquitto:2
+    profiles: ['mqtt']
+    restart: unless-stopped
+    mem_limit: ${MOSQUITTO_MEM_LIMIT:-128m}
+    cpus: ${MOSQUITTO_CPUS:-0.5}
+    environment:
+      MQTT_USERNAME: ${MQTT_USERNAME:-app}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-change-me}
+    command:
+      - sh
+      - -c
+      - >-
+        mosquitto_passwd -c -b /mosquitto/data/passwd "$$MQTT_USERNAME" "$$MQTT_PASSWORD"
+        && chmod 600 /mosquitto/data/passwd
+        && exec mosquitto -c /mosquitto/config/mosquitto.conf
+    volumes:
+      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mosquitto_sub -h 127.0.0.1 -p 1883 -u "$$MQTT_USERNAME" -P "$$MQTT_PASSWORD" -t _health -C 1 -W 1 -E || exit 1'
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    <<: *logging
+
   # Metrics (M-6): `--profile monitoring` runs Prometheus inside the network, scraping every api
   # replica; UI on 127.0.0.1:9090 only (tunnel with ssh -L 9090:127.0.0.1:9090 <vps>).
   prometheus:
@@ -405,6 +444,7 @@ volumes:
   caddy-config:
   mysql-data:
   valkey-data:
+  mosquitto-data:
   uploads:
   prometheus-data:
   alertmanager-data:

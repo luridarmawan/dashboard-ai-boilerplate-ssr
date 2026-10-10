@@ -171,6 +171,24 @@ const envSchema = z
      */
     MAIL_BCC: z.email().optional(),
     /**
+     * MQTT bootstrap: used when the matching `mqtt.*` setting is EMPTY in the database, same rule
+     * as SMTP_* (E-6). The client itself is switched on in Settings → MQTT (`mqtt.enabled`);
+     * these only say where the broker is. mqtt://, mqtts://, ws:// or wss://.
+     */
+    MQTT_URL: z
+      .string()
+      .regex(/^(mqtts?|wss?):\/\/\S+$/, 'mis. mqtt://broker:1883, mqtts://…, ws://… atau wss://…')
+      .optional(),
+    MQTT_USERNAME: z.string().min(1).max(191).optional(),
+    MQTT_PASSWORD: z.string().min(1).optional(),
+    /** Prefix of every client id this deployment uses (`<prefix>-<instance>`); default `crk`. */
+    MQTT_CLIENT_ID_PREFIX: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/, 'huruf, angka, - dan _ saja (maks. 32)')
+      .optional(),
+    /** Topic namespace of this deployment, prepended to every subscription and publish. */
+    MQTT_TOPIC_PREFIX: z.string().max(191).optional(),
+    /**
      * Google sign-in bootstrap (A-8): used when `security.google_client_id` / `_secret` are EMPTY
      * in the database, same rule as SMTP_*. The feature itself is switched on in Settings.
      */

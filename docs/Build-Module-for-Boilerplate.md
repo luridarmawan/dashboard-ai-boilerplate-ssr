@@ -4,7 +4,7 @@ Tutorial berurutan: dari repo bersih sampai sebuah modul jalan di dashboard, len
 
 Kalau modul Anda milik tim lain, punya siklus rilis sendiri, atau akan dipasang ke beberapa instalasi, pakai [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) — modul di repositori sendiri, dipasang sebagai submodule terkunci.
 
-Referensi kontraknya (setiap berkas modul, 17 titik perluasan, aturan yang dijaga `modules:sync`) ada di [`MODULES.md`](./MODULES.md). Dokumen ini alurnya; dokumen itu spesifikasinya.
+Referensi kontraknya (setiap berkas modul, 18 titik perluasan, aturan yang dijaga `modules:sync`) ada di [`MODULES.md`](./MODULES.md). Dokumen ini alurnya; dokumen itu spesifikasinya.
 
 ## 0. Prasyarat
 
@@ -44,7 +44,7 @@ db/tables.ts                                  ← tabel (netral dialect)
 permissions.ts  menu.ts  config.ts            ← izin, entri menu, setelan modul
 i18n/id.json  i18n/en.json                    ← terjemahan (tidak ada string keras di komponen)
 api/schemas.ts  api/routes.ts  api/tools.ts   ← skema TypeBox bersama, endpoint, tool MCP
-hooks.ts  jobs.ts  widgets.ts  seed.ts        ← event hook, job terjadwal, widget dashboard, seed
+hooks.ts  jobs.ts  mqtt.ts  widgets.ts  seed.ts  ← event hook, job terjadwal, langganan MQTT, widget dashboard, seed
 web/routes/invoices/…                         ← daftar, tambah, ubah (7 berkas, tanpa JS)
 web/widgets/Summary.svelte                    ← widget dashboard
 test/integration/billing.test.ts              ← tes integrasi yang sudah jalan
@@ -97,12 +97,13 @@ Lalu ikutkan kolom itu di `api/schemas.ts` (skema TypeBox yang dipakai API **dan
 |---|---|
 | `hooks.ts` | Berlangganan event core (mis. `user.created`) — event bus, bukan impor silang antar modul |
 | `jobs.ts` | Job terjadwal; core menjamin **berjalan tepat sekali** walau instance-nya tiga |
+| `mqtt.ts` | Langganan MQTT lewat klien inti (Pengaturan → MQTT); `shared: true` = satu pesan satu instance |
 | `widgets.ts` + `web/widgets/*.svelte` | Widget dashboard; boleh menyebut path `data` agar dashboard mengambilkan datanya |
 | `api/tools.ts` | Tool yang otomatis terpapar ke MCP dan ke chat AI |
 | `config.ts` | Setelan modul yang muncul sebagai form di **Pengaturan** |
 | `seed.ts` | Data awal, idempoten |
 
-Daftar lengkap 17 titik perluasan beserta kontraknya ada di [`MODULES.md` §3](./MODULES.md).
+Daftar lengkap 18 titik perluasan beserta kontraknya ada di [`MODULES.md` §3](./MODULES.md).
 
 ## 6. Tes, lint, typecheck
 

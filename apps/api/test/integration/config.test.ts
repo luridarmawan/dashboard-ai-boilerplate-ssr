@@ -136,6 +136,33 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(publicRoutes).not.toContain('/settings');
   });
 
+  test('a deployment-wide section (mqtt) is offered in the global scope only and refuses a tenant save', async () => {
+    const names = async (qs: string) =>
+      ((await json(await call(`/v1/configuration${qs}`, {}, [admin]))).data?.sections as {
+        section: string;
+        scope: string | null;
+      }[]) ?? [];
+    // The admin signed in above is the seeded superadmin: both scopes answer.
+    expect((await names('')).some((s) => s.section === 'mqtt')).toBe(false);
+    const global = await names('?scope=global');
+    expect(global.find((s) => s.section === 'mqtt')?.scope).toBe('global');
+    const refused = await json(
+      await put('/v1/configuration', { values: { 'mqtt.url': 'mqtt://broker:1883' } }, [admin]),
+    );
+    expect(refused.success).toBe(false);
+    const details = (refused.error?.details ?? {}) as Record<string, string>;
+    expect(details['mqtt.url']).toMatch(/global/);
+    const saved = await json(
+      await put(
+        '/v1/configuration',
+        { scope: 'global', values: { 'mqtt.url': 'mqtt://broker:1883', 'mqtt.enabled': false } },
+        [admin],
+      ),
+    );
+    expect(saved.success, JSON.stringify(saved)).toBe(true);
+    await put('/v1/configuration', { scope: 'global', values: { 'mqtt.url': '' } }, [admin]);
+  });
+
   test('route values are validated against the route registry when saved (§4.7 rule 1)', async () => {
     // F-11: the 404 handler must be a DECLARED handler page — a landing page is refused even
     // though it is public, because it would answer every unknown URL with a 200.

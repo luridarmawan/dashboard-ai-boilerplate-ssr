@@ -406,6 +406,12 @@ export interface ConfigSectionDef {
   readonly groups?: readonly ConfigFieldGroupDef[];
   /** Buttons beside "Save" for this section (extension point 6). */
   readonly actions?: readonly ConfigSectionActionDef[];
+  /**
+   * `global`: the section describes the deployment, not a tenant — one broker, one process-wide
+   * client. It is shown only in the global scope (superadmin) and its keys refuse a tenant-scope
+   * save. Unset = per tenant with global fallback, like every other section (E-2).
+   */
+  readonly scope?: 'global';
 }
 
 const CONFIG_KEY_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;

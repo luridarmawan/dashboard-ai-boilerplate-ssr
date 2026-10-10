@@ -43,6 +43,7 @@ export async function serve(): Promise<void> {
       instanceId: runtime.instanceId,
       jobs: runtime.scheduler.jobs().map((j) => j.name),
       hooks: runtime.bus.subscriptions().length,
+      mqtt: runtime.mqtt.state().enabled ? runtime.mqtt.state().url : 'off',
     }),
   );
 }

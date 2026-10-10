@@ -1,5 +1,4 @@
 import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
-import { notify } from '@app/api/notifications';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
@@ -36,6 +35,7 @@ import {
 } from '@core/db';
 import { defineApiRoutes } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
+import { inboundInquiry, recordInquiry } from './inquiries.ts';
 import { InquiryBody, InquiryStateBody, ProductBody, ProductUpdateBody } from './schemas.ts';
 
 /**
@@ -61,22 +61,6 @@ async function storefrontTenant(clientId: string | null): Promise<string | null>
 
 /** Signed inbound inquiries older than this are refused (replay window). */
 const INBOUND_MAX_AGE_S = 300;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** The JSON body of an inbound inquiry, checked by hand: it arrives as raw text (see the route). */
-function inboundInquiry(
-  v: unknown,
-): { name: string; email: string; message: string; source: string | null } | null {
-  if (!v || typeof v !== 'object') return null;
-  const o = v as Record<string, unknown>;
-  const str = (x: unknown, min: number, max: number) =>
-    typeof x === 'string' && x.trim().length >= min && x.trim().length <= max ? x.trim() : null;
-  const name = str(o.name, 2, 191);
-  const email = str(o.email, 3, 191)?.toLowerCase() ?? null;
-  const message = str(o.message, 10, 5000);
-  if (!name || !email || !EMAIL_RE.test(email) || !message) return null;
-  return { name, email, message, source: str(o.source, 1, 191) };
-}
 
 type ProductRow = typeof schema.exampleProducts.$inferSelect;
 const Product = t.Object({
@@ -413,16 +397,18 @@ export default defineApiRoutes(
           set.status = 429;
           return fail('rate_limited', 'Terlalu banyak pesan dari alamat ini', requestId);
         }
-        const tenant = forTenant(tid);
-        const id = newId();
-        await tenant.insert(schema.exampleInquiries, {
-          id,
-          name: body.name.trim(),
-          email: body.email.trim().toLowerCase(),
-          message: body.message.trim(),
-          source: body.source ?? null,
-          ip,
-        });
+        // Stored, announced (bell + MQTT) and audited like every other inquiry; the e-mails below
+        // are what only the public form owes — a copy to the reader and a receipt to the visitor.
+        await recordInquiry(
+          tid,
+          {
+            name: body.name.trim(),
+            email: body.email.trim().toLowerCase(),
+            message: body.message.trim(),
+            source: body.source ?? null,
+          },
+          { fallbackSource: null, ip, requestId },
+        );
         // Both e-mails are written in the language of the request that sent the form (K-2): the
         // web forwards the locale it resolved for the visitor, and the tenant's default backs it up.
         const locale = await mailLocale({ request, clientId: tid });
@@ -453,26 +439,6 @@ export default defineApiRoutes(
           locale,
           clientId: tid,
           data: { name: body.name.trim(), message: body.message.trim() },
-        });
-        // J-4: whoever may read inquiries in this tenant gets a bell notification (no email needed).
-        await notify({
-          clientId: tid,
-          permission: 'example.inquiry.read',
-          type: 'example.inquiry',
-          title: `Pesan baru dari ${body.name.trim()}`,
-          body: body.message.trim().slice(0, 200),
-          link: '/m/example/inquiries',
-          data: { inquiryId: id },
-        });
-        await writeAudit(db, {
-          clientId: tid,
-          actorId: null,
-          action: 'example.inquiry.create',
-          resource: 'example.inquiry',
-          resourceId: id,
-          ip,
-          requestId,
-          after: { email: body.email.trim().toLowerCase(), source: body.source ?? null },
         });
         set.status = 201;
         return ok({ received: true as const });
@@ -527,33 +493,10 @@ export default defineApiRoutes(
           set.status = 422;
           return fail('validation_failed', 'Isi inquiry tidak valid', requestId);
         }
-        const id = newId();
-        await forTenant(tid).insert(schema.exampleInquiries, {
-          id,
-          name: body.name,
-          email: body.email,
-          message: body.message,
-          source: body.source ?? 'inbound',
-          ip: null,
-        });
-        await notify({
-          clientId: tid,
-          permission: 'example.inquiry.read',
-          type: 'example.inquiry',
-          title: `Pesan baru dari ${body.name}`,
-          body: body.message.slice(0, 200),
-          link: '/m/example/inquiries',
-          data: { inquiryId: id },
-        });
-        await writeAudit(unsafeAcrossTenants(), {
-          clientId: tid,
-          actorId: null,
-          action: 'example.inquiry.create',
-          resource: 'example.inquiry',
-          resourceId: id,
+        const id = await recordInquiry(tid, body, {
+          fallbackSource: 'inbound',
           ip: null,
           requestId,
-          after: { email: body.email, source: body.source ?? 'inbound' },
         });
         set.status = 201;
         return ok({ id });

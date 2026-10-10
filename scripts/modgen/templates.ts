@@ -368,6 +368,26 @@ export default defineJobs('${name}', [
   },
 ]);
 `;
+  files['mqtt.ts'] = `import { logger } from '@core/logger';
+import { defineMqtt } from '@core/module-kit';
+
+/**
+ * MQTT subscription (extension point 18). The core owns the client (Settings → MQTT); a message
+ * on the topic reaches ONE instance of the deployment. Nothing happens until an admin switches
+ * the client on, so this costs nothing in a deployment without a broker.
+ */
+export default defineMqtt('${name}', [
+  {
+    name: '${ns}.ping',
+    topic: '${ns}/ping',
+    description: { id: 'Menerima ping dari perangkat', en: 'Receives a device ping' },
+    handler: async (message, ctx) => {
+      logger.info('${ns}: ping over MQTT', { payload: message.text().slice(0, 200), instanceId: ctx.instanceId });
+      await ctx.publish('${ns}/pong', message.text());
+    },
+  },
+]);
+`;
   files['widgets.ts'] = `import { defineWidgets } from '@core/module-kit';
 
 /** Dashboard widget (extension point 11), filtered by permission on the server. */

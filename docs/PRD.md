@@ -316,6 +316,7 @@ modules/<Nama>/
 ├── layouts/             # layout shell kustom (opsional) — titik perluasan 15
 ├── icons/               # set ikon / pemetaan ikon (opsional) — titik perluasan 16
 ├── csrf-exempt.ts       # route API yang dipanggil sistem luar tanpa CSRF (opsional) — titik perluasan 17
+├── mqtt.ts              # langganan MQTT lewat klien inti (opsional) — titik perluasan 18
 ├── permissions.ts       # resource + action yang dimiliki modul
 ├── menu.ts              # entri menu (dengan syarat izin)
 ├── config.ts            # section konfigurasi milik modul (opsional)
@@ -344,6 +345,7 @@ modules/<Nama>/
 | 15 | **Layout** | Menyumbang layout shell kustom (dashboard / publik / auth) yang memenuhi kontrak region, dan bisa dipakai tema mana pun — termasuk tema bawaan core |
 | 16 | **Set ikon** | Menyumbang pemetaan nama ikon semantik → glyph, sehingga seluruh aplikasi bisa berganti bahasa visual tanpa menyentuh komponen |
 | 17 | **Route tanpa CSRF** | Menandai route API miliknya sendiri (method + path persis, dengan alasan) yang dipanggil sistem luar yang tidak bisa mengirim token bearer maupun pasangan CSRF — callback/webhook pihak ketiga. Request ke route itu **selalu anonim** (cookie sesi diabaikan), jadi route wajib memverifikasi pemanggilnya sendiri (A-10) |
+| 18 | **Langganan MQTT** | Mendeklarasikan topik yang dilanggan lewat **klien MQTT inti** (satu per proses API, sakelar dan broker di Pengaturan → MQTT) beserta handler-nya, dan menerbitkan pesan lewat `publish()`. Satu pesan diproses **satu** instance (shared subscription MQTT 5); handler yang gagal dicatat, tidak menjatuhkan klien (FR-S) |
 
 **Keputusan G — modul dirakit saat build, tapi kontraknya bersifat data.**
 `bun modules:sync` membaca `modules.json` dan `module.json` tiap modul, lalu meng-generate registry (route API, route web, route publik, skema DB, menu, izin, i18n, tool, tema). Menambah modul = daftarkan sumbernya + `bun modules:sync`. Core tetap tidak berubah; yang berubah hanya berkas hasil generate, yang tidak pernah diedit tangan.
@@ -647,7 +649,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | G-2 | **[P0]** **Registrasi simetris.** Satu perintah `bun modules:sync` meng-generate registry untuk API *dan* web *dan* route publik *dan* skema DB *dan* menu *dan* tema *dan* seed izin. Perintah ini jalan otomatis sebelum `dev` dan `build`. Menutup D8. |
 | G-3 | **[P0]** Modul mengimpor core lewat **paket** (`@core/ui`, `@core/db`, `@core/module-kit`), bukan path relatif. Memindahkan folder modul — atau memindahkannya ke repositori lain — tidak boleh merusak apa pun (§4.9 poin 1). |
 | G-4 | **[P0]** Generator modul CLI (`bun modgen`) — hasilkan CRUD lengkap: tabel, migrasi, route API dengan skema, halaman list+form, entri menu, seed izin, berkas i18n. Mode interaktif dan non-interaktif. |
-| G-5 | **[P0]** **17 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
+| G-5 | **[P0]** **18 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
 | G-6 | **[P0]** **Menambah atau menghapus modul tidak mengubah berkas core mana pun.** Ditegakkan di CI: pipeline menjalankan `modgen`, lalu memeriksa bahwa `git diff` hanya menyentuh `modules/`, `modules.json`, dan direktori hasil generate. Ini mengubah janji modularitas dari niat menjadi sesuatu yang terukur. |
 | G-7 | **[P0]** Kegagalan satu modul saat inisialisasi tidak boleh mematikan aplikasi; catat galatnya, tandai modul sebagai gagal di UI admin, lanjutkan. |
 | G-8 | **[P0]** Modul bisa diaktifkan/nonaktifkan **per tenant** lewat tabel `modules`. Modul nonaktif: menu hilang, section-nya di Pengaturan hilang (nilai tersimpan tidak disentuh), route menolak dan hilang dari dokumen API (`/openapi.json`, `/docs`) untuk tenant itu, tema & route publiknya tidak terdaftar, tabelnya tetap ada. |
@@ -718,6 +720,20 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | J-4 | **[P1]** Notifikasi dalam aplikasi (bell di header), lengkap dengan backend-nya. |
 | J-5 | **[P2]** Webhook keluar untuk event penting. |
 | J-6 | **[P1]** **Keterlibatan email** — apakah email dibuka, diklik, atau ditindaklanjuti (permintaan pemilik 2026-09-25). Tiga sinyal, disimpan di baris `outbox_email` **di samping** status pengiriman, bukan di dalamnya: (a) **dibuka** — gambar pelacak 1×1 `GET /v1/mail/o/<token>.gif` (`opened_at`, `open_count`); (b) **diklik** — tombol CTA dibungkus `GET /v1/mail/c/<token>` yang mencatat lalu 302 ke tautan dari payload baris itu sendiri, tidak pernah dari query (`clicked_at`); (c) **ditindaklanjuti** — token sekali pakai yang dibawa email dipakai (verifikasi, reset/set kata sandi, undangan) → `acted_at` pada email terbaru jenis itu ke alamat itu. (a) dan (b) **opsional per tenant** lewat `mail.track_opens` (baku mati; memproses data pribadi), diputuskan saat pengiriman sehingga berlaku juga untuk kirim ulang; token dicetak sekali per baris dan dipakai ulang. Hanya bagian HTML yang disentuh: versi teks dan tautan cadangan "salin tautan ini" tetap mentah. Kedua endpoint publik, tanpa sesi/CSRF, tidak menyimpan IP atau user agent; pixel selalu menjawab GIF yang sama untuk token apa pun. Tampil sebagai kolom **Keterlibatan** di `/outbox`. Sinyal (a) tidak pasti — proxy gambar dan pra-muat privasi memicunya, klien yang memblokir gambar tidak — sedangkan (c) tidak bisa dipalsukan. |
+
+### FR-S · MQTT
+
+Diminta pemilik 2026-10-11 untuk aplikasi turunan (digital twin: posisi aset dari gateway, perangkat IoT) — klien disiapkan di boilerplate agar setiap app di atasnya tinggal berlangganan.
+
+| ID | Kebutuhan |
+|---|---|
+| S-1 | **[P1]** **Klien MQTT inti, satu per proses API**, dibangun di atas mqtt.js. Broker (`mqtt://`, `mqtts://`, `ws://`, `wss://`), username/password, versi protokol (5 baku, 3.1.1 untuk broker lama), awalan client id, dan awalan topik diatur di **Pengaturan → MQTT**; kolom kosong jatuh ke `MQTT_*` di `.env` per kolom (E-6). Section ini **hanya ada di lingkup global** (`ConfigSectionDef.scope: 'global'` — mekanisme baru yang berlaku untuk section deployment-wide mana pun): tidak ditawarkan di formulir tenant dan menolak simpanan lingkup tenant. |
+| S-2 | **[P1]** **Sakelar `mqtt.enabled`** (baku mati) berlaku **tanpa restart**: instance yang menyimpan memuat ulang klien seketika (`config.saved`), instance lain dalam ≤ 30 detik; konfigurasi yang tidak berubah tidak memutus koneksi. Mati = tidak ada koneksi, langganan modul tidak aktif, `publish()` menjawab `disabled`. |
+| S-3 | **[P1]** **Titik perluasan 18 — `mqtt.ts`** (`defineMqtt`): nama ber-namespace, filter topik sah (`+` satu level penuh, `#` hanya terakhir, tanpa `$share/`), `qos`, `shared` (baku true), `handler(message, ctx)`. `modules:sync` memvalidasi dan menolak nama yang bentrok antar modul; nama langganan tampil di halaman Modul. Awalan topik deployment ditambahkan ke langganan/publish dan dihilangkan sebelum handler. Handler yang melempar dicatat dan dihitung, tidak menjatuhkan klien (G-7). |
+| S-4 | **[P1]** **Satu pesan, satu instance** di `--scale api=N` lewat **shared subscription MQTT 5** (`$share/<awalan client id>/…`), bukan lock database; di MQTT 3.1.1 setiap instance menerima setiap pesan dan core memperingatkan sekali. Dibuktikan `scripts/ci/mqtt-smoke.ts` di Mosquitto nyata (dua instance, 60 pesan, 0 duplikat). |
+| S-5 | **[P1]** **`publish(topic, payload, { qos, retain })`** dari `@app/api/mqtt` untuk modul dan core — tidak pernah melempar, hasilnya nilai (`ok` / `disabled` / `disconnected` / `invalid_topic` / `failed`); `mqttState()` untuk status. **Jembatan event inti** opsional (`mqtt.publish_events`): setiap event inti diterbitkan sebagai JSON ke `events/<nama event>` — padanan webhook keluar (J-5). |
+| S-6 | **[P1]** **Operasional:** tombol **Uji koneksi** di section (aksi titik perluasan 6; `POST /v1/configuration/mqtt/test`, izin `config.edit`, rate limit per akun, teraudit `mqtt.test`) melakukan satu pulang-pergi lewat topik uji; `/v1/ready` memuat `checks.mqtt` hanya bila klien diaktifkan; preflight memperingatkan bila `MQTT_URL` diisi tapi broker tidak menjawab; metrik `mqtt_connected`, `mqtt_messages_total`, `mqtt_handler_runs_total`, `mqtt_handler_duration_seconds`. |
+| S-7 | **[P1]** **Broker tersedia dari compose**: `--profile mqtt` menjalankan Eclipse Mosquitto 2 — dev anonim di `127.0.0.1:31883`, produksi dengan satu akun dari `MQTT_USERNAME`/`MQTT_PASSWORD` dan listener hanya di jaringan stack. Browser **tidak pernah** terhubung ke broker; data ke browser lewat SSE/route modul. |
 
 ### FR-K · Internasionalisasi
 
@@ -954,6 +970,7 @@ Milestone hanya memuat kebutuhan **P0**; rujukan grup (`FR-X`) sengaja tidak dip
 | MariaDB diperlakukan bagaimana | **Dialect tier-1 dengan job CI sendiri**, bukan diasumsikan ikut lolos bersama MySQL | Divergensi yang sudah diketahui ditutup aturan eksplisit: JSON tidak pernah di-query, charset/collation ditulis eksplisit, tipe `UUID`/SEQUENCE/system-versioned native MariaDB dilarang (§4.3, P-9) |
 | Bentuk identifier | **UUIDv7 (RFC 9562), di-generate aplikasi dari satu fungsi tunggal** | Terurut waktu dan monotonik dalam milidetik yang sama, jadi aman sebagai clustered PK dan sebagai cursor paginasi. Lebar kolom netral terhadap versi UUID — mengganti strategi ID kelak tidak menuntut migrasi skema (§4.3.1, O-6) |
 | Redis/Valkey | **Opsional.** Database adalah backing store baku untuk sesi, cache konfigurasi, dan rate limit | Setiap jenis state punya dua adapter yang keduanya benar di multi-instance; uji `--scale api=3` dijalankan **tanpa** Redis. Tidak boleh ada fitur yang hanya jalan bila Redis ada (Keputusan M) |
+| MQTT | **Klien inti, satu per proses, opsional; sakelar di Pengaturan (lingkup global), diputuskan 2026-10-11** | Modul tidak memegang koneksi (titik perluasan 18, FR-S). "Satu pesan satu instance" lewat shared subscription MQTT 5, bukan lock database — jadi MQTT 5 disarankan dan 3.1.1 ditoleransi dengan peringatan. Satu broker per deployment; tenant lewat topik + ACL broker, bukan koneksi per tenant. Browser tidak pernah menyentuh broker ([`MQTT.md`](./MQTT.md)) |
 
 ### 11.2 Masih terbuka
 

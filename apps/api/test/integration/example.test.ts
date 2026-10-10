@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { and, eq, schema, unsafeAcrossTenants } from '@core/db';
+import exampleMqtt from '../../../../modules/Example/mqtt.ts';
 import { app } from '../../src/app.ts';
 import { settings } from '../../src/services.ts';
 import { sign } from '../../src/webhooks.ts';
@@ -268,5 +269,70 @@ describe.skipIf(!enabled)('Example public API', () => {
     }
     // No secret, no endpoint — even a correctly signed request is refused.
     expect((await signed(raw)).status).toBe(503);
+  });
+
+  /** Extension point 18: the same inquiry over MQTT lands in the same table. The handler is called
+   *  the way the core client calls it (no broker here — the client itself is covered by
+   *  apps/api/test/mqtt.test.ts); the tenant comes from the topic. */
+  test('inquiries over MQTT: `example/<tenant>/inquiries` is stored for that tenant; junk is dropped', async () => {
+    const db = unsafeAcrossTenants();
+    const [tenant] = await db
+      .select({ id: schema.clients.id })
+      .from(schema.clients)
+      .where(eq(schema.clients.code, 'default'));
+    const tid = tenant?.id ?? '';
+    expect(tid).not.toBe('');
+    const sub = exampleMqtt.find((s) => s.name === 'example.inquiries');
+    expect(sub?.topic).toBe('example/+/inquiries');
+    const message = (clientId: string, body: unknown) => {
+      const bytes = new TextEncoder().encode(
+        typeof body === 'string' ? body : JSON.stringify(body),
+      );
+      return {
+        topic: `example/${clientId}/inquiries`,
+        payload: bytes,
+        qos: 1 as const,
+        retain: false,
+        params: [clientId],
+        text: () => new TextDecoder().decode(bytes),
+        json: <T>() => {
+          try {
+            return JSON.parse(new TextDecoder().decode(bytes)) as T;
+          } catch {
+            return null;
+          }
+        },
+      };
+    };
+    const ctx = {
+      subscription: 'example.inquiries',
+      module: 'Example',
+      instanceId: 'test',
+      receivedAt: new Date(),
+      signal: new AbortController().signal,
+      publish: async () => ({ ok: false as const, reason: 'disabled' as const }),
+    };
+    const email = `mqtt-${Date.now()}@example.test`;
+    await sub?.handler(
+      message(tid, { name: 'Gateway Gudang', email, message: 'Stok kopi tinggal 12 karung.' }),
+      ctx,
+    );
+    const rows = await db
+      .select()
+      .from(schema.exampleInquiries)
+      .where(
+        and(eq(schema.exampleInquiries.email, email), eq(schema.exampleInquiries.client_id, tid)),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.source).toBe('mqtt');
+    // Not JSON, not an inquiry, not a tenant id: dropped without throwing.
+    await sub?.handler(message(tid, 'not json'), ctx);
+    await sub?.handler(message('not-a-tenant', { name: 'x', email, message: 'y' }), ctx);
+    expect(
+      await db
+        .select()
+        .from(schema.exampleInquiries)
+        .where(eq(schema.exampleInquiries.email, email)),
+    ).toHaveLength(1);
   });
 });

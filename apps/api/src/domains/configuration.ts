@@ -21,6 +21,7 @@ import {
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
 import { publicOrigin, smtpFor } from '../mail.ts';
+import { mqttFor, mqttState, testMqtt } from '../mqtt.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { permission, tenantContext } from '../plugins/tenancy.ts';
@@ -78,6 +79,8 @@ const Section = t.Object({
   title: Localized,
   note: t.Nullable(Localized),
   order: t.Integer(),
+  /** `global` = deployment-wide section, offered in the global scope only. */
+  scope: t.Nullable(t.Literal('global')),
   groups: t.Array(FieldGroup),
   actions: t.Array(SectionAction),
   fields: t.Array(Field),
@@ -141,8 +144,12 @@ export const configuration = new Elysia({
       // section — the Settings page must not offer a form for something the tenant cannot use.
       // Its stored values stay untouched, so re-enabling brings the section back as it was.
       const enabledModules = await moduleState.enabledFor(scope.clientId);
+      // Deployment-wide sections (`scope: 'global'`) have no tenant layer, so the tenant form does
+      // not offer them — a value typed there would be refused on save and read by nobody.
       const view = (await settings.adminView(scope.clientId)).filter(
-        (s) => s.module === 'core' || enabledModules.has(s.module),
+        (s) =>
+          (s.module === 'core' || enabledModules.has(s.module)) &&
+          (s.scope !== 'global' || scope.clientId === null),
       );
       // The mail tester opens with the SMTP account this scope actually sends as — which lives
       // in the settings OR in .env (J-1, E-6), so only `smtpFor()` can name it. Resolved once,
@@ -161,6 +168,7 @@ export const configuration = new Elysia({
         title: { ...s.title },
         note: s.note ? { ...s.note } : null,
         order: s.order,
+        scope: s.scope,
         groups: s.groups.map((g) => ({
           key: g.key,
           title: { ...g.title },
@@ -489,6 +497,79 @@ export const configuration = new Elysia({
         summary: 'Send a test email',
         description:
           'Sends straight through the SMTP settings of this scope, bypassing the outbox queue.',
+      },
+    },
+  )
+  /**
+   * Settings → MQTT → "Test connection" (extension point 6). The section is deployment-wide, so
+   * this always tests the GLOBAL configuration — the same resolution the running client uses
+   * (setting, else `MQTT_*` from .env) — whatever scope the page was opened in. One round trip
+   * through a probe topic, with the broker named in the answer either way.
+   */
+  .post(
+    '/mqtt/test',
+    async ({ auth, set, request, server, requestId }) => {
+      const a = actor(auth);
+      const db = unsafeAcrossTenants();
+      const limit = await consumeRateLimit(db, `mqtttest:user:${a.user.id}`, {
+        limit: 20,
+        windowSeconds: 600,
+      });
+      Object.assign(set.headers, rateLimitHeaders(limit));
+      if (!limit.allowed) {
+        set.status = 429;
+        return fail('rate_limited', 'Terlalu banyak uji koneksi — coba lagi nanti', requestId);
+      }
+      const resolved = await mqttFor();
+      if (!resolved.config) {
+        return ok({
+          ok: false,
+          message: resolved.problem ?? 'Broker MQTT belum dikonfigurasi',
+          details: [
+            'Isi URL broker di bagian ini (lingkup global), simpan, lalu uji lagi.',
+            'Atau kosongkan dan isi MQTT_URL / MQTT_USERNAME / MQTT_PASSWORD di .env.',
+          ],
+        });
+      }
+      const r = await testMqtt(resolved.config);
+      const live = mqttState();
+      await writeAudit(db, {
+        clientId: null,
+        actorId: a.user.id,
+        action: 'mqtt.test',
+        resource: 'config',
+        resourceId: GLOBAL,
+        ip: clientIp(request, server),
+        requestId,
+        after: { ok: r.ok, url: resolved.config.url, source: resolved.config.source },
+      });
+      return ok({
+        ok: r.ok,
+        message: r.message,
+        details: [
+          ...r.details,
+          resolved.enabled
+            ? live.connected
+              ? `klien instance ini tersambung (${live.subscriptions.length} langganan modul)`
+              : `klien instance ini aktif tetapi belum tersambung${live.lastError ? ` — ${live.lastError}` : ''}`
+            : 'klien belum diaktifkan — nyalakan "Aktifkan klien MQTT" lalu simpan',
+        ],
+      });
+    },
+    {
+      beforeHandle: permission('config.edit'),
+      body: t.Object({ scope: t.Optional(t.String()) }),
+      response: {
+        200: OkSchema(
+          t.Object({ ok: t.Boolean(), message: t.String(), details: t.Array(t.String()) }),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary: 'Test the MQTT broker',
+        description:
+          'Connects to the broker the global settings resolve to (settings, else MQTT_* from .env), ' +
+          'subscribes to a probe topic, publishes to it and waits for the echo. Rate limited per account.',
       },
     },
   );

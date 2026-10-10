@@ -87,6 +87,18 @@ export {
   satisfiesCore,
 } from './manifest.ts';
 export {
+  defineMqtt,
+  invalidTopicFilter,
+  invalidTopicName,
+  type MqttContext,
+  type MqttMessage,
+  type MqttPublishOptions,
+  type MqttPublishResult,
+  type MqttQos,
+  type MqttSubscriptionDef,
+  matchTopic,
+} from './mqtt.ts';
+export {
   BREAKPOINT,
   cleanupStatements,
   type DrizzleSnapshotLike,

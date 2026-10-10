@@ -36,6 +36,7 @@ const chips = (c: Mod['contributes']): [string, number, string][] =>
       ['refresh', c.hooks.length, t('modules.chip.hooks')],
       ['clock', c.jobs.length, t('modules.chip.jobs')],
       ['sparkles', c.tools.length, t('modules.chip.tools')],
+      ['plug', c.mqtt.length, t('modules.chip.mqtt')],
       ['palette', c.themes, t('modules.chip.themes')],
       ['monitor', c.layouts, t('modules.chip.layouts')],
       ['image', c.iconSets, t('modules.chip.icon_sets')],

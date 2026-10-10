@@ -32,6 +32,7 @@ import {
   namespaceOf,
   satisfiesCore,
 } from './manifest.ts';
+import { invalidTopicFilter } from './mqtt.ts';
 import { validateTool } from './tools.ts';
 
 /**
@@ -86,13 +87,13 @@ export interface WebRouteRecord {
   readonly kind: 'svelte' | 'ts';
 }
 
-/** A module that ships `hooks.ts` (9), `jobs.ts` (12) or `api/tools.ts` (8). */
+/** A module that ships `hooks.ts` (9), `jobs.ts` (12), `api/tools.ts` (8) or `mqtt.ts` (18). */
 export interface RuntimeModuleRecord {
   readonly name: string;
   readonly ns: string;
   /** Module-relative file, POSIX. */
   readonly file: string;
-  /** Event names (hooks), job names (jobs) or tool names (tools) declared — for the registry and the admin UI. */
+  /** Event names (hooks), job names (jobs), tool names (tools) or subscription names (mqtt) declared — for the registry and the admin UI. */
   readonly items: readonly string[];
 }
 
@@ -106,6 +107,7 @@ export interface SyncResult {
   readonly hookModules: readonly RuntimeModuleRecord[];
   readonly jobModules: readonly RuntimeModuleRecord[];
   readonly toolModules: readonly RuntimeModuleRecord[];
+  readonly mqttModules: readonly RuntimeModuleRecord[];
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
@@ -161,6 +163,8 @@ export interface ModuleContributions {
   readonly hooks: readonly string[];
   readonly jobs: readonly string[];
   readonly tools: readonly string[];
+  /** Subscription names declared in `mqtt.ts` (extension point 18). */
+  readonly mqtt: readonly string[];
   readonly themes: number;
   readonly layouts: number;
   readonly iconSets: number;
@@ -242,6 +246,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const jobModules: RuntimeModuleRecord[] = [];
   const jobOwner = new Map<string, string>();
   const toolModules: RuntimeModuleRecord[] = [];
+  const mqttModules: RuntimeModuleRecord[] = [];
+  const mqttOwner = new Map<string, string>();
   const toolOwner = new Map<string, string>();
   // Extension point 7 (K-6): module messages, merged into one typed catalogue per locale.
   const i18n: Record<string, Record<string, string>> = {};
@@ -567,6 +573,48 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
         if (names.length)
           jobModules.push({ name: manifest.name, ns, file: 'jobs.ts', items: names });
+      }
+    }
+
+    // ---- mqtt.ts (extension point 18) ----
+    const mq = await loadDefault<readonly { name?: string; topic?: string; handler?: unknown }[]>(
+      join(dir, 'mqtt.ts'),
+      problems,
+      tag,
+    );
+    if (mq !== undefined) {
+      if (!Array.isArray(mq))
+        problems.push(`${tag}: mqtt.ts harus meng-export default array (pakai defineMqtt)`);
+      else {
+        const names: string[] = [];
+        for (const sub of mq) {
+          if (typeof sub?.name !== 'string' || typeof sub.handler !== 'function') {
+            problems.push(`${tag}: mqtt.ts memuat entri tanpa name/handler (pakai defineMqtt)`);
+            continue;
+          }
+          if (!sub.name.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: langganan MQTT "${sub.name}" harus diawali "${ns}."`);
+            continue;
+          }
+          const why = invalidTopicFilter(typeof sub.topic === 'string' ? sub.topic : '');
+          if (why) {
+            problems.push(
+              `${tag}: langganan MQTT "${sub.name}": filter topik tidak valid — ${why}`,
+            );
+            continue;
+          }
+          const owner = mqttOwner.get(sub.name);
+          if (owner)
+            problems.push(
+              `langganan MQTT "${sub.name}" didefinisikan oleh ${owner} dan ${manifest.name}`,
+            );
+          else {
+            mqttOwner.set(sub.name, manifest.name);
+            names.push(sub.name);
+          }
+        }
+        if (names.length)
+          mqttModules.push({ name: manifest.name, ns, file: 'mqtt.ts', items: names });
       }
     }
 
@@ -990,6 +1038,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         hooks: hookModules.find((h) => h.name === m.name)?.items ?? [],
         jobs: jobModules.find((j) => j.name === m.name)?.items ?? [],
         tools: toolModules.find((t) => t.name === m.name)?.items ?? [],
+        mqtt: mqttModules.find((q) => q.name === m.name)?.items ?? [],
         themes: themesContrib.filter((t) => t.module === m.name).length,
         layouts: layoutsContrib.filter((l) => l.module === m.name).length,
         iconSets: iconSetsContrib.filter((i) => i.module === m.name).length,
@@ -1012,7 +1061,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       files.push(
         await writeFile(
           out,
-          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules),
+          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules, mqttModules),
         ),
       );
       const toolsOut = join(root, 'apps/api/src/generated/tools.ts');
@@ -1089,6 +1138,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     webRoutes,
     hookModules,
     jobModules,
+    mqttModules,
     toolModules,
     files,
     warnings,
@@ -1257,6 +1307,7 @@ function emitRegistry(
     hooks: [],
     jobs: [],
     tools: [],
+    mqtt: [],
     themes: 0,
     layouts: 0,
     iconSets: 0,
@@ -1300,6 +1351,7 @@ export function emitApiModules(
   outFile: string,
   hookModules: readonly RuntimeModuleRecord[] = [],
   jobModules: readonly RuntimeModuleRecord[] = [],
+  mqttModules: readonly RuntimeModuleRecord[] = [],
 ): string {
   const byName = new Map(ordered.map((m) => [m.name, m]));
   const imports: string[] = [];
@@ -1324,6 +1376,12 @@ export function emitApiModules(
     const ident = `jobs_${jm.ns.replace(/[^a-z0-9]/g, '_')}`;
     imports.push(`import ${ident} from '${relTo(jm.name, jm.file)}';`);
     jobEntries.push(`  { module: '${jm.name}', jobs: ${ident} },`);
+  }
+  const mqttEntries: string[] = [];
+  for (const qm of mqttModules) {
+    const ident = `mqtt_${qm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${relTo(qm.name, qm.file)}';`);
+    mqttEntries.push(`  { module: '${qm.name}', subscriptions: ${ident} },`);
   }
   for (const am of apiModules) {
     const mod = byName.get(am.name);
@@ -1350,6 +1408,11 @@ export const moduleHooks = [${hookIdents.join(', ')}];
 /** Periodic jobs declared by modules (G-18); the core scheduler registers them at boot. */
 export const moduleJobs = [
 ${jobEntries.join('\n')}
+];
+
+/** MQTT subscriptions declared by modules (extension point 18); the core client subscribes them. */
+export const moduleMqtt = [
+${mqttEntries.join('\n')}
 ];
 `;
 }
