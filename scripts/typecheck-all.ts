@@ -40,7 +40,8 @@ for (const dir of [...dirs].sort()) {
     name?: string;
     scripts?: Record<string, string>;
   };
-  const rel = relative(root, dir);
+  // POSIX separators: on Windows `relative` yields `modules\AI`, which would never match below.
+  const rel = relative(root, dir).split('\\').join('/');
   if (rel.startsWith('modules/') && !registered.has(rel)) {
     console.log(`  – ${rel.padEnd(28)} (tidak terdaftar di modules.json — dilewati)`);
     continue;
