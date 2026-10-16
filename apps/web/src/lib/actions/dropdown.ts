@@ -7,10 +7,15 @@
  */
 const ATTR = 'data-dropdown';
 
+/**
+ * Closes every open dropdown except `except` and the dropdowns that contain it: a dropdown nested
+ * in another (the language picker inside the mobile menu) must not close its own parent, or the
+ * menu vanishes the moment the inner one opens and nothing in it can be picked.
+ */
 export function closeAllDropdowns(except?: Element | null): void {
   if (typeof document === 'undefined') return;
   for (const d of document.querySelectorAll<HTMLDetailsElement>(`details[${ATTR}]`)) {
-    if (d !== except && d.open) d.open = false;
+    if (d.open && !(except && d.contains(except))) d.open = false;
   }
 }
 
