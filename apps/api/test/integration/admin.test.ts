@@ -402,6 +402,8 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
           rt: '03',
           rw: '07',
           postalCode: '40111',
+          referenceId: 'PKS/012/X/2026',
+          joinDate: '2024-02-29',
           kelurahan: 'Braga',
           kelurahanId: '32.73.01.1001',
           city: 'Bandung',
@@ -419,6 +421,8 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect(p.totalReceipts).toBe('0');
     expect(p.kelurahanId).toBe('32.73.01.1001');
     expect(p.postalCode).toBe('40111');
+    expect(p.referenceId).toBe('PKS/012/X/2026');
+    expect(p.joinDate).toBe('2024-02-29'); // a leap day survives the round trip unshifted
     expect(p.latitude).toBe('-6.9174639');
     expect(p.longitude).toBe('107.6191228');
     expect(p.url).toBe('https://example.test');
@@ -437,6 +441,16 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((await put(`/v1/clients/${leaf.id}`, { postalCode: '40;11' }, [admin])).status).toBe(
       422,
     );
+    // Join date: a day the calendar lacks, or another shape, is refused; null clears it alone.
+    const feb30 = await put(`/v1/clients/${leaf.id}`, { joinDate: '2026-02-30' }, [admin]);
+    expect(feb30.status).toBe(422);
+    expect((await json(feb30)).error?.details).toEqual({ joinDate: expect.any(String) });
+    expect((await put(`/v1/clients/${leaf.id}`, { joinDate: '30-01-2026' }, [admin])).status).toBe(
+      422,
+    );
+    const noDate = await json(await put(`/v1/clients/${leaf.id}`, { joinDate: null }, [admin]));
+    expect(noDate.data?.joinDate).toBeNull();
+    expect(noDate.data?.referenceId).toBe('PKS/012/X/2026');
 
     // Loops are refused: itself, and any of its own descendants.
     expect((await put(`/v1/clients/${root.id}`, { parentId: root.id }, [admin])).status).toBe(409);

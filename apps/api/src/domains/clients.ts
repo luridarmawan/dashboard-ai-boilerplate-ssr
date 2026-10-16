@@ -54,6 +54,7 @@ const ParentRef = t.Object({ id: t.String(), code: t.String(), name: t.String() 
  */
 const PROFILE = {
   description: 'description',
+  referenceId: 'reference_id',
   balance: 'balance',
   totalReceipts: 'total_receipts',
   address: 'address',
@@ -91,6 +92,9 @@ const Client = t.Object({
   createdAt: t.String(),
   // Profile block — spelled out so the OpenAPI document and the typed client see each field.
   description: t.Nullable(t.String()),
+  referenceId: t.Nullable(t.String()),
+  /** `YYYY-MM-DD`. */
+  joinDate: t.Nullable(t.String()),
   balance: t.String(),
   totalReceipts: t.String(),
   address: t.Nullable(t.String()),
@@ -156,6 +160,7 @@ function view(c: ClientRow, parent: ParentRow | null = null) {
     statusId: c.status_id,
     createdAt: c.created_at.toISOString(),
     ...profile,
+    joinDate: c.join_date ? c.join_date.toISOString().slice(0, 10) : null,
   };
 }
 /** Only the profile keys the body carries; `null` clears a column, and clears money to "0". */
@@ -167,6 +172,22 @@ function profilePatch(body: ProfileBody): Partial<ClientInsert> {
     patch[PROFILE[k]] = v === null && MONEY_KEYS.has(k) ? '0' : v;
   }
   return patch as Partial<ClientInsert>;
+}
+/**
+ * `joinDate` → the `join_date` column: a calendar day kept at 00:00 UTC, so it reads back as
+ * the same `YYYY-MM-DD` in every time zone. `undefined` = untouched, `null` = cleared, and a
+ * date the calendar does not have (`2026-02-30`) is `invalid` — the schema only checks shape.
+ */
+function joinDateValue(v: string | null | undefined): Date | null | undefined | 'invalid' {
+  if (v === undefined || v === null) return v;
+  const d = new Date(`${v}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v ? 'invalid' : d;
+}
+function invalidJoinDate(set: { status?: number | string }, requestId: string) {
+  set.status = 422;
+  return fail('validation_failed', 'Periksa isian', requestId, {
+    joinDate: 'Tanggal tidak ada di kalender',
+  });
 }
 /** Region code field → the name field it names, when the code is in `regions`. */
 const REGION_NAMES = [
@@ -409,6 +430,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         if (!parent || !(await canActInTenant(db, a.user, parent.id)))
           return notFound(set, requestId, 'Tenant induk');
       }
+      const joinDate = joinDateValue(body.joinDate);
+      if (joinDate === 'invalid') return invalidJoinDate(set, requestId);
       const id = newId();
       await db.insert(schema.clients).values({
         id,
@@ -416,6 +439,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         name: body.name.trim(),
         parent_id: body.parentId ?? null,
         settings: body.settings ?? null,
+        join_date: joinDate ?? null,
         ...profilePatch(await withRegionNames(db, body)),
       });
       // Usable at once: system groups, and the creator as its first member and admin (C-3).
@@ -476,7 +500,10 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
             'Tenant induk yang dipilih adalah sub-tenant dari tenant ini; pilih tenant lain',
           );
       }
+      const joinDate = joinDateValue(body.joinDate);
+      if (joinDate === 'invalid') return invalidJoinDate(set, requestId);
       const patch: Partial<ClientInsert> = profilePatch(await withRegionNames(db, body));
+      if (joinDate !== undefined) patch.join_date = joinDate;
       if (body.name !== undefined) patch.name = body.name.trim();
       if (body.parentId !== undefined) patch.parent_id = body.parentId;
       if (body.settings !== undefined) patch.settings = body.settings;
@@ -505,7 +532,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       detail: {
         summary: 'Update a tenant',
         description:
-          'Name, parent, settings, status and the profile block (description, ledger amounts, address and region fields, coordinates, links). The code cannot change. A null `parentId` makes it a top-level tenant; a parent that is one of its own sub-tenants is refused. Amounts and coordinates are decimal strings.',
+          'Name, parent, settings, status and the profile block (description, reference id, join date, ledger amounts, address and region fields, coordinates, links). The code cannot change. A null `parentId` makes it a top-level tenant; a parent that is one of its own sub-tenants is refused. Amounts and coordinates are decimal strings; `joinDate` is `YYYY-MM-DD`.',
       },
     },
   )

@@ -18,6 +18,10 @@ export const clients = defineTable({
     code: col.identifier(32),
     name: col.varchar(191),
     description: col.text().nullable(),
+    /** External reference: cooperation agreement, certificate, contract number (`PKS/012/X/2026`). */
+    reference_id: col.varchar(191).nullable(),
+    /** The day the tenant joined (date only: stored at 00:00 UTC, served as `YYYY-MM-DD`). */
+    join_date: col.datetime().nullable(),
     /** Small per-tenant preferences. Never queried into (§4.3). */
     settings: col.json().nullable(),
 
