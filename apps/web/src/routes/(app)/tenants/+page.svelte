@@ -23,6 +23,7 @@ const columns: ColumnDef<Row>[] = [
     value: (r) => r.name,
   },
   { key: 'code', label: t('tenants.code'), value: (r) => r.code },
+  { key: 'parent', label: t('tenants.parent'), value: (r) => r.parent?.name ?? null },
   { key: 'status', label: t('tenants.status') },
   {
     key: 'created',
@@ -58,6 +59,8 @@ const columns: ColumnDef<Row>[] = [
         {#if row.id === data.clientId} <code>{t('common.active')}</code>{/if}
       {:else if col.key === 'code'}
         <code>{row.code}</code>
+      {:else if col.key === 'parent'}
+        {#if row.parent}<a href={`/tenants/${row.parent.id}`}>{row.parent.name}</a>{:else}—{/if}
       {:else if col.key === 'status'}
         {row.statusId === 1 ? t('common.active') : t('common.inactive')}
       {:else}

@@ -8,6 +8,7 @@ import {
 import {
   ClientCreateBody,
   ClientUpdateBody,
+  codeFromName,
   errorResponses,
   fail,
   OkSchema,
@@ -21,6 +22,7 @@ import {
   count,
   desc,
   eq,
+  inArray,
   isNull,
   newId,
   schema,
@@ -43,14 +45,72 @@ import { permission, tenantContext } from '../plugins/tenancy.ts';
  * is usable immediately. The `default` tenant cannot be deleted (B-5).
  */
 
+/** The parent tenant, resolved so lists and forms can show its name without a second call. */
+const ParentRef = t.Object({ id: t.String(), code: t.String(), name: t.String() });
+/**
+ * Profile columns (groundwork for later features): API key ↔ column. Everything here is
+ * optional on the way in and nullable on the way out, except the two ledger amounts, which are
+ * decimal strings that default to "0" — money never travels as a float.
+ */
+const PROFILE = {
+  description: 'description',
+  balance: 'balance',
+  totalReceipts: 'total_receipts',
+  address: 'address',
+  rt: 'rt',
+  rw: 'rw',
+  kelurahan: 'kelurahan',
+  kelurahanId: 'kelurahan_id',
+  kecamatan: 'kecamatan',
+  kecamatanId: 'kecamatan_id',
+  city: 'city',
+  cityId: 'city_id',
+  regency: 'regency',
+  province: 'province',
+  provinceId: 'province_id',
+  region: 'region',
+  regionId: 'region_id',
+  countryId: 'country_id',
+  latitude: 'latitude',
+  longitude: 'longitude',
+  mapsUrl: 'maps_url',
+  url: 'url',
+} as const;
+type ProfileKey = keyof typeof PROFILE;
+const PROFILE_KEYS = Object.keys(PROFILE) as ProfileKey[];
+const MONEY_KEYS: ReadonlySet<ProfileKey> = new Set(['balance', 'totalReceipts']);
 const Client = t.Object({
   id: t.String(),
   code: t.String(),
   name: t.String(),
   parentId: t.Nullable(t.String()),
+  parent: t.Nullable(ParentRef),
   settings: t.Nullable(t.Unknown()),
   statusId: t.Integer(),
   createdAt: t.String(),
+  // Profile block — spelled out so the OpenAPI document and the typed client see each field.
+  description: t.Nullable(t.String()),
+  balance: t.String(),
+  totalReceipts: t.String(),
+  address: t.Nullable(t.String()),
+  rt: t.Nullable(t.String()),
+  rw: t.Nullable(t.String()),
+  kelurahan: t.Nullable(t.String()),
+  kelurahanId: t.Nullable(t.String()),
+  kecamatan: t.Nullable(t.String()),
+  kecamatanId: t.Nullable(t.String()),
+  city: t.Nullable(t.String()),
+  cityId: t.Nullable(t.String()),
+  regency: t.Nullable(t.String()),
+  province: t.Nullable(t.String()),
+  provinceId: t.Nullable(t.String()),
+  region: t.Nullable(t.String()),
+  regionId: t.Nullable(t.String()),
+  countryId: t.Nullable(t.String()),
+  latitude: t.Nullable(t.String()),
+  longitude: t.Nullable(t.String()),
+  mapsUrl: t.Nullable(t.String()),
+  url: t.Nullable(t.String()),
 });
 const Scope = t.Object({
   id: t.String(),
@@ -60,21 +120,92 @@ const Scope = t.Object({
 });
 
 type ClientRow = typeof schema.clients.$inferSelect;
+type ParentRow = typeof ParentRef.static;
+type Db = ReturnType<typeof unsafeAcrossTenants>;
 
 function actor(auth: AuthState | null): AuthState {
   if (!auth) throw new Error('guard missing: route reached without a session');
   return auth;
 }
-function view(c: ClientRow) {
+type ProfileBody = { [K in ProfileKey]?: string | null };
+type ClientInsert = typeof schema.clients.$inferInsert;
+const DECIMAL_KEYS: ReadonlySet<ProfileKey> = new Set([...MONEY_KEYS, 'latitude', 'longitude']);
+/**
+ * Decimal columns come back dialect-flavoured — "0.0000" from MySQL and PostgreSQL, "0" from
+ * SQLite's TEXT — so the API trims the fraction's trailing zeros and answers the same on all three.
+ */
+function plainDecimal(s: string): string {
+  return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s;
+}
+function view(c: ClientRow, parent: ParentRow | null = null) {
+  const profile = Object.fromEntries(
+    PROFILE_KEYS.map((k) => {
+      const raw = c[PROFILE[k]] ?? (MONEY_KEYS.has(k) ? '0' : null);
+      return [k, raw !== null && DECIMAL_KEYS.has(k) ? plainDecimal(String(raw)) : raw];
+    }),
+  ) as Record<ProfileKey, string | null> & Record<'balance' | 'totalReceipts', string>;
   return {
     id: c.id,
     code: c.code,
     name: c.name,
     parentId: c.parent_id,
+    parent,
     settings: c.settings ?? null,
     statusId: c.status_id,
     createdAt: c.created_at.toISOString(),
+    ...profile,
   };
+}
+/** Only the profile keys the body carries; `null` clears a column, and clears money to "0". */
+function profilePatch(body: ProfileBody): Partial<ClientInsert> {
+  const patch: Record<string, string | null> = {};
+  for (const k of PROFILE_KEYS) {
+    const v = body[k];
+    if (v === undefined) continue;
+    patch[PROFILE[k]] = v === null && MONEY_KEYS.has(k) ? '0' : v;
+  }
+  return patch as Partial<ClientInsert>;
+}
+/**
+ * Parents of a page of tenants in one query, keyed by id. A deleted parent is still reported:
+ * the link exists in the data, and hiding it would make the child look like a root.
+ */
+async function parentsOf(db: Db, rows: ClientRow[]): Promise<Map<string, ParentRow>> {
+  const ids = [...new Set(rows.map((r) => r.parent_id).filter((x): x is string => !!x))];
+  const map = new Map<string, ParentRow>();
+  if (!ids.length) return map;
+  const parents = await db
+    .select({ id: schema.clients.id, code: schema.clients.code, name: schema.clients.name })
+    .from(schema.clients)
+    .where(inArray(schema.clients.id, ids));
+  for (const p of parents) map.set(p.id, p);
+  return map;
+}
+function withParents(rows: ClientRow[], parents: Map<string, ParentRow>) {
+  return rows.map((r) => view(r, r.parent_id ? (parents.get(r.parent_id) ?? null) : null));
+}
+async function viewWithParent(db: Db, c: ClientRow) {
+  return withParents([c], await parentsOf(db, [c]))[0] as ReturnType<typeof view>;
+}
+/**
+ * Walks up from `candidateId` through `parent_id`. True when `tenantId` is on that path, i.e.
+ * making `candidateId` the parent of `tenantId` would close a loop. The visited set stops the
+ * walk if the data already holds a cycle, so a bad row cannot hang the request.
+ */
+async function wouldCycle(db: Db, candidateId: string, tenantId: string): Promise<boolean> {
+  const seen = new Set<string>();
+  let cur: string | null = candidateId;
+  while (cur && !seen.has(cur)) {
+    if (cur === tenantId) return true;
+    seen.add(cur);
+    const [row] = await db
+      .select({ parentId: schema.clients.parent_id })
+      .from(schema.clients)
+      .where(eq(schema.clients.id, cur))
+      .limit(1);
+    cur = row?.parentId ?? null;
+  }
+  return false;
 }
 async function live(id: string): Promise<ClientRow | null> {
   const [row] = await unsafeAcrossTenants()
@@ -108,7 +239,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       const a = actor(auth);
       return ok({
         activeClientId: tenantState?.clientId ?? null,
-        tenants: await tenantsOf(unsafeAcrossTenants(), a.user.id),
+        tenants: await tenantsOf(unsafeAcrossTenants(), a.user),
       });
     },
     {
@@ -151,7 +282,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
           .orderBy(order)
           .limit(p.limit)
           .offset(p.offset);
-        return page(rows.map(view), p.meta(Number(tot?.n ?? 0)));
+        return page(withParents(rows, await parentsOf(db, rows)), p.meta(Number(tot?.n ?? 0)));
       }
       const where = and(
         eq(schema.clientUserMaps.user_id, a.user.id),
@@ -172,10 +303,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         .orderBy(order)
         .limit(p.limit)
         .offset(p.offset);
-      return page(
-        rows.map((r) => view(r.c)),
-        p.meta(Number(tot?.n ?? 0)),
-      );
+      const mine = rows.map((r) => r.c);
+      return page(withParents(mine, await parentsOf(db, mine)), p.meta(Number(tot?.n ?? 0)));
     },
     {
       beforeHandle: permission('client.read'),
@@ -194,7 +323,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       const c = await live(params.id);
       if (!c || !(await canActInTenant(unsafeAcrossTenants(), a.user, c.id)))
         return notFound(set, requestId, 'Tenant');
-      return ok(view(c));
+      return ok(await viewWithParent(unsafeAcrossTenants(), c));
     },
     {
       beforeHandle: permission('client.read'),
@@ -208,10 +337,19 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
     async ({ auth, body, set, request, server, requestId, tenantState }) => {
       const a = actor(auth);
       const db = unsafeAcrossTenants();
+      // No code given: derive one from the name. A name with nothing usable in it is told so,
+      // field-wise, instead of being handed a made-up code.
+      const code = body.code ?? codeFromName(body.name, 32);
+      if (code.length < 2) {
+        set.status = 422;
+        return fail('validation_failed', 'Periksa isian', requestId, {
+          code: 'Kode tidak bisa diturunkan dari nama ini; isi kode sendiri',
+        });
+      }
       const [dup] = await db
         .select({ id: schema.clients.id, deletedAt: schema.clients.deleted_at })
         .from(schema.clients)
-        .where(eq(schema.clients.code, body.code))
+        .where(eq(schema.clients.code, code))
         .limit(1);
       /**
        * A deleted tenant keeps its code — and, unlike a group or an AI profile, ALL of its data:
@@ -224,8 +362,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
           set,
           requestId,
           dup.deletedAt
-            ? `Kode tenant "${body.code}" masih dipegang tenant yang sudah dihapus; datanya tidak ikut terhapus, jadi kode itu tidak dipakai ulang — pilih kode lain`
-            : `Kode tenant "${body.code}" sudah dipakai`,
+            ? `Kode tenant "${code}" masih dipegang tenant yang sudah dihapus; datanya tidak ikut terhapus, jadi kode itu tidak dipakai ulang — pilih kode lain`
+            : `Kode tenant "${code}" sudah dipakai`,
         );
       if (body.parentId) {
         const parent = await live(body.parentId);
@@ -235,10 +373,11 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       const id = newId();
       await db.insert(schema.clients).values({
         id,
-        code: body.code,
+        code,
         name: body.name.trim(),
         parent_id: body.parentId ?? null,
         settings: body.settings ?? null,
+        ...profilePatch(body),
       });
       // Usable at once: system groups, and the creator as its first member and admin (C-3).
       const groups = await seedTenantGroups(db, id);
@@ -263,7 +402,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         after: view(c),
       });
       set.status = 201;
-      return ok(view(c));
+      return ok(await viewWithParent(db, c));
     },
     {
       beforeHandle: permission('client.create'),
@@ -271,7 +410,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       response: { 201: OkSchema(Client), ...errorResponses },
       detail: {
         summary: 'Create a tenant',
-        description: 'Seeds its system groups and makes you its admin.',
+        description:
+          'Seeds its system groups and makes you its admin. Without `code`, one is derived from the name (lower case, runs of other characters become `_`). `parentId` places it under another tenant you can act in; omit it for a top-level tenant.',
       },
     },
   )
@@ -289,8 +429,15 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         const parent = await live(body.parentId);
         if (!parent || !(await canActInTenant(db, a.user, parent.id)))
           return notFound(set, requestId, 'Tenant induk');
+        // A tenant cannot move under one of its own descendants.
+        if (await wouldCycle(db, parent.id, before.id))
+          return conflict(
+            set,
+            requestId,
+            'Tenant induk yang dipilih adalah sub-tenant dari tenant ini; pilih tenant lain',
+          );
       }
-      const patch: Partial<typeof schema.clients.$inferInsert> = {};
+      const patch: Partial<ClientInsert> = profilePatch(body);
       if (body.name !== undefined) patch.name = body.name.trim();
       if (body.parentId !== undefined) patch.parent_id = body.parentId;
       if (body.settings !== undefined) patch.settings = body.settings;
@@ -309,7 +456,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         before: view(before),
         after: view(after),
       });
-      return ok(view(after));
+      return ok(await viewWithParent(db, after));
     },
     {
       beforeHandle: permission('client.edit'),
@@ -318,7 +465,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       response: { 200: OkSchema(Client), ...errorResponses },
       detail: {
         summary: 'Update a tenant',
-        description: 'Name, parent, settings and status. The code cannot change.',
+        description:
+          'Name, parent, settings, status and the profile block (description, ledger amounts, address and region fields, coordinates, links). The code cannot change. A null `parentId` makes it a top-level tenant; a parent that is one of its own sub-tenants is refused. Amounts and coordinates are decimal strings.',
       },
     },
   )

@@ -105,7 +105,7 @@ export function buildMcpServer(
 
   server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
     if (req.params.uri !== ME_URI) throw new Error(`Resource tidak dikenal: ${req.params.uri}`);
-    const tenants = await tenantsOf(unsafeAcrossTenants(), a.user.id);
+    const tenants = await tenantsOf(unsafeAcrossTenants(), a.user);
     const me = {
       user: { id: a.user.id, name: a.user.name, email: a.user.email, locale: a.user.locale },
       via: a.token ? 'token' : 'session',

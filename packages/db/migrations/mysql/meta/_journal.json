@@ -218,6 +218,13 @@
       "when": 1790333255828,
       "tag": "0030_zippy_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1792131257327,
+      "tag": "0031_perfect_firebird",
+      "breakpoints": true
     }
   ]
 }

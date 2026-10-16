@@ -2,7 +2,36 @@ import { ClientUpdateBody, formToObject, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
+import { parentCandidates, parentOptions } from '$lib/server/tenants';
 import type { Actions, PageServerLoad } from './$types';
+
+/**
+ * Profile fields of the edit form: an empty box clears the column (null), so they are all
+ * nullable in `formToObject`. The ledger amounts are not on the form — they are groundwork for
+ * later features and only move through the API.
+ */
+const PROFILE_FIELDS = [
+  'description',
+  'url',
+  'mapsUrl',
+  'address',
+  'rt',
+  'rw',
+  'kelurahan',
+  'kelurahanId',
+  'kecamatan',
+  'kecamatanId',
+  'city',
+  'cityId',
+  'regency',
+  'province',
+  'provinceId',
+  'region',
+  'regionId',
+  'countryId',
+  'latitude',
+  'longitude',
+] as const;
 
 export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
@@ -11,6 +40,8 @@ export const load: PageServerLoad = async (event) => {
     error(res.status === 404 ? 404 : res.status, t('tenants.detail.not_found'));
   return {
     client: res.data.data,
+    // Parent choices: never the tenant itself or anything under it (that would close a loop).
+    parents: parentOptions(await parentCandidates(event, event.params.id)),
     /**
      * Deleting a tenant is the most destructive act in the app, so it takes two steps: `?confirm=delete`
      * opens the confirmation (a plain link — no JavaScript needed, L-22), and the action below still
@@ -32,10 +63,14 @@ export const actions: Actions = {
         message: t('common.form_expired'),
       });
     }
-    const raw = formToObject(form);
+    // An empty parent choice means "top level": null clears the parent, it is not a missing field.
+    const raw = formToObject(form, { nullable: ['parentId', ...PROFILE_FIELDS] });
+    const profile = Object.fromEntries(PROFILE_FIELDS.map((k) => [k, raw[k] ?? null]));
     const v = validateForm(ClientUpdateBody, {
       name: raw.name,
+      parentId: raw.parentId ?? null,
       statusId: raw.active !== undefined ? 1 : 0,
+      ...profile,
     });
     if (!v.ok)
       return actionFailure(

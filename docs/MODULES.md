@@ -130,6 +130,7 @@ export default defineTables('Billing', [
       number: col.identifier(32),      // ascii_bin — kode/slug/kunci
       customer: col.varchar(191),      // utf8mb4 — teks manusia
       total: col.money(),              // decimal(18,4), bukan float
+      lat: col.decimal(10, 7).nullable(), // decimal(presisi, skala) — koordinat, tarif; TEXT di SQLite
       status: col.enum(['draft', 'sent', 'paid'], 16).default('draft'), // varchar + constraint aplikasi
       meta: col.json().nullable(),     // jangan pernah di-query ke dalamnya (§4.3)
       due_at: col.datetime().nullable(), // selalu UTC

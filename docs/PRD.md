@@ -582,7 +582,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | B-1 | **[P0]** Tenant = baris di tabel `clients`, mendukung hierarki lewat `parent_id`. |
 | B-2 | **[P0]** Tenant aktif ditentukan dari sesi (server-side), bukan hanya dari header yang dikirim klien. Header `X-Client-ID` tetap didukung untuk klien API, tapi **wajib divalidasi terhadap keanggotaan user** (`client_user_maps`) — bukan sekadar dicek keberadaannya. |
 | B-3 | **[P0]** **Penjaga tenant di lapisan data, bukan di setiap handler.** Semua query lewat helper repository yang otomatis menyuntikkan filter `client_id`. Query yang sengaja lintas-tenant harus memanggil API eksplisit (`unsafeAcrossTenants()`) yang mudah di-grep saat audit. |
-| B-4 | **[P0]** UI switcher tenant untuk user yang punya akses ke lebih dari satu tenant. Ganti tenant = navigasi ulang server-side, bukan sekadar ganti state klien. |
+| B-4 | **[P0]** UI switcher tenant untuk user yang punya akses ke lebih dari satu tenant. Isinya mengikuti aturan yang sama dengan hak bertindak: anggota melihat tenant keanggotaannya, superadmin melihat semua tenant hidup (C-5). Ganti tenant = navigasi ulang server-side, bukan sekadar ganti state klien. |
 | B-5 | **[P0]** Instalasi single-tenant tetap wajar: satu tenant baku ter-seed, dan switcher disembunyikan bila user hanya punya satu tenant. Multi-tenancy tidak boleh terasa membebani proyek yang tidak memakainya. |
 | B-6 | **[P1]** Kuota & saldo per tenant (`balance`, `credit`) — dipakai untuk membatasi pemakaian AI. |
 
@@ -1021,7 +1021,7 @@ Seluruhnya memakai PK UUIDv7 (O-6), `status_id` + `deleted_at` untuk hapus lunak
 
 Kolom `client_id` ada pada tabel **ber-tenant**, bukan pada semuanya — dan pengecualiannya disengaja:
 
-- `clients` tidak punya `client_id`; hierarkinya lewat `parent_id` (B-1).
+- `clients` tidak punya `client_id`; hierarkinya lewat `parent_id` (B-1). Selain `code`/`name`/`settings`, tabel ini membawa blok profil sebagai fondasi fitur mendatang — `description`, saldo (`balance`, `total_receipts`, `decimal(18,4)`), alamat administratif Indonesia (`address`, `rt`, `rw`, `kelurahan`, `kecamatan`, `city`, `regency`, `province`, `region`, masing-masing nama + `*_id` kode opak, plus `country_id`), koordinat (`latitude`/`longitude`, `decimal(10|11,7)`), `maps_url`, `url`. Semuanya nullable atau berdefault; core belum membaca kolom-kolom ini di luar CRUD tenant (D-3).
 - `configurations` membolehkan `client_id IS NULL` sebagai nilai global yang jadi fallback saat tenant belum menimpanya (E-2). Pola yang sama berlaku untuk `themes` dan `modules`.
 - `rate_limits` global: dikunci per identitas pemanggil lewat `key` unik (`login:ip:…`, `tenant:<id>:api:<user>`). Bukan `client_id` nullable — NULL dalam unique index tidak unik di MySQL maupun PostgreSQL.
 - `sessions` dan `api_tokens` punya `client_id` dengan arti **tenant aktif**, bukan kepemilikan; keduanya tabel global dan tidak disaring penjaga tenant.

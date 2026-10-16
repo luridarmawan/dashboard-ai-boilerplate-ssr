@@ -751,7 +751,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         async ({ auth }) => {
           const a = auth as NonNullable<typeof auth>;
           const db = unsafeAcrossTenants();
-          const tenants = await tenantsOf(db, a.user.id);
+          const tenants = await tenantsOf(db, a.user);
           // E-10: the web decides from this whether to show the maintenance page or the app; the
           // group lookup only runs while maintenance is on.
           const maintenance = await maintenanceState(a.clientId);

@@ -347,6 +347,115 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     ).toBe(200);
   });
 
+  test('tenant hierarchy: parent on create/edit, resolved in responses, no loops, no orphaning', async () => {
+    const mk = async (code: string, name: string, parentId?: string) => {
+      const res = await post('/v1/clients', { code, name, ...(parentId ? { parentId } : {}) }, [
+        admin,
+      ]);
+      expect(res.status).toBe(201);
+      return (await json(res)).data as {
+        id: string;
+        parentId: string | null;
+        parent: { id: string; code: string; name: string } | null;
+        balance: string;
+        totalReceipts: string;
+        address: string | null;
+      };
+    };
+    const root = await mk(`hq-${run}`.slice(0, 32), 'Head office');
+    expect(root.parentId).toBeNull();
+    expect(root.parent).toBeNull();
+
+    // No code given: it is derived from the name; a name with nothing usable is a field error.
+    const derived = await post('/v1/clients', { name: `PT. Maju Jaya ${run}` }, [admin]);
+    expect(derived.status).toBe(201);
+    const derivedRow = (await json(derived)).data as { id: string; code: string };
+    expect(derivedRow.code).toBe(`pt_maju_jaya_${run}`.slice(0, 32).replace(/_+$/, ''));
+    const unusable = await post('/v1/clients', { name: '***' }, [admin]);
+    expect(unusable.status).toBe(422);
+    const details = (await json(unusable)).error?.details as { code?: string } | undefined;
+    expect(details?.code).toBeDefined();
+    expect((await del(`/v1/clients/${derivedRow.id}`, [admin])).status).toBe(200);
+    const branch = await mk(`br-${run}`.slice(0, 32), 'Branch', root.id);
+    expect(branch.parentId).toBe(root.id);
+    expect(branch.parent?.name).toBe('Head office');
+    const leaf = await mk(`lf-${run}`.slice(0, 32), 'Leaf', branch.id);
+
+    // The list resolves parents too.
+    const list = await json(await call(`/v1/clients?q=${run}&limit=50`, {}, [admin]));
+    const rows = list.data as unknown as { id: string; parent: { id: string } | null }[];
+    expect(rows.find((r) => r.id === leaf.id)?.parent?.id).toBe(branch.id);
+
+    // Profile block (groundwork): defaults, set, clear; amounts and coordinates stay strings.
+    expect(leaf.balance).toBe('0');
+    expect(leaf.totalReceipts).toBe('0');
+    expect(leaf.address).toBeNull();
+    const profiled = await json(
+      await put(
+        `/v1/clients/${leaf.id}`,
+        {
+          description: 'Toko cabang',
+          balance: '1250000.5',
+          address: 'Jl. Merdeka 1',
+          rt: '03',
+          rw: '07',
+          kelurahan: 'Braga',
+          kelurahanId: '32.73.01.1001',
+          city: 'Bandung',
+          province: 'Jawa Barat',
+          countryId: 'ID',
+          latitude: '-6.9174639',
+          longitude: '107.6191228',
+          url: 'https://example.test',
+        },
+        [admin],
+      ),
+    );
+    const p = profiled.data as Record<string, string | null>;
+    expect(p.balance).toBe('1250000.5'); // trailing zeros trimmed, same on every dialect
+    expect(p.totalReceipts).toBe('0');
+    expect(p.kelurahanId).toBe('32.73.01.1001');
+    expect(p.latitude).toBe('-6.9174639');
+    expect(p.longitude).toBe('107.6191228');
+    expect(p.url).toBe('https://example.test');
+    const clearedProfile = await json(
+      await put(`/v1/clients/${leaf.id}`, { address: null, balance: null, latitude: null }, [
+        admin,
+      ]),
+    );
+    expect(clearedProfile.data?.address).toBeNull();
+    expect(clearedProfile.data?.balance).toBe('0');
+    expect(clearedProfile.data?.latitude).toBeNull();
+    expect(clearedProfile.data?.city).toBe('Bandung'); // untouched keys stay
+    // Out-of-range coordinates and non-decimal amounts never reach the database.
+    expect((await put(`/v1/clients/${leaf.id}`, { latitude: '91' }, [admin])).status).toBe(422);
+    expect((await put(`/v1/clients/${leaf.id}`, { balance: '1e5' }, [admin])).status).toBe(422);
+
+    // Loops are refused: itself, and any of its own descendants.
+    expect((await put(`/v1/clients/${root.id}`, { parentId: root.id }, [admin])).status).toBe(409);
+    expect((await put(`/v1/clients/${root.id}`, { parentId: leaf.id }, [admin])).status).toBe(409);
+    // An unknown parent is a 404, not a silent null.
+    expect(
+      (
+        await put(`/v1/clients/${leaf.id}`, { parentId: '00000000-0000-7000-8000-000000000000' }, [
+          admin,
+        ])
+      ).status,
+    ).toBe(404);
+    // Re-parenting and clearing both work.
+    const moved = await json(await put(`/v1/clients/${leaf.id}`, { parentId: root.id }, [admin]));
+    expect((moved.data as { parent: { id: string } }).parent.id).toBe(root.id);
+    const cleared = await json(await put(`/v1/clients/${leaf.id}`, { parentId: null }, [admin]));
+    expect(cleared.data?.parentId).toBeNull();
+    expect(cleared.data?.parent).toBeNull();
+
+    // A parent with live sub-tenants cannot be deleted; children first.
+    expect((await del(`/v1/clients/${root.id}`, [admin])).status).toBe(409);
+    expect((await del(`/v1/clients/${leaf.id}`, [admin])).status).toBe(200);
+    expect((await del(`/v1/clients/${branch.id}`, [admin])).status).toBe(200);
+    expect((await del(`/v1/clients/${root.id}`, [admin])).status).toBe(200);
+  });
+
   test('profile: edit, change password (wrong current → 401), other sessions revoked (D-4)', async () => {
     const bob2 = await login(bobEmail, bobPassword);
     expect(

@@ -76,7 +76,7 @@ function mysqlColumn(name: string, c: ColumnDef): string {
       e = `json('${name}')`;
       break;
     case 'decimal':
-      e = `decimal('${name}', { precision: 18, scale: 4 })`;
+      e = `decimal('${name}', { precision: ${t.precision}, scale: ${t.scale} })`;
       break;
   }
   return e + modifiers(c, { now: '.default(sql`CURRENT_TIMESTAMP(3)`)' });
@@ -149,7 +149,7 @@ function pgColumn(name: string, c: ColumnDef): string {
       e = `jsonb('${name}')`;
       break;
     case 'decimal':
-      e = `numeric('${name}', { precision: 18, scale: 4 })`;
+      e = `numeric('${name}', { precision: ${t.precision}, scale: ${t.scale} })`;
       break;
   }
   return e + modifiers(c, { now: '.defaultNow()' });

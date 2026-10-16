@@ -115,17 +115,61 @@ export const GroupPermissionsBody = t.Object({
 
 // ---- tenants (D-3) ----
 export const ClientCode = t.String({ minLength: 2, maxLength: 32, pattern: '^[a-z][a-z0-9_-]*$' });
+const OptText = (maxLength: number) => t.Optional(t.Nullable(t.String({ maxLength })));
+/** Opaque region code (BPS-style `32.73.01.1001`, ISO `ID`, …): ascii, no meaning assigned yet. */
+const RegionCode = t.Optional(
+  t.Nullable(t.String({ maxLength: 32, pattern: '^[A-Za-z0-9._-]*$' })),
+);
+/** Exact decimal as text: money and coordinates never travel as floats. */
+const Decimal = (pattern: string) => t.Optional(t.Nullable(t.String({ pattern, maxLength: 24 })));
+const Money = Decimal('^-?[0-9]{1,14}(\\.[0-9]{1,4})?$');
+const Latitude = Decimal('^-?(90(\\.0{1,7})?|[0-8]?[0-9](\\.[0-9]{1,7})?)$');
+const Longitude = Decimal(
+  '^-?(180(\\.0{1,7})?|1[0-7][0-9](\\.[0-9]{1,7})?|[0-9]{1,2}(\\.[0-9]{1,7})?)$',
+);
+const Url = OptText(2048);
+/**
+ * Tenant profile (groundwork for later features): every field optional and nullable, so a form
+ * can clear one with an empty value. Address and region fields are free text plus opaque ids.
+ */
+const ClientProfile = {
+  description: OptText(2000),
+  balance: Money,
+  totalReceipts: Money,
+  address: OptText(2000),
+  rt: OptText(8),
+  rw: OptText(8),
+  kelurahan: OptText(191),
+  kelurahanId: RegionCode,
+  kecamatan: OptText(191),
+  kecamatanId: RegionCode,
+  city: OptText(191),
+  cityId: RegionCode,
+  regency: OptText(191),
+  province: OptText(191),
+  provinceId: RegionCode,
+  region: OptText(191),
+  regionId: RegionCode,
+  countryId: RegionCode,
+  latitude: Latitude,
+  longitude: Longitude,
+  mapsUrl: Url,
+  url: Url,
+};
 export const ClientCreateBody = t.Object({
-  code: ClientCode,
+  /** Optional: left out, the API derives it from `name` (`codeFromName`). */
+  code: t.Optional(ClientCode),
   name: Name,
   parentId: t.Optional(t.Nullable(Id)),
   settings: t.Optional(t.Nullable(t.Record(t.String(), t.Unknown()))),
+  ...ClientProfile,
 });
 export const ClientUpdateBody = t.Object({
   name: t.Optional(Name),
   parentId: t.Optional(t.Nullable(Id)),
   settings: t.Optional(t.Nullable(t.Record(t.String(), t.Unknown()))),
   statusId: t.Optional(Status),
+  ...ClientProfile,
 });
 
 // ---- validating a posted form against a schema ----

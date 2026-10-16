@@ -196,5 +196,15 @@ describe.skipIf(!enabled)('seed, tenancy and RBAC (O-3, B-2, B-4, C-3, C-5, C-7)
       admin,
     ]);
     expect(ghost.status).toBe(403); // a tenant that does not exist is still refused
+    // The switcher follows the same rule: every live tenant for a superadmin, memberships only
+    // for everyone else — so the UI never offers less than the API accepts (B-4).
+    const scope = await json(await call('/v1/clients/scope', {}, [admin]));
+    const mine = (scope.data as { tenants: { id: string; isDefault: boolean }[] }).tenants;
+    expect(mine.some((x) => x.id === acmeId)).toBe(true); // no membership row, listed anyway
+    expect(mine.find((x) => x.id === acmeId)?.isDefault).toBe(false);
+    expect(mine.find((x) => x.id === defaultTenant)?.isDefault).toBe(true); // seeded membership
+    const theirs = await json(await call('/v1/auth/me', {}, [member]));
+    const theirIds = (theirs.data as { tenants: { id: string }[] }).tenants.map((x) => x.id);
+    expect(theirIds.sort()).toEqual([acmeId, defaultTenant].sort()); // still memberships only
   });
 });

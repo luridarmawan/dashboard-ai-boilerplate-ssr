@@ -151,6 +151,7 @@ export const errorResponses = {
 } as const;
 
 export { clientIpFromForwarded, isPrivateAddress } from './client-ip.ts';
+export { codeFromName } from './code.ts';
 export {
   AdminPasswordSetBody,
   ClientCode,
