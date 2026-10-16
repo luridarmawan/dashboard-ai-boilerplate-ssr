@@ -15,6 +15,7 @@ import { moduleDomain } from './domains/modules.ts';
 import { notificationsDomain } from './domains/notifications.ts';
 import { outbox } from './domains/outbox.ts';
 import { queueDomain } from './domains/queue.ts';
+import { regions } from './domains/regions.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
 import { tokensDomain } from './domains/tokens.ts';
@@ -112,6 +113,7 @@ export const app = new Elysia()
       .use(users)
       .use(groups)
       .use(clients)
+      .use(regions)
       .use(configuration)
       .use(themesDomain)
       .use(moduleDomain)

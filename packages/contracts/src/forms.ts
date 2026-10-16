@@ -139,6 +139,8 @@ const ClientProfile = {
   address: OptText(2000),
   rt: OptText(8),
   rw: OptText(8),
+  /** 3–10 letters, digits, spaces or dashes: covers `40111` as well as `SW1A 1AA`. */
+  postalCode: t.Optional(t.Nullable(t.String({ pattern: '^[A-Za-z0-9 -]{3,10}$' }))),
   kelurahan: OptText(191),
   kelurahanId: RegionCode,
   kecamatan: OptText(191),

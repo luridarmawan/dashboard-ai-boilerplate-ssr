@@ -34,6 +34,7 @@
     "db:matrix": "docker compose --profile matrix up -d --wait && bun run scripts/db-matrix.ts",
     "db:matrix:docker": "docker compose --profile matrix up -d --wait && docker run --rm --network dashboard-ai-boilerplate_default --user \"$(id -u):$(id -g)\" -e HOME=/tmp -v \"$PWD\":/w -w /w -e MATRIX_MYSQL_URL=mysql://app:app@mysql:3306/app -e MATRIX_MARIADB_URL=mysql://app:app@mariadb:3306/app -e MATRIX_POSTGRES_URL=postgres://app:app@postgres:5432/app oven/bun:1.4 bun run scripts/db-matrix.ts",
     "db:migrate": "bun run --cwd packages/db migrate",
+    "db:regions": "bun run apps/api/src/index.ts regions",
     "db:seed": "bun run --cwd packages/auth seed",
     "db:smoke": "bun run --cwd packages/db smoke",
     "dev": "bun run scripts/dev.ts",

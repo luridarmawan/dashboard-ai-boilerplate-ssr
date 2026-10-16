@@ -1,6 +1,7 @@
 import { ClientUpdateBody, formToObject, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { error, redirect } from '@sveltejs/kit';
+import { regionChain, regionOptions } from '$lib/server/regions';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
 import { parentCandidates, parentOptions } from '$lib/server/tenants';
 import type { Actions, PageServerLoad } from './$types';
@@ -17,6 +18,7 @@ const PROFILE_FIELDS = [
   'address',
   'rt',
   'rw',
+  'postalCode',
   'kelurahan',
   'kelurahanId',
   'kecamatan',
@@ -33,13 +35,33 @@ const PROFILE_FIELDS = [
   'longitude',
 ] as const;
 
+/**
+ * The region picker: province → regency/city → district → village, as codes. Posted without the
+ * names — the API fills those from the regions table — and only when that table has data.
+ */
+const REGION_IDS = ['provinceId', 'cityId', 'kecamatanId', 'kelurahanId'] as const;
+const REGION_NAMES = ['province', 'city', 'kecamatan', 'kelurahan'] as const;
+
 export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
   const res = await apiFor(event).v1.clients({ id: event.params.id }).get();
   if (!res.data?.success)
     error(res.status === 404 ? 404 : res.status, t('tenants.detail.not_found'));
+  const client = res.data.data;
+  // One request for the provinces tells whether region data is loaded at all; without it the
+  // form keeps plain text boxes. Deeper levels load only under a chosen parent.
+  const provinces = await regionOptions(event);
+  const picker = provinces.length > 0;
+  const [cities, districts, villages] = picker
+    ? await Promise.all([
+        regionOptions(event, client.provinceId),
+        regionOptions(event, client.cityId),
+        regionOptions(event, client.kecamatanId),
+      ])
+    : [[], [], []];
   return {
-    client: res.data.data,
+    client,
+    regions: { picker, provinces, cities, districts, villages },
     // Parent choices: never the tenant itself or anything under it (that would close a loop).
     parents: parentOptions(await parentCandidates(event, event.params.id)),
     /**
@@ -65,7 +87,18 @@ export const actions: Actions = {
     }
     // An empty parent choice means "top level": null clears the parent, it is not a missing field.
     const raw = formToObject(form, { nullable: ['parentId', ...PROFILE_FIELDS] });
-    const profile = Object.fromEntries(PROFILE_FIELDS.map((k) => [k, raw[k] ?? null]));
+    const profile: Record<string, unknown> = Object.fromEntries(
+      PROFILE_FIELDS.map((k) => [k, raw[k] ?? null]),
+    );
+    if (form.has('_regionPicker')) {
+      // Picker mode: the names are not on the form — the API fills them — and a level that no
+      // longer sits under its parent (the parent changed) is cleared with everything below it.
+      const chain = regionChain(REGION_IDS.map((k) => raw[k] as string | null | undefined));
+      REGION_IDS.forEach((k, i) => {
+        profile[k] = chain[i];
+      });
+      for (const k of REGION_NAMES) delete profile[k];
+    }
     const v = validateForm(ClientUpdateBody, {
       name: raw.name,
       parentId: raw.parentId ?? null,

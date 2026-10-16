@@ -685,6 +685,15 @@ importSeconds.observeMs({ source: 'csv' }, performance.now() - t0);
 
 Aturannya: nama Prometheus (`<ns>_…_total`, akhiran satuan), nilai label **terbatas** — jenis, status, sumber; **tidak pernah** id user, id tenant, atau teks bebas. Nama yang sama didaftarkan dua kali mengembalikan instrumen yang sama. Panduan pemakaian dan daftar metrik core: [`DEPLOY.md` §7a](./DEPLOY.md).
 
+### Data wilayah dari modul
+
+Core membawa data wilayah administratif Indonesia (provinsi → kabupaten/kota → kecamatan → kelurahan/desa, ±91 ribu baris) di tabel global `regions`. Tabelnya dibuat migrasi, isinya dimuat terpisah dengan `bun db:regions` (produksi: `api regions`) — idempoten, aman diulang. Tanpa argumen yang dimuat data bawaan `packages/db/data/regions-id.tsv.gz`; berkas lain boleh `.tsv`, `.tsv.gz`, atau dump MySQL `.sql` dengan kolom `code`, `parent_code`, `country_code`, `level`, `name` (isi dump hanya dibaca, tidak pernah dieksekusi).
+
+- **Kode** adalah kunci alami berbentuk jalur bertitik: `32` → `32.73` → `32.73.01` → `32.73.01.1001`. Simpan kodenya di tabel modul (`col.identifier(16)`), bukan foreign key — impor ulang tidak pernah membuat baris yatim. Level: `REGION_LEVEL` dari `@core/db/regions` (1 provinsi, 2 kab/kota, 3 kecamatan, 4 kelurahan/desa).
+- **API** (cukup sesi, tanpa izin): `GET /v1/regions` (tingkat teratas), `?parent=<kode>` (anak), `?q=<nama>&level=` (pencarian, maks. 50), `GET /v1/regions/<kode>` (wilayah + leluhurnya).
+- **Form web**: `regionOptions(event, parent)` dari `$lib/server/regions` mengisi `<select>` di `load`; `GET /regions?parent=<kode>` memberi opsi yang sama ke browser untuk pemilih bertingkat. Contoh lengkap, termasuk perilaku tanpa JavaScript dan `regionChain()` untuk membuang tingkat yang tidak lagi cocok: halaman edit tenant (`apps/web/src/routes/(app)/tenants/[id]`).
+- **Query langsung** dari API modul: `schema.regions` dari `@core/db`, lewat `unsafeAcrossTenants()` karena tabelnya global.
+
 ### `api/tools.ts` — tool AI / MCP (titik perluasan 8)
 
 Fungsi yang boleh dipanggil asisten AI (dan, nanti, klien MCP) atas nama user. Modul hanya **mendeklarasikan**; yang menegakkan izin, tenant, dan skema adalah registry core — jadi tool tidak pernah menjadi pintu belakang (I-3, I-6).

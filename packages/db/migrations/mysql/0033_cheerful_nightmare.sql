@@ -1,0 +1,1 @@
+ALTER TABLE `clients` ADD `postal_code` varchar(10) CHARACTER SET ascii COLLATE ascii_bin;

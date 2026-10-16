@@ -1,0 +1,1 @@
+ALTER TABLE `clients` ADD `postal_code` text(10);

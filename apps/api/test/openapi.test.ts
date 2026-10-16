@@ -34,6 +34,8 @@ describe('OpenAPI document (N-1, N-2, gate M3 #2)', () => {
       '/v1/group-members/{id}',
       '/v1/clients/',
       '/v1/clients/scope',
+      '/v1/regions/',
+      '/v1/regions/{code}',
       '/v1/configuration/',
       '/v1/configuration/public',
       '/v1/themes/',

@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { runSeed } from '@core/auth';
+import { eq, schema, unsafeAcrossTenants } from '@core/db';
+import { importRegions } from '@core/db/regions';
 import { app } from '../../src/app.ts';
 
 /**
@@ -399,6 +401,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
           address: 'Jl. Merdeka 1',
           rt: '03',
           rw: '07',
+          postalCode: '40111',
           kelurahan: 'Braga',
           kelurahanId: '32.73.01.1001',
           city: 'Bandung',
@@ -415,6 +418,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect(p.balance).toBe('1250000.5'); // trailing zeros trimmed, same on every dialect
     expect(p.totalReceipts).toBe('0');
     expect(p.kelurahanId).toBe('32.73.01.1001');
+    expect(p.postalCode).toBe('40111');
     expect(p.latitude).toBe('-6.9174639');
     expect(p.longitude).toBe('107.6191228');
     expect(p.url).toBe('https://example.test');
@@ -430,6 +434,9 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     // Out-of-range coordinates and non-decimal amounts never reach the database.
     expect((await put(`/v1/clients/${leaf.id}`, { latitude: '91' }, [admin])).status).toBe(422);
     expect((await put(`/v1/clients/${leaf.id}`, { balance: '1e5' }, [admin])).status).toBe(422);
+    expect((await put(`/v1/clients/${leaf.id}`, { postalCode: '40;11' }, [admin])).status).toBe(
+      422,
+    );
 
     // Loops are refused: itself, and any of its own descendants.
     expect((await put(`/v1/clients/${root.id}`, { parentId: root.id }, [admin])).status).toBe(409);
@@ -454,6 +461,68 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect((await del(`/v1/clients/${leaf.id}`, [admin])).status).toBe(200);
     expect((await del(`/v1/clients/${branch.id}`, [admin])).status).toBe(200);
     expect((await del(`/v1/clients/${root.id}`, [admin])).status).toBe(200);
+  });
+
+  test('regions: import is idempotent, API lists and resolves, tenant names follow codes', async () => {
+    const db = unsafeAcrossTenants();
+    // Fixture under a country of its own, so it never mixes with a loaded Indonesian set.
+    const p = `Z${run % 10_000}`;
+    const fixture = [
+      { code: p, parentCode: null, countryCode: 'ZZ', level: 1, name: 'Prov Uji' },
+      { code: `${p}.01`, parentCode: p, countryCode: 'ZZ', level: 2, name: 'Kota Uji' },
+      { code: `${p}.02`, parentCode: p, countryCode: 'ZZ', level: 2, name: 'Kab. Uji' },
+      { code: `${p}.01.01`, parentCode: `${p}.01`, countryCode: 'ZZ', level: 3, name: 'Kec Uji' },
+    ];
+    try {
+      const first = await importRegions(db, fixture);
+      expect(first.inserted).toBe(4);
+      const again = await importRegions(db, [
+        ...fixture.slice(0, 3),
+        { ...fixture[3], name: 'Kec Baru' } as (typeof fixture)[number],
+      ]);
+      expect(again).toEqual({ total: 4, inserted: 0, updated: 1, unchanged: 3 });
+
+      expect((await call('/v1/regions?country=ZZ', {}, [])).status).toBe(401); // session only
+      const top = await json(await call('/v1/regions?country=ZZ', {}, [admin]));
+      expect((top.data as unknown as { code: string }[]).map((r) => r.code)).toEqual([p]);
+      const kids = await json(await call(`/v1/regions?country=ZZ&parent=${p}`, {}, [admin]));
+      expect((kids.data as unknown as { name: string }[]).map((r) => r.name)).toEqual([
+        'Kab. Uji',
+        'Kota Uji',
+      ]);
+      const found = await json(await call('/v1/regions?country=ZZ&q=baru', {}, [admin]));
+      expect((found.data as unknown as { code: string }[]).map((r) => r.code)).toEqual([
+        `${p}.01.01`,
+      ]);
+      const one = await json(await call(`/v1/regions/${p}.01.01`, {}, [admin]));
+      const ancestors = (one.data as { ancestors: { code: string }[] }).ancestors;
+      expect(ancestors.map((a) => a.code)).toEqual([p, `${p}.01`]);
+      expect((await call('/v1/regions/NOPE.1', {}, [admin])).status).toBe(404);
+
+      // A tenant that posts codes only gets the names filled; a cleared code clears its name.
+      const res = await post('/v1/clients', { name: `Region test ${run}` }, [admin]);
+      const tid = ((await json(res)).data as { id: string }).id;
+      const set = await json(
+        await put(
+          `/v1/clients/${tid}`,
+          { provinceId: p, cityId: `${p}.01`, kecamatanId: `${p}.01.01` },
+          [admin],
+        ),
+      );
+      expect(set.data?.province).toBe('Prov Uji');
+      expect(set.data?.city).toBe('Kota Uji');
+      expect(set.data?.kecamatan).toBe('Kec Baru');
+      const own = await json(
+        await put(`/v1/clients/${tid}`, { cityId: `${p}.02`, city: 'Ditulis sendiri' }, [admin]),
+      );
+      expect(own.data?.city).toBe('Ditulis sendiri'); // an explicit name wins
+      const cleared = await json(await put(`/v1/clients/${tid}`, { kecamatanId: null }, [admin]));
+      expect(cleared.data?.kecamatan).toBeNull();
+      expect(cleared.data?.province).toBe('Prov Uji');
+      expect((await del(`/v1/clients/${tid}`, [admin])).status).toBe(200);
+    } finally {
+      await db.delete(schema.regions).where(eq(schema.regions.country_code, 'ZZ'));
+    }
   });
 
   test('profile: edit, change password (wrong current → 401), other sessions revoked (D-4)', async () => {
