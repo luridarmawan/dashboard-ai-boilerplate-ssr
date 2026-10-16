@@ -13,6 +13,8 @@ import type { Actions, PageServerLoad } from './$types';
  */
 const PROFILE_FIELDS = [
   'description',
+  'referenceId',
+  'joinDate',
   'url',
   'mapsUrl',
   'address',

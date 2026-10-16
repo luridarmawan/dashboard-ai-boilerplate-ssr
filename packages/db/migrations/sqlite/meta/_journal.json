@@ -57,6 +57,13 @@
       "when": 1792140123081,
       "tag": "0007_whole_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792161488488,
+      "tag": "0008_tranquil_blazing_skull",
+      "breakpoints": true
     }
   ]
 }

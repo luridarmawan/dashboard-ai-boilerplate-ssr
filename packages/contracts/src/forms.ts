@@ -134,6 +134,11 @@ const Url = OptText(2048);
  */
 const ClientProfile = {
   description: OptText(2000),
+  referenceId: OptText(191),
+  /** Calendar date, `YYYY-MM-DD`; the API refuses impossible dates such as `2026-02-30`. */
+  joinDate: t.Optional(
+    t.Nullable(t.String({ pattern: '^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$' })),
+  ),
   balance: Money,
   totalReceipts: Money,
   address: OptText(2000),
