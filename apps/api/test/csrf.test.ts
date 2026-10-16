@@ -1,7 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { resetEnvCache } from '@core/config';
+import { Elysia } from 'elysia';
 import { app } from '../src/app.ts';
+import { authContext } from '../src/plugins/auth.ts';
 import { allowedOrigins, checkCsrf } from '../src/plugins/csrf.ts';
+import {
+  compileCsrfExempt,
+  csrfExemptRoutes,
+  isCsrfExempt,
+  matchCsrfExempt,
+} from '../src/plugins/csrf-exempt.ts';
 
 /** M1 gate #2 (PRD §8 #10): a cross-origin state-changing request is rejected. */
 const TOKEN = 'A'.repeat(43);
@@ -187,4 +195,91 @@ describe('allowedOrigins — APP_ORIGIN and the loopback twins', () => {
     expect(allowedOrigins(fromWeb('App.Example.com'))).toEqual(['http://app.example.com']);
     restore();
   });
+});
+
+describe('module CSRF exemptions (extension point 17)', () => {
+  const list = compileCsrfExempt([
+    {
+      method: 'POST',
+      path: '/v1/m/pay/hooks/:provider',
+      module: 'Pay',
+      ns: 'pay',
+      reason: 'Signed.',
+    },
+  ]);
+
+  test('method + exact shape match; a param matches one non-empty segment', () => {
+    expect(matchCsrfExempt(list, 'post', '/v1/m/pay/hooks/midtrans')?.module).toBe('Pay');
+    for (const [method, path] of [
+      ['PUT', '/v1/m/pay/hooks/midtrans'],
+      ['POST', '/v1/m/pay/hooks'],
+      ['POST', '/v1/m/pay/hooks/'],
+      ['POST', '/v1/m/pay/hooks/a/b'],
+      ['POST', '/v1/m/pay/hooks/midtrans/'],
+      ['POST', '/v1/m/pay/hooksx/midtrans'],
+      ['POST', '/v1/m/payx/hooks/midtrans'],
+    ] as const)
+      expect(matchCsrfExempt(list, method, path), `${method} ${path}`).toBeNull();
+  });
+
+  test('core declares none: every generated entry lives under /v1/m/<its namespace>/', () => {
+    for (const e of csrfExemptRoutes)
+      expect(e.path.startsWith(`/v1/m/${e.ns}/`), e.path).toBe(true);
+  });
+
+  const inbound = '/v1/m/example/inbound/inquiries';
+  const hasExample = csrfExemptRoutes.some((e) => e.path === inbound);
+
+  test.skipIf(!hasExample)(
+    'a cross-origin POST to an exempt route is not refused by CSRF',
+    async () => {
+      const res = await app.handle(
+        new Request(`http://api.test${inbound}`, {
+          method: 'POST',
+          headers: { 'content-type': 'text/plain', origin: 'https://evil.example' },
+          body: '{}',
+        }),
+      );
+      // Without a database the handler itself may fail; what matters is who answered.
+      const body = (await res.json()) as { error?: { code: string } };
+      expect(body.error?.code).not.toBe('csrf_failed');
+    },
+  );
+
+  test.skipIf(!hasExample)('near misses of an exempt route still get the full check', async () => {
+    for (const [method, path] of [
+      ['POST', `${inbound}/`],
+      ['PUT', inbound],
+      ['POST', '/v1/m/example/inquiries'],
+    ] as const) {
+      const res = await app.handle(
+        new Request(`http://api.test${path}`, {
+          method,
+          headers: { 'content-type': 'application/json', origin: 'https://evil.example' },
+          body: '{}',
+        }),
+      );
+      expect(res.status, `${method} ${path}`).toBe(403);
+    }
+  });
+
+  test.skipIf(!hasExample)(
+    'an exempt request is anonymous: the session cookie is never read',
+    async () => {
+      // A well-formed session token would normally hit the database; on an exempt route the auth
+      // plugin returns before that, so this runs without one and still sees `auth === null`.
+      const probe = new Elysia()
+        .use(authContext)
+        .post(inbound, ({ auth }) => ({ anonymous: auth === null }))
+        .post('/v1/m/example/other', ({ auth }) => ({ anonymous: auth === null }));
+      const req = (path: string) =>
+        new Request(`http://api.test${path}`, {
+          method: 'POST',
+          headers: { cookie: `crk_session=${TOKEN}; crk_impersonate=${TOKEN}` },
+        });
+      expect(isCsrfExempt(req(inbound))).toBe(true);
+      expect(await (await probe.handle(req(inbound))).json()).toEqual({ anonymous: true });
+      expect(isCsrfExempt(req('/v1/m/example/other'))).toBe(false);
+    },
+  );
 });

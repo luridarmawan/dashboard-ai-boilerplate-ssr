@@ -1,5 +1,6 @@
 import type { Direction, LocaleResolution } from '@core/i18n';
 import type { PublicConfig } from '$lib/server/config';
+import type { MaintenanceState } from '$lib/server/maintenance';
 import type { Session } from '$lib/server/session';
 import type { SidebarState } from '$lib/server/sidebar';
 import type { ResolvedTheme } from '$lib/server/theme';
@@ -24,6 +25,11 @@ declare global {
       dir: Direction;
       /** Sidebar rail (F-8): the user's own preference, resolved before render. */
       sidebar: SidebarState;
+      /**
+       * Maintenance mode (E-10) for this request: on or off, which switch, whether this user is
+       * exempt. Module pages read `active` to switch their own features off while staying up.
+       */
+      maintenance: MaintenanceState;
     }
   }
 }

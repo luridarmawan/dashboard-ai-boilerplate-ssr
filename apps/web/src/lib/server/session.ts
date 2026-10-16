@@ -16,10 +16,9 @@ import { checkRequestOrigin, forwardedOrigin } from '$lib/server/origin';
  *   - `forwardSetCookies()` copies cookies the API set (login, logout) onto the browser.
  */
 
-export const SESSION_COOKIE = 'crk_session';
-/** Impersonation (D-6): rides along with the admin's own session cookie. */
-export const IMPERSONATE_COOKIE = 'crk_impersonate';
-export const CSRF_COOKIE = 'crk_csrf';
+export { CSRF_COOKIE, IMPERSONATE_COOKIE, SESSION_COOKIE } from './cookies.ts';
+
+import { CSRF_COOKIE, IMPERSONATE_COOKIE, SESSION_COOKIE } from './cookies.ts';
 export const CSRF_FIELD = '_csrf';
 
 export interface SessionUser {
@@ -46,11 +45,19 @@ export interface TenantSummary {
   name: string;
   isDefault: boolean;
 }
+/** What the API says about maintenance mode for this session (E-10; see lib/server/maintenance.ts). */
+export interface SessionMaintenance {
+  active: boolean;
+  source: 'env' | 'config' | null;
+  /** This user may keep working while maintenance is on (superadmin or Administrator group). */
+  exempt: boolean;
+}
 export interface Session {
   user: SessionUser;
   clientId: string | null;
   tenants: TenantSummary[];
   permissions: string[];
+  maintenance: SessionMaintenance;
   /** The superadmin acting as `user` (D-6); null normally. */
   impersonator: { id: string; name: string; email: string } | null;
   /** Cosmetic check for the UI (C-6b); the API is the authority. */
@@ -229,6 +236,8 @@ export async function apiFetchData<T = unknown>(
   event: RequestEvent,
   path: string,
   clientId?: string | null,
+  /** Optional `AbortSignal` (e.g. `AbortSignal.timeout(ms)`) for callers that must not hang. */
+  init?: { signal?: AbortSignal },
 ): Promise<T | null> {
   if (!path.startsWith('/v1/')) return null;
   const headers: Record<string, string> = {
@@ -247,7 +256,10 @@ export async function apiFetchData<T = unknown>(
   const ip = clientAddress(event);
   if (ip) headers['x-forwarded-for'] = ip;
   try {
-    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, { headers });
+    const res = await fetch(`${env.API_URL ?? 'http://127.0.0.1:3001'}${path}`, {
+      headers,
+      ...(init?.signal ? { signal: init.signal } : {}),
+    });
     if (!res.ok) return null;
     const body = (await res.json()) as { success?: boolean; data?: T };
     return body.success ? (body.data ?? null) : null;
@@ -304,6 +316,7 @@ export async function loadSession(event: RequestEvent): Promise<Session | null> 
     clientId: me.data.data.clientId,
     tenants: me.data.data.tenants,
     permissions,
+    maintenance: me.data.data.maintenance,
     impersonator: me.data.data.impersonator ?? null,
     can,
   };

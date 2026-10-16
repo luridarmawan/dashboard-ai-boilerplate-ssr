@@ -46,6 +46,16 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
   locale: locals.locale.locale,
   dir: locals.dir,
   /**
+   * Maintenance mode (E-10) as every page — module pages included — may read it: on/off, which
+   * switch, and whether this visitor is exempt. A public module page uses `active` to switch a
+   * feature off (checkout, posting) while the page itself stays up.
+   */
+  maintenance: {
+    active: locals.maintenance.active,
+    source: locals.maintenance.source,
+    exempt: locals.maintenance.exempt,
+  },
+  /**
    * The active locale's catalogue (K-2). Anonymous responses carry only what an anonymous page
    * can render (see ANONYMOUS_NAMESPACES) — the dashboard's ~500 strings would otherwise sit in
    * the HTML of every landing page. Splitting on the SESSION rather than the route is what keeps

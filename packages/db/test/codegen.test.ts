@@ -24,6 +24,7 @@ const probe = defineTable({
     when: col.datetime().nullable(),
     meta: col.json().nullable(),
     price: col.money(),
+    lat: col.decimal(10, 7).nullable(),
     state: col.enum(['draft', 'live'], 8).default('draft'),
   },
   indexes: [{ columns: ['client_id', 'code'], unique: true }, { columns: ['client_id', 'when'] }],
@@ -62,6 +63,7 @@ describe('emitMysql — aturan §4.3 untuk MySQL/MariaDB', () => {
     );
     expect(out).toContain("meta: json('meta')");
     expect(out).toContain("price: decimal('price', { precision: 18, scale: 4 }).notNull()");
+    expect(out).toContain("lat: decimal('lat', { precision: 10, scale: 7 })");
     expect(out).toContain("flag: boolean('flag').notNull().default(false)");
   });
 
@@ -92,6 +94,7 @@ describe('emitPg — aturan §4.3 untuk PostgreSQL', () => {
     );
     expect(out).toContain("meta: jsonb('meta')");
     expect(out).toContain("price: numeric('price', { precision: 18, scale: 4 }).notNull()");
+    expect(out).toContain("lat: numeric('lat', { precision: 10, scale: 7 })");
   });
 
   test('tidak ada sisa dialek MySQL, dan enum tetap varchar', () => {
@@ -126,7 +129,8 @@ describe('emitSqlite — aturan §4.3 untuk SQLite', () => {
 
   test('decimal jadi TEXT — NUMERIC akan dikoersi ke float, dan uang tidak pernah float', () => {
     expect(out).toContain("price: text('price').notNull()");
-    expect(out).not.toMatch(/numeric\(|real\(/);
+    expect(out).toContain("lat: text('lat')");
+    expect(out).not.toMatch(/numeric\(|real\(|decimal\(/);
   });
 
   test('json, boolean, bigint, dan enum tetap varchar-setara', () => {

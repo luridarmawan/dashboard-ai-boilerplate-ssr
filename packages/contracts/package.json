@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Shared API contract pieces: the response envelope (N-4), pagination meta (N-5), stable error codes",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./code": "./src/code.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"

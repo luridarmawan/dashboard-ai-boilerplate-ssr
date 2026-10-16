@@ -31,8 +31,13 @@ export {
   type ConfigSectionDef,
   type CoreAction,
   type CoreMenuGroup,
+  CSRF_EXEMPT_METHODS,
+  CSRF_EXEMPT_PATH_RE,
+  type CsrfExemptDef,
+  type CsrfExemptMethod,
   defineApiRoutes,
   defineConfig,
+  defineCsrfExempt,
   defineIconSets,
   defineLayouts,
   defineMenu,
@@ -81,6 +86,18 @@ export {
   namespaceOf,
   satisfiesCore,
 } from './manifest.ts';
+export {
+  defineMqtt,
+  invalidTopicFilter,
+  invalidTopicName,
+  type MqttContext,
+  type MqttMessage,
+  type MqttPublishOptions,
+  type MqttPublishResult,
+  type MqttQos,
+  type MqttSubscriptionDef,
+  matchTopic,
+} from './mqtt.ts';
 export {
   BREAKPOINT,
   cleanupStatements,

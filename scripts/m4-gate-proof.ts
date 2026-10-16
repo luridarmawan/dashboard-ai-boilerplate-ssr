@@ -153,15 +153,38 @@ const admin = new Jar();
   check('unknown slug → 404 (not 500)', missing.res.status === 404, `${missing.res.status}`);
   const sm = await get(anon, '/sitemap.xml', 'application/xml');
   check(
-    'F-7 sitemap.xml lists /example and product pages',
+    'F-7 sitemap.xml lists `/` and the product pages',
     sm.res.status === 200 &&
-      sm.html.includes(`${WEB}/example`) &&
+      sm.html.includes(`<loc>${WEB}/</loc>`) &&
       sm.html.includes('/product/gayo-arabika'),
   );
+  // One URL per content: `/example` answers `/` right now, so it is listed as `/` only; the
+  // cookie forms (`/theme`, `/lang`) are not content at all.
+  check(
+    'F-7 sitemap.xml does not list the landing target twice, nor the utility pages',
+    !sm.html.includes(`<loc>${WEB}/example</loc>`) &&
+      !sm.html.includes(`<loc>${WEB}/theme</loc>`) &&
+      !sm.html.includes(`<loc>${WEB}/lang</loc>`),
+  );
+  const direct = await get(anon, '/example');
+  check(
+    'R-4 the landing target is canonical at `/` even when visited directly',
+    direct.html.includes(`<link rel="canonical" href="${WEB}/"/>`),
+  );
+  const cat = await get(anon, '/catalog?q=kopi');
+  check(
+    'R-4 any other public page is canonical at its own path, query dropped',
+    cat.html.includes(`<link rel="canonical" href="${WEB}/catalog"/>`),
+  );
+  const picker = await get(anon, '/theme');
+  check('R-4 the theme picker is noindex', picker.html.includes('name="robots" content="noindex"'));
   const rb = await get(anon, '/robots.txt', 'text/plain');
   check(
-    'F-7 robots.txt with Sitemap line',
-    rb.res.status === 200 && rb.html.includes('Sitemap: ') && rb.html.includes('User-agent'),
+    'F-7 robots.txt with Sitemap line and the built-in rules',
+    rb.res.status === 200 &&
+      rb.html.includes('Sitemap: ') &&
+      rb.html.includes('User-agent') &&
+      rb.html.includes('Disallow: /theme'),
   );
 }
 

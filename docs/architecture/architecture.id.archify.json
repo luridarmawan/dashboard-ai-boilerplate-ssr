@@ -4,11 +4,13 @@
   "meta": {
     "title": "Dashboard AI Boilerplate (SSR) — Arsitektur",
     "quality_profile": "showcase",
+    "output": "docs/architecture/architecture.id.html",
+    "locale": "id",
     "repository": {
-      "url": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr",
+      "url": "git@github.com:luridarmawan/dashboard-ai-boilerplate-ssr.git",
       "provider": "github",
       "link_mode": "local-only",
-      "revision": "1a7669cc22e9c27434d46cf8367159350b7012c3"
+      "revision": "af1f19d5fe73e5e6390c72ab214994896ddb0948"
     },
     "views": [
       {
@@ -26,14 +28,15 @@
       },
       {
         "id": "modularitas",
-        "label": "Modularitas",
+        "label": "Modularitas & tool",
         "focus": [
           "modules",
           "web",
           "api",
-          "ai"
+          "ai",
+          "clients"
         ],
-        "note": "Modul dirakit statis ke web dan API oleh modules:sync, tanpa menyentuh berkas core."
+        "note": "modules:sync merakit modul secara statis ke web dan API. Chat, /v1/tools, dan server MCP di /v1/mcp memakai satu registry tool yang sama."
       },
       {
         "id": "pekerjaan-latar",
@@ -45,9 +48,449 @@
           "smtp",
           "storage"
         ],
-        "note": "Scheduler, antrean, outbox email, dan webhook keluar — semuanya bersandar pada database."
+        "note": "Scheduler, antrean ad-hoc, outbox email, dan webhook keluar semuanya bersandar pada database; tanpa broker."
       }
-    ]
+    ],
+    "translations": {
+      "page.title": "Diagram {title}",
+      "diagram.description.architecture": "Diagram arsitektur yang dibuat dengan Archify.",
+      "diagram.description.workflow": "Diagram alur kerja yang dibuat dengan Archify.",
+      "diagram.description.sequence": "Diagram sekuens yang dibuat dengan Archify.",
+      "diagram.description.dataflow": "Diagram aliran data yang dibuat dengan Archify.",
+      "diagram.description.lifecycle": "Diagram siklus hidup yang dibuat dengan Archify.",
+      "node.focus": "Fokus ke {label}",
+      "node.focus.detail": "Fokus ke {label}, {detail}",
+      "node.context.architecture": "Komponen arsitektur",
+      "node.context.workflow": "Simpul alur kerja",
+      "node.context.sequence": "Peserta sekuens",
+      "node.context.dataflow": "Simpul aliran data",
+      "node.context.lifecycle": "Status siklus hidup",
+      "legend.title": "Legenda",
+      "legend.architecture.frontend": "Frontend",
+      "legend.architecture.backend": "Backend",
+      "legend.architecture.database": "Basis data",
+      "legend.architecture.cloud": "Cloud",
+      "legend.architecture.security": "Keamanan",
+      "legend.architecture.messagebus": "Bus pesan",
+      "legend.architecture.external": "Eksternal",
+      "legend.workflow.frontend": "UI pengguna",
+      "legend.workflow.backend": "Logika agen",
+      "legend.workflow.security": "Kebijakan",
+      "legend.workflow.messagebus": "Aksi tool",
+      "legend.workflow.database": "Konteks / jejak",
+      "legend.workflow.cloud": "Layanan cloud",
+      "legend.workflow.external": "Sistem eksternal",
+      "legend.sequence.emphasis": "permintaan utama",
+      "legend.sequence.return": "balasan",
+      "legend.sequence.security": "keamanan",
+      "legend.sequence.dashed": "jejak asinkron",
+      "legend.sequence.default": "pesan",
+      "legend.dataflow.emphasis": "data utama",
+      "legend.dataflow.security": "kebijakan / PII",
+      "legend.dataflow.dashed": "batch asinkron",
+      "legend.dataflow.database": "penyimpanan data",
+      "legend.dataflow.default": "aliran data",
+      "legend.lifecycle.start": "status awal",
+      "legend.lifecycle.active": "aktif",
+      "legend.lifecycle.waiting": "menunggu",
+      "legend.lifecycle.decision": "keputusan",
+      "legend.lifecycle.success": "berhasil",
+      "legend.lifecycle.failure": "gagal / keluar",
+      "legend.lifecycle.neutral": "netral",
+      "legend.lifecycle.external": "eksternal",
+      "legend.lifecycle.final": "status akhir",
+      "viewer.kind.frontend": "Frontend",
+      "viewer.kind.backend": "Backend",
+      "viewer.kind.database": "Basis data",
+      "viewer.kind.cloud": "Cloud",
+      "viewer.kind.security": "Keamanan",
+      "viewer.kind.messagebus": "Bus pesan",
+      "viewer.kind.external": "Eksternal",
+      "viewer.kind.neutral": "Netral",
+      "viewer.kind.node": "Simpul",
+      "viewer.kind.start": "Mulai",
+      "viewer.kind.active": "Aktif",
+      "viewer.kind.waiting": "Menunggu",
+      "viewer.kind.decision": "Keputusan",
+      "viewer.kind.success": "Berhasil",
+      "viewer.kind.failure": "Gagal",
+      "viewer.toolbar.actions": "Aksi diagram",
+      "viewer.theme.toggle.title": "Ganti tema (T)",
+      "viewer.theme.toggle": "Ganti tema warna",
+      "viewer.theme.dark": "Gelap",
+      "viewer.theme.light": "Terang",
+      "viewer.preset.choose.title": "Pilih gaya visual (S untuk berganti)",
+      "viewer.preset.choose": "Pilih gaya visual",
+      "viewer.preset.style": "Gaya",
+      "viewer.preset.menu": "Gaya visual",
+      "viewer.preset.identity": "Identitas visual",
+      "viewer.preset.cycles": "untuk berganti",
+      "viewer.preset.classic": "Klasik",
+      "viewer.preset.classic.short": "Klasik",
+      "viewer.preset.classic.hint": "Baku teknis yang stabil",
+      "viewer.preset.flow": "Signal Flow",
+      "viewer.preset.flow.short": "Flow",
+      "viewer.preset.flow.hint": "Presentasi yang menonjolkan gerak",
+      "viewer.preset.blueprint": "Blueprint",
+      "viewer.preset.blueprint.hint": "Tinjauan rekayasa",
+      "viewer.preset.editorial": "Editorial",
+      "viewer.preset.editorial.hint": "Catatan publikasi dan peluncuran",
+      "viewer.preset.badge.signalFlow": "SIGNAL FLOW",
+      "viewer.preset.badge.blueprint": "BLUEPRINT / REV 01",
+      "viewer.preset.badge.editorial": "EDITORIAL / CATATAN LAPANGAN",
+      "viewer.preset.badge.editorialPlate": "ARCHIFY / LEMBAR 04",
+      "viewer.preset.current": "Gaya visual: {style}. Pilih gaya visual",
+      "viewer.motion.live": "Hidup",
+      "viewer.motion.still": "Diam",
+      "viewer.motion.pause": "Jeda gerakan",
+      "viewer.motion.resume": "Lanjutkan gerakan",
+      "viewer.motion.reduced": "Gerakan dijeda karena preferensi kurangi-gerakan",
+      "viewer.motion.hidden": "Gerakan dijeda selagi halaman ini tersembunyi",
+      "viewer.motion.yielding": "Jeda gerakan; saat ini mengalah pada {owner}",
+      "viewer.motion.yielding.title": "Pratinjau hidup aktif · mengalah pada {owner}",
+      "viewer.owner.route": "Penelusur Rute",
+      "viewer.owner.lens": "Lensa Semantik",
+      "viewer.owner.relationship": "Pratinjau Relasi",
+      "viewer.owner.intent": "Jejak Niat",
+      "viewer.owner.focus": "fokus semantik",
+      "viewer.owner.legend": "pratinjau legenda",
+      "viewer.owner.reader": "interaksi pembaca",
+      "viewer.present.enter": "Masuk mode presentasi",
+      "viewer.present.enter.title": "Mode presentasi (F)",
+      "viewer.present.exit": "Keluar mode presentasi",
+      "viewer.present.exit.title": "Keluar mode presentasi (F atau Escape)",
+      "viewer.present.present": "Presentasi",
+      "viewer.present.exit.label": "Keluar",
+      "viewer.export.button": "Ekspor",
+      "viewer.export.button.title": "Ekspor diagram (E)",
+      "viewer.export.diagram": "Ekspor diagram",
+      "viewer.export.menu": "Ekspor",
+      "viewer.export.subtitle": "Keluaran portabel dan bersih",
+      "viewer.export.share": "Bagikan",
+      "viewer.export.shareCard": "Kartu Bagikan",
+      "viewer.export.routeShareCard": "Kartu Bagikan Rute",
+      "viewer.export.reachShareCard": "Kartu Bagikan Jangkauan",
+      "viewer.export.copyDiagram": "Salin diagram",
+      "viewer.export.clipboardPng": "PNG ke papan klip",
+      "viewer.export.raster": "Gambar raster",
+      "viewer.export.image": "Gambar",
+      "viewer.export.lossless": "Gambar tanpa kehilangan",
+      "viewer.export.compact": "Gambar ringkas",
+      "viewer.export.modern": "Gambar modern",
+      "viewer.export.vectorMotion": "Vektor dan gerakan",
+      "viewer.export.vectorMotion.heading": "Vektor & gerakan",
+      "viewer.export.editable": "Vektor yang bisa disunting",
+      "viewer.export.svg.auto": "SVG · Otomatis",
+      "viewer.export.svg.auto.hint": "Mengikuti tema host",
+      "viewer.export.svg.light": "SVG · Terang",
+      "viewer.export.svg.light.hint": "Selalu terang",
+      "viewer.export.svg.dark": "SVG · Gelap",
+      "viewer.export.svg.dark.hint": "Selalu gelap",
+      "viewer.export.motion6s": "Gerakan 6 dtk",
+      "viewer.export.unsupported": "Tidak didukung peramban ini",
+      "viewer.export.clipboardUnsupported": "Peramban ini tidak mendukung penulisan gambar ke papan klip",
+      "viewer.export.clipboardUnsupported.short": "Penulisan gambar ke papan klip tidak didukung di peramban ini.",
+      "viewer.export.motionUnavailable": "Perekaman gerakan tidak tersedia di peramban ini",
+      "viewer.export.webmUnavailable": "WebM tidak tersedia di peramban ini",
+      "viewer.export.failed": "Ekspor gagal: {message}",
+      "viewer.export.unknownVariant": "Varian Kartu Bagikan tidak dikenal: {variant}",
+      "viewer.export.routeRequired": "Telusuri rute dulu sebelum mengekspor Kartu Bagikan Rute",
+      "viewer.export.reachRequired": "Telusuri jangkauan dulu sebelum mengekspor Kartu Bagikan Jangkauan",
+      "viewer.export.unknown": "tidak diketahui",
+      "viewer.export.routeFailed": "Ekspor Kartu Bagikan Rute gagal: {message}",
+      "viewer.export.reachFailed": "Ekspor Kartu Bagikan Jangkauan gagal: {message}",
+      "viewer.export.copyFailed": "Salin gagal: {message}",
+      "viewer.export.copiedPng": "PNG disalin ke papan klip",
+      "viewer.export.downloadedRoute": "Kartu Bagikan Rute diunduh",
+      "viewer.export.downloadedReach": "Kartu Bagikan Jangkauan diunduh",
+      "viewer.export.downloadedWebm": "WebM diunduh",
+      "viewer.export.recording": "Merekam 6 detik gerakan…",
+      "viewer.export.card.routeSummary.one": "Jalur: {source} → {target} · {count} langkah",
+      "viewer.export.card.routeSummary.other": "Jalur: {source} → {target} · {count} langkah",
+      "viewer.export.card.reachSummary": "Jangkauan {direction} dari {origin} · {nodes} · {links} · maks {hops}",
+      "viewer.export.card.node.one": "{count} simpul",
+      "viewer.export.card.node.other": "{count} simpul",
+      "viewer.export.card.link.one": "{count} tautan",
+      "viewer.export.card.link.other": "{count} tautan",
+      "viewer.export.card.hop.one": "{count} lompatan",
+      "viewer.export.card.hop.other": "{count} lompatan",
+      "viewer.export.card.routeBadge": "ARCHIFY · RUTE · {hops}",
+      "viewer.export.card.reachBadge": "ARCHIFY · JANGKAUAN {direction}",
+      "viewer.export.direction.upstream": "Hulu",
+      "viewer.export.direction.downstream": "Hilir",
+      "viewer.export.error.canvasUnavailable": "Canvas tidak tersedia untuk {label}",
+      "viewer.export.error.contextUnavailable": "Konteks canvas 2D tidak tersedia untuk {label}",
+      "viewer.export.error.toBlobUnavailable": "canvas.toBlob tidak tersedia untuk {label}",
+      "viewer.export.error.toBlobNull": "canvas.toBlob tidak mengembalikan data untuk {label}",
+      "viewer.export.error.variantsCombined": "Varian Kartu Bagikan tidak dapat digabung",
+      "viewer.export.error.viewerState": "Ekspor Kartu Bagikan tidak dapat membersihkan status sementara penampil",
+      "viewer.export.error.routeState": "Ekspor Kartu Rute tidak dapat mempertahankan rute yang terurai dengan aman",
+      "viewer.export.error.reachState": "Ekspor Kartu Jangkauan tidak dapat mempertahankan jangkauan dengan aman",
+      "viewer.export.error.webmRequirements": "Ekspor gerakan WebM memerlukan animasi jejak dan dukungan MediaRecorder peramban",
+      "viewer.export.error.mediaRecorder": "MediaRecorder gagal",
+      "viewer.export.error.emptyWebm": "MediaRecorder menghasilkan WebM kosong",
+      "viewer.export.error.webmBackground": "Latar SVG tidak dapat dimuat untuk ekspor WebM",
+      "viewer.guide.title": "Jelajahi sistem ini",
+      "viewer.focus.selectedNodes": "{count} simpul terpilih",
+      "viewer.guide.eyebrow": "Panduan diagram",
+      "viewer.guide.close": "Tutup panduan diagram",
+      "viewer.guide.inspecting": "Memeriksa semantik terkompilasi",
+      "viewer.guide.actions": "Aksi penjelajahan diagram",
+      "viewer.guide.find": "Cari simpul",
+      "viewer.guide.find.hint": "Cari label, tanggung jawab, jenis, dan ID tetap.",
+      "viewer.guide.route": "Telusuri rute",
+      "viewer.guide.route.aria": "Telusuri rute berarah",
+      "viewer.guide.route.hint": "Tanyakan bagaimana dua simpul terhubung mengikuti arah panah.",
+      "viewer.guide.map": "Lihat seluruh sistem",
+      "viewer.guide.map.hint": "Buka Radar Semantik dengan viewport hidup dan simpul tetap.",
+      "viewer.guide.lens": "Bandingkan jenis semantik",
+      "viewer.guide.lens.hint": "Hitung peran, tampilkan lalu lintasnya, dan bandingkan tautan langsung.",
+      "viewer.guide.present": "Masuk Mode Presentasi",
+      "viewer.guide.present.hint": "Berikan seluruh viewport ke diagram tanpa mengubah ekspor.",
+      "viewer.guide.shortcuts": "Pintasan papan ketik lainnya",
+      "viewer.guide.shortcut.export": "Ekspor",
+      "viewer.guide.shortcut.theme": "Tema",
+      "viewer.guide.shortcut.style": "Gaya",
+      "viewer.guide.shortcut.reset": "Atur ulang",
+      "viewer.guide.shortcut.zoomIn": "Perbesar",
+      "viewer.guide.shortcut.zoomOut": "Perkecil",
+      "viewer.guide.shortcut.close": "Tutup",
+      "viewer.guide.facts": "{nodes} · {relationships}",
+      "viewer.guide.fact.node.one": "{count} simpul semantik",
+      "viewer.guide.fact.node.other": "{count} simpul semantik",
+      "viewer.guide.fact.relationship.one": "{count} relasi",
+      "viewer.guide.fact.relationship.other": "{count} relasi",
+      "viewer.guide.open": "Buka panduan diagram",
+      "viewer.finder.title": "Cari simpul",
+      "viewer.finder.close": "Tutup pencari simpul",
+      "viewer.finder.placeholder": "Cari label atau ID",
+      "viewer.finder.search": "Cari simpul diagram",
+      "viewer.finder.results": "Simpul diagram",
+      "viewer.finder.empty": "Tidak ada simpul yang cocok",
+      "viewer.finder.result.focus": "Fokus ke {label}",
+      "viewer.finder.result.routeStart": "Pilih {label} sebagai awal rute",
+      "viewer.finder.result.routeTarget": "Pilih {label} sebagai tujuan rute, {links}",
+      "viewer.finder.status.empty": "Tidak ada simpul yang cocok",
+      "viewer.finder.status.count.one": "{count} simpul cocok",
+      "viewer.finder.status.count.other": "{count} simpul cocok",
+      "viewer.finder.noun.nodes": "simpul",
+      "viewer.finder.link.one": "{count} tautan",
+      "viewer.finder.link.other": "{count} tautan",
+      "viewer.finder.result.focus.one": "Fokus ke {label}, {count} koneksi terkait",
+      "viewer.finder.result.focus.other": "Fokus ke {label}, {count} koneksi terkait",
+      "viewer.finder.status.filtered": "{visible} dari {available} {noun}",
+      "viewer.finder.status.all": "{available} {noun}",
+      "viewer.passport.eyebrow": "Paspor semantik",
+      "viewer.passport.metadata": "Metadata simpul",
+      "viewer.passport.evidence": "Bukti sumber terverifikasi",
+      "viewer.passport.verified": "Sumber terverifikasi",
+      "viewer.passport.verificationScope": "Diverifikasi terhadap Git lokal pada revisi yang dipatok. Akses remote belum diperiksa.",
+      "viewer.passport.reach": "Jangkauan",
+      "viewer.passport.reach.trace": "Telusuri keterjangkauan",
+      "viewer.passport.upstream": "Hulu",
+      "viewer.passport.downstream": "Hilir",
+      "viewer.passport.upstream.trace": "Telusuri keterjangkauan ke hulu",
+      "viewer.passport.downstream.trace": "Telusuri keterjangkauan ke hilir",
+      "viewer.passport.close": "Tutup paspor semantik",
+      "viewer.passport.move": "Pindahkan paspor semantik. Seret, pakai tombol panah, atau tekan Home untuk mengatur ulang.",
+      "viewer.passport.copy": "Salin tautan",
+      "viewer.passport.copy.focus": "Salin tautan ke simpul yang difokus",
+      "viewer.passport.relations": "Relasi",
+      "viewer.passport.relations.show": "Tampilkan relasi yang terhubung",
+      "viewer.passport.relations.hide": "Sembunyikan relasi yang terhubung",
+      "viewer.passport.relations.list": "Relasi yang terhubung",
+      "viewer.passport.copyRelation": "Salin relasi",
+      "viewer.passport.copyNode": "Salin simpul",
+      "viewer.passport.copyPinned": "Salin tautan ke relasi yang disematkan",
+      "viewer.passport.copySource": "Salin tautan ke simpul sumber",
+      "viewer.passport.copy.focused.success": "Tautan simpul terfokus disalin",
+      "viewer.passport.copy.pinned.success": "Tautan relasi tersemat disalin",
+      "viewer.passport.copy.focused.failed": "Tautan simpul terfokus gagal disalin",
+      "viewer.passport.copy.pinned.failed": "Tautan relasi tersemat gagal disalin",
+      "viewer.passport.relationship.none": "Tidak ada relasi yang terhubung",
+      "viewer.passport.relationship.count.one": "{count} relasi",
+      "viewer.passport.relationship.count.other": "{count} relasi",
+      "viewer.passport.relationship.show.one": "Tampilkan {count} relasi terhubung",
+      "viewer.passport.relationship.show.other": "Tampilkan {count} relasi terhubung",
+      "viewer.passport.relationship.summary": "{out} keluar · {in} masuk{loops}",
+      "viewer.passport.relationship.loops": " · {count} putaran",
+      "viewer.passport.relationship.explorer": "Penjelajah relasi langsung",
+      "viewer.passport.relationship.help": "Gunakan tombol panah untuk menjelajahi relasi. Tekan Enter atau Spasi untuk menyematkan rincian; Escape membersihkan.",
+      "viewer.passport.relationship.loopsBack": "berputar kembali",
+      "viewer.passport.relationship.connectsTo": "terhubung ke",
+      "viewer.passport.relationship.connectsFrom": "terhubung dari",
+      "viewer.passport.relationship.pinned": "Relasi tersemat · {from} → {to} · {label}",
+      "viewer.passport.relationship.inspect": "Periksa relasi {index} dari {total}: {from} ke {to}, {label}. Tekan Enter untuk rincian.",
+      "viewer.passport.relationship.group.out": "Keluar",
+      "viewer.passport.relationship.group.in": "Masuk",
+      "viewer.passport.relationship.group.loop": "Putaran diri",
+      "viewer.passport.relationship.row": "{group}: {relationship}, {neighbor}",
+      "viewer.passport.relationship.direction.out": "KELUAR →",
+      "viewer.passport.relationship.direction.in": "← MASUK",
+      "viewer.passport.relationship.direction.loop": "PUTARAN",
+      "viewer.passport.sourceCount.one": "{count} rujukan sumber terverifikasi",
+      "viewer.passport.sourceCount.other": "{count} rujukan sumber terverifikasi",
+      "viewer.passport.sourceMarker": "SRC",
+      "viewer.passport.beacon.one": "{count} sumber terverifikasi; fokus ke simpul ini untuk memeriksa",
+      "viewer.passport.beacon.other": "{count} sumber terverifikasi; fokus ke simpul ini untuk memeriksa",
+      "viewer.passport.repository.open": "Buka revisi repositori terverifikasi {revision}",
+      "viewer.passport.source.open": "Buka sumber terverifikasi {path} pada revisi {revision}",
+      "viewer.passport.source.openLink": "Buka ↗",
+      "viewer.passport.reach.upstream.one": "Telusuri {count} simpul hulu",
+      "viewer.passport.reach.upstream.other": "Telusuri {count} simpul hulu",
+      "viewer.passport.reach.downstream.one": "Telusuri {count} simpul hilir",
+      "viewer.passport.reach.downstream.other": "Telusuri {count} simpul hilir",
+      "viewer.passport.reach.noUpstream": "Tidak ada simpul hulu",
+      "viewer.passport.reach.noDownstream": "Tidak ada simpul hilir",
+      "viewer.passport.reach.status": "{direction} · {nodes} simpul · {links} tautan · maks {hops} lompatan",
+      "viewer.route.eyebrow": "Jalur",
+      "viewer.route.start": "Klik tempat jalur dimulai",
+      "viewer.route.start.find": "Cari awal",
+      "viewer.route.start.find.aria": "Cari awal rute",
+      "viewer.route.copy": "Salin tautan",
+      "viewer.route.copy.aria": "Salin tautan ke rute yang ditelusuri",
+      "viewer.route.clear": "Bersihkan",
+      "viewer.route.clear.aria": "Bersihkan penelusur rute",
+      "viewer.route.traced": "Jalur",
+      "viewer.route.pickTwo": "Klik dua simpul pada diagram",
+      "viewer.route.pickOne": "Klik satu simpul pada diagram",
+      "viewer.route.controls": "Kontrol perjalanan rute",
+      "viewer.route.previous": "Posisi rute sebelumnya",
+      "viewer.route.play": "Putar perjalanan rute",
+      "viewer.route.pause": "Jeda perjalanan rute",
+      "viewer.route.replay": "Ulangi perjalanan rute",
+      "viewer.route.next": "Posisi rute berikutnya",
+      "viewer.route.journey": "Perjalanan",
+      "viewer.route.pause.label": "Jeda",
+      "viewer.route.replay.label": "Ulangi",
+      "viewer.route.overview": "Ikhtisar",
+      "viewer.route.overview.aria": "Tampilkan ikhtisar rute lengkap",
+      "viewer.route.instructions": "Klik awal, lalu akhir. Jalur mengikuti arah panah.",
+      "viewer.route.destination": "Di mana jalur dari {label} berakhir?",
+      "viewer.route.destination.find": "Cari tujuan",
+      "viewer.route.destination.find.aria": "Cari tujuan rute yang terjangkau",
+      "viewer.route.differentDestination": "Pilih tujuan lain",
+      "viewer.route.distinct": "Pilih dua simpul yang berbeda.",
+      "viewer.route.unreachable": "{label} tidak terjangkau dari sini",
+      "viewer.route.unreachable.detail": "{target} tidak terjangkau dari {source} mengikuti panah. Pilih simpul yang disorot.",
+      "viewer.route.start.instructions": "Berikutnya, pilih akhir. Hanya simpul yang terjangkau yang menyala.",
+      "viewer.route.copy.success": "Tautan rute tersalin",
+      "viewer.route.copy.failed": "Tautan rute gagal disalin",
+      "viewer.route.position": "Posisi rute {index} dari {total}: {label}",
+      "viewer.route.step": "Langkah {index} dari {total} · {phase} · {label}",
+      "viewer.route.motionRequired": "Perjalanan otomatis memerlukan gerakan Hidup",
+      "viewer.route.trigger.clear": "Bersihkan rute yang ditelusuri",
+      "viewer.route.overview.status": "{nodes} · {hops} · jalur terpendek",
+      "viewer.route.overview.node.one": "{count} simpul",
+      "viewer.route.overview.node.other": "{count} simpul",
+      "viewer.route.overview.hop.one": "{count} langkah",
+      "viewer.route.overview.hop.other": "{count} langkah",
+      "viewer.route.phase.playing": "Berjalan",
+      "viewer.route.phase.complete": "Selesai",
+      "viewer.route.phase.inspecting": "Memeriksa",
+      "viewer.route.destination.count.one": "{count} simpul terjangkau disorot. Klik simpul itu.",
+      "viewer.route.destination.count.other": "{count} simpul terjangkau disorot. Klik salah satunya.",
+      "viewer.route.noOutgoing": "Tidak ada panah keluar dari simpul ini. Bersihkan dan pilih awal lain.",
+      "viewer.route.result.title": "{source} ke {target}",
+      "viewer.route.finder.source.title": "Pilih awal rute",
+      "viewer.route.finder.source.placeholder": "Cari sumber rute",
+      "viewer.route.finder.source.empty": "Tidak ada sumber rute yang cocok",
+      "viewer.route.finder.source.results": "Simpul yang dapat memulai rute",
+      "viewer.route.finder.source.noun": "sumber rute",
+      "viewer.route.finder.source.badge": "awal",
+      "viewer.route.finder.target.title": "Tujuan dari {label}",
+      "viewer.route.finder.target.placeholder": "Cari tujuan yang terjangkau",
+      "viewer.route.finder.target.empty": "Tidak ada tujuan terjangkau yang cocok",
+      "viewer.route.finder.target.results": "Tujuan rute yang terjangkau",
+      "viewer.route.finder.target.noun": "tujuan terjangkau",
+      "viewer.route.hop.one": "{count} lompatan",
+      "viewer.route.hop.other": "{count} lompatan",
+      "viewer.lens.eyebrow": "Lensa semantik",
+      "viewer.lens.title": "Bandingkan peran sistem",
+      "viewer.lens.close": "Tutup lensa semantik",
+      "viewer.lens.instruction": "Pilih hingga dua jenis semantik. Satu jenis menampilkan lalu lintas nyatanya; dua jenis membandingkan relasi langsung saja.",
+      "viewer.lens.kinds": "Jenis semantik",
+      "viewer.lens.choose": "Pilih jenis untuk memeriksa simpul dan relasi yang menyentuhnya.",
+      "viewer.lens.copy": "Salin tautan ke lensa semantik",
+      "viewer.lens.clear": "Bersihkan lensa semantik",
+      "viewer.lens.open": "Buka lensa semantik",
+      "viewer.lens.openActive": "Buka lensa semantik aktif",
+      "viewer.lens.legend": "Legenda semantik",
+      "viewer.lens.legend.inspect.one": "Periksa {label}, {count} simpul",
+      "viewer.lens.legend.inspect.other": "Periksa {label}, {count} simpul",
+      "viewer.lens.kind.count.one": "{label}, {count} simpul",
+      "viewer.lens.kind.count.other": "{label}, {count} simpul",
+      "viewer.lens.compare.one": "{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} relasi langsung",
+      "viewer.lens.compare.other": "{first} → {second}: {forward} · {second} → {first}: {reverse} · {count} relasi langsung",
+      "viewer.lens.single": "{nodes} · {relationships} · tetangga yang terhubung tetap terlihat",
+      "viewer.lens.node.one": "{count} simpul {label}",
+      "viewer.lens.node.other": "{count} simpul {label}",
+      "viewer.lens.relationship.one": "{count} relasi yang menyentuh",
+      "viewer.lens.relationship.other": "{count} relasi yang menyentuh",
+      "viewer.radar.title": "Radar semantik",
+      "viewer.radar.building": "Menyusun ikhtisar",
+      "viewer.radar.openFull": "Buka radar semantik penuh",
+      "viewer.radar.open": "Buka radar",
+      "viewer.radar.close": "Tutup radar semantik",
+      "viewer.radar.surface": "Ikhtisar diagram. Klik simpul untuk memfokusnya, atau gunakan tombol panah untuk menggeser.",
+      "viewer.radar.click": "Klik simpul",
+      "viewer.radar.drag": "Seret untuk menggeser",
+      "viewer.radar.space": "Radar semantik butuh ruang MAP lebih luas.",
+      "viewer.radar.nodes": "Simpul radar diagram semantik",
+      "viewer.radar.focus": "Fokus ke {label} dari Radar Semantik",
+      "viewer.radar.status": "{count} simpul · {viewport}",
+      "viewer.radar.fullMap": "{count} simpul · peta penuh",
+      "viewer.radar.compacted": "Radar dipadatkan agar tidak menutupi Paspor Semantik atau kontrol MAP.",
+      "viewer.radar.cancelWaiting": "Batalkan radar semantik yang menunggu ruang MAP lebih luas",
+      "viewer.radar.needsSpace": "Radar semantik butuh ruang MAP yang lebih terlihat",
+      "viewer.radar.viewport.full": "peta penuh",
+      "viewer.radar.viewport.width": "{percent}% lebar",
+      "viewer.radar.viewport.scale": "{percent}% viewport",
+      "viewer.nav.controls": "Kontrol tampilan diagram",
+      "viewer.nav.route": "Telusuri rute berarah",
+      "viewer.nav.route.title": "Telusuri rute (R)",
+      "viewer.nav.route.short": "JALUR",
+      "viewer.nav.radar": "Buka radar semantik",
+      "viewer.nav.radar.title": "Radar semantik (M)",
+      "viewer.nav.radar.short": "MAP",
+      "viewer.nav.lens": "Buka lensa semantik",
+      "viewer.nav.lens.title": "Lensa semantik (L)",
+      "viewer.nav.lens.short": "LENSA",
+      "viewer.nav.find": "Cari simpul",
+      "viewer.nav.find.title": "Cari simpul (/)",
+      "viewer.outline.title": "Indeks simpul",
+      "viewer.rail.show": "Catatan & indeks",
+      "viewer.rail.controls": "Panel samping",
+      "viewer.rail.collapse": "Ciutkan panel samping",
+      "viewer.rail.bottom": "Pindahkan panel ke bawah diagram",
+      "viewer.rail.right": "Pindahkan panel ke samping diagram",
+      "viewer.nav.guide": "Buka panduan diagram",
+      "viewer.nav.guide.title": "Panduan diagram (?)",
+      "viewer.nav.zoomOut": "Perkecil",
+      "viewer.nav.zoomOut.title": "Perkecil (-)",
+      "viewer.nav.reset": "Atur ulang tampilan diagram",
+      "viewer.nav.reset.title": "Atur ulang tampilan (0)",
+      "viewer.nav.read": "BACA",
+      "viewer.nav.zoomIn": "Perbesar",
+      "viewer.nav.zoomIn.title": "Perbesar (+)",
+      "viewer.nav.camera": "{hint}. Atur ulang tampilan diagram",
+      "viewer.nav.camera.title": "{semantic}{hint} · atur ulang tampilan (0)",
+      "viewer.nav.camera.semantic": "Kamera semantik aktif · ",
+      "viewer.nav.level.map": "MAP",
+      "viewer.nav.level.read": "BACA",
+      "viewer.nav.level.full": "PENUH",
+      "viewer.nav.level.auto": "OTOMATIS",
+      "viewer.nav.detail.map": "Perbesar untuk menampilkan label relasi dan konteks simpul",
+      "viewer.nav.detail.read": "Perbesar lagi untuk menampilkan tag dan anotasi",
+      "viewer.nav.detail.full": "Detail diagram penuh",
+      "viewer.intent.summary": "{label}. {out} keluar, {in} masuk{loops}. {total} koneksi. Tekan Enter untuk rincian.",
+      "viewer.intent.loops": ", {count} putaran diri",
+      "viewer.common.copied": "Tersalin",
+      "viewer.common.copyFailed": "Salin gagal",
+      "viewer.common.copyLink": "Salin tautan",
+      "viewer.common.clear": "Bersihkan",
+      "viewer.common.close": "Tutup"
+    }
   },
   "layout": {
     "mode": "grid",
@@ -66,7 +509,7 @@
       "id": "clients",
       "type": "external",
       "label": "Peramban & klien MCP",
-      "sublabel": "HTML utuh, tanpa JS wajib",
+      "sublabel": "HTML utuh · token bearer MCP",
       "row": 1,
       "col": 0,
       "size": [
@@ -82,15 +525,23 @@
       "tag": "lb round_robin",
       "row": 1,
       "col": 1,
-      "sources": [
-        {
-          "path": "deploy/Caddyfile",
-          "label": "rute /v1 vs web"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "deploy/Caddyfile",
+          "line": 13,
+          "end_line": 27,
+          "label": "/v1, /docs, /openapi.json → api"
+        },
+        {
+          "path": "compose.prod.yml",
+          "line": 77,
+          "end_line": 82,
+          "label": "layanan caddy"
+        }
       ]
     },
     {
@@ -101,15 +552,22 @@
       "brand": "svelte",
       "row": 0,
       "col": 2,
-      "sources": [
-        {
-          "path": "apps/web/src/hooks.server.ts",
-          "label": "sesi, tema, bahasa"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/src/hooks.server.ts",
+          "line": 20,
+          "end_line": 34,
+          "label": "sesi, konfigurasi, tema, bahasa"
+        },
+        {
+          "path": "apps/web/src/lib/server/trap.ts",
+          "line": 5,
+          "label": "penjebak 404 (app.not_found_route)"
+        }
       ]
     },
     {
@@ -119,41 +577,56 @@
       "sublabel": "sesi, RBAC, CSRF, tenancy",
       "row": 1,
       "col": 2,
-      "sources": [
-        {
-          "path": "apps/api/src/plugins/auth.ts",
-          "label": "sesi & izin"
-        },
-        {
-          "path": "apps/api/src/plugins/csrf.ts",
-          "label": "double-submit"
-        },
-        {
-          "path": "apps/api/src/plugins/tenancy.ts",
-          "label": "tenant aktif"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/plugins/auth.ts",
+          "line": 50,
+          "label": "authContext · requireAuth"
+        },
+        {
+          "path": "apps/api/src/plugins/csrf.ts",
+          "line": 129,
+          "label": "cookie double-submit"
+        },
+        {
+          "path": "apps/api/src/plugins/tenancy.ts",
+          "line": 112,
+          "label": "requirePermission()"
+        }
       ]
     },
     {
       "id": "api",
       "type": "backend",
       "label": "Elysia API",
-      "sublabel": "api:3001 · /v1 · /docs",
+      "sublabel": "api:3001 · /v1 · /docs · /v1/mcp",
       "row": 1,
       "col": 3,
+      "size": [
+        190,
+        76
+      ],
       "sources": [
         {
           "path": "apps/api/src/app.ts",
+          "line": 44,
+          "end_line": 125,
           "label": "komposisi domain"
+        },
+        {
+          "path": "apps/api/src/domains/mcp.ts",
+          "line": 201,
+          "label": "server MCP, Streamable HTTP"
+        },
+        {
+          "path": "apps/api/src/metrics.ts",
+          "line": 110,
+          "label": "/metrics di akar API"
         }
-      ],
-      "size": [
-        180,
-        76
       ]
     },
     {
@@ -164,19 +637,26 @@
       "tag": "modules.json",
       "row": 0,
       "col": 3,
-      "sources": [
-        {
-          "path": "packages/module-kit/src/sync.ts",
-          "label": "codegen shim"
-        },
-        {
-          "path": "modules.json",
-          "label": "registrasi"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/module-kit/src/sync.ts",
+          "line": 179,
+          "label": "codegen syncModules()"
+        },
+        {
+          "path": "modules.json",
+          "line": 1,
+          "label": "registrasi"
+        },
+        {
+          "path": "apps/api/src/tools.ts",
+          "line": 1,
+          "label": "registry tool (titik perluasan 8)"
+        }
       ]
     },
     {
@@ -187,15 +667,22 @@
       "tag": "opsional",
       "row": 0,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/auth/src/redis.ts",
-          "label": "fail-open ke DB"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/auth/src/redis.ts",
+          "line": 8,
+          "end_line": 9,
+          "label": "fail-open ke database"
+        },
+        {
+          "path": "compose.prod.yml",
+          "line": 318,
+          "label": "layanan valkey"
+        }
       ]
     },
     {
@@ -203,21 +690,30 @@
       "type": "database",
       "label": "Database",
       "sublabel": "MySQL · MariaDB · PostgreSQL",
+      "tag": "+ SQLite (tingkat 2)",
       "row": 1,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/db/src/descriptor.ts",
-          "label": "deskriptor netral"
-        },
-        {
-          "path": "packages/db/src/migrate.ts",
-          "label": "migrasi ter-versi"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/db/src/descriptor.ts",
+          "line": 190,
+          "label": "deskriptor tabel netral"
+        },
+        {
+          "path": "packages/db/src/migrate.ts",
+          "line": 22,
+          "end_line": 24,
+          "label": "keluarga mysql · pg · sqlite"
+        },
+        {
+          "path": "packages/db/src/dialect/sqlite-client.ts",
+          "line": 47,
+          "label": "klien bun:sqlite"
+        }
       ]
     },
     {
@@ -227,33 +723,51 @@
       "sublabel": "volume uploads atau S3",
       "row": 2,
       "col": 2,
-      "sources": [
-        {
-          "path": "packages/storage/src/index.ts",
-          "label": "local | s3"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/storage/src/index.ts",
+          "line": 162,
+          "end_line": 184,
+          "label": "local | s3 dari env"
+        },
+        {
+          "path": "apps/api/src/files.ts",
+          "line": 66,
+          "label": "storeUpload(), satu-satunya jalur tulis"
+        }
       ]
     },
     {
       "id": "ai",
       "type": "external",
-      "label": "Provider AI",
-      "sublabel": "OpenAI-compatible",
+      "label": "Provider AI & server MCP",
+      "sublabel": "OpenAI-compatible · MCP HTTP",
       "row": 2,
       "col": 3,
+      "size": [
+        190,
+        76
+      ],
       "sources": [
         {
           "path": "modules/AI/api/providers.ts",
-          "label": "profil per tenant"
+          "line": 116,
+          "label": "resolveProvider() per tenant"
+        },
+        {
+          "path": "modules/AI/api/mcp-client.ts",
+          "line": 63,
+          "label": "discoverRemoteTools()"
+        },
+        {
+          "path": "modules/AI/api/mcp-client.ts",
+          "line": 97,
+          "label": "callRemoteTool()"
         }
-      ],
-      "size": [
-        180,
-        76
       ]
     },
     {
@@ -263,23 +777,29 @@
       "sublabel": "outbox, webhook, dead-letter",
       "row": 2,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/runtime/src/scheduler.ts",
-          "label": "klaim lease"
-        },
-        {
-          "path": "apps/api/src/queue.ts",
-          "label": "enqueue & retry"
-        },
-        {
-          "path": "apps/api/src/webhooks.ts",
-          "label": "kirim bertanda tangan"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/runtime/src/scheduler.ts",
+          "line": 22,
+          "end_line": 24,
+          "label": "klaim lease lewat UPDATE"
+        },
+        {
+          "path": "apps/api/src/runtime.ts",
+          "line": 59,
+          "end_line": 134,
+          "label": "job inti + jobs.ts modul"
+        },
+        {
+          "path": "apps/api/src/queue.ts",
+          "line": 263,
+          "end_line": 273,
+          "label": "klaim bersyarat, tepat sekali"
+        }
       ]
     },
     {
@@ -289,15 +809,21 @@
       "sublabel": "email keluar, POST HMAC",
       "row": 3,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/mail/src/index.ts",
-          "label": "outbox"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/mail/src/index.ts",
+          "line": 225,
+          "label": "deliverOutbox()"
+        },
+        {
+          "path": "apps/api/src/webhooks.ts",
+          "line": 14,
+          "label": "HMAC-SHA256 X-CRK-Signature"
+        }
       ]
     }
   ],
@@ -353,13 +879,14 @@
       "from": "modules",
       "to": "web",
       "label": "shim rute & widget",
-      "variant": "dashed"
+      "variant": "dashed",
+      "labelDy": -32
     },
     {
       "id": "modules-api",
       "from": "modules",
       "to": "api",
-      "label": "plugin /v1/m/<ns>",
+      "label": "plugin /v1/m/<ns> · tool",
       "variant": "dashed",
       "labelDy": 24
     },
@@ -387,7 +914,7 @@
       "id": "api-ai",
       "from": "api",
       "to": "ai",
-      "label": "chat & tool streaming",
+      "label": "stream chat · tools/call",
       "labelDy": 60
     },
     {
@@ -418,6 +945,7 @@
       "items": [
         "Satu origin: /v1 dan halaman berbagi satu domain",
         "HTML lengkap — sesi, izin, tema, bahasa di byte pertama",
+        "URL tak dikenal dijebak dan diserahkan ke halaman 404 modul (app.not_found_route)",
         "Satu x-request-id menembus web → API → log"
       ]
     },
@@ -425,18 +953,20 @@
       "dot": "emerald",
       "title": "Inti API & modul",
       "items": [
-        "OpenAPI dan /metrics terbit dari skema rute",
+        "OpenAPI dari skema rute; modul nonaktif disembunyikan per tenant",
         "Gerbang tunggal: sesi, izin efektif, CSRF, tenant",
-        "modules:sync merakit modul tanpa menyentuh core"
+        "/v1/mcp adalah kulit tipis di atas registry tool yang sama — token bearer, tiap panggilan diaudit",
+        "Masuk dengan Google opsional: ditautkan lewat sub Google, MFA tetap ditegakkan"
       ]
     },
     {
       "dot": "violet",
       "title": "Data & pekerjaan",
       "items": [
-        "Satu deskriptor → migrasi MySQL, MariaDB, PostgreSQL",
-        "Job diklaim satu UPDATE: tepat sekali walau api diskalakan",
-        "Outbox email, webhook HMAC, berkas ke volume atau S3"
+        "Satu deskriptor → MySQL, MariaDB, PostgreSQL; SQLite sebagai dialek tingkat 2",
+        "Job diklaim satu UPDATE bersyarat: tepat sekali walau api diskalakan",
+        "Outbox email dengan pelacakan buka/klik, webhook HMAC, berkas ke volume atau S3",
+        "Prometheus mengikis /metrics di akar API; Grafana & Alertmanager ikut di compose.prod.yml"
       ]
     }
   ]

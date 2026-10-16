@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import type { TableDef } from '@core/db/descriptor';
 import type {
   ConfigSectionDef,
+  CsrfExemptDef,
   IconSetContribDef,
   LayoutContribDef,
   MenuEntryDef,
@@ -20,7 +21,7 @@ import type {
   PublicRouteDef,
   WidgetDef,
 } from './contract.ts';
-import { CORE_MENU_GROUPS } from './contract.ts';
+import { CORE_MENU_GROUPS, CSRF_EXEMPT_METHODS, CSRF_EXEMPT_PATH_RE } from './contract.ts';
 import { CORE_EVENTS } from './events.ts';
 import { parseEvery } from './jobs.ts';
 import {
@@ -31,6 +32,7 @@ import {
   namespaceOf,
   satisfiesCore,
 } from './manifest.ts';
+import { invalidTopicFilter } from './mqtt.ts';
 import { validateTool } from './tools.ts';
 
 /**
@@ -85,13 +87,13 @@ export interface WebRouteRecord {
   readonly kind: 'svelte' | 'ts';
 }
 
-/** A module that ships `hooks.ts` (9), `jobs.ts` (12) or `api/tools.ts` (8). */
+/** A module that ships `hooks.ts` (9), `jobs.ts` (12), `api/tools.ts` (8) or `mqtt.ts` (18). */
 export interface RuntimeModuleRecord {
   readonly name: string;
   readonly ns: string;
   /** Module-relative file, POSIX. */
   readonly file: string;
-  /** Event names (hooks), job names (jobs) or tool names (tools) declared — for the registry and the admin UI. */
+  /** Event names (hooks), job names (jobs), tool names (tools) or subscription names (mqtt) declared — for the registry and the admin UI. */
   readonly items: readonly string[];
 }
 
@@ -105,6 +107,7 @@ export interface SyncResult {
   readonly hookModules: readonly RuntimeModuleRecord[];
   readonly jobModules: readonly RuntimeModuleRecord[];
   readonly toolModules: readonly RuntimeModuleRecord[];
+  readonly mqttModules: readonly RuntimeModuleRecord[];
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
@@ -116,6 +119,17 @@ export interface SyncResult {
   readonly themesContrib: readonly ThemeContrib[];
   readonly configSections: readonly (ConfigSectionDef & { module: string })[];
   readonly publicRoutes: readonly (PublicRouteDef & { module: string; ns: string })[];
+  readonly csrfExempt: readonly CsrfExemptRecord[];
+}
+
+/** A module API route exempt from CSRF (extension point 17), with its full mounted path. */
+export interface CsrfExemptRecord {
+  readonly method: string;
+  /** Full path, Elysia notation: `/v1/m/<ns>/inbound/:id`. */
+  readonly path: string;
+  readonly module: string;
+  readonly ns: string;
+  readonly reason: string;
 }
 
 /** A theme folder contributed by a module (extension point 14). */
@@ -144,10 +158,13 @@ export interface ModuleContributions {
   readonly api: boolean;
   readonly pages: number;
   readonly publicRoutes: number;
+  readonly csrfExempt: number;
   readonly widgets: number;
   readonly hooks: readonly string[];
   readonly jobs: readonly string[];
   readonly tools: readonly string[];
+  /** Subscription names declared in `mqtt.ts` (extension point 18). */
+  readonly mqtt: readonly string[];
   readonly themes: number;
   readonly layouts: number;
   readonly iconSets: number;
@@ -229,6 +246,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const jobModules: RuntimeModuleRecord[] = [];
   const jobOwner = new Map<string, string>();
   const toolModules: RuntimeModuleRecord[] = [];
+  const mqttModules: RuntimeModuleRecord[] = [];
+  const mqttOwner = new Map<string, string>();
   const toolOwner = new Map<string, string>();
   // Extension point 7 (K-6): module messages, merged into one typed catalogue per locale.
   const i18n: Record<string, Record<string, string>> = {};
@@ -240,6 +259,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const publicRoutes: (PublicRouteDef & { module: string; ns: string })[] = [];
   const publicOwner = new Map<string, string>();
   const corePublicPaths = readCoreRoutePaths(root);
+  const csrfExempt: CsrfExemptRecord[] = [];
   const seedModules: { module: string; file: string }[] = [];
   const widgets: (WidgetDef & { module: string; path: string })[] = [];
   const widgetOwner = new Map<string, string>();
@@ -447,6 +467,57 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       }
     }
 
+    // ---- csrf-exempt.ts (extension point 17, A-10) ----
+    const ce = await loadDefault<readonly CsrfExemptDef[]>(
+      join(dir, 'csrf-exempt.ts'),
+      problems,
+      tag,
+    );
+    if (ce !== undefined) {
+      if (!Array.isArray(ce))
+        problems.push(
+          `${tag}: csrf-exempt.ts harus meng-export default array (pakai defineCsrfExempt)`,
+        );
+      else {
+        // Each entry must name a route the module really serves: an exemption for a path that
+        // does not exist yet is a hole waiting for the route that later lands on it.
+        const served = new Set(
+          looksLikeElysia(r)
+            ? (r as { routes: { method?: string; path?: string }[] }).routes.map(
+                (x) => `${String(x.method).toUpperCase()} ${x.path}`,
+              )
+            : [],
+        );
+        for (const e of ce) {
+          const key = `${e?.method} ${e?.path}`;
+          if (
+            !(CSRF_EXEMPT_METHODS as readonly string[]).includes(e?.method) ||
+            !CSRF_EXEMPT_PATH_RE.test(e?.path ?? '')
+          ) {
+            problems.push(`${tag}: pengecualian CSRF "${key}" tidak valid`);
+            continue;
+          }
+          if (typeof e.reason !== 'string' || e.reason.trim().length < 10) {
+            problems.push(`${tag}: pengecualian CSRF "${key}" tanpa reason`);
+            continue;
+          }
+          if (!served.has(key)) {
+            problems.push(
+              `${tag}: pengecualian CSRF "${key}" tidak cocok dengan route mana pun di api/routes.ts`,
+            );
+            continue;
+          }
+          csrfExempt.push({
+            method: e.method,
+            path: `/v1/m/${ns}${e.path}`,
+            module: manifest.name,
+            ns,
+            reason: e.reason.trim(),
+          });
+        }
+      }
+    }
+
     // ---- hooks.ts (extension point 9) ----
     const h = await loadDefault<{ module?: string; handlers?: Record<string, unknown> }>(
       join(dir, 'hooks.ts'),
@@ -502,6 +573,48 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
         if (names.length)
           jobModules.push({ name: manifest.name, ns, file: 'jobs.ts', items: names });
+      }
+    }
+
+    // ---- mqtt.ts (extension point 18) ----
+    const mq = await loadDefault<readonly { name?: string; topic?: string; handler?: unknown }[]>(
+      join(dir, 'mqtt.ts'),
+      problems,
+      tag,
+    );
+    if (mq !== undefined) {
+      if (!Array.isArray(mq))
+        problems.push(`${tag}: mqtt.ts harus meng-export default array (pakai defineMqtt)`);
+      else {
+        const names: string[] = [];
+        for (const sub of mq) {
+          if (typeof sub?.name !== 'string' || typeof sub.handler !== 'function') {
+            problems.push(`${tag}: mqtt.ts memuat entri tanpa name/handler (pakai defineMqtt)`);
+            continue;
+          }
+          if (!sub.name.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: langganan MQTT "${sub.name}" harus diawali "${ns}."`);
+            continue;
+          }
+          const why = invalidTopicFilter(typeof sub.topic === 'string' ? sub.topic : '');
+          if (why) {
+            problems.push(
+              `${tag}: langganan MQTT "${sub.name}": filter topik tidak valid — ${why}`,
+            );
+            continue;
+          }
+          const owner = mqttOwner.get(sub.name);
+          if (owner)
+            problems.push(
+              `langganan MQTT "${sub.name}" didefinisikan oleh ${owner} dan ${manifest.name}`,
+            );
+          else {
+            mqttOwner.set(sub.name, manifest.name);
+            names.push(sub.name);
+          }
+        }
+        if (names.length)
+          mqttModules.push({ name: manifest.name, ns, file: 'mqtt.ts', items: names });
       }
     }
 
@@ -920,10 +1033,12 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         api: apiModules.some((a) => a.name === m.name),
         pages: webRoutes.filter((w) => w.module === m.name && w.kind === 'svelte').length,
         publicRoutes: publicRoutes.filter((p) => p.module === m.name).length,
+        csrfExempt: csrfExempt.filter((c) => c.module === m.name).length,
         widgets: widgets.filter((w) => w.module === m.name).length,
         hooks: hookModules.find((h) => h.name === m.name)?.items ?? [],
         jobs: jobModules.find((j) => j.name === m.name)?.items ?? [],
         tools: toolModules.find((t) => t.name === m.name)?.items ?? [],
+        mqtt: mqttModules.find((q) => q.name === m.name)?.items ?? [],
         themes: themesContrib.filter((t) => t.module === m.name).length,
         layouts: layoutsContrib.filter((l) => l.module === m.name).length,
         iconSets: iconSetsContrib.filter((i) => i.module === m.name).length,
@@ -946,7 +1061,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       files.push(
         await writeFile(
           out,
-          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules),
+          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules, mqttModules),
         ),
       );
       const toolsOut = join(root, 'apps/api/src/generated/tools.ts');
@@ -960,6 +1075,13 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       await writeFile(
         join(root, 'packages/module-kit/src/generated/public-routes.ts'),
         emitPublicRoutes(publicRoutes),
+      ),
+    );
+    // Read by the API's CSRF and auth plugins through `@core/module-kit/csrf-exempt`.
+    files.push(
+      await writeFile(
+        join(root, 'packages/module-kit/src/generated/csrf-exempt.ts'),
+        emitCsrfExempt(csrfExempt),
       ),
     );
     files.push(
@@ -1004,6 +1126,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     widgets,
     configSections,
     publicRoutes,
+    csrfExempt,
     layoutsContrib,
     iconSetsContrib,
     themesContrib,
@@ -1015,6 +1138,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     webRoutes,
     hookModules,
     jobModules,
+    mqttModules,
     toolModules,
     files,
     warnings,
@@ -1178,10 +1302,12 @@ function emitRegistry(
     api: false,
     pages: 0,
     publicRoutes: 0,
+    csrfExempt: 0,
     widgets: 0,
     hooks: [],
     jobs: [],
     tools: [],
+    mqtt: [],
     themes: 0,
     layouts: 0,
     iconSets: 0,
@@ -1225,6 +1351,7 @@ export function emitApiModules(
   outFile: string,
   hookModules: readonly RuntimeModuleRecord[] = [],
   jobModules: readonly RuntimeModuleRecord[] = [],
+  mqttModules: readonly RuntimeModuleRecord[] = [],
 ): string {
   const byName = new Map(ordered.map((m) => [m.name, m]));
   const imports: string[] = [];
@@ -1249,6 +1376,12 @@ export function emitApiModules(
     const ident = `jobs_${jm.ns.replace(/[^a-z0-9]/g, '_')}`;
     imports.push(`import ${ident} from '${relTo(jm.name, jm.file)}';`);
     jobEntries.push(`  { module: '${jm.name}', jobs: ${ident} },`);
+  }
+  const mqttEntries: string[] = [];
+  for (const qm of mqttModules) {
+    const ident = `mqtt_${qm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${relTo(qm.name, qm.file)}';`);
+    mqttEntries.push(`  { module: '${qm.name}', subscriptions: ${ident} },`);
   }
   for (const am of apiModules) {
     const mod = byName.get(am.name);
@@ -1275,6 +1408,11 @@ export const moduleHooks = [${hookIdents.join(', ')}];
 /** Periodic jobs declared by modules (G-18); the core scheduler registers them at boot. */
 export const moduleJobs = [
 ${jobEntries.join('\n')}
+];
+
+/** MQTT subscriptions declared by modules (extension point 18); the core client subscribes them. */
+export const moduleMqtt = [
+${mqttEntries.join('\n')}
 ];
 `;
 }
@@ -1574,6 +1712,18 @@ export const modulePublicRoutes: readonly { path: string; module: string; ns: st
 }
 
 /** Module seeds in init order, imported statically so `bun db:seed` runs them after the core seed. */
+/** Module API routes that skip CSRF (extension point 17); requests on them are anonymous. */
+function emitCsrfExempt(list: readonly CsrfExemptRecord[]): string {
+  return `${GEN_HEADER}
+/** Module API routes exempt from CSRF (extension point 17): method, full path, owner, reason. */
+export const moduleCsrfExempt: readonly { method: string; path: string; module: string; ns: string; reason: string }[] = ${JSON.stringify(
+    list,
+    null,
+    2,
+  )};
+`;
+}
+
 function emitSeeds(
   seeds: readonly { module: string; file: string }[],
   root: string,
@@ -1619,6 +1769,8 @@ export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = 
 export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [];
 `,
     'packages/module-kit/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean }[] = [];
+`,
+    'packages/module-kit/src/generated/csrf-exempt.ts': `${H}export const moduleCsrfExempt: readonly { method: string; path: string; module: string; ns: string; reason: string }[] = [];
 `,
     'packages/i18n/src/generated/messages.ts': `${H}export const LOCALES = ${JSON.stringify(I18N_LOCALES)} as const;
 export type Locale = (typeof LOCALES)[number];

@@ -13,6 +13,7 @@ import { activeDialect, schema, unsafeAcrossTenants } from '@core/db';
 import { familyOf, migrationStatus, probeDatabase } from '@core/db/migrate';
 import { modules } from '@core/module-kit/registry';
 import { S3Storage } from '@core/storage';
+import { normalizeTopicPrefix, testMqtt } from './mqtt.ts';
 
 /**
  * `api preflight` (PRD Q-13): is this environment ready to run the app? Every check answers with
@@ -241,6 +242,36 @@ export async function runPreflight(
       });
     else push({ name: 'redis', status: 'ok', detail: e.REDIS_URL ?? '', ms: ping.ms });
   } else push({ name: 'redis', status: 'skip', detail: 'tidak dipakai (semua *_DRIVER=database)' });
+
+  // 7b. mqtt — only when .env names a broker (the Settings switch lives in the database and may
+  // still be off); a dead broker is a warning: the api starts, the client keeps reconnecting.
+  if (e.MQTT_URL) {
+    const probe = await timed(async () => {
+      const r = await testMqtt(
+        {
+          url: e.MQTT_URL ?? '',
+          username: e.MQTT_USERNAME ?? null,
+          password: e.MQTT_PASSWORD ?? null,
+          protocolVersion: 5,
+          clientIdPrefix: e.MQTT_CLIENT_ID_PREFIX ?? 'crk',
+          topicPrefix: normalizeTopicPrefix(e.MQTT_TOPIC_PREFIX),
+          source: 'env',
+        },
+        { timeoutMs: 5_000 },
+      );
+      if (!r.ok) throw new Error(r.message);
+      return r.message;
+    });
+    if (probe.error)
+      push({
+        name: 'mqtt',
+        status: 'warn',
+        detail: probe.error,
+        ms: probe.ms,
+        hint: 'MQTT_URL/MQTT_USERNAME/MQTT_PASSWORD benar? service mosquitto hidup (`dc --profile mqtt ps`)? broker MQTT 5?',
+      });
+    else push({ name: 'mqtt', status: 'ok', detail: e.MQTT_URL, ms: probe.ms });
+  } else push({ name: 'mqtt', status: 'skip', detail: 'tidak dipakai (MQTT_URL kosong)' });
 
   // 8. uploads — the local volume writable, or the S3 bucket reachable with these credentials (Q-16).
   if (e.STORAGE_DRIVER === 's3') {

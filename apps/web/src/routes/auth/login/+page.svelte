@@ -38,6 +38,7 @@ const BY_CODE: Record<string, MessageKey> = {
   rate_limited: 'auth.login.err.rate_limited',
   csrf_failed: 'auth.login.err.expired',
   validation_failed: 'auth.login.err.validation',
+  maintenance: 'auth.login.err.maintenance',
 };
 const BY_REASON: Record<string, MessageKey> = {
   bad_code: 'auth.mfa.err.bad_code',
@@ -177,6 +178,7 @@ async function submitCode(event: SubmitEvent) {
 
 <div class="page">
   <h1>{t('auth.login.title')}</h1>
+  {#if data.maintenance}<p class="notice" role="status" data-testid="maintenance-notice">{t('auth.login.maintenance_notice')}</p>{/if}
   {#if errorText}<p class="error" role="alert">{errorText}</p>{/if}
   {#if data.ssoError && !step2 && !errorText}<p class="error" role="alert">{t('auth.google.failed')}</p>{/if}
   {#if step2}

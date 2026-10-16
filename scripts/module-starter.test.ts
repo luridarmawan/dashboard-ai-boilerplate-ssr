@@ -72,6 +72,7 @@ describe('bun create module — the starter template (§0, §1, §4)', () => {
     for (const file of [
       'hooks.ts',
       'jobs.ts',
+      'mqtt.ts',
       'widgets.ts',
       'api/tools.ts',
       'api/routes.ts',

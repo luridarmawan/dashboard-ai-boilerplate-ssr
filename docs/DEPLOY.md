@@ -22,7 +22,7 @@ backup ──► mysqldump harian ──► ./backups (host)
 
 - **Satu origin** (Keputusan E): web dan API dari domain yang sama lewat path. Tidak ada CORS, tidak ada cookie lintas-domain.
 - **Caddy** (Keputusan D): TLS otomatis Let's Encrypt untuk `DOMAIN` sungguhan; untuk `localhost` Caddy memakai CA internalnya. Replika `api` diresolusi lewat DNS Docker (*dynamic upstream*).
-- **`api` stateless** (Keputusan F): `--scale api=N` langsung bekerja; state bersama di database, Valkey hanya percepatan opsional (`--profile redis`).
+- **`api` stateless** (Keputusan F): `--scale api=N` langsung bekerja; state bersama di database, Valkey hanya percepatan opsional (`--profile redis`). Broker MQTT juga opsional (`--profile mqtt`, Mosquitto 2) untuk modul yang berlangganan perangkat atau menerbitkan event — sakelarnya di **Pengaturan → MQTT**, dan dengan MQTT 5 setiap pesan diproses satu replika saja ([`MQTT.md`](./MQTT.md)).
 - **Migrasi eksplisit** (Q-4): service `migrate` dijalankan operator, tidak pernah otomatis saat container start.
 - **Konfigurasi runtime di database** (E-6): tema, bahasa, landing, SMTP, retensi log, modul — dari halaman **Pengaturan**, berlaku ke semua replika tanpa restart.
 
@@ -87,6 +87,8 @@ curl -s  https://$(grep ^DOMAIN= .env.prod | cut -d= -f2)/v1/version          # 
 #    Email: isi SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASSWORD/MAIL_FROM_ADDRESS di .env.prod (lalu `dc up -d`),
 #    atau lewat Pengaturan → Email; nilai di Pengaturan menang per kolom. MAIL_BCC (opsional, .env saja)
 #    = BCC ke setiap email keluar, mis. kotak arsip.
+#    Lokasi IP di /users (tanda "?"): IP publik dikirim ke IP_LOOKUP_URL (baku https://ipwho.is/{ip});
+#    set IP_LOOKUP_URL=off bila alamat pengguna tidak boleh keluar server.
 #    Uji kredensial .env.prod: `bun --env-file=.env.prod run mail:test --to anda@contoh.id`
 #    (koneksi + autentikasi + satu email uji, tanpa database) — atau tombol "Kirim email uji" di Pengaturan → Email,
 #    yang menguji konfigurasi yang benar-benar dipakai lingkup itu (Pengaturan dulu, lalu .env) termasuk per tenant;
@@ -170,11 +172,19 @@ dc run --rm -e CONFIRM_RESTORE=yes restore latest
 #     RATELIMIT_DRIVER=redis  jendela rate limit dihitung INCR+PEXPIREAT, tabel rate_limits tidak tumbuh
 #   Redis mati = perilaku database biasa (fail-open ke database, satu peringatan per menit di log).
 dc --profile redis up -d --wait --scale api=3
+
+# MQTT opsional (titik perluasan 18) — broker untuk modul yang berlangganan perangkat/gateway
+#   di .env.prod: MQTT_URL=mqtt://mosquitto:1883 MQTT_USERNAME=app MQTT_PASSWORD=<rahasia>
+#   lalu nyalakan di Pengaturan → MQTT (lingkup global) — tanpa restart. Listener hanya di jaringan
+#   stack; perangkat di luar host butuh `ports:` atau route layer4 yang Anda tambahkan sendiri.
+dc --profile mqtt up -d --wait
 ```
 
 **Rotasi log (Q-7):** semua service memakai driver `json-file` dengan `max-size 10m`, `max-file 5` — maksimum ±50 MB per container. Log audit dan log aplikasi di database dipangkas job `core.logs.retention` sesuai **Pengaturan → Log & retensi** (M-3).
 
 **Restart otomatis (Q-6):** `restart: unless-stopped` di semua service; Docker menyalakannya kembali saat proses mati dan saat host reboot (pastikan `systemctl is-enabled docker` = `enabled`).
+
+**Mode pemeliharaan (E-10):** dua cara. Tanpa restart, dari UI: *Pengaturan → Aplikasi → Ketersediaan → Mode pemeliharaan* — per tenant (atau global bagi superadmin), pengguna di luar group Administrator langsung tersingkir ke halaman pemeliharaan pada request berikutnya, halaman publik tetap tayang. Untuk pekerjaan yang menyentuh database sendiri (migrasi besar, restore): `MAINTENANCE_MODE=true` di `.env.prod` lalu `dc up -d --scale api=N` (api **dan** web membacanya; compose meneruskannya ke keduanya) — seluruh URL menjawab 503 dengan halaman pemeliharaan kecuali `/auth/login`, dan hanya administrator yang bisa masuk. Pantau dengan `curl -sI https://<domain>/ | head -1` (503 selama aktif, `Retry-After: 300`); pratinjau halamannya kapan saja di `/maintenance`. Jangan lupa mematikannya kembali: halaman masuk dan shell dasbor administrator memasang pemberitahuan selama mode aktif.
 
 **Berkas unggahan (Q-9, Q-16):** bawaan `STORAGE_DRIVER=local` — volume `uploads` → `/data/uploads` di `api` (`UPLOADS_DIR`); dengan `--scale api=N` semua replika berbagi volume yang sama di satu host. Sertakan dalam backup host bila ada berkas: `docker run --rm -v crk-prod_uploads:/u -v $PWD/backups:/b alpine tar czf /b/uploads-$(date -u +%Y%m%dT%H%M%SZ).tgz -C /u .`
 
@@ -298,6 +308,7 @@ Bukti: `scripts/ci/rollout-proof.sh` (job CI `scale-proof`) menembakkan request 
 | `migrations` | ada migrasi tersemat yang belum diterapkan, atau database kosong | `dc run --rm migrate` |
 | `seed` | peringatan: belum ada tenant | `dc run --rm seed` |
 | `redis` | `PING` gagal saat ada `*_DRIVER=redis` | REDIS_URL / `--profile redis` |
+| `mqtt` | peringatan: `MQTT_URL` diisi tapi broker tidak menjawab uji pulang-pergi | MQTT_URL / kredensial / `--profile mqtt` |
 | `uploads` | `UPLOADS_DIR` tidak bisa ditulis, atau (`STORAGE_DRIVER=s3`) bucket tidak terjangkau | `chown 1000:1000` volume; periksa `S3_*` |
 | `modules` | (dari sumber) `modules.json` ≠ registry | `bun modules:sync` |
 

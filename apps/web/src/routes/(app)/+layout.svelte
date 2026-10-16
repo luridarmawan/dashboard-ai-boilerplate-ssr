@@ -5,6 +5,7 @@ import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import LanguagePicker from '$lib/components/LanguagePicker.svelte';
 import { Button } from '$lib/components/ui';
+import { forgetBrowserStorage } from '$lib/forget-browser';
 import { useT } from '$lib/i18n';
 import type { MenuItem } from '$lib/server/menu';
 import type { LayoutData } from './$types';
@@ -240,7 +241,8 @@ const shellContext = $derived({
           </li>
         {/if}
       </ul>
-      <form method="POST" action="/auth/logout" class="mt-1 border-t pt-1">
+      <!-- A deliberate logout also wipes this origin's Web Storage before the form leaves (A-5); the submit itself is untouched. -->
+      <form method="POST" action="/auth/logout" class="mt-1 border-t pt-1" onsubmit={() => forgetBrowserStorage()}>
         <Csrf token={data.csrf} />
         <button type="submit" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-destructive hover:bg-accent"><Icon name="logout" size={16} />{t('nav.logout')}</button>
       </form>
@@ -262,6 +264,14 @@ const shellContext = $derived({
 {/snippet}
 
 {#snippet content()}
+  {#if data.maintenanceSource}
+    <!-- E-10: an administrator working during maintenance sees that the door is closed to everyone else. -->
+    <p class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-foreground" role="status" data-testid="maintenance-banner">
+      <Icon name="warning" size={16} class="shrink-0" />
+      <span>{t('shell.maintenance_banner', { source: data.maintenanceSource === 'env' ? t('maintenance.source.env') : t('maintenance.source.config') })}</span>
+      {#if data.maintenanceSource === 'config' && data.canEditConfig}<a href="/settings" class="font-medium underline underline-offset-2">{t('shell.maintenance_banner_settings')}</a>{/if}
+    </p>
+  {/if}
   {#if data.tenantError}<p class="error mb-4">{t('shell.tenant_error')}</p>{/if}
   {@render children()}
 {/snippet}

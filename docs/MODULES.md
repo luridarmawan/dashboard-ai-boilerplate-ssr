@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Versi 2 — kontrak M6. Semua titik perluasan yang bisa dipakai hari ini ada di §2a; yang belum ada ditandai di §6 dan tidak boleh diasumsikan |
-| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (16 titik perluasan), §4.9 (modul lintas repositori), FR-G |
+| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (18 titik perluasan), §4.9 (modul lintas repositori), FR-G |
 | **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
 | **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
 | **Tutorial** | Langkah demi langkah, dengan penjelasan tiap perintah: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) (modul di dalam repo ini) · [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) (repositori sendiri, termasuk repo privat). Dokumen ini kontraknya; keduanya alurnya |
@@ -57,7 +57,7 @@ INTEGRATION=1 bun test modules/Billing/test
 
 Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langkah "regenerate" yang akan menimpanya.
 
-### 2a. Peta 16 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
+### 2a. Peta 18 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
 
 | # | Titik perluasan | Berkas di modul | Contoh hidup | Dibuktikan oleh |
 |---|---|---|---|---|
@@ -77,6 +77,8 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 14 | Tema | `themes/<id>/` | `modules/Dummy/themes/ocean/` | `bun theme:validate`, m2 proof #5 |
 | 15 | Layout | `layouts.ts` (`defineLayouts`) | `modules/Dummy/layouts.ts` | `scripts/ci/layout-contract.ts`, m2 proof #5 |
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
+| 17 | Route tanpa CSRF | `csrf-exempt.ts` (`defineCsrfExempt`) — route API yang dipanggil sistem luar tanpa bearer maupun pasangan CSRF; request-nya selalu anonim | `modules/Example/csrf-exempt.ts` → `POST /v1/m/example/inbound/inquiries` | `apps/api/test/csrf.test.ts`, `apps/api/test/integration/example.test.ts` |
+| 18 | Langganan MQTT | `mqtt.ts` (`defineMqtt`) — topik yang dilanggan lewat klien MQTT **inti** (satu per proses, sakelar di **Pengaturan → MQTT**); `shared: true` = satu pesan diproses satu instance; publish lewat `publish()` dari `@app/api/mqtt` ([`MQTT.md`](./MQTT.md)) | `modules/Example/mqtt.ts` → `example/<tenant>/inquiries` | `apps/api/test/mqtt.test.ts`, `packages/module-kit/test/mqtt.test.ts`, `scripts/ci/mqtt-smoke.ts`, `apps/api/test/integration/example.test.ts` |
 
 ### 2b. Secara manual (kalau ingin memahami tiap berkas)
 
@@ -128,6 +130,7 @@ export default defineTables('Billing', [
       number: col.identifier(32),      // ascii_bin — kode/slug/kunci
       customer: col.varchar(191),      // utf8mb4 — teks manusia
       total: col.money(),              // decimal(18,4), bukan float
+      lat: col.decimal(10, 7).nullable(), // decimal(presisi, skala) — koordinat, tarif; TEXT di SQLite
       status: col.enum(['draft', 'sent', 'paid'], 16).default('draft'), // varchar + constraint aplikasi
       meta: col.json().nullable(),     // jangan pernah di-query ke dalamnya (§4.3)
       due_at: col.datetime().nullable(), // selalu UTC
@@ -213,6 +216,7 @@ Aturan yang berlaku:
 
 - **Path relatif.** `/invoices/count` menjadi `/v1/m/billing/invoices/count`; sync yang me-mount, modul tidak bisa memilih atau keluar dari prefiksnya.
 - **Setiap route punya skema TypeBox** (`response`, `body`, `query`) — itulah yang membuat route Anda otomatis muncul di `/openapi.json` dan bertipe di klien Eden (N-1, N-2, N-3). Route tanpa skema bukan bagian kontrak.
+- **Modul nonaktif tidak didokumentasikan.** Route `/v1/m/<ns>/*` milik modul yang dinonaktifkan hilang dari `/openapi.json` dan `/docs`, memakai tenant yang sama dengan penolakan route-nya: sesi atau `X-Client-ID`, dan status global untuk pembaca anonim.
 - **`detail.summary` pendek, `detail.description` untuk rinciannya.** Summary satu frasa berbahasa Inggris (±3–6 kata, tanpa titik): `List invoices`, `Delete an invoice`. Syarat, efek samping, dan parameter query masuk ke `description` sebagai kalimat utuh. Jangan menulis izin di sana — baris *Requires permission: `x`* ditambahkan otomatis dari `beforeHandle: permission('x')` atau `requirePermission('x')`. Jangan pula menyelipkan kode kebutuhan PRD (`A-1`, `L-24`); pembaca `/docs` tidak mengenalnya, dan `apps/api/test/openapi.test.ts` menolaknya.
 - **Kembalikan amplop** `ok(data)` / `ok(data, meta)`. Galat dilempar saja; hook global mengubahnya jadi `{ success: false, error, requestId }` (N-4).
 - **Tabel Anda tersedia sebagai `schema.<camelCase>`** — `billing_invoices` → `schema.billingInvoices`.
@@ -330,6 +334,37 @@ Aturan mainnya:
 - **Sitemap bersyarat.** URL akar hanya ada selama modul Anda penangkapnya; `GET /v1/m/<ns>/sitemap` `Example` membaca `settings.get(tenantId, 'app.not_found_route')` dan menambahkan `/<slug>` hanya bila nilainya `/resolve`.
 - Yang **tidak pernah** sampai ke Anda: aset (`/_app`), `/v1`, `/m`, `/auth`, prefix halaman core, segmen berawalan titik, `robots.txt`, `sitemap.xml`, request non-HTML, dan halaman yang route-nya ada tapi menjawab 404 sendiri (`/product/slug-tak-ada`). Modul yang dinonaktifkan sesudah setelan disimpan → 404 bawaan + satu peringatan, tanpa loop.
 
+### `csrf-exempt.ts` — route yang dipanggil sistem luar tanpa CSRF (titik perluasan 17)
+
+Setiap request yang mengubah state ke API melewati proteksi CSRF (PRD A-10): header `Origin` harus milik aplikasi dan pasangan cookie `crk_csrf` + header `x-csrf-token` harus cocok. Pemanggil luar punya dua jalan, **pilih yang pertama bila bisa**:
+
+1. **Token bearer** (A-4) — mesin, CLI, atau integrasi yang bisa mengirim `Authorization: Bearer <token>`. Lolos CSRF secara struktural, lalu tetap melewati RBAC dan tenancy biasa. Tidak perlu berkas ini.
+2. **`csrf-exempt.ts`** — untuk pemanggil yang **tidak bisa** mengatur headernya: callback payment gateway, webhook layanan lain, perangkat yang hanya bisa POST dengan skema tanda tangannya sendiri.
+
+```ts
+// csrf-exempt.ts
+import { defineCsrfExempt } from '@core/module-kit';
+export default defineCsrfExempt('Billing', [
+  {
+    method: 'POST',
+    path: '/hooks/:provider', // relative to the module: POST /v1/m/billing/hooks/:provider
+    reason: 'Signed by the provider with HMAC-SHA256 (X-Signature) using billing.webhook_secret.',
+  },
+]);
+```
+
+Aturan yang ditegakkan:
+
+- **Hanya route modul sendiri.** Path ditulis relatif (`/hooks/:provider`) dan selalu dipasang di bawah `/v1/m/<ns>/`; route core dan route modul lain tidak bisa dikecualikan.
+- **Persis, bukan pola.** `method` salah satu dari `POST`/`PUT`/`PATCH`/`DELETE` (GET tidak pernah diperiksa); `:param` cocok dengan tepat satu segmen; `*`, garis miring di akhir, dan path absolut `/v1/…` ditolak. Request yang nyaris cocok (slash di akhir, method lain) tetap diperiksa penuh — gagal tertutup.
+- **Harus ada route-nya.** `modules:sync` menolak entri yang tidak cocok dengan method + path mana pun di `api/routes.ts`: pengecualian untuk route yang belum ada adalah lubang yang menunggu route yang kelak mendarat di sana.
+- **`reason` wajib** — tulis cara route itu memverifikasi pemanggilnya. Teks ini ikut tampil di deskripsi OpenAPI route tersebut, dan modul mendapat chip "route tanpa CSRF" di halaman **Modul**.
+- **Request-nya selalu anonim.** Pada route yang dikecualikan, plugin auth **mengabaikan cookie sesi dan impersonasi** — `auth` selalu `null` (token bearer tetap dihitung). Situs lain tidak bisa menumpang login pengunjung lewat route ini, jadi pengecualian tidak membuka CSRF; yang dibuka hanya pintu untuk pemanggil anonim. Konsekuensinya, route ini **wajib** memverifikasi pemanggilnya sendiri — tanda tangan HMAC, secret bersama, atau token sekali pakai — dan tidak bisa memakai `permission()`.
+
+Tenant pada route seperti ini datang dari header `X-Client-ID` (anonim boleh menyebut tenant hidup) atau ditentukan route itu sendiri. Modul yang dinonaktifkan (G-8) tetap menolak route-nya seperti biasa.
+
+Contoh hidup: `Example` menerima inquiry dari sistem luar di `POST /v1/m/example/inbound/inquiries`. Route itu memakai `parse: 'text'` agar body mentah yang ditandatangani tersedia, memverifikasi `X-Example-Signature: sha256=<hex>` = HMAC-SHA256 dari `"<X-Example-Timestamp>.<body mentah>"` dengan setelan `example.inbound_secret` (skema yang sama dengan webhook keluar, `sign()` dari `@app/api/webhooks`), menolak cap waktu lebih tua dari 5 menit, dan baru mem-parse JSON sesudahnya. Secret kosong = endpoint menjawab 503. Daftar hasil sync ada di `packages/module-kit/src/generated/csrf-exempt.ts` (`@core/module-kit/csrf-exempt`).
+
 ### Gambar & lazy load — `<Img>` dan `class="lazy"`
 
 Berlaku **global**: dipasang sekali di shell core (`apps/web/src/routes/+layout.svelte`), jadi modul tidak mendaftar apa pun dan tidak mengimpor apa pun untuk mendapatkannya.
@@ -416,6 +451,8 @@ Tipe: `string · text · number · boolean · select · secret · markdown · ro
 ```
 
 Murni tampilan: nilai, validasi, dan tombol **Simpan** tetap satu per section. `width` berlaku di layar lebar — `full` satu baris penuh, `half` dua per baris, `third` tiga per baris (mulai `lg`; di bawahnya dua) — dan ponsel selalu satu per baris; tanpa `width`, `text`/`markdown`/`list` penuh, selebihnya `half`. Field tanpa `group` digambar lebih dulu, di atas grup pertama; grup tanpa field tidak digambar. `defineConfig` menolak `group` yang tidak dideklarasikan section-nya, key grup ganda, dan key yang bukan slug. Jam milik field `timezone` digambar di **penutup blok** tempat field itu berada. Contoh nyata: section `app` core (`packages/settings/src/registry.ts`) — *Aplikasi* · *Halaman baku* · *Tema & tata letak*.
+
+**Mode pemeliharaan (E-10).** Core punya dua sakelar yang menutup aplikasi untuk semua orang kecuali superadmin dan anggota group Administrator: `app.maintenance_mode` di Pengaturan (per tenant) dan `MAINTENANCE_MODE=true` di `.env` (seluruh deployment). Yang `.env` menutup semua URL — API modul ikut 503 — jadi modul tidak perlu berbuat apa pun. Yang dari Pengaturan sengaja **membiarkan halaman dan API publik tetap tayang** untuk pengunjung anonim; di sinilah modul memutuskan apa yang dimatikan: di API, `const m = await maintenanceState(tenantState.clientId)` dari `@app/api/maintenance` lalu tolak transaksi dengan `maintenanceFailure(requestId, m.source)` (503 kode `maintenance`) sementara `GET` katalog tetap dilayani; di halaman, `event.locals.maintenance.active` (loader) atau `page.data.maintenance.active` (komponen) untuk menyembunyikan tombol beli/kirim dan menampilkan pemberitahuan. Pengguna bersesi yang bukan administrator tidak pernah sampai ke halaman modul selama mode aktif — hooks sudah menjawab mereka dengan halaman `/maintenance`.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
 
@@ -504,7 +541,13 @@ import { defineSeed } from '@core/module-kit';
 export default defineSeed('Billing', async ({ db, tenantId, log }) => { /* cek dulu, insert bila belum ada */ });
 ```
 
-**Sitemap dinamis.** Modul dengan halaman publik ber-parameter (mis. `/product/[slug]`) menyediakan `GET /v1/m/<ns>/sitemap` yang mengembalikan `{ path, lastmod }[]`; `sitemap.xml` core memanggilnya untuk setiap modul aktif (F-7). Route publik tanpa parameter cukup diberi `sitemap: true` di `public.ts`.
+**Sitemap dinamis.** Modul dengan halaman publik ber-parameter (mis. `/product/[slug]`) menyediakan `GET /v1/m/<ns>/sitemap` yang mengembalikan `{ path, lastmod }[]`; `sitemap.xml` core memanggilnya untuk setiap modul aktif (F-7). Route publik tanpa parameter cukup diberi `sitemap: true` di `public.ts`. Yang perlu diketahui modul ([`Sitemap-SEO-Roadmap.md`](./Sitemap-SEO-Roadmap.md)):
+
+- `path` harus path absolut di origin ini (`/…`, bukan URL penuh, bukan `//…`); entri lain dibuang diam-diam. Core yang meng-escape XML — jangan escape sendiri.
+- Satu URL per isi: halaman yang sedang menjadi `app.landing_route` **tidak** muncul dengan path-nya sendiri (ia sudah ada sebagai `/`), dan entri yang path-nya sudah ada dibuang. Jadi jangan heran `/example` hilang dari sitemap saat ia landing.
+- Panggilan ke endpoint Anda dibatasi **3 detik**; lewat itu, 404, atau galat = modul Anda tidak menyumbang entri, tanpa merusak sitemap modul lain. Jangan menghitung mahal di sini — baca dari tabel, bukan dari API luar.
+- Canonical halaman publik: pakai `canonicalUrl(event)` dari `$lib/server/seo` (R-4) untuk `rel=canonical`, `og:url`, dan `url` JSON-LD — ia mengembalikan alamat yang dilihat pengunjung, tanpa query, dan `/` selama halaman Anda yang menjadi landing.
+- Belum ada sitemap index. Modul yang mendekati 50.000 URL perlu `/sitemap-<ns>.xml` sendiri dan index di `/sitemap.xml` — belum dibangun karena belum ada yang membutuhkannya.
 
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
 
@@ -538,6 +581,30 @@ export default defineJobs('Billing', [
 ```
 
 Yang dijamin penjadwal core (G-18): dengan berapa pun instance API (`--scale api=3`), sebuah job berjalan **tepat sekali per interval** — lock diambil lewat satu `UPDATE` bersyarat di tabel `scheduler_jobs`, jadi jalur bakunya tidak butuh Redis (Keputusan M). Setiap eksekusi tercatat di `scheduler_runs`. Job yang melebihi `lease`-nya boleh dimulai ulang di instance lain — buat run pendek atau pecah pekerjaannya. Modul **tidak pernah** membuat timer sendiri.
+
+### `mqtt.ts` — langganan MQTT (titik perluasan 18)
+
+```ts
+import { defineMqtt } from '@core/module-kit';
+
+export default defineMqtt('Billing', [
+  {
+    name: 'billing.meter_readings',      // wajib "billing.*"
+    topic: 'meter/+/reading',            // filter MQTT; tanpa $share/ dan tanpa awalan deployment
+    qos: 1,                              // baku 1
+    shared: true,                        // baku: satu pesan → satu instance (MQTT 5)
+    handler: async (message, ctx) => {
+      const [meterId] = message.params;  // tangkapan wildcard
+      const reading = message.json<{ kwh: number }>();
+      if (!reading) return;              // payload rusak: buang, jangan lempar
+      await enqueue('billing.reading.store', { meterId, ...reading });
+      await ctx.publish(`meter/${meterId}/ack`, 'ok');
+    },
+  },
+]);
+```
+
+Core memegang **satu** klien MQTT per proses API — broker, kredensial, versi protokol, dan sakelar on/off ada di **Pengaturan → MQTT** (lingkup global; `MQTT_*` di `.env` sebagai bootstrap), berlaku tanpa restart. Modul tidak mengimpor pustaka MQTT dan tidak mengelola koneksi. Awalan topik deployment (`mqtt.topic_prefix`) ditambahkan ke langganan dan publish, dan dihilangkan sebelum pesan sampai ke handler. Handler berjalan tanpa request, di instance yang menerima pesan; yang melempar dicatat dan dihitung, tidak menjatuhkan klien (G-7). Tenant tidak ikut dalam sesi broker — bawa di topik atau isi pesan. Menerbitkan dari mana saja: `publish(topic, payload, { qos, retain })` dari `@app/api/mqtt`, tidak pernah melempar (`{ ok: false, reason: 'disabled' }` saat klien mati), dan `mqttState()` untuk status. Rincian, metrik, dan broker dev/prod di [`MQTT.md`](./MQTT.md).
 
 ### Notifikasi dari modul (J-4)
 
@@ -689,6 +756,8 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | `api/routes.ts` bukan Elysia | `… api/routes.ts harus meng-export default instance Elysia (pakai defineApiRoutes)` |
 | Event tak dikenal / job tanpa prefiks / interval < 1 s | `… hooks.ts berlangganan event "invoice.paid" yang tidak dikenal core` · `… job "cleanup" harus diawali "billing." (G-9)` · `… job "billing.fast": interval 0s harus bilangan bulat ≥ 1 detik` |
 | Tool tanpa prefiks / izin tak dideklarasikan / skema bukan objek | `… nama tool "other.thing" harus diawali "billing." (G-9)` · `… tool "billing.ghost" menuntut izin "billing.nothing.read" yang tidak ada di permissions.ts` · `… tool "billing.bare": input harus JSON Schema bertipe object` |
+| Pengecualian CSRF salah bentuk / tanpa route | `… pengecualian CSRF "GET /feed" tidak valid` · `… pengecualian CSRF "POST /inbound" tanpa reason` · `… pengecualian CSRF "POST /ghost" tidak cocok dengan route mana pun di api/routes.ts` |
+| Langganan MQTT tanpa prefiks / filter rusak / `$share/` tulisan tangan | `… langganan MQTT "readings" harus diawali "billing."` · `… langganan MQTT "billing.broken": filter topik tidak valid — "#" hanya boleh di level terakhir` · `… jangan tulis $share/ — pakai \`shared: true\`` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -718,7 +787,7 @@ Mencabut modul (G-15): `bun modules:remove <Nama>` — tampilkan rencananya lebi
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua 16 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
+Semua 18 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
 
 | Hal | Status |
 |---|---|

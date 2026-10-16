@@ -256,6 +256,46 @@ describe('syncModules — API routes & web pages (extension points 2 & 3)', () =
   });
 });
 
+describe('syncModules — CSRF-exempt routes (extension point 17)', () => {
+  test('csrf-exempt.ts entries are mounted under /v1/m/<ns> and keep their reason', async () => {
+    const r = await syncModules({
+      root: join(fixtures, 'good'),
+      write: false,
+      coreIcons: CORE_ICONS,
+    });
+    expect(r.csrfExempt).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/m/alpha/hooks/:provider',
+        module: 'Alpha',
+        ns: 'alpha',
+        reason: 'Signed by the provider with HMAC-SHA256.',
+      },
+    ]);
+  });
+
+  test('safe methods, wildcards, a missing reason and unserved routes are all rejected', async () => {
+    let err: SyncError | undefined;
+    try {
+      await syncModules({ root: join(fixtures, 'bad'), write: false, coreIcons: CORE_ICONS });
+    } catch (e) {
+      err = e as SyncError;
+    }
+    const p = err?.problems ?? [];
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "GET \/feed" tidak valid/.test(x))).toBe(true);
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "POST \/hooks\/\*" tidak valid/.test(x))).toBe(
+      true,
+    );
+    expect(p.some((x) => /Naughty.*pengecualian CSRF "POST \/inbound" tanpa reason/.test(x))).toBe(
+      true,
+    );
+    // Naughty's routes.ts is not an Elysia instance, so no route can match.
+    expect(p.some((x) => /Naughty.*"POST \/ghost" tidak cocok dengan route mana pun/.test(x))).toBe(
+      true,
+    );
+  });
+});
+
 describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
   test('hooks.ts and jobs.ts are registered with their declared names', async () => {
     const r = await syncModules({
@@ -271,6 +311,10 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     ]);
     expect(r.toolModules).toEqual([
       { name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] },
+    ]);
+    // mqtt.ts (extension point 18) rides the same registration path.
+    expect(r.mqttModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] },
     ]);
   });
 
@@ -295,6 +339,14 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       ),
     ).toBe(true);
     expect(p.some((x) => /Naughty.*tool "naughty\.bare".*bertipe object/.test(x))).toBe(true);
+    // mqtt.ts (extension point 18): foreign prefix, `#` not last, a hand-written $share/ prefix
+    expect(
+      p.some((x) => /Naughty.*langganan MQTT "readings" harus diawali "naughty\."/.test(x)),
+    ).toBe(true);
+    expect(
+      p.some((x) => /Naughty.*"naughty\.broken".*"#" hanya boleh di level terakhir/.test(x)),
+    ).toBe(true);
+    expect(p.some((x) => /Naughty.*"naughty\.shared".*\$share/.test(x))).toBe(true);
   });
 
   test('emitApiModules exports moduleHooks and moduleJobs from the module files', () => {
@@ -315,11 +367,14 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       '/repo/apps/api/src/generated/modules.ts',
       [{ name: 'Alpha', ns: 'alpha', file: 'hooks.ts', items: ['system.ping'] }],
       [{ name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] }],
+      [{ name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] }],
     );
     expect(out).toContain("import hooks_alpha from '../../../../modules/Alpha/hooks.ts';");
     expect(out).toContain("import jobs_alpha from '../../../../modules/Alpha/jobs.ts';");
+    expect(out).toContain("import mqtt_alpha from '../../../../modules/Alpha/mqtt.ts';");
     expect(out).toContain('export const moduleHooks = [hooks_alpha];');
     expect(out).toContain("{ module: 'Alpha', jobs: jobs_alpha },");
+    expect(out).toContain("{ module: 'Alpha', subscriptions: mqtt_alpha },");
     // Tools live in their own generated file (no import cycle through the route mounts).
     const tools = emitApiTools(
       [{ name: 'Alpha', ns: 'alpha', file: 'api/tools.ts', items: ['alpha.count_items'] }],

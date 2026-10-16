@@ -2,13 +2,19 @@ import { ClientCreateBody, formToObject, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import { redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
-import type { Actions } from './$types';
+import { parentCandidates, parentOptions } from '$lib/server/tenants';
+import type { Actions, PageServerLoad } from './$types';
+
+export const load: PageServerLoad = async (event) => ({
+  parents: parentOptions(await parentCandidates(event)),
+});
 
 export const actions: Actions = {
   default: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    const input = formToObject(form);
+    // An empty parent choice means "top level": null, not a missing field.
+    const input = formToObject(form, { nullable: ['parentId'] });
     if (!checkCsrf(event, form)) {
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },

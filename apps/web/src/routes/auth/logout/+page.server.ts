@@ -1,11 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import {
-  apiFor,
-  checkCsrf,
-  forwardSetCookies,
-  IMPERSONATE_COOKIE,
-  SESSION_COOKIE,
-} from '$lib/server/session';
+import { forgetBrowser } from '$lib/server/forget';
+import { apiFor, checkCsrf, forwardSetCookies } from '$lib/server/session';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
@@ -19,8 +14,9 @@ export const actions: Actions = {
       const res = await apiFor(event).v1.auth.logout.post();
       forwardSetCookies(event, res.response);
     }
-    event.cookies.delete(SESSION_COOKIE, { path: '/' });
-    event.cookies.delete(IMPERSONATE_COOKIE, { path: '/' });
+    // A deliberate logout leaves nothing behind in the browser: every app cookie — including the
+    // cached preferences of the person who just left — and, via Clear-Site-Data, Web Storage.
+    forgetBrowser(event);
     redirect(303, '/auth/login');
   },
 };

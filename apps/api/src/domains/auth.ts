@@ -2,15 +2,19 @@ import {
   canActInTenant,
   consumeRateLimit,
   createSession,
+  defaultTenantOf,
   effectivePermissions,
   findSession,
   hashPassword,
   hashRecoveryCode,
   hashToken,
   invalidateUserSessions,
+  isMaintenanceExempt,
   parseRateLimitRule,
   passwordProblems,
+  peekRateLimit,
   permissionRegistry,
+  type RateLimitResult,
   randomToken,
   rateLimitHeaders,
   revokeAllSessions,
@@ -27,6 +31,7 @@ import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@co
 import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
+import { maintenanceState, refuseLoginDuringMaintenance } from '../maintenance.ts';
 import {
   authContext,
   clientIp,
@@ -346,11 +351,20 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       );
 
       // Stricter than the general limit (A-2): per IP and per account, whichever trips first.
-      const byIp = await consumeRateLimit(db, `login:ip:${ip}`, rule);
-      const byEmail = await consumeRateLimit(db, `login:email:${email}`, rule);
-      const tightest = byIp.remaining <= byEmail.remaining ? byIp : byEmail;
-      Object.assign(set.headers, rateLimitHeaders(tightest));
-      if (!byIp.allowed || !byEmail.allowed) {
+      // Only FAILED attempts spend from the budget — the door is checked before the password,
+      // but the counters move in the wrong-password branch below. Someone signing in and out of
+      // several accounts from one address (a tester, a shared office machine) never locks the
+      // address; ten wrong guesses in a window still do.
+      const ipKey = `login:ip:${ip}`;
+      const emailKey = `login:email:${email}`;
+      const tightestOf = (a: RateLimitResult, b: RateLimitResult) =>
+        a.remaining <= b.remaining ? a : b;
+      const seen = tightestOf(
+        await peekRateLimit(db, ipKey, rule),
+        await peekRateLimit(db, emailKey, rule),
+      );
+      Object.assign(set.headers, rateLimitHeaders(seen));
+      if (!seen.allowed) {
         set.status = 429;
         return fail('rate_limited', 'Terlalu banyak percobaan masuk — coba lagi nanti', requestId);
       }
@@ -364,6 +378,12 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         user?.status_id === STATUS.ACTIVE &&
         (await verifyPassword(body.password, user?.password_hash ?? null));
       if (!user || !valid) {
+        // The failed guess is what costs: spend one from both counters and report what is left.
+        const spent = tightestOf(
+          await consumeRateLimit(db, ipKey, rule),
+          await consumeRateLimit(db, emailKey, rule),
+        );
+        Object.assign(set.headers, rateLimitHeaders({ ...spent, allowed: true }));
         await writeAudit(db, {
           clientId: null,
           actorId: user?.id ?? null,
@@ -376,6 +396,17 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         set.status = 401;
         return fail('invalid_credentials', 'Email atau kata sandi salah', requestId);
       }
+
+      // E-10: a closed door is announced before the second factor is asked for.
+      const refused = await refuseLoginDuringMaintenance({
+        db,
+        user,
+        clientId: await defaultTenantOf(db, user.id),
+        ip,
+        requestId,
+        set,
+      });
+      if (refused) return refused;
 
       const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
       if (challenge) return ok(challenge);
@@ -395,7 +426,7 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
       detail: {
         summary: 'Log in',
         description:
-          'Sets the httpOnly session cookie, or returns an MFA challenge when the account has 2FA. Rate-limited per IP and per account.',
+          'Sets the httpOnly session cookie, or returns an MFA challenge when the account has 2FA. Failed attempts are rate-limited per IP and per account; successful logins do not count.',
       },
     },
   )
@@ -491,6 +522,16 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return refuse('Kode 2FA salah', 'bad_code');
       }
       await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+      // E-10: maintenance may have been switched on between the two steps.
+      const refused = await refuseLoginDuringMaintenance({
+        db,
+        user,
+        clientId: await defaultTenantOf(db, user.id),
+        ip,
+        requestId,
+        set,
+      });
+      if (refused) return refused;
       const result = await issueSession({ db, user, ip, request, cookie, requestId, mfa: method });
       return ok(result);
     },
@@ -709,11 +750,19 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         '/me',
         async ({ auth }) => {
           const a = auth as NonNullable<typeof auth>;
-          const tenants = await tenantsOf(unsafeAcrossTenants(), a.user.id);
+          const db = unsafeAcrossTenants();
+          const tenants = await tenantsOf(db, a.user);
+          // E-10: the web decides from this whether to show the maintenance page or the app; the
+          // group lookup only runs while maintenance is on.
+          const maintenance = await maintenanceState(a.clientId);
+          const exempt = maintenance.active
+            ? await isMaintenanceExempt(db, a.user, a.clientId)
+            : true;
           return ok({
             user: publicUser(a.user),
             clientId: a.clientId,
             tenants,
+            maintenance: { active: maintenance.active, source: maintenance.source, exempt },
             impersonator: a.impersonator
               ? { id: a.impersonator.id, name: a.impersonator.name, email: a.impersonator.email }
               : null,
@@ -748,6 +797,12 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
                     isDefault: t.Boolean(),
                   }),
                 ),
+                maintenance: t.Object({
+                  active: t.Boolean(),
+                  source: t.Nullable(t.Union([t.Literal('env'), t.Literal('config')])),
+                  /** May this user keep working while maintenance is on? Always true while it is off. */
+                  exempt: t.Boolean(),
+                }),
                 token: t.Nullable(
                   t.Object({
                     id: t.String(),

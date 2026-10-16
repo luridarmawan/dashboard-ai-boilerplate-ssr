@@ -444,11 +444,45 @@ const member = new Jar();
   const dash = await get(admin, '/dashboard');
   const r = await post(admin, '/auth/logout', { _csrf: csrfOf(dash.html) });
   check('logout → 303 /auth/login', r.res.status === 303 && location(r.res) === '/auth/login');
+  // A-5: a deliberate logout leaves nothing behind in the browser — every app cookie is expired
+  // in the same response, and Clear-Site-Data wipes Web Storage without JavaScript.
+  const expired = r.res.headers
+    .getSetCookie()
+    .filter((c) => /max-age=0|expires=Thu, 01 Jan 1970/i.test(c))
+    .map((c) => c.split('=')[0]?.trim());
+  for (const name of ['crk_session', 'crk_csrf', 'crk_theme', 'crk_lang', 'crk_sidebar'])
+    check(`logout expires ${name}`, expired.includes(name), expired.join(','));
+  check(
+    'logout sends Clear-Site-Data: "storage"',
+    r.res.headers.get('clear-site-data') === '"storage"',
+    String(r.res.headers.get('clear-site-data')),
+  );
   const again = await get(admin, '/dashboard');
   check(
     'dashboard afterwards redirects to login',
     again.res.status === 303 && location(again.res).startsWith('/auth/login'),
   );
+}
+
+// 11. developer "clear cache" on the login page (NODE_ENV=development only): the same sweep as
+// logout, without a session. Skipped — not failed — when the web runs in another NODE_ENV.
+{
+  const fresh = new Jar();
+  const page = await get(fresh, '/auth/login');
+  if (page.html.includes('data-testid="clear-cache"')) {
+    fresh.cookies.set('crk_theme', 'base');
+    const r = await post(fresh, '/auth/clear-cache', {});
+    check(
+      'clear-cache → 303 /auth/login',
+      r.res.status === 303 && location(r.res) === '/auth/login',
+    );
+    check(
+      'clear-cache expires the theme cookie and sends Clear-Site-Data',
+      !fresh.cookies.has('crk_theme') && r.res.headers.get('clear-site-data') === '"storage"',
+    );
+  } else {
+    console.log('  - clear-cache control not rendered (NODE_ENV is not development) — skipped');
+  }
 }
 
 console.log(failures === 0 ? '\nGATE M1 #1: LOLOS' : `\nGATE M1 #1: GAGAL (${failures})`);

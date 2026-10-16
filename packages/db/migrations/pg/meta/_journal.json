@@ -218,6 +218,13 @@
       "when": 1790333256448,
       "tag": "0030_faithful_night_nurse",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792131258853,
+      "tag": "0031_mighty_wild_pack",
+      "breakpoints": true
     }
   ]
 }

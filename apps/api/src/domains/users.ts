@@ -55,6 +55,7 @@ import {
 import { Elysia, t } from 'elysia';
 import { fileIdFromUrl, findAvatarFile, removeFile, storeUpload } from '../files.ts';
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
+import { isIpLiteral, lookupIp } from '../lib/ip-lookup.ts';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import {
   type AuthState,
@@ -135,6 +136,18 @@ const TenantUser = t.Intersect([
     online: t.Boolean(),
   }),
 ]);
+
+/** Rough location of an IP (the "?" next to the user list's IP columns). */
+const IpInfoSchema = t.Object({
+  ip: t.String(),
+  private: t.Boolean(),
+  city: t.Nullable(t.String()),
+  region: t.Nullable(t.String()),
+  country: t.Nullable(t.String()),
+  countryCode: t.Nullable(t.String()),
+  isp: t.Nullable(t.String()),
+  asn: t.Nullable(t.String()),
+});
 
 /**
  * Presence (D-5). `last_seen_at` is touched at most once a minute per session
@@ -1139,6 +1152,56 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         summary: 'List users',
         description:
           'Users of the active tenant; paginated, searchable, sortable and filterable by group.',
+      },
+    },
+  )
+  .get(
+    '/ip-info',
+    async ({ query, set, requestId, tenantState }) => {
+      const ts = tenantOf(tenantState);
+      const ip = query.ip.trim();
+      if (!ts || !isIpLiteral(ip)) return notFound(set, requestId, 'Alamat IP');
+      // Only addresses this tenant's members were seen from: the endpoint is not a free
+      // lookup service for anyone holding `user.read`.
+      const db = unsafeAcrossTenants(); // join over users; tenant condition is explicit below
+      const [seen] = await db
+        .select({ id: schema.users.id })
+        .from(schema.clientUserMaps)
+        .innerJoin(schema.users, eq(schema.users.id, schema.clientUserMaps.user_id))
+        .where(
+          and(
+            scopeOf(ts.tenant, schema.clientUserMaps),
+            isNull(schema.clientUserMaps.deleted_at),
+            isNull(schema.users.deleted_at),
+            or(eq(schema.users.last_login_ip, ip), eq(schema.users.last_active_ip, ip)),
+          ),
+        )
+        .limit(1);
+      if (!seen) return notFound(set, requestId, 'Alamat IP');
+      const found = await lookupIp(ip);
+      if (!found.ok) {
+        set.status = 503;
+        return fail(
+          'service_unavailable',
+          found.reason === 'disabled'
+            ? 'Pencarian lokasi IP dimatikan'
+            : 'Layanan lokasi IP tidak menjawab',
+          requestId,
+          { reason: found.reason },
+        );
+      }
+      return ok(found.info);
+    },
+    {
+      beforeHandle: permission('user.read'),
+      query: t.Object({ ip: t.String({ minLength: 1, maxLength: 45 }) }),
+      response: { 200: OkSchema(IpInfoSchema), ...errorResponses },
+      detail: {
+        summary: 'Locate an IP address',
+        description:
+          'City, region, country and network of an address a member of the active tenant last ' +
+          'logged in or was last active from. Private addresses are answered without an outside ' +
+          'lookup; public ones go to the service configured by IP_LOOKUP_URL and are cached for a day.',
       },
     },
   )

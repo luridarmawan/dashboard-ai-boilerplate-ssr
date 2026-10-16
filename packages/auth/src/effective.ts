@@ -80,8 +80,37 @@ export interface TenantSummary {
   readonly isDefault: boolean;
 }
 
-/** Tenants a user may act in, for the switcher (B-4). Deliberately reads ACROSS tenants. */
-export async function tenantsOf(db: Db, userId: string): Promise<TenantSummary[]> {
+/**
+ * Tenants a user may act in, for the switcher (B-4). Deliberately reads ACROSS tenants.
+ * The same rule as `canActInTenant`, as a list: members see their memberships; a superadmin
+ * sees every live tenant (C-5), with `isDefault` still taken from their own membership row
+ * where one exists — so the switcher never offers less than the API would accept.
+ */
+export async function tenantsOf(
+  db: Db,
+  user: { id: string; is_superadmin: boolean },
+): Promise<TenantSummary[]> {
+  if (user.is_superadmin) {
+    const rows = await db
+      .select({
+        id: schema.clients.id,
+        code: schema.clients.code,
+        name: schema.clients.name,
+        isDefault: schema.clientUserMaps.is_default,
+      })
+      .from(schema.clients)
+      .leftJoin(
+        schema.clientUserMaps,
+        and(
+          eq(schema.clientUserMaps.client_id, schema.clients.id),
+          eq(schema.clientUserMaps.user_id, user.id),
+          isNull(schema.clientUserMaps.deleted_at),
+        ),
+      )
+      .where(isNull(schema.clients.deleted_at))
+      .orderBy(schema.clients.name);
+    return rows.map((r) => ({ ...r, isDefault: r.isDefault === true }));
+  }
   return db
     .select({
       id: schema.clients.id,
@@ -93,9 +122,10 @@ export async function tenantsOf(db: Db, userId: string): Promise<TenantSummary[]
     .innerJoin(schema.clients, eq(schema.clients.id, schema.clientUserMaps.client_id))
     .where(
       and(
-        eq(schema.clientUserMaps.user_id, userId),
+        eq(schema.clientUserMaps.user_id, user.id),
         isNull(schema.clientUserMaps.deleted_at),
         isNull(schema.clients.deleted_at),
       ),
-    );
+    )
+    .orderBy(schema.clients.name);
 }

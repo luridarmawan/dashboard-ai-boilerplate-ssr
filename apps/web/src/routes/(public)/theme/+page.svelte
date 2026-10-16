@@ -18,7 +18,11 @@ const modes = [
 const langName = (l: string) => (l === 'id' ? t('lang.id') : l === 'en' ? t('lang.en') : l);
 </script>
 
-<svelte:head><title>{t('theme.title')}</title></svelte:head>
+<svelte:head>
+  <title>{t('theme.title')}</title>
+  <!-- A cookie form, not content: keep it out of search results (R-4). -->
+  <meta name="robots" content="noindex" />
+</svelte:head>
 
 <div class="mx-auto max-w-5xl px-4 py-10">
   <h1>{t('theme.title')}</h1>

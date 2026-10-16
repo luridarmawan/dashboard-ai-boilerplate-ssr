@@ -82,3 +82,23 @@ export function parseOriginalPath(raw: string | null): TrappedPath | null {
 export function trappedPath(event: Pick<RequestEvent, 'request'>): TrappedPath | null {
   return parseOriginalPath(event.request.headers.get(ORIGINAL_PATH_HEADER));
 }
+
+export interface CanonicalInput {
+  /** The path in the visitor's address bar: the trapped/forwarded one, else the page's own. */
+  readonly visible: string;
+  /** The page's own route path (`event.url.pathname`), e.g. `/example` when rendering as `/`. */
+  readonly route: string;
+  /** The route `/` currently serves (`app.landing_route`), or null for the built-in page. */
+  readonly landing: string | null;
+}
+
+/**
+ * One URL per content (R-4, F-7): the page that answers `/` is canonical at `/` wherever it was
+ * reached from; every other page is canonical at the address the visitor sees, query dropped.
+ */
+export function canonicalPath(input: CanonicalInput): string {
+  if (input.landing && input.route === input.landing) return '/';
+  const q = input.visible.indexOf('?');
+  const path = q < 0 ? input.visible : input.visible.slice(0, q);
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/';
+}

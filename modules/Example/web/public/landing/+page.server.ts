@@ -1,5 +1,6 @@
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
+import { canonicalUrl } from '$lib/server/seo';
 import { apiFor, checkCsrf, csrfToken, str, unwrap } from '$lib/server/session';
 
 /**
@@ -23,6 +24,8 @@ export const load: ServerLoad = async (event) => {
     showPricing: cfg['example.show_pricing'] !== false,
     loggedIn: !!event.locals.session,
     origin: event.url.origin,
+    /** One URL per content (R-4): `/` while this page is the landing, else its own path. */
+    canonical: canonicalUrl(event),
     sent: event.url.searchParams.has('sent'),
   };
 };

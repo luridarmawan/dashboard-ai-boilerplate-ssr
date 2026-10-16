@@ -30,7 +30,7 @@ const ld = $derived(
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: data.brand,
-    url: `${data.origin}/`,
+    url: data.canonical,
     description,
     contactPoint: {
       '@type': 'ContactPoint',
@@ -104,11 +104,11 @@ function errorFor(code: unknown): string {
 <svelte:head>
   <title>{title}</title>
   <meta name="description" content={description} />
-  <link rel="canonical" href={`${data.origin}/`} />
+  <link rel="canonical" href={data.canonical} />
   <meta property="og:type" content="website" />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
-  <meta property="og:url" content={`${data.origin}/`} />
+  <meta property="og:url" content={data.canonical} />
   <meta property="og:site_name" content={data.brand} />
   <meta name="twitter:card" content="summary" />
   {@html `<script type="application/ld+json">${ld}</script>`}

@@ -24,8 +24,11 @@ import { webhooksDomain } from './domains/webhooks.ts';
 import { modulesPlugin } from './generated/modules.ts';
 import { metricsDomain } from './metrics.ts';
 import { csrf } from './plugins/csrf.ts';
+import { documentCsrfExempt } from './plugins/csrf-exempt.ts';
 import { demoMode } from './plugins/demo.ts';
+import { maintenanceMode } from './plugins/maintenance.ts';
 import { moduleGate } from './plugins/module-gate.ts';
+import { openapiModuleFilter } from './plugins/openapi-modules.ts';
 import { requestContext } from './plugins/request-context.ts';
 import { documentPermissions } from './plugins/tenancy.ts';
 
@@ -44,6 +47,9 @@ export const app = new Elysia()
   .use(metricsDomain)
   .use(csrf)
   .use(demoMode)
+  // E-10: after the session is known, before any route — /docs and /openapi.json included.
+  .use(maintenanceMode)
+  .use(openapiModuleFilter)
   .use(
     openapi({
       path: '/docs',
@@ -125,5 +131,7 @@ export const app = new Elysia()
 
 // Permission lines in the OpenAPI document come from the route guards themselves.
 documentPermissions(app);
+// …and so do the CSRF-exempt notes, from the list `modules:sync` generated.
+documentCsrfExempt(app);
 
 export type App = typeof app;

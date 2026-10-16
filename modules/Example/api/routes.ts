@@ -1,10 +1,16 @@
 import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
-import { notify } from '@app/api/notifications';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
 import { settings } from '@app/api/services';
-import { consumeRateLimit, parseRateLimitRule, rateLimitHeaders, writeAudit } from '@core/auth';
+import { sign } from '@app/api/webhooks';
+import {
+  consumeRateLimit,
+  parseRateLimitRule,
+  rateLimitHeaders,
+  timingSafeEqual,
+  writeAudit,
+} from '@core/auth';
 import {
   errorResponses,
   fail,
@@ -29,6 +35,7 @@ import {
 } from '@core/db';
 import { defineApiRoutes } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
+import { inboundInquiry, recordInquiry } from './inquiries.ts';
 import { InquiryBody, InquiryStateBody, ProductBody, ProductUpdateBody } from './schemas.ts';
 
 /**
@@ -51,6 +58,9 @@ async function storefrontTenant(clientId: string | null): Promise<string | null>
   defaultTenantId = row?.id ?? null;
   return defaultTenantId;
 }
+
+/** Signed inbound inquiries older than this are refused (replay window). */
+const INBOUND_MAX_AGE_S = 300;
 
 type ProductRow = typeof schema.exampleProducts.$inferSelect;
 const Product = t.Object({
@@ -387,16 +397,18 @@ export default defineApiRoutes(
           set.status = 429;
           return fail('rate_limited', 'Terlalu banyak pesan dari alamat ini', requestId);
         }
-        const tenant = forTenant(tid);
-        const id = newId();
-        await tenant.insert(schema.exampleInquiries, {
-          id,
-          name: body.name.trim(),
-          email: body.email.trim().toLowerCase(),
-          message: body.message.trim(),
-          source: body.source ?? null,
-          ip,
-        });
+        // Stored, announced (bell + MQTT) and audited like every other inquiry; the e-mails below
+        // are what only the public form owes — a copy to the reader and a receipt to the visitor.
+        await recordInquiry(
+          tid,
+          {
+            name: body.name.trim(),
+            email: body.email.trim().toLowerCase(),
+            message: body.message.trim(),
+            source: body.source ?? null,
+          },
+          { fallbackSource: null, ip, requestId },
+        );
         // Both e-mails are written in the language of the request that sent the form (K-2): the
         // web forwards the locale it resolved for the visitor, and the tenant's default backs it up.
         const locale = await mailLocale({ request, clientId: tid });
@@ -428,26 +440,6 @@ export default defineApiRoutes(
           clientId: tid,
           data: { name: body.name.trim(), message: body.message.trim() },
         });
-        // J-4: whoever may read inquiries in this tenant gets a bell notification (no email needed).
-        await notify({
-          clientId: tid,
-          permission: 'example.inquiry.read',
-          type: 'example.inquiry',
-          title: `Pesan baru dari ${body.name.trim()}`,
-          body: body.message.trim().slice(0, 200),
-          link: '/m/example/inquiries',
-          data: { inquiryId: id },
-        });
-        await writeAudit(db, {
-          clientId: tid,
-          actorId: null,
-          action: 'example.inquiry.create',
-          resource: 'example.inquiry',
-          resourceId: id,
-          ip,
-          requestId,
-          after: { email: body.email.trim().toLowerCase(), source: body.source ?? null },
-        });
         set.status = 201;
         return ok({ received: true as const });
       },
@@ -461,6 +453,65 @@ export default defineApiRoutes(
         detail: {
           summary: 'Submit the contact form',
           description: 'Public and rate-limited. Stored and emailed through the outbox.',
+        },
+      },
+    )
+    // Extension point 17: declared in ../csrf-exempt.ts, so an external system can post here
+    // without the CSRF pair. The request is anonymous (cookies are ignored); the HMAC signature
+    // over "<timestamp>.<raw body>" — the same scheme as outgoing webhooks — is the only proof.
+    .post(
+      '/inbound/inquiries',
+      async ({ body: raw, set, request, requestId, tenantState }) => {
+        const tid = await storefrontTenant(tenantState?.clientId ?? null);
+        const secret = tid
+          ? await settings.get<string | null>(tid, 'example.inbound_secret')
+          : null;
+        if (!tid || typeof secret !== 'string' || !secret.trim()) {
+          set.status = 503;
+          return fail('service_unavailable', 'Endpoint inquiry masuk belum diaktifkan', requestId);
+        }
+        const timestamp = request.headers.get('x-example-timestamp') ?? '';
+        const signature = request.headers.get('x-example-signature') ?? '';
+        const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+        const expected = await sign(secret.trim(), timestamp, raw);
+        if (
+          !/^\d+$/.test(timestamp) ||
+          age > INBOUND_MAX_AGE_S ||
+          !timingSafeEqual(signature, expected)
+        ) {
+          set.status = 401;
+          return fail('unauthorized', 'Tanda tangan tidak valid atau kedaluwarsa', requestId);
+        }
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = null;
+        }
+        const body = inboundInquiry(parsed);
+        if (!body) {
+          set.status = 422;
+          return fail('validation_failed', 'Isi inquiry tidak valid', requestId);
+        }
+        const id = await recordInquiry(tid, body, {
+          fallbackSource: 'inbound',
+          ip: null,
+          requestId,
+        });
+        set.status = 201;
+        return ok({ id });
+      },
+      {
+        // The raw text is what was signed; it is parsed only after the signature checks out.
+        parse: 'text',
+        body: t.String({ maxLength: 20_000 }),
+        response: { 201: OkSchema(t.Object({ id: t.String() })), ...errorResponses },
+        detail: {
+          summary: 'Receive an inquiry from an external system',
+          description:
+            'Signed with `X-Example-Timestamp` (Unix seconds) and `X-Example-Signature: sha256=<hex>` = ' +
+            'HMAC-SHA256 of `"<timestamp>.<raw body>"` with the `example.inbound_secret` setting; ' +
+            'older than 5 minutes is refused. Body: `{ name, email, message, source? }`.',
         },
       },
     )

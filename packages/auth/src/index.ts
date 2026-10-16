@@ -16,6 +16,7 @@ export {
   type TenantSummary,
   tenantsOf,
 } from './effective.ts';
+export { isMaintenanceExempt, MAINTENANCE_EXEMPT_GROUP } from './maintenance.ts';
 export {
   emailDomainAllowed,
   GOOGLE_AUTHORIZE_URL,
@@ -42,6 +43,7 @@ export {
 export {
   consume as consumeRateLimit,
   parseRule as parseRateLimitRule,
+  peek as peekRateLimit,
   type RateLimitResult,
   type RateLimitRule,
   rateLimitHeaders,

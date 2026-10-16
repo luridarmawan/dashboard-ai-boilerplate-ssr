@@ -29,5 +29,11 @@ function loginBackground(): string | null {
 export const load: LayoutServerLoad = async (event) => {
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'auth', variant);
-  return { layoutId: layout.layout.id, layoutVariant: variant, background: loginBackground() };
+  return {
+    layoutId: layout.layout.id,
+    layoutVariant: variant,
+    background: loginBackground(),
+    // Developer conveniences on the auth pages (the "clear cache" control): NODE_ENV=development only.
+    devTools: env.NODE_ENV === 'development',
+  };
 };

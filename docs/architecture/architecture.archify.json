@@ -4,11 +4,13 @@
   "meta": {
     "title": "Dashboard AI Boilerplate (SSR) — Architecture",
     "quality_profile": "showcase",
+    "output": "docs/architecture/architecture.html",
+    "locale": "en",
     "repository": {
-      "url": "https://github.com/luridarmawan/dashboard-ai-boilerplate-ssr",
+      "url": "git@github.com:luridarmawan/dashboard-ai-boilerplate-ssr.git",
       "provider": "github",
       "link_mode": "local-only",
-      "revision": "1a7669cc22e9c27434d46cf8367159350b7012c3"
+      "revision": "af1f19d5fe73e5e6390c72ab214994896ddb0948"
     },
     "views": [
       {
@@ -26,14 +28,15 @@
       },
       {
         "id": "modularity",
-        "label": "Modularity",
+        "label": "Modularity & tools",
         "focus": [
           "modules",
           "web",
           "api",
-          "ai"
+          "ai",
+          "clients"
         ],
-        "note": "modules:sync composes modules statically into web and API, touching no core file."
+        "note": "modules:sync composes modules statically into web and API. Chat, /v1/tools and the MCP server at /v1/mcp share one tool registry."
       },
       {
         "id": "background-work",
@@ -45,10 +48,9 @@
           "smtp",
           "storage"
         ],
-        "note": "Scheduler, queue, mail outbox and outgoing webhooks all rest on the database."
+        "note": "Scheduler, ad-hoc queue, mail outbox and outgoing webhooks all rest on the database; no broker is required."
       }
-    ],
-    "locale": "en"
+    ]
   },
   "layout": {
     "mode": "grid",
@@ -67,7 +69,7 @@
       "id": "clients",
       "type": "external",
       "label": "Browser & MCP clients",
-      "sublabel": "full HTML, no JS required",
+      "sublabel": "full HTML · MCP bearer tokens",
       "row": 1,
       "col": 0,
       "size": [
@@ -83,15 +85,23 @@
       "tag": "lb round_robin",
       "row": 1,
       "col": 1,
-      "sources": [
-        {
-          "path": "deploy/Caddyfile",
-          "label": "routes /v1 vs web"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "deploy/Caddyfile",
+          "line": 13,
+          "end_line": 27,
+          "label": "/v1, /docs, /openapi.json → api"
+        },
+        {
+          "path": "compose.prod.yml",
+          "line": 77,
+          "end_line": 82,
+          "label": "caddy service"
+        }
       ]
     },
     {
@@ -102,15 +112,22 @@
       "brand": "svelte",
       "row": 0,
       "col": 2,
-      "sources": [
-        {
-          "path": "apps/web/src/hooks.server.ts",
-          "label": "session, theme, locale"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "apps/web/src/hooks.server.ts",
+          "line": 20,
+          "end_line": 34,
+          "label": "session, config, theme, locale"
+        },
+        {
+          "path": "apps/web/src/lib/server/trap.ts",
+          "line": 5,
+          "label": "404 trapper (app.not_found_route)"
+        }
       ]
     },
     {
@@ -120,41 +137,56 @@
       "sublabel": "session, RBAC, CSRF, tenancy",
       "row": 1,
       "col": 2,
-      "sources": [
-        {
-          "path": "apps/api/src/plugins/auth.ts",
-          "label": "session & permissions"
-        },
-        {
-          "path": "apps/api/src/plugins/csrf.ts",
-          "label": "double-submit"
-        },
-        {
-          "path": "apps/api/src/plugins/tenancy.ts",
-          "label": "active tenant"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "apps/api/src/plugins/auth.ts",
+          "line": 50,
+          "label": "authContext · requireAuth"
+        },
+        {
+          "path": "apps/api/src/plugins/csrf.ts",
+          "line": 129,
+          "label": "double-submit cookie"
+        },
+        {
+          "path": "apps/api/src/plugins/tenancy.ts",
+          "line": 112,
+          "label": "requirePermission()"
+        }
       ]
     },
     {
       "id": "api",
       "type": "backend",
       "label": "Elysia API",
-      "sublabel": "api:3001 · /v1 · /docs",
+      "sublabel": "api:3001 · /v1 · /docs · /v1/mcp",
       "row": 1,
       "col": 3,
+      "size": [
+        190,
+        76
+      ],
       "sources": [
         {
           "path": "apps/api/src/app.ts",
+          "line": 44,
+          "end_line": 125,
           "label": "domain composition"
+        },
+        {
+          "path": "apps/api/src/domains/mcp.ts",
+          "line": 201,
+          "label": "MCP server, Streamable HTTP"
+        },
+        {
+          "path": "apps/api/src/metrics.ts",
+          "line": 110,
+          "label": "/metrics at the API root"
         }
-      ],
-      "size": [
-        180,
-        76
       ]
     },
     {
@@ -165,19 +197,26 @@
       "tag": "modules.json",
       "row": 0,
       "col": 3,
-      "sources": [
-        {
-          "path": "packages/module-kit/src/sync.ts",
-          "label": "codegen shims"
-        },
-        {
-          "path": "modules.json",
-          "label": "registration"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/module-kit/src/sync.ts",
+          "line": 179,
+          "label": "syncModules() codegen"
+        },
+        {
+          "path": "modules.json",
+          "line": 1,
+          "label": "registration"
+        },
+        {
+          "path": "apps/api/src/tools.ts",
+          "line": 1,
+          "label": "tool registry (extension point 8)"
+        }
       ]
     },
     {
@@ -188,15 +227,22 @@
       "tag": "optional",
       "row": 0,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/auth/src/redis.ts",
-          "label": "fail-open to DB"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/auth/src/redis.ts",
+          "line": 8,
+          "end_line": 9,
+          "label": "fail-open to the database"
+        },
+        {
+          "path": "compose.prod.yml",
+          "line": 318,
+          "label": "valkey service"
+        }
       ]
     },
     {
@@ -204,21 +250,30 @@
       "type": "database",
       "label": "Database",
       "sublabel": "MySQL · MariaDB · PostgreSQL",
+      "tag": "+ SQLite (tier 2)",
       "row": 1,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/db/src/descriptor.ts",
-          "label": "neutral descriptor"
-        },
-        {
-          "path": "packages/db/src/migrate.ts",
-          "label": "versioned migrations"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/db/src/descriptor.ts",
+          "line": 190,
+          "label": "neutral table descriptor"
+        },
+        {
+          "path": "packages/db/src/migrate.ts",
+          "line": 22,
+          "end_line": 24,
+          "label": "mysql · pg · sqlite families"
+        },
+        {
+          "path": "packages/db/src/dialect/sqlite-client.ts",
+          "line": 47,
+          "label": "bun:sqlite client"
+        }
       ]
     },
     {
@@ -228,33 +283,51 @@
       "sublabel": "uploads volume or S3",
       "row": 2,
       "col": 2,
-      "sources": [
-        {
-          "path": "packages/storage/src/index.ts",
-          "label": "local | s3"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/storage/src/index.ts",
+          "line": 162,
+          "end_line": 184,
+          "label": "local | s3 from env"
+        },
+        {
+          "path": "apps/api/src/files.ts",
+          "line": 66,
+          "label": "storeUpload(), the only write path"
+        }
       ]
     },
     {
       "id": "ai",
       "type": "external",
-      "label": "AI provider",
-      "sublabel": "OpenAI-compatible",
+      "label": "AI provider & MCP servers",
+      "sublabel": "OpenAI-compatible · MCP HTTP",
       "row": 2,
       "col": 3,
+      "size": [
+        190,
+        76
+      ],
       "sources": [
         {
           "path": "modules/AI/api/providers.ts",
-          "label": "per-tenant profiles"
+          "line": 116,
+          "label": "resolveProvider() per tenant"
+        },
+        {
+          "path": "modules/AI/api/mcp-client.ts",
+          "line": 63,
+          "label": "discoverRemoteTools()"
+        },
+        {
+          "path": "modules/AI/api/mcp-client.ts",
+          "line": 97,
+          "label": "callRemoteTool()"
         }
-      ],
-      "size": [
-        180,
-        76
       ]
     },
     {
@@ -264,23 +337,29 @@
       "sublabel": "outbox, webhooks, dead-letter",
       "row": 2,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/runtime/src/scheduler.ts",
-          "label": "claim lease"
-        },
-        {
-          "path": "apps/api/src/queue.ts",
-          "label": "enqueue & retry"
-        },
-        {
-          "path": "apps/api/src/webhooks.ts",
-          "label": "signed delivery"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/runtime/src/scheduler.ts",
+          "line": 22,
+          "end_line": 24,
+          "label": "lease claim by UPDATE"
+        },
+        {
+          "path": "apps/api/src/runtime.ts",
+          "line": 59,
+          "end_line": 134,
+          "label": "core jobs + module jobs.ts"
+        },
+        {
+          "path": "apps/api/src/queue.ts",
+          "line": 263,
+          "end_line": 273,
+          "label": "conditional claim, exactly once"
+        }
       ]
     },
     {
@@ -290,15 +369,21 @@
       "sublabel": "outgoing mail, HMAC POST",
       "row": 3,
       "col": 4,
-      "sources": [
-        {
-          "path": "packages/mail/src/index.ts",
-          "label": "outbox"
-        }
-      ],
       "size": [
         180,
         76
+      ],
+      "sources": [
+        {
+          "path": "packages/mail/src/index.ts",
+          "line": 225,
+          "label": "deliverOutbox()"
+        },
+        {
+          "path": "apps/api/src/webhooks.ts",
+          "line": 14,
+          "label": "X-CRK-Signature HMAC-SHA256"
+        }
       ]
     }
   ],
@@ -361,7 +446,7 @@
       "id": "modules-api",
       "from": "modules",
       "to": "api",
-      "label": "plugin /v1/m/<ns>",
+      "label": "plugin /v1/m/<ns> · tools",
       "variant": "dashed",
       "labelDy": 24
     },
@@ -389,7 +474,7 @@
       "id": "api-ai",
       "from": "api",
       "to": "ai",
-      "label": "chat & tool streaming",
+      "label": "chat stream · tools/call",
       "labelDy": 60
     },
     {
@@ -420,6 +505,7 @@
       "items": [
         "One origin: /v1 and pages share a single domain",
         "Full HTML — session, permissions, theme, locale in the first byte",
+        "Unknown URLs are trapped and handed to a module's 404 page (app.not_found_route)",
         "One x-request-id spans web → API → log"
       ]
     },
@@ -427,18 +513,20 @@
       "dot": "emerald",
       "title": "API core & modules",
       "items": [
-        "OpenAPI and /metrics published from route schemas",
+        "OpenAPI from route schemas; disabled modules are hidden per tenant",
         "One gate: session, effective permissions, CSRF, tenant",
-        "modules:sync composes modules without touching core"
+        "/v1/mcp is a thin shell over the same tool registry — bearer tokens, every call audited",
+        "Google sign-in is optional: linked by Google sub, MFA still enforced"
       ]
     },
     {
       "dot": "violet",
       "title": "Data & work",
       "items": [
-        "One descriptor → MySQL, MariaDB, PostgreSQL migrations",
+        "One descriptor → MySQL, MariaDB, PostgreSQL; SQLite as the tier-2 dialect",
         "Jobs claimed by one conditional UPDATE: exactly once at any scale",
-        "Mail outbox, HMAC webhooks, files to a volume or S3"
+        "Mail outbox with open/click tracking, HMAC webhooks, files to a volume or S3",
+        "Prometheus scrapes /metrics at the API root; Grafana & Alertmanager ship in compose.prod.yml"
       ]
     }
   ]

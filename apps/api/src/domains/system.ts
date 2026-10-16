@@ -8,13 +8,15 @@ import { Elysia, t } from 'elysia';
 import rootPkg from '../../../../package.json' with { type: 'json' };
 import { instanceId } from '../instance.ts';
 import { registerAppMetrics } from '../metrics.ts';
+import { mqttState } from '../mqtt.ts';
 import { describeCause } from '../plugins/request-context.ts';
 
 /**
  * System endpoints (PRD M-4, M-5).
  *
  *   /health   liveness — the process is up; never touches a dependency
- *   /ready    readiness — the database answers (Redis only when a redis driver is active)
+ *   /ready    readiness — the database answers (Redis only when a redis driver is active; the
+ *             MQTT broker only when the client is switched on in Settings → MQTT)
  *   /version  build identity + installed modules, for support and for the module admin UI
  */
 
@@ -94,6 +96,16 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
         }
       }
 
+      // MQTT is a dependency only once an admin switched it on: then "ready" means "subscribed".
+      const mq = mqttState();
+      if (mq.enabled) {
+        checks.mqtt = {
+          ok: mq.connected,
+          ms: 0,
+          ...(mq.connected ? {} : { error: mq.lastError ?? 'belum tersambung ke broker' }),
+        };
+      }
+
       const ready = Object.values(checks).every((c) => c.ok);
       if (!ready) set.status = 503;
       return ok({ ready, dialect: activeDialect, checks });
@@ -117,7 +129,8 @@ export const system = new Elysia({ name: 'system', tags: ['system'] })
       },
       detail: {
         summary: 'Readiness check',
-        description: 'Answers when the database (and Redis, when enabled) respond.',
+        description:
+          'Answers when the database (and Redis or the MQTT broker, when enabled) respond.',
       },
     },
   )

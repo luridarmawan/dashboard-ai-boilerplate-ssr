@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { Db } from '@core/db';
-import { consume, parseRule } from '../src/rate-limit.ts';
+import { consume, parseRule, peek } from '../src/rate-limit.ts';
 import {
   configureRateLimitRedis,
   configureSessionRedis,
@@ -113,6 +113,40 @@ describe('Redis adapters (Decision M, ROADMAP §8 item 7)', () => {
     expect(keys.some((k) => k.startsWith('crk:rl:login:ip:1.2.3.4:'))).toBe(true);
     expect(calls.filter((c) => c === 'PEXPIREAT').length).toBe(2); // once per window
     expect(hits.n).toBe(0);
+  });
+
+  test('rate limit: peek reads the window without spending from it, in Redis and in the table', async () => {
+    const { r } = fakeRedis();
+    configureRateLimitRedis(() => r);
+    const { db, hits } = dbStub();
+    const rule = parseRule('2/60');
+    const t0 = new Date(Date.UTC(2100, 0, 1, 10, 0, 5));
+    // Nothing spent yet: full budget, and peeking twice changes nothing.
+    expect(await peek(db, 'login:ip:9.9.9.9', rule, t0)).toMatchObject({
+      allowed: true,
+      remaining: 2,
+    });
+    expect(await peek(db, 'login:ip:9.9.9.9', rule, t0)).toMatchObject({
+      allowed: true,
+      remaining: 2,
+    });
+    await consume(db, 'login:ip:9.9.9.9', rule, t0);
+    expect(await peek(db, 'login:ip:9.9.9.9', rule, t0)).toMatchObject({
+      allowed: true,
+      remaining: 1,
+    });
+    await consume(db, 'login:ip:9.9.9.9', rule, t0);
+    expect(await peek(db, 'login:ip:9.9.9.9', rule, t0)).toMatchObject({
+      allowed: false,
+      remaining: 0,
+    });
+    // The next window is untouched.
+    const later = await peek(db, 'login:ip:9.9.9.9', rule, new Date(t0.getTime() + 60_000));
+    expect(later).toMatchObject({ allowed: true, remaining: 2 });
+    expect(hits.n).toBe(0);
+    // Without Redis the table is read — once, and nothing is written.
+    resetRedisAdapters();
+    await expect(peek(db, 'k', rule)).rejects.toThrow('database touched');
   });
 
   test('rate limit: a failing Redis falls back to the database path (never fails open)', async () => {

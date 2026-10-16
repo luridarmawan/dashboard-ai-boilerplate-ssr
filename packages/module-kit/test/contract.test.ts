@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { defineConfig, defineWidgets, ModuleContractError } from '../src/contract.ts';
+import {
+  defineConfig,
+  defineCsrfExempt,
+  defineWidgets,
+  ModuleContractError,
+} from '../src/contract.ts';
 
 describe('defineWidgets (extension point 11)', () => {
   const base = {
@@ -50,5 +55,36 @@ describe('defineConfig field groups (extension point 6)', () => {
     expect(() => defineConfig('Alpha', [section([{ key: 'Bad Key' }])])).toThrow(
       ModuleContractError,
     );
+  });
+});
+
+describe('defineCsrfExempt (extension point 17)', () => {
+  const ok = {
+    method: 'POST',
+    path: '/hooks/:provider',
+    reason: 'Signed by the provider.',
+  } as const;
+
+  test('an exact path with params and a reason is accepted as-is', () => {
+    expect(defineCsrfExempt('Alpha', [ok])).toEqual([ok]);
+  });
+
+  test('safe methods, wildcards, absolute or trailing-slash paths and empty reasons are refused', () => {
+    const bad = [
+      { ...ok, method: 'GET' },
+      { ...ok, path: '/hooks/*' },
+      { ...ok, path: '/v1/m/alpha/hooks' },
+      { ...ok, path: '/hooks/' },
+      { ...ok, path: 'hooks' },
+      { ...ok, reason: '  ' },
+    ];
+    for (const e of bad)
+      expect(() => defineCsrfExempt('Alpha', [e as never]), JSON.stringify(e)).toThrow(
+        ModuleContractError,
+      );
+  });
+
+  test('the same method + path twice is refused', () => {
+    expect(() => defineCsrfExempt('Alpha', [ok, ok])).toThrow(/duplikat/);
   });
 });

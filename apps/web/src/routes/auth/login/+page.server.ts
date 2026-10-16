@@ -23,6 +23,8 @@ export const load: PageServerLoad = async (event) => {
     google: cfgBool(event.locals.config, 'security.google_enabled') === true,
     // /auth/google bounces here with ?error= when the provider is off or the API refused to start.
     ssoError: event.url.searchParams.get('error'),
+    // E-10: say up front that only administrators get in, instead of after a correct password.
+    maintenance: event.locals.maintenance.active,
   };
 };
 

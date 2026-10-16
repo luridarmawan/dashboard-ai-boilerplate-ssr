@@ -21,7 +21,7 @@ export type ColumnType =
   | { readonly kind: 'boolean' }
   | { readonly kind: 'datetime' }
   | { readonly kind: 'json' }
-  | { readonly kind: 'decimal' }
+  | { readonly kind: 'decimal'; readonly precision: number; readonly scale: number }
   | { readonly kind: 'enum'; readonly values: readonly string[]; readonly length: number };
 
 export type DefaultValue =
@@ -151,7 +151,19 @@ export const col = {
   /** Never query inside JSON in portable code — MariaDB stores it as longtext. */
   json: (): Col => mk({ kind: 'json' }),
   /** decimal(18,4). Money is never a float. */
-  money: (): Col => mk({ kind: 'decimal' }),
+  money: (): Col => col.decimal(18, 4),
+  /**
+   * Exact decimal with an explicit precision and scale — coordinates, rates, measurements.
+   * Never a float on any dialect: SQLite keeps it as TEXT (see the emitter). Read back as a
+   * string by Drizzle on every dialect; convert at the edge.
+   */
+  decimal: (precision: number, scale: number): Col => {
+    assertLength(precision, 1, 65, 'decimal precision');
+    if (!Number.isInteger(scale) || scale < 0 || scale > precision) {
+      throw new DescriptorError(`decimal scale harus bilangan bulat 0..${precision}`);
+    }
+    return mk({ kind: 'decimal', precision, scale });
+  },
   /** varchar + application constraint — native enums are forbidden (§4.3). */
   enum: (values: readonly string[], length = 32): Col => {
     if (values.length === 0) throw new DescriptorError('enum butuh minimal satu nilai');

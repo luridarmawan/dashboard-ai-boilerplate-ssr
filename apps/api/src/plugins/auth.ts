@@ -10,6 +10,7 @@ import {
 import { clientIpFromForwarded, fail } from '@core/contracts';
 import { newId, unsafeAcrossTenants } from '@core/db';
 import { Elysia } from 'elysia';
+import { isCsrfExempt } from './csrf-exempt.ts';
 
 /**
  * Session resolution (PRD A-3, A-4, B-2). Runs on every request: an `Authorization: Bearer`
@@ -18,6 +19,7 @@ import { Elysia } from 'elysia';
  * / D1), and exposed as `auth` to handlers. Routes that need a user opt in with `requireAuth`;
  * everything else in the API is protected by default because the domain groups mount it
  * (Principle 4). Bearer requests carry no cookie, so the CSRF plugin exempts them structurally.
+ * Routes a module declared CSRF-exempt never get a cookie session — only a bearer token counts.
  *
  * The lookup uses the raw connection on purpose: sessions and users are global tables, and
  * the active tenant is only KNOWN after the session is read.
@@ -71,6 +73,9 @@ export const authContext = new Elysia({ name: 'auth-context' }).derive(
         },
       };
     }
+    // A CSRF-exempt module route (extension point 17) is anonymous by construction: honouring the
+    // cookie here would let any site post to it with the visitor's session.
+    if (isCsrfExempt(request)) return { auth: null };
     const token = cookie[SESSION_COOKIE]?.value;
     if (typeof token !== 'string' || !looksLikeToken(token)) return { auth: null };
     const found = await findSession(db, token, { ip: clientIp(request, server) });

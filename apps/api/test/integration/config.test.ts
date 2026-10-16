@@ -101,9 +101,16 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(d(r).notFoundRoutes).toEqual(
       expect.arrayContaining([{ path: '/resolve', module: 'Example' }]),
     );
-    // The Application tab is drawn in three groups (owner's ask of 2026-09-26): identity
-    // (name | lead, logo | favicon), default handlers (three per row), theme & layout.
-    expect(app?.groups?.map((g) => g.key)).toEqual(['identity', 'handlers', 'appearance']);
+    // The Application tab is drawn in four groups (owner's asks of 2026-09-26 and 2026-10-01):
+    // identity (name | lead, logo | favicon), default handlers (three per row), theme & layout,
+    // availability (maintenance mode, E-10).
+    expect(app?.groups?.map((g) => g.key)).toEqual([
+      'identity',
+      'handlers',
+      'appearance',
+      'seo',
+      'availability',
+    ]);
     const layout = (app?.fields ?? []).map((f) => `${f.key}:${f.group}:${f.width}`);
     expect(layout).toEqual([
       'app.name:identity:half',
@@ -117,6 +124,8 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'app.default_locale:appearance:third',
       'app.timezone:appearance:third',
       'app.allowed_themes:appearance:full',
+      'app.robots_txt:seo:full',
+      'app.maintenance_mode:availability:full',
     ]);
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');
     expect((d(r).routes as string[]).includes('/dashboard')).toBe(true);
@@ -125,6 +134,33 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     expect(publicRoutes).toEqual(expect.arrayContaining(['/', '/auth/login']));
     expect(publicRoutes).not.toContain('/dashboard');
     expect(publicRoutes).not.toContain('/settings');
+  });
+
+  test('a deployment-wide section (mqtt) is offered in the global scope only and refuses a tenant save', async () => {
+    const names = async (qs: string) =>
+      ((await json(await call(`/v1/configuration${qs}`, {}, [admin]))).data?.sections as {
+        section: string;
+        scope: string | null;
+      }[]) ?? [];
+    // The admin signed in above is the seeded superadmin: both scopes answer.
+    expect((await names('')).some((s) => s.section === 'mqtt')).toBe(false);
+    const global = await names('?scope=global');
+    expect(global.find((s) => s.section === 'mqtt')?.scope).toBe('global');
+    const refused = await json(
+      await put('/v1/configuration', { values: { 'mqtt.url': 'mqtt://broker:1883' } }, [admin]),
+    );
+    expect(refused.success).toBe(false);
+    const details = (refused.error?.details ?? {}) as Record<string, string>;
+    expect(details['mqtt.url']).toMatch(/global/);
+    const saved = await json(
+      await put(
+        '/v1/configuration',
+        { scope: 'global', values: { 'mqtt.url': 'mqtt://broker:1883', 'mqtt.enabled': false } },
+        [admin],
+      ),
+    );
+    expect(saved.success, JSON.stringify(saved)).toBe(true);
+    await put('/v1/configuration', { scope: 'global', values: { 'mqtt.url': '' } }, [admin]);
   });
 
   test('route values are validated against the route registry when saved (§4.7 rule 1)', async () => {
@@ -299,6 +335,14 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       [admin],
     );
     expect(refused.status).toBe(422);
+    // The API docs drop its routes for this tenant; anonymous readers see the global state.
+    const docPaths = async (cookies: string[]) =>
+      Object.keys(
+        ((await (await call('/openapi.json', {}, cookies)).json()) as { paths: object }).paths,
+      );
+    expect((await docPaths([admin])).some((p) => p.startsWith('/v1/m/dummy/'))).toBe(false);
+    expect(await docPaths([admin])).toContain('/v1/m/example/products');
+    expect(await docPaths([])).toContain('/v1/m/dummy/ping');
     const list = await json(await call('/v1/module', {}, [admin]));
     expect(
       (d(list) as unknown as { name: string; effective: boolean }[]).find((m) => m.name === 'Dummy')
@@ -306,6 +350,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
     ).toBe(false);
     expect((await put('/v1/module/Dummy/enabled', { enabled: null }, [admin])).status).toBe(200); // drop override
     expect((await call('/v1/m/dummy/ping', {}, [admin])).status).toBe(200);
+    expect(await docPaths([admin])).toContain('/v1/m/dummy/ping');
     expect(await sectionsOf()).toContain('dummy');
     expect(await routesOf()).toEqual(expect.arrayContaining(['/hello-dummy', '/m/dummy/notes']));
   });

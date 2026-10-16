@@ -95,6 +95,17 @@ const envSchema = z
       .default('false')
       .transform((v) => v === 'true'),
     /**
+     * Maintenance mode, deployment-wide (E-10): every page and every API route answers 503 with the
+     * maintenance page — except signing in, and only members of the Administrator group (or a
+     * superadmin) may sign in. Lives in .env because it must hold while the database is being
+     * migrated or restored; the per-tenant switch an admin flips at runtime is `app.maintenance_mode`
+     * in Settings. Both processes read it: the web renders the page, the API refuses the calls.
+     */
+    MAINTENANCE_MODE: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    /**
      * The built-in page-pattern gallery at `/examples` (L-19) — part of the boilerplate, not of
      * every deployment built from it. With `false` those pages answer 404, the sidebar entry is
      * gone, and the `route` settings (landing, home) no longer offer them.
@@ -160,6 +171,24 @@ const envSchema = z
      */
     MAIL_BCC: z.email().optional(),
     /**
+     * MQTT bootstrap: used when the matching `mqtt.*` setting is EMPTY in the database, same rule
+     * as SMTP_* (E-6). The client itself is switched on in Settings → MQTT (`mqtt.enabled`);
+     * these only say where the broker is. mqtt://, mqtts://, ws:// or wss://.
+     */
+    MQTT_URL: z
+      .string()
+      .regex(/^(mqtts?|wss?):\/\/\S+$/, 'mis. mqtt://broker:1883, mqtts://…, ws://… atau wss://…')
+      .optional(),
+    MQTT_USERNAME: z.string().min(1).max(191).optional(),
+    MQTT_PASSWORD: z.string().min(1).optional(),
+    /** Prefix of every client id this deployment uses (`<prefix>-<instance>`); default `crk`. */
+    MQTT_CLIENT_ID_PREFIX: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/, 'huruf, angka, - dan _ saja (maks. 32)')
+      .optional(),
+    /** Topic namespace of this deployment, prepended to every subscription and publish. */
+    MQTT_TOPIC_PREFIX: z.string().max(191).optional(),
+    /**
      * Google sign-in bootstrap (A-8): used when `security.google_client_id` / `_secret` are EMPTY
      * in the database, same rule as SMTP_*. The feature itself is switched on in Settings.
      */
@@ -168,6 +197,14 @@ const envSchema = z
     /** Test seams only: point the code exchange and identity lookup at a local stand-in for Google. */
     GOOGLE_OAUTH_TOKEN_URL: z.url().optional(),
     GOOGLE_OAUTH_USERINFO_URL: z.url().optional(),
+    /**
+     * Where the user list looks up the city and country of a login / last-active IP: a URL
+     * template with `{ip}`, answering JSON in the ipwho.is or ip-api.com shape. The address is
+     * sent to that service, so `off` switches the lookup off (the "?" button then says so).
+     */
+    IP_LOOKUP_URL: z
+      .union([z.literal('off'), z.url().includes('{ip}')])
+      .default('https://ipwho.is/{ip}'),
     /**
      * Dev web server address (also read by apps/web/vite.config.ts). The api uses it only as the
      * LAST fallback for links in e-mails when neither APP_ORIGIN nor a forwarding request is there.

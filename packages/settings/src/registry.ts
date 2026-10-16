@@ -44,6 +44,22 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       { key: 'identity', title: { id: 'Aplikasi', en: 'Application' } },
       { key: 'handlers', title: { id: 'Halaman baku', en: 'Default handler' } },
       { key: 'appearance', title: { id: 'Tema & tata letak', en: 'Theme & layout' } },
+      {
+        key: 'seo',
+        title: { id: 'SEO', en: 'SEO' },
+        note: {
+          id: 'Apa yang boleh dirayapi mesin pencari. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
+          en: 'What search engines may crawl. The sitemap (/sitemap.xml) is generated from the public pages.',
+        },
+      },
+      {
+        key: 'availability',
+        title: { id: 'Ketersediaan', en: 'Availability' },
+        note: {
+          id: 'Menutup aplikasi sementara untuk semua orang kecuali administrator.',
+          en: 'Temporarily closes the application to everyone but administrators.',
+        },
+      },
     ],
     fields: [
       {
@@ -198,6 +214,43 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         group: 'appearance',
         width: 'third',
       },
+      // ---- robots.txt (F-7). The body `GET /robots.txt` serves; the handler always appends the
+      // `Sitemap:` line, so the setting only decides what crawlers may and may not visit.
+      {
+        key: 'app.robots_txt',
+        type: 'text',
+        title: { id: 'Isi robots.txt', en: 'robots.txt body' },
+        note: {
+          id: 'Aturan untuk perayap mesin pencari; baris Sitemap ditambahkan otomatis. Kosongkan untuk aturan bawaan: izinkan semua kecuali dasbor, halaman modul, halaman masuk, pemilih tema/bahasa, dan tautan undangan.',
+          en: 'Rules for search-engine crawlers; the Sitemap line is added automatically. Leave empty for the built-in rules: allow everything except the dashboard, module pages, sign-in, the theme/language pickers and invitation links.',
+        },
+        default: null,
+        public: true,
+        max: 4000,
+        order: 11,
+        group: 'seo',
+        width: 'full',
+      },
+      // ---- Maintenance mode (E-10). The runtime switch, per tenant with global fallback like every
+      // other setting; MAINTENANCE_MODE in .env is the deployment-wide switch for when the database
+      // itself is the thing being worked on. Either one closes the doors to everyone outside the
+      // Administrator group; the .env one also hides every public page, this one leaves public
+      // pages up and lets modules decide what to switch off (`locals.maintenance` on the web,
+      // `maintenanceState()` in the API).
+      {
+        key: 'app.maintenance_mode',
+        type: 'boolean',
+        title: { id: 'Mode pemeliharaan', en: 'Maintenance mode' },
+        note: {
+          id: 'Aktif: hanya anggota group Administrator (dan superadmin) yang bisa masuk dan bekerja; pengguna lain melihat halaman pemeliharaan, pengunjung anonim masih bisa membuka halaman publik. Modul membaca nilai ini untuk mematikan fiturnya sendiri. MAINTENANCE_MODE=true di .env menutup seluruh aplikasi, termasuk halaman publik, kecuali halaman masuk.',
+          en: 'On: only members of the Administrator group (and superadmins) can sign in and work; other users see the maintenance page, anonymous visitors can still open public pages. Modules read this value to switch their own features off. MAINTENANCE_MODE=true in .env closes the whole application, public pages included, except the sign-in page.',
+        },
+        default: false,
+        public: true,
+        order: 12,
+        group: 'availability',
+        width: 'full',
+      },
     ],
   },
   {
@@ -231,8 +284,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'string',
         title: { id: 'Rate limit login', en: 'Login rate limit' },
         note: {
-          id: 'Bentuk <jumlah>/<detik>, mis. 10/900.',
-          en: '<count>/<seconds>, e.g. 10/900.',
+          id: 'Percobaan login gagal per IP dan per akun, bentuk <jumlah>/<detik>, mis. 10/900. Login yang berhasil tidak dihitung.',
+          en: 'Failed login attempts per IP and per account, <count>/<seconds>, e.g. 10/900. Successful logins do not count.',
         },
         default: null,
         max: 20,
@@ -537,6 +590,123 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: false,
         order: 6,
+      },
+    ],
+  },
+  {
+    section: 'mqtt',
+    title: { id: 'MQTT', en: 'MQTT' },
+    note: {
+      id: 'Satu klien MQTT per proses API untuk seluruh deployment: modul berlangganan topik lewat mqtt.ts dan menerbitkan lewat publish(). Berlaku tanpa restart; kolom yang kosong memakai MQTT_* dari .env.',
+      en: 'One MQTT client per API process for the whole deployment: modules subscribe through mqtt.ts and publish through publish(). Applies without a restart; empty fields fall back to MQTT_* from .env.',
+    },
+    order: 25,
+    // One broker per deployment: the section lives in the global scope only (see ConfigSectionDef.scope).
+    scope: 'global',
+    // Extension point 6: a round trip through the stored broker — connect, subscribe to a private
+    // probe topic, publish to it, wait for the echo — so the verdict covers URL, credentials, ACL
+    // and the protocol version, not only "the port answered".
+    actions: [
+      {
+        key: 'test',
+        label: { id: 'Uji koneksi', en: 'Test connection' },
+        endpoint: '/v1/configuration/mqtt/test',
+        permission: 'config.edit',
+        note: {
+          id: 'Menguji broker yang tersimpan (bukan yang belum disimpan di formulir ini) — simpan dulu, lalu uji. Satu pesan dikirim ke topik uji dan ditunggu kembali.',
+          en: 'Tests the stored broker (not unsaved edits in this form) — save first, then test. One message is published to a probe topic and awaited back.',
+        },
+      },
+    ],
+    fields: [
+      {
+        key: 'mqtt.enabled',
+        type: 'boolean',
+        title: { id: 'Aktifkan klien MQTT', en: 'Enable the MQTT client' },
+        note: {
+          id: 'Mati = tidak ada koneksi ke broker; langganan modul tidak aktif dan publish() menjawab "disabled". Menyala = setiap instance API tersambung dan berlangganan.',
+          en: 'Off = no broker connection; module subscriptions are inactive and publish() answers "disabled". On = every API instance connects and subscribes.',
+        },
+        default: false,
+        order: 0,
+      },
+      {
+        key: 'mqtt.url',
+        type: 'string',
+        title: { id: 'URL broker', en: 'Broker URL' },
+        note: {
+          id: 'mqtt://host:1883, mqtts://host:8883, ws://host:9001/mqtt atau wss://…. Kosong = MQTT_URL dari .env.',
+          en: 'mqtt://host:1883, mqtts://host:8883, ws://host:9001/mqtt or wss://…. Empty = MQTT_URL from .env.',
+        },
+        default: null,
+        max: 512,
+        order: 1,
+      },
+      {
+        key: 'mqtt.username',
+        type: 'string',
+        title: { id: 'Username', en: 'Username' },
+        note: { id: 'Kosong = MQTT_USERNAME dari .env.', en: 'Empty = MQTT_USERNAME from .env.' },
+        default: null,
+        max: 191,
+        order: 2,
+      },
+      {
+        key: 'mqtt.password',
+        type: 'secret',
+        title: { id: 'Password', en: 'Password' },
+        note: { id: 'Kosong = MQTT_PASSWORD dari .env.', en: 'Empty = MQTT_PASSWORD from .env.' },
+        order: 3,
+      },
+      {
+        key: 'mqtt.protocol_version',
+        type: 'select',
+        title: { id: 'Versi protokol', en: 'Protocol version' },
+        note: {
+          id: 'MQTT 5 diperlukan agar langganan bersama ($share) membuat satu pesan diproses sekali di banyak instance. Pilih 3.1.1 hanya untuk broker lama; di sana setiap instance menerima setiap pesan.',
+          en: 'MQTT 5 is required for shared subscriptions ($share) so that one message is processed once across instances. Choose 3.1.1 only for old brokers; there every instance receives every message.',
+        },
+        default: '5',
+        options: [
+          { value: '5', label: { id: 'MQTT 5 (disarankan)', en: 'MQTT 5 (recommended)' } },
+          { value: '4', label: { id: 'MQTT 3.1.1', en: 'MQTT 3.1.1' } },
+        ],
+        order: 4,
+      },
+      {
+        key: 'mqtt.client_id_prefix',
+        type: 'string',
+        title: { id: 'Awalan client id', en: 'Client id prefix' },
+        note: {
+          id: 'Client id tiap instance = <awalan>-<instance>. Huruf, angka, - dan _. Kosong = MQTT_CLIENT_ID_PREFIX dari .env, lalu "crk".',
+          en: 'Each instance connects as <prefix>-<instance>. Letters, digits, - and _. Empty = MQTT_CLIENT_ID_PREFIX from .env, then "crk".',
+        },
+        default: null,
+        max: 32,
+        order: 5,
+      },
+      {
+        key: 'mqtt.topic_prefix',
+        type: 'string',
+        title: { id: 'Awalan topik', en: 'Topic prefix' },
+        note: {
+          id: 'Namespace deployment ini di broker bersama, mis. "acme/prod": ditambahkan ke setiap langganan dan publish, dan dihilangkan sebelum pesan sampai ke modul. Kosong = MQTT_TOPIC_PREFIX dari .env, lalu tanpa awalan.',
+          en: 'This deployment\'s namespace on a shared broker, e.g. "acme/prod": prepended to every subscription and publish, and stripped before a message reaches a module. Empty = MQTT_TOPIC_PREFIX from .env, then no prefix.',
+        },
+        default: null,
+        max: 191,
+        order: 6,
+      },
+      {
+        key: 'mqtt.publish_events',
+        type: 'boolean',
+        title: { id: 'Terbitkan event inti ke broker', en: 'Publish core events to the broker' },
+        note: {
+          id: 'Setiap event inti (user.created, job.finished, …) diterbitkan sebagai JSON ke events/<nama event> — padanan webhook keluar untuk sistem yang mendengarkan MQTT.',
+          en: 'Every core event (user.created, job.finished, …) is published as JSON to events/<event name> — the MQTT counterpart of outgoing webhooks.',
+        },
+        default: false,
+        order: 7,
       },
     ],
   },

@@ -46,15 +46,59 @@ export function rateLimitHeaders(r: RateLimitResult): Record<string, string> {
   return h;
 }
 
+function windowOf(rule: RateLimitRule, now: Date) {
+  const windowMs = rule.windowSeconds * 1000;
+  const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
+  return { windowStart, resetAt: new Date(windowStart.getTime() + windowMs) };
+}
+
+/**
+ * Read the current window WITHOUT spending from it — for callers that only want to know whether
+ * the key is already exhausted and will `consume` later, once they know the request deserves to
+ * count (the login handler counts failed attempts only, A-2). Same window arithmetic as `consume`,
+ * so the two agree on `resetAt`; a Redis error falls back to the table, like `consume` does.
+ */
+export async function peek(
+  db: Db,
+  key: string,
+  rule: RateLimitRule,
+  now = new Date(),
+): Promise<RateLimitResult> {
+  const { windowStart, resetAt } = windowOf(rule, now);
+  const result = (count: number): RateLimitResult => ({
+    allowed: count < rule.limit,
+    limit: rule.limit,
+    remaining: Math.max(0, rule.limit - count),
+    resetAt,
+  });
+
+  const redis = rateLimitRedis();
+  if (redis) {
+    try {
+      const raw = await redis.send('GET', [`${RL_PREFIX}${key}:${windowStart.getTime()}`]);
+      const count = raw === null || raw === undefined ? 0 : Number(raw);
+      if (Number.isFinite(count)) return result(count);
+    } catch (err) {
+      warnRedis('rate-limit', err);
+    }
+  }
+
+  const [row] = await db
+    .select({ count: schema.rateLimits.count, window_start: schema.rateLimits.window_start })
+    .from(schema.rateLimits)
+    .where(eq(schema.rateLimits.key, key))
+    .limit(1);
+  // No row, or a row from an earlier window, means nothing has been spent in this one.
+  return result(row && row.window_start.getTime() === windowStart.getTime() ? row.count : 0);
+}
+
 export async function consume(
   db: Db,
   key: string,
   rule: RateLimitRule,
   now = new Date(),
 ): Promise<RateLimitResult> {
-  const windowMs = rule.windowSeconds * 1000;
-  const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
-  const resetAt = new Date(windowStart.getTime() + windowMs);
+  const { windowStart, resetAt } = windowOf(rule, now);
 
   const redis = rateLimitRedis();
   if (redis) {

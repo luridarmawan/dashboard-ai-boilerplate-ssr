@@ -4,8 +4,7 @@
  */
 
 /** state + PKCE verifier + where to go afterwards, httpOnly, 10 minutes, scoped to the flow's path. */
-export const OAUTH_COOKIE = 'crk_oauth';
-export const OAUTH_COOKIE_PATH = '/auth/google';
+export { OAUTH_COOKIE, OAUTH_COOKIE_PATH } from './cookies.ts';
 
 export function safeNext(next: string | null | undefined, home = '/dashboard'): string {
   return next?.startsWith('/') && !next.startsWith('//') ? next : home;

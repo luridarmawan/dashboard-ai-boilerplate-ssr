@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "version": "0.0.1",
-  "description": "Boilerplate dashboard admin ber-AI \u2014 API-first, SSR, modular, database-agnostic, self-hosted",
+  "description": "Boilerplate dashboard admin ber-AI — API-first, SSR, modular, database-agnostic, self-hosted",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -26,6 +26,7 @@
     "ci:idle-memory": "sh scripts/ci/idle-memory.sh",
     "ci:modgen-guard": "sh scripts/ci/modgen-guard.sh",
     "ci:starter-check": "bun run scripts/create-module-template.ts --check",
+    "ci:mqtt-smoke": "bun --env-file=/dev/null run scripts/ci/mqtt-smoke.ts",
     "ci:sync-pure": "bun run bootstrap && git diff --exit-code && test -z \"$(git ls-files --others --exclude-standard)\"",
     "clean": "bun run scripts/clean.ts",
     "db:codegen": "bun run --cwd packages/db codegen",
@@ -90,6 +91,8 @@
     "@core/settings": "workspace:*",
     "@core/ui-theme": "workspace:*",
     "@types/bun": "^1.2.0",
+    "aedes": "^1.2.0",
+    "mqtt": "^5.16.0",
     "typescript": "^5.9.0"
   }
 }

@@ -22,12 +22,15 @@ const permissions = $derived([...data.permissions].sort());
 <div class="page">
   <h1>{t('dashboard.hello', { name: data.user.name })}</h1>
   <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-    <Card title={t('dashboard.active_tenant')} class="md:col-span-2 xl:col-span-3">
-      <div class="grid gap-2 text-sm sm:grid-cols-2">
-        <p><span class="text-muted-foreground">{t('dashboard.email')}</span><br />{data.user.email}{#if data.user.isSuperadmin} · <code>superadmin</code>{/if}</p>
-        <p><span class="text-muted-foreground">{t('dashboard.active_tenant')}</span><br />{data.tenants.find((x) => x.id === data.clientId)?.name ?? '—'}</p>
-      </div>
-    </Card>
+    <!-- With a single tenant there is nothing to tell apart, so the card is not rendered. -->
+    {#if data.tenants.length > 1}
+      <Card title={t('dashboard.active_tenant')} class="md:col-span-2 xl:col-span-3">
+        <div class="grid gap-2 text-sm sm:grid-cols-2">
+          <p><span class="text-muted-foreground">{t('dashboard.email')}</span><br />{data.user.email}{#if data.user.isSuperadmin} · <code>superadmin</code>{/if}</p>
+          <p><span class="text-muted-foreground">{t('dashboard.active_tenant')}</span><br />{data.tenants.find((x) => x.id === data.clientId)?.name ?? '—'}</p>
+        </div>
+      </Card>
+    {/if}
     {#each data.widgets as w (w.id)}
       <Card title={w.title} description={w.module} class={span(w.size)}>
         {#if w.Component}
