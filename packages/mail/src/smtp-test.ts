@@ -99,6 +99,13 @@ export function buildTestMessage(
     readonly sentBy?: string | undefined;
     /** Tracking pixel (J-6) — the test mail is what people try tracking with first. */
     readonly pixelUrl?: string | undefined;
+    /**
+     * "I received this" page (J-6 `acted`): the one signal an image proxy or a link scanner
+     * cannot produce, because the page asks for a deliberate press of a button.
+     */
+    readonly confirmUrl?: string | undefined;
+    /** What the button points at instead of `confirmUrl` — the tracked click redirect. */
+    readonly buttonUrl?: string | undefined;
   } = {},
 ): TestMessage {
   const sentAt = opts.sentAt ?? new Date();
@@ -120,6 +127,10 @@ export function buildTestMessage(
     '',
     ...rows.map(([k, v]) => `${k.padEnd(12)} ${v}`),
     '',
+    // Plain-text readers get the page itself: no click is counted, the confirmation still is.
+    ...(opts.confirmUrl
+      ? ['Konfirmasi bahwa email ini sampai di kotak masuk:', opts.confirmUrl, '']
+      : []),
     `Dikirim oleh \`${sentBy}\` — abaikan jika tidak Anda kenali.`,
   ].join('\n');
   const esc = (s: string) =>
@@ -135,7 +146,13 @@ ${rows
       `<tr><td style="padding:6px 8px;border-top:1px solid #e4e4e7;color:#71717a;white-space:nowrap">${esc(k)}</td><td style="padding:6px 8px;border-top:1px solid #e4e4e7"><code>${esc(v)}</code></td></tr>`,
   )
   .join('\n')}
-</table>
+</table>${
+    opts.confirmUrl
+      ? `
+<p style="margin:20px 0 0"><a href="${esc(opts.buttonUrl ?? opts.confirmUrl)}" style="display:inline-block;background:#18181b;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px">Konfirmasi email diterima</a></p>
+<p style="margin:8px 0 0;font-size:12px;color:#71717a">Tombol ini memberi tahu halaman Pengaturan bahwa email uji benar-benar sampai dan dibaca.</p>`
+      : ''
+  }
 <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">Dikirim oleh <code>${esc(sentBy)}</code> — abaikan jika tidak Anda kenali.</p>
 </div>${opts.pixelUrl ? `<img src="${esc(opts.pixelUrl)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ''}</body></html>`;
   return {

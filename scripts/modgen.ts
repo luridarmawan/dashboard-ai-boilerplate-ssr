@@ -119,7 +119,11 @@ function register(spec: ModuleSpec, dir: string): boolean {
     modules: { name: string; source: string; path: string }[];
   };
   if (json.modules.some((m) => m.name === spec.name)) return false;
-  json.modules.push({ name: spec.name, source: 'local', path: relative(root, dir) });
+  json.modules.push({
+    name: spec.name,
+    source: 'local',
+    path: relative(root, dir).split('\\').join('/'),
+  });
   writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`);
   return true;
 }

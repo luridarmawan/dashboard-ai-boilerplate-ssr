@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { MessageKey } from '@core/i18n';
-import { onMount } from 'svelte';
+import { onDestroy, onMount } from 'svelte';
 import { enhance } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
@@ -79,7 +79,72 @@ type ActionResult = {
   /** Set on failures: the message key to render instead of `message`, with `params` filled in. */
   i18n?: string;
   params?: Record<string, string>;
+  /** A delivered test e-mail whose fate the page follows (opened, clicked, confirmed). */
+  engagement?: { id: string; scope: string };
 };
+
+/** What `/settings/action/mail-test/<id>` answers — the outbox row's engagement columns. */
+type Engagement = {
+  status: string;
+  sentAt: string | null;
+  openedAt: string | null;
+  openCount: number;
+  clickedAt: string | null;
+  actedAt: string | null;
+};
+
+/**
+ * Following a test e-mail: poll its row while the operator goes to the inbox, and stop once the
+ * recipient confirmed receipt (nothing stronger can happen after that) or after a while — the
+ * outbox keeps the record for later. One follower per action; a new run replaces the old one.
+ */
+const FOLLOW_EVERY_MS = 4_000;
+const FOLLOW_FOR_MS = 15 * 60_000;
+let engagements = $state<Record<string, Engagement>>({});
+let following = $state<Record<string, boolean>>({});
+const followers = new Map<string, ReturnType<typeof setInterval>>();
+
+function unfollow(id: string) {
+  const timer = followers.get(id);
+  if (timer) clearInterval(timer);
+  followers.delete(id);
+  following = { ...following, [id]: false };
+}
+
+function follow(id: string, target: { id: string; scope: string }) {
+  unfollow(id);
+  const until = Date.now() + FOLLOW_FOR_MS;
+  const poll = async () => {
+    try {
+      const res = await fetch(
+        `/settings/action/mail-test/${encodeURIComponent(target.id)}?scope=${target.scope}`,
+      );
+      if (res.ok) {
+        const e = (await res.json()) as Engagement | null;
+        if (e) engagements = { ...engagements, [id]: e };
+        if (e?.actedAt) unfollow(id);
+      }
+    } catch {
+      // A missed poll is retried on the next tick; the outbox stays the record either way.
+    }
+    if (Date.now() > until) unfollow(id);
+  };
+  following = { ...following, [id]: true };
+  followers.set(id, setInterval(poll, FOLLOW_EVERY_MS));
+  void poll();
+}
+
+onDestroy(() => {
+  for (const timer of followers.values()) clearInterval(timer);
+  followers.clear();
+});
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString(locale === 'en' ? 'en-GB' : 'id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
 
 /**
  * What the operator reads. API messages are Indonesian by contract, so a failure that declared a
@@ -138,7 +203,12 @@ async function runAction(section: string, key: string, inputKey?: string | null)
     body.set('scope', data.scope);
     if (inputKey) body.set(`input.${inputKey}`, inputs[inputId(section, key)] ?? '');
     const res = await fetch('/settings/action', { method: 'POST', body });
-    results = { ...results, [id]: (await res.json()) as ActionResult };
+    const result = (await res.json()) as ActionResult;
+    results = { ...results, [id]: result };
+    const { [id]: _previous, ...rest } = engagements;
+    engagements = rest;
+    if (result.engagement) follow(id, result.engagement);
+    else unfollow(id);
   } catch (err) {
     results = {
       ...results,
@@ -498,6 +568,37 @@ $effect(() => {
                   <ul class="mt-1 text-xs text-muted-foreground">
                     {#each r.details as d, i (i)}<li>{d}</li>{/each}
                   </ul>
+                {/if}
+                {#if r.engagement}
+                  {@const e = engagements[`${s.section}:${a.key}`]}
+                  {@const live = following[`${s.section}:${a.key}`]}
+                  <!-- What happened to the mail after it left, strongest signal last. The pixel and
+                       the click only exist when open tracking is on; the confirmation always does. -->
+                  <div class="mt-3 rounded-md border p-3 text-sm" data-testid={`action-engagement-${s.section}-${a.key}`}>
+                    <p class="mb-2 flex items-center gap-2 font-medium">
+                      {t('settings.mail_engagement.title')}
+                      {#if live}<span class="flex items-center gap-1 text-xs font-normal text-muted-foreground"><Icon name="refresh" size={12} class="animate-spin" />{t('settings.mail_engagement.watching')}</span>{/if}
+                    </p>
+                    <ul class="grid gap-1">
+                      {#each [
+                        { key: 'sent', icon: 'check', at: e?.sentAt ?? null, extra: '' },
+                        { key: 'opened', icon: 'eye', at: e?.openedAt ?? null, extra: e && e.openCount > 1 ? ` ×${e.openCount}` : '' },
+                        { key: 'clicked', icon: 'link', at: e?.clickedAt ?? null, extra: '' },
+                        { key: 'confirmed', icon: 'check-double', at: e?.actedAt ?? null, extra: '' },
+                      ] as step (step.key)}
+                        <li class={`flex items-center gap-2 ${step.at ? 'text-success' : 'text-muted-foreground'}`} data-step={step.key} data-done={step.at ? 'true' : 'false'}>
+                          <Icon name={step.icon} size={14} />
+                          <span>{t(`settings.mail_engagement.${step.key}` as MessageKey)}</span>
+                          <span class="text-xs">{step.at ? `${fmtTime(step.at)}${step.extra}` : t('settings.mail_engagement.not_yet')}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                    {#if !live && !e?.actedAt}
+                      <p class="mt-2 text-xs text-muted-foreground">{t('settings.mail_engagement.stopped')} <a href="/outbox">{t('settings.mail_engagement.outbox')}</a></p>
+                    {:else if !e?.actedAt}
+                      <p class="mt-2 text-xs text-muted-foreground">{t('settings.mail_engagement.hint')}</p>
+                    {/if}
+                  </div>
                 {/if}
               </div>
             {/if}

@@ -29,6 +29,15 @@ export function newOpenToken(): string {
 
 const TOKEN = /^[0-9a-f]{32}$/;
 
+/**
+ * `coalesce(column, now)`: keep the first time a signal was seen. The time is bound through the
+ * column's own encoder — a bare `Date` inside `sql` is not, and on SQLite (epoch milliseconds)
+ * the UPDATE then silently changes no row.
+ */
+type DateColumn = (typeof schema.outboxEmail)['opened_at' | 'clicked_at' | 'acted_at'];
+const firstTime = (column: DateColumn, now: Date) =>
+  sql`coalesce(${column}, ${sql.param(now, column)})`;
+
 /** Give the row its token if it has none yet; returns the token in effect. */
 export async function ensureOpenToken(db: Db, id: string, current: string | null): Promise<string> {
   if (current) return current;
@@ -53,7 +62,7 @@ export async function markOpened(db: Db, token: string): Promise<boolean> {
   const r = await db
     .update(schema.outboxEmail)
     .set({
-      opened_at: sql`coalesce(${schema.outboxEmail.opened_at}, ${now})`,
+      opened_at: firstTime(schema.outboxEmail.opened_at, now),
       open_count: sql`${schema.outboxEmail.open_count} + 1`,
     })
     .where(eq(schema.outboxEmail.open_token, token));
@@ -78,12 +87,81 @@ export async function resolveClick(db: Db, token: string): Promise<string | null
   await db
     .update(schema.outboxEmail)
     .set({
-      clicked_at: sql`coalesce(${schema.outboxEmail.clicked_at}, ${now})`,
+      clicked_at: firstTime(schema.outboxEmail.clicked_at, now),
       // A click proves the mail was open even when the image never loaded.
-      opened_at: sql`coalesce(${schema.outboxEmail.opened_at}, ${now})`,
+      opened_at: firstTime(schema.outboxEmail.opened_at, now),
     })
     .where(eq(schema.outboxEmail.id, row.id));
   return link;
+}
+
+/**
+ * The recipient confirmed receipt on the page the mail linked to — `acted` for a mail whose only
+ * "action" is that confirmation (the Settings → Email test). Keyed by the row's own token, and
+ * only for the templates the caller names, so the token of a reset or an invite can never be
+ * spent this way. Repeats keep the first time. False = unknown token or not such a mail.
+ */
+export async function markConfirmed(
+  db: Db,
+  token: string,
+  templates: readonly string[],
+): Promise<boolean> {
+  if (!TOKEN.test(token) || !templates.length) return false;
+  const now = new Date();
+  const r = await db
+    .update(schema.outboxEmail)
+    .set({
+      acted_at: firstTime(schema.outboxEmail.acted_at, now),
+      // Reaching the page means the link was followed and the mail was open, image or not.
+      clicked_at: firstTime(schema.outboxEmail.clicked_at, now),
+      opened_at: firstTime(schema.outboxEmail.opened_at, now),
+    })
+    .where(
+      and(
+        eq(schema.outboxEmail.open_token, token),
+        inArray(schema.outboxEmail.template, [...templates]),
+      ),
+    );
+  return affected(r) === 1;
+}
+
+export interface Engagement {
+  readonly status: string;
+  readonly sentAt: string | null;
+  readonly openedAt: string | null;
+  readonly openCount: number;
+  readonly clickedAt: string | null;
+  readonly actedAt: string | null;
+}
+
+/** Delivery state and engagement of one outbox row, as ISO strings; null = no such row. */
+export async function engagementOf(
+  db: Db,
+  id: string,
+  where: { readonly template: string; readonly clientId: string | null },
+): Promise<Engagement | null> {
+  const [row] = await db
+    .select()
+    .from(schema.outboxEmail)
+    .where(
+      and(
+        eq(schema.outboxEmail.id, id),
+        eq(schema.outboxEmail.template, where.template),
+        where.clientId === null
+          ? isNull(schema.outboxEmail.client_id)
+          : eq(schema.outboxEmail.client_id, where.clientId),
+      ),
+    )
+    .limit(1);
+  if (!row) return null;
+  return {
+    status: row.status,
+    sentAt: row.sent_at?.toISOString() ?? null,
+    openedAt: row.opened_at?.toISOString() ?? null,
+    openCount: row.open_count,
+    clickedAt: row.clicked_at?.toISOString() ?? null,
+    actedAt: row.acted_at?.toISOString() ?? null,
+  };
 }
 
 export interface ActedInput {
@@ -130,7 +208,7 @@ export async function markActed(db: Db, input: ActedInput): Promise<boolean> {
     .set({
       acted_at: now,
       // Following the link is the strongest proof of an open there is.
-      opened_at: sql`coalesce(${schema.outboxEmail.opened_at}, ${now})`,
+      opened_at: firstTime(schema.outboxEmail.opened_at, now),
     })
     .where(eq(schema.outboxEmail.id, row.id));
   return true;

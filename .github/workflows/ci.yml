@@ -308,6 +308,8 @@ jobs:
         with:
           bun-version: 1.4.2
       - run: bun install --frozen-lockfile
+      # mqtt.ts → services.ts → @core/module-kit/registry, which only exists after codegen (gitignored)
+      - run: bun run bootstrap
       - name: Mosquitto 2 dengan konfigurasi dev (anonim, 1883)
         run: |
           docker run -d --name mosquitto -p 31883:1883 \

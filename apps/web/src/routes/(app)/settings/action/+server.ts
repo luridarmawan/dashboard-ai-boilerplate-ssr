@@ -72,15 +72,22 @@ export const POST: RequestHandler = async (event) => {
     const value = form.get(`input.${declared.input.key}`);
     body[declared.input.key] = typeof value === 'string' ? value.slice(0, 2000) : '';
   }
-  const r = await apiPostData<{ ok: boolean; message: string; details?: string[] }>(
-    event,
-    declared.endpoint,
-    body,
-  );
+  const r = await apiPostData<{
+    ok: boolean;
+    message: string;
+    details?: string[];
+    engagement?: { id: string };
+  }>(event, declared.endpoint, body);
   if (!r.data) {
     return json(fromApi(r.error, r.details), {
       status: r.status,
     });
   }
-  return json({ ok: r.data.ok, message: r.data.message, details: r.data.details ?? [] });
+  return json({
+    ok: r.data.ok,
+    message: r.data.message,
+    details: r.data.details ?? [],
+    // A delivered test e-mail: the page follows what happens to it (see ./mail-test/[id]).
+    ...(r.data.engagement ? { engagement: { id: r.data.engagement.id, scope } } : {}),
+  });
 };

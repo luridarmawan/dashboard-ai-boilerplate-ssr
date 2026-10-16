@@ -206,9 +206,51 @@ describe.skipIf(!enabled)('settings → email tester (J-1, E-3, extension point 
       // Opening it marks the row: the whole point of trying tracking with the test mail.
       expect((await call(`/v1/mail/o/${row?.open_token}.gif`)).status).toBe(200);
       expect((await lastRowFor('lacak@contoh.test'))?.opened_at).not.toBeNull();
+      // The button goes through the tracked redirect to the confirmation page.
+      expect(src).toContain(`/v1/mail/c/${row?.open_token}`);
+      const click = await call(`/v1/mail/c/${row?.open_token}`);
+      expect(click.status).toBe(302);
+      expect(click.headers.get('location')).toContain(`/auth/mail-received/${row?.open_token}`);
     } finally {
       await put({ scope: 'global', values: { 'mail.track_opens': false } }, [admin]);
     }
+  });
+
+  test('the recipient confirms receipt, and the tester follows the row (opened, clicked, confirmed)', async () => {
+    // Tracking off: no pixel, no tracked redirect — the confirmation button is there regardless.
+    const r = await json(
+      await call(
+        '/v1/configuration/mail/test',
+        { method: 'POST', body: JSON.stringify({ scope: 'global', to: 'konfirm@contoh.test' }) },
+        [admin],
+      ),
+    );
+    const result = r.data as unknown as ActionResult & { engagement?: { id: string } };
+    expect(result.ok).toBe(true);
+    const row = await lastRowFor('konfirm@contoh.test');
+    expect(result.engagement?.id).toBe(row?.id);
+    const src = (smtp?.messages.at(-1) ?? '').replace(/=\r\n/g, '');
+    expect(src).toContain(`/auth/mail-received/${row?.open_token}`);
+    expect(src).not.toContain('/v1/mail/o/');
+
+    const follow = async (scope = 'global') =>
+      json(await call(`/v1/configuration/mail/test/${row?.id}?scope=${scope}`, {}, [admin]));
+    const before = await follow();
+    expect(before.data).toMatchObject({ status: 'sent', openedAt: null, actedAt: null });
+    // Another scope does not see the global test.
+    expect((await follow('tenant')).success).toBe(false);
+
+    // Only a test mail's token confirms anything; an unknown one is a 404.
+    expect((await call(`/v1/mail/received/${'0'.repeat(32)}`, { method: 'POST' })).status).toBe(
+      404,
+    );
+    expect((await call(`/v1/mail/received/${row?.open_token}`, { method: 'POST' })).status).toBe(
+      200,
+    );
+    const after = await follow();
+    expect(after.data?.actedAt).not.toBeNull();
+    expect(after.data?.clickedAt).not.toBeNull();
+    expect(after.data?.openedAt).not.toBeNull();
   });
 
   test('a test that fails is on record too, as a failed row, and can be sent again from the outbox', async () => {
