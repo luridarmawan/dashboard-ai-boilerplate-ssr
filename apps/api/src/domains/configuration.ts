@@ -4,9 +4,11 @@ import { unsafeAcrossTenants } from '@core/db';
 import {
   buildTestMessage,
   createSmtpTransport,
+  engagementOf,
   formatFrom,
   newOpenToken,
   recordTestEmail,
+  SMTP_TEST_TEMPLATE,
   sendTestEmail,
   smtpHints,
   tlsMode,
@@ -425,14 +427,24 @@ export const configuration = new Elysia({
       const transport = createSmtpTransport(smtp, { timeoutMs: 10_000 });
       // Built before sending so the outbox row is titled with the real subject either way.
       const sentBy = 'Pengaturan → Email';
-      // J-6: the test mail carries the pixel when this scope tracks opens — it is the mail an
-      // admin opens to see tracking work, so it must be the first one that is tracked.
+      // J-6: the test mail carries the pixel and the tracked button when this scope tracks
+      // opens — it is the mail an admin opens to see tracking work, so it must be the first one
+      // that is tracked. The "I received this" button is there either way: confirming receipt is
+      // a deliberate act by the reader, not passive tracking, and it is what the tester waits for.
       const tracked =
         (await settings.get<boolean | null>(scope.clientId, 'mail.track_opens')) === true;
-      const openToken = tracked ? newOpenToken() : null;
+      const openToken = newOpenToken();
+      const origin = publicOrigin(request);
+      const confirmUrl = `${origin}/auth/mail-received/${openToken}`;
       const message = buildTestMessage(smtp, to, {
         sentBy,
-        ...(openToken ? { pixelUrl: `${publicOrigin(request)}/v1/mail/o/${openToken}.gif` } : {}),
+        confirmUrl,
+        ...(tracked
+          ? {
+              pixelUrl: `${origin}/v1/mail/o/${openToken}.gif`,
+              buttonUrl: `${origin}/v1/mail/c/${openToken}`,
+            }
+          : {}),
       });
       const record = (error: string | null) =>
         recordTestEmail(db, {
@@ -442,6 +454,7 @@ export const configuration = new Elysia({
           sentBy,
           error,
           openToken,
+          link: confirmUrl,
         });
       const started = Date.now();
       let step = 'Koneksi/autentikasi';
@@ -451,19 +464,21 @@ export const configuration = new Elysia({
         const r = await sendTestEmail(smtp, to, { transport, message });
         const ms = Date.now() - started;
         await audit(true, `terkirim dalam ${ms} ms`);
-        await record(null);
+        const outboxId = await record(null);
         return ok({
           ok: true,
           message: `Email uji terkirim ke ${to} (${ms} ms) — periksa kotak masuk, termasuk folder spam.`,
           details: [
             ...context,
             ...(smtp.bcc ? [`bcc ${smtp.bcc}`] : []),
-            ...(openToken ? ['pelacakan buka aktif — pixel disertakan'] : []),
+            ...(tracked ? ['pelacakan buka aktif — pixel disertakan'] : []),
             ...(r.messageId ? [`message-id ${r.messageId}`] : []),
             ...(r.rejected.length ? [`ditolak: ${r.rejected.join(', ')}`] : []),
             ...(r.response ? [`respons server: ${r.response}`] : []),
             'tercatat di Outbox',
           ],
+          // The page follows this row: opened, clicked, confirmed — while the operator waits.
+          engagement: { id: outboxId },
         });
       } catch (err) {
         const e = err as { code?: string; responseCode?: number; command?: string };
@@ -489,7 +504,13 @@ export const configuration = new Elysia({
       }),
       response: {
         200: OkSchema(
-          t.Object({ ok: t.Boolean(), message: t.String(), details: t.Array(t.String()) }),
+          t.Object({
+            ok: t.Boolean(),
+            message: t.String(),
+            details: t.Array(t.String()),
+            /** The outbox row of a delivered test, to follow with `GET /mail/test/:id`. */
+            engagement: t.Optional(t.Object({ id: t.String() })),
+          }),
         ),
         ...errorResponses,
       },
@@ -497,6 +518,56 @@ export const configuration = new Elysia({
         summary: 'Send a test email',
         description:
           'Sends straight through the SMTP settings of this scope, bypassing the outbox queue.',
+      },
+    },
+  )
+  /**
+   * What became of one test e-mail after it left: opened (pixel), clicked (tracked button),
+   * confirmed (the recipient pressed "received" on the page the mail links to). The Settings
+   * page polls this under the tester's verdict. Only `smtp-test` rows of the caller's scope are
+   * visible here — the outbox itself has its own, wider permission.
+   */
+  .get(
+    '/mail/test/:id',
+    async ({ auth, params, query, set, requestId, tenantState }) => {
+      const scope = scopeOf(actor(auth), tenantState?.clientId ?? null, query.scope);
+      if (!scope.ok) {
+        set.status = 403;
+        return fail('forbidden', 'Hanya superadmin yang boleh melihat uji global', requestId);
+      }
+      const e = await engagementOf(unsafeAcrossTenants(), params.id, {
+        template: SMTP_TEST_TEMPLATE,
+        clientId: scope.clientId,
+      });
+      if (!e) {
+        set.status = 404;
+        return fail('not_found', 'Email uji tidak ditemukan', requestId);
+      }
+      return ok(e);
+    },
+    {
+      beforeHandle: permission('config.edit'),
+      params: t.Object({ id: t.String({ maxLength: 64 }) }),
+      query: t.Object({
+        scope: t.Optional(t.Union([t.Literal('tenant'), t.Literal('global')])),
+      }),
+      response: {
+        200: OkSchema(
+          t.Object({
+            status: t.String(),
+            sentAt: t.Nullable(t.String()),
+            openedAt: t.Nullable(t.String()),
+            openCount: t.Integer(),
+            clickedAt: t.Nullable(t.String()),
+            actedAt: t.Nullable(t.String()),
+          }),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary: 'Get test email engagement',
+        description:
+          'Delivery status and whether the test email was opened, its button clicked, and its receipt confirmed.',
       },
     },
   )

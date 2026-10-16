@@ -93,6 +93,20 @@ describe('test message', () => {
       expect(body).not.toContain('secret-password');
     }
     expect(m.html).toContain('&quot;Acme Dash&quot; &lt;noreply@x.test&gt;');
+    expect(m.html).not.toContain('Konfirmasi email diterima');
+  });
+  test('the confirmation button leads to the page, or through the tracked redirect when given', () => {
+    const page = 'https://app.test/auth/mail-received/abc';
+    const plain = buildTestMessage(smtp, 'me@x.test', { confirmUrl: page });
+    expect(plain.html).toContain(`href="${page}"`);
+    expect(plain.text).toContain(page);
+    const tracked = buildTestMessage(smtp, 'me@x.test', {
+      confirmUrl: page,
+      buttonUrl: 'https://app.test/v1/mail/c/abc',
+    });
+    expect(tracked.html).toContain('href="https://app.test/v1/mail/c/abc"');
+    // Plain text has no tracked redirect: the page itself, where the confirmation still counts.
+    expect(tracked.text).toContain(page);
   });
   test('sendTestEmail hands the message to the transport and normalises the result', async () => {
     const sent: unknown[] = [];

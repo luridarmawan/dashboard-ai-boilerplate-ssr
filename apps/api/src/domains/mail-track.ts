@@ -1,7 +1,7 @@
-import { errorResponses, fail } from '@core/contracts';
+import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
 import { unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
-import { markOpened, resolveClick } from '@core/mail';
+import { markConfirmed, markOpened, resolveClick, SMTP_TEST_TEMPLATE } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { requestContext } from '../plugins/request-context.ts';
 
@@ -77,6 +77,30 @@ export const mailTrack = new Elysia({ name: 'mail-track', prefix: '/mail', tags:
       detail: {
         summary: 'Email link redirect',
         description: 'Records the click and redirects to the original link.',
+      },
+    },
+  )
+  /**
+   * The recipient of a Settings → Email test pressed "received" on the page its button leads to.
+   * A POST from a form, never the GET of the link itself: a link scanner fetching the URL must not
+   * be able to confirm anything. Only test mails can be confirmed this way.
+   */
+  .post(
+    '/received/:token',
+    async ({ params, set, requestId }) => {
+      const done = await markConfirmed(unsafeAcrossTenants(), params.token, [SMTP_TEST_TEMPLATE]);
+      if (!done) {
+        set.status = 404;
+        return fail('not_found', 'Tautan tidak dikenal atau sudah tidak berlaku', requestId);
+      }
+      return ok({ confirmed: true });
+    },
+    {
+      params: t.Object({ token: Token }),
+      response: { 200: OkSchema(t.Object({ confirmed: t.Boolean() })), 404: errorResponses[404] },
+      detail: {
+        summary: 'Confirm a test email was received',
+        description: 'Records that the recipient confirmed receipt of a test email.',
       },
     },
   );

@@ -24,8 +24,11 @@ import {
 
 export {
   type ActedInput,
+  type Engagement,
+  engagementOf,
   ensureOpenToken,
   markActed,
+  markConfirmed,
   markOpened,
   newOpenToken,
   resolveClick,
@@ -158,6 +161,11 @@ export const SMTP_TEST_TEMPLATE = 'smtp-test';
 /** Payload of an `smtp-test` row: only what the body needs beyond the live configuration. */
 export interface SmtpTestPayload {
   readonly sentBy?: string;
+  /**
+   * The "I received this" page the mail's button leads to, carrying the row's token. Kept in the
+   * payload so a re-send links to the same page, and so the click redirect has somewhere to go.
+   */
+  readonly link?: string;
 }
 
 /** What the log transport (no SMTP outside production) pretends to be when a test is re-sent. */
@@ -178,6 +186,8 @@ function renderSmtpTest(
   const msg = buildTestMessage(smtp ?? LOG_STAND_IN(brand), to, {
     sentBy: payload.sentBy,
     pixelUrl: track.pixelUrl,
+    confirmUrl: payload.link,
+    buttonUrl: track.buttonUrl,
   });
   return { subject: msg.subject, html: msg.html, text: msg.text };
 }
@@ -189,8 +199,10 @@ export interface RecordTestEmailInput {
   readonly sentBy: string;
   /** null = delivered; a message = what SMTP answered, and the row is `failed`. */
   readonly error: string | null;
-  /** The token the pixel in this very mail carries, when tracking was on for the scope. */
+  /** The token this very mail carries (pixel, click redirect, confirmation page). */
   readonly openToken?: string | null;
+  /** The confirmation page the mail links to — see `SmtpTestPayload.link`. */
+  readonly link?: string | null;
 }
 
 /**
@@ -201,7 +213,10 @@ export interface RecordTestEmailInput {
 export async function recordTestEmail(db: Db, input: RecordTestEmailInput): Promise<string> {
   const id = newId();
   const now = new Date();
-  const payload: SmtpTestPayload = { sentBy: input.sentBy };
+  const payload: SmtpTestPayload = {
+    sentBy: input.sentBy,
+    ...(input.link ? { link: input.link } : {}),
+  };
   await db.insert(schema.outboxEmail).values({
     id,
     client_id: input.clientId ?? null,
