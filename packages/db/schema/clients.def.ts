@@ -29,6 +29,8 @@ export const clients = defineTable({
     address: col.text().nullable(),
     rt: col.varchar(8).nullable(),
     rw: col.varchar(8).nullable(),
+    /** Free-form, country-specific (Indonesia: 5 digits); never parsed as a number. */
+    postal_code: col.identifier(10).nullable(),
     kelurahan: col.varchar(191).nullable(),
     kelurahan_id: col.identifier(32).nullable(),
     kecamatan: col.varchar(191).nullable(),

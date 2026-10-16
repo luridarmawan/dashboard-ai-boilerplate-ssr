@@ -1,0 +1,1 @@
+ALTER TABLE "clients" ADD COLUMN "postal_code" varchar(10);

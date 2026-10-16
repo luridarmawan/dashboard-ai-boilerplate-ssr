@@ -401,6 +401,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
           address: 'Jl. Merdeka 1',
           rt: '03',
           rw: '07',
+          postalCode: '40111',
           kelurahan: 'Braga',
           kelurahanId: '32.73.01.1001',
           city: 'Bandung',
@@ -417,6 +418,7 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect(p.balance).toBe('1250000.5'); // trailing zeros trimmed, same on every dialect
     expect(p.totalReceipts).toBe('0');
     expect(p.kelurahanId).toBe('32.73.01.1001');
+    expect(p.postalCode).toBe('40111');
     expect(p.latitude).toBe('-6.9174639');
     expect(p.longitude).toBe('107.6191228');
     expect(p.url).toBe('https://example.test');
@@ -432,6 +434,9 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     // Out-of-range coordinates and non-decimal amounts never reach the database.
     expect((await put(`/v1/clients/${leaf.id}`, { latitude: '91' }, [admin])).status).toBe(422);
     expect((await put(`/v1/clients/${leaf.id}`, { balance: '1e5' }, [admin])).status).toBe(422);
+    expect((await put(`/v1/clients/${leaf.id}`, { postalCode: '40;11' }, [admin])).status).toBe(
+      422,
+    );
 
     // Loops are refused: itself, and any of its own descendants.
     expect((await put(`/v1/clients/${root.id}`, { parentId: root.id }, [admin])).status).toBe(409);

@@ -18,6 +18,7 @@ const PROFILE_FIELDS = [
   'address',
   'rt',
   'rw',
+  'postalCode',
   'kelurahan',
   'kelurahanId',
   'kecamatan',

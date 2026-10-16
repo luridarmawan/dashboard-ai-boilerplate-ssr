@@ -497,6 +497,7 @@
   "tenants.new.lead_3": "; Anda menjadi anggota dan admin pertamanya.",
   "tenants.parent": "Tenant induk",
   "tenants.parent_hint": "Kosongkan untuk tenant tingkat atas (tanpa induk).",
+  "tenants.postal_code": "Kode pos",
   "tenants.status": "Status",
   "webhooks.add": "Tambah webhook",
   "webhooks.deleted": "Webhook dihapus.",

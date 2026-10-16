@@ -497,6 +497,7 @@
   "tenants.new.lead_3": "; you become its first member and admin.",
   "tenants.parent": "Parent tenant",
   "tenants.parent_hint": "Leave empty for a top-level tenant (no parent).",
+  "tenants.postal_code": "Postal code",
   "tenants.status": "Status",
   "webhooks.add": "Add webhook",
   "webhooks.deleted": "Webhook deleted.",

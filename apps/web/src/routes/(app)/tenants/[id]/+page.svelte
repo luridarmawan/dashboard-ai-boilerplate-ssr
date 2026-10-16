@@ -60,8 +60,7 @@ const addressFields: FieldDef[] = $derived(
         level('kelurahanId', t('tenants.kelurahan'), r.villages),
         text('region', t('tenants.region'), 191),
         regionId('regionId', t('tenants.region_id')),
-        regionId('countryId', t('tenants.country_id')),
-        text('regency', t('tenants.regency'), 191),
+        { ...text('regency', t('tenants.regency'), 191), span: 2 },
       ]
     : [
         text('kelurahan', t('tenants.kelurahan'), 191),
@@ -70,12 +69,11 @@ const addressFields: FieldDef[] = $derived(
         regionId('kecamatanId', t('tenants.kecamatan_id')),
         text('city', t('tenants.city'), 191),
         regionId('cityId', t('tenants.city_id')),
-        text('regency', t('tenants.regency'), 191),
-        regionId('countryId', t('tenants.country_id')),
         text('province', t('tenants.province'), 191),
         regionId('provinceId', t('tenants.province_id')),
         text('region', t('tenants.region'), 191),
         regionId('regionId', t('tenants.region_id')),
+        { ...text('regency', t('tenants.regency'), 191), span: 2 },
       ],
 );
 const fields: FieldDef[] = $derived([
@@ -93,6 +91,15 @@ const fields: FieldDef[] = $derived([
   { name: 'address', type: 'text', label: t('tenants.address'), maxlength: 2000, rows: 2, span: 2 },
   text('rt', t('tenants.rt'), 8),
   text('rw', t('tenants.rw'), 8),
+  {
+    name: 'postalCode',
+    type: 'string',
+    label: t('tenants.postal_code'),
+    maxlength: 10,
+    pattern: '[A-Za-z0-9 -]{3,10}',
+    autocomplete: 'postal-code',
+  },
+  regionId('countryId', t('tenants.country_id')),
   ...addressFields,
   {
     name: 'latitude',
@@ -119,6 +126,7 @@ const values = $derived({
   address: c.address,
   rt: c.rt,
   rw: c.rw,
+  postalCode: c.postalCode,
   kelurahan: c.kelurahan,
   kelurahanId: c.kelurahanId,
   kecamatan: c.kecamatan,

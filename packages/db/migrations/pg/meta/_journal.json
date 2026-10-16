@@ -232,6 +232,13 @@
       "when": 1792139119607,
       "tag": "0032_short_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792140122270,
+      "tag": "0033_rich_captain_america",
+      "breakpoints": true
     }
   ]
 }
