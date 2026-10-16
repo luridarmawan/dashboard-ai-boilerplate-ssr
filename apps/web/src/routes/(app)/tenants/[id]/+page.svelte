@@ -33,6 +33,51 @@ const regionId = (name: string, label: string): FieldDef => ({
   pattern: '[A-Za-z0-9._\\-]*',
   autocomplete: 'off',
 });
+const r = $derived(data.regions);
+/** A picker level: its options come from `load`; empty until the level above is chosen. */
+const level = (
+  name: string,
+  label: string,
+  options: { value: string; label: string }[],
+): FieldDef => ({
+  name,
+  type: 'select',
+  label,
+  options,
+  ...(options.length ? {} : { hint: t('tenants.region_pick_parent') }),
+});
+/**
+ * With region data loaded: four linked pickers that post codes only (the API fills the names).
+ * Without it: the free-text name + code pairs, as before.
+ */
+const addressFields: FieldDef[] = $derived(
+  r.picker
+    ? [
+        { name: '_regionPicker', type: 'hidden' },
+        level('provinceId', t('tenants.province'), r.provinces),
+        level('cityId', t('tenants.city_picker'), r.cities),
+        level('kecamatanId', t('tenants.kecamatan'), r.districts),
+        level('kelurahanId', t('tenants.kelurahan'), r.villages),
+        text('region', t('tenants.region'), 191),
+        regionId('regionId', t('tenants.region_id')),
+        regionId('countryId', t('tenants.country_id')),
+        text('regency', t('tenants.regency'), 191),
+      ]
+    : [
+        text('kelurahan', t('tenants.kelurahan'), 191),
+        regionId('kelurahanId', t('tenants.kelurahan_id')),
+        text('kecamatan', t('tenants.kecamatan'), 191),
+        regionId('kecamatanId', t('tenants.kecamatan_id')),
+        text('city', t('tenants.city'), 191),
+        regionId('cityId', t('tenants.city_id')),
+        text('regency', t('tenants.regency'), 191),
+        regionId('countryId', t('tenants.country_id')),
+        text('province', t('tenants.province'), 191),
+        regionId('provinceId', t('tenants.province_id')),
+        text('region', t('tenants.region'), 191),
+        regionId('regionId', t('tenants.region_id')),
+      ],
+);
 const fields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('tenants.name'), required: true, maxlength: 191 },
   {
@@ -48,18 +93,7 @@ const fields: FieldDef[] = $derived([
   { name: 'address', type: 'text', label: t('tenants.address'), maxlength: 2000, rows: 2, span: 2 },
   text('rt', t('tenants.rt'), 8),
   text('rw', t('tenants.rw'), 8),
-  text('kelurahan', t('tenants.kelurahan'), 191),
-  regionId('kelurahanId', t('tenants.kelurahan_id')),
-  text('kecamatan', t('tenants.kecamatan'), 191),
-  regionId('kecamatanId', t('tenants.kecamatan_id')),
-  text('city', t('tenants.city'), 191),
-  regionId('cityId', t('tenants.city_id')),
-  text('regency', t('tenants.regency'), 191),
-  regionId('countryId', t('tenants.country_id')),
-  text('province', t('tenants.province'), 191),
-  regionId('provinceId', t('tenants.province_id')),
-  text('region', t('tenants.region'), 191),
-  regionId('regionId', t('tenants.region_id')),
+  ...addressFields,
   {
     name: 'latitude',
     type: 'string',
@@ -100,7 +134,36 @@ const values = $derived({
   latitude: c.latitude,
   longitude: c.longitude,
   active: c.statusId === 1,
+  _regionPicker: '1',
 });
+
+/**
+ * Progressive enhancement of the region picker: with JavaScript, choosing a level loads the next
+ * one at once and empties everything below it. Without JavaScript the same form still works —
+ * save, and `load` fills the next level from the saved choice; the action drops stale levels.
+ */
+const CHAIN = ['provinceId', 'cityId', 'kecamatanId', 'kelurahanId'];
+function cascade(root: HTMLElement) {
+  const select = (name: string) => root.querySelector<HTMLSelectElement>(`#f-${name}`);
+  const reset = (el: HTMLSelectElement, options: { value: string; label: string }[]) => {
+    el.replaceChildren(new Option('—', ''), ...options.map((o) => new Option(o.label, o.value)));
+  };
+  const onChange = async (e: Event) => {
+    const el = e.target as HTMLSelectElement;
+    const i = CHAIN.indexOf(el.name);
+    if (i < 0 || i === CHAIN.length - 1) return;
+    for (const name of CHAIN.slice(i + 1)) {
+      const below = select(name);
+      if (below) reset(below, []);
+    }
+    const next = select(CHAIN[i + 1] as string);
+    if (!next || !el.value) return;
+    const res = await fetch(`/regions?parent=${encodeURIComponent(el.value)}`);
+    if (res.ok) reset(next, await res.json());
+  };
+  root.addEventListener('change', onChange);
+  return { destroy: () => root.removeEventListener('change', onChange) };
+}
 /** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
 const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
 const fieldErrors = $derived(
@@ -120,9 +183,9 @@ const fieldErrors = $derived(
     <p>{t('tenants.balance')}: <span class="text-foreground">{amount(c.balance)}</span></p>
     <p>{t('tenants.total_receipts')}: <span class="text-foreground">{amount(c.totalReceipts)}</span></p>
   </div>
-  <Card>
+  <div use:cascade><Card>
     <FormBuilder {fields} {values} columns={2} errors={fieldErrors} csrf={data.csrf} action="?/save" readonly={!can('client.edit')} cancelHref="/tenants" cancelLabel={t('common.back')} notice={form?.saved ? t('common.saved') : null} error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
-  </Card>
+  </Card></div>
   {#if can('client.manage') && c.code !== 'default'}
     <Card title={t('tenants.detail.delete')} description={t('tenants.detail.delete_hint')}>
       {#if confirming}

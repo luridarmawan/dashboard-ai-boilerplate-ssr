@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./descriptor": "./src/descriptor.ts",
     "./id": "./src/id.ts",
-    "./migrate": "./src/migrate.ts"
+    "./migrate": "./src/migrate.ts",
+    "./regions": "./src/regions.ts"
   },
   "scripts": {
     "codegen": "bun --env-file=../../.env run scripts/codegen.ts",

@@ -6,6 +6,7 @@
  *   (none) | serve   HTTP server + scheduler (default)
  *   migrate          apply committed migrations — explicit, never on start (Q-4)
  *   seed             idempotent bootstrap seed (O-3)
+ *   regions [file]   load administrative regions (bundled Indonesian set, or a .tsv/.tsv.gz/.sql)
  *   preflight        readiness checks before start: env, DB, migrations, Redis, volumes (Q-13)
  *   health           GET /v1/health on the local port; exit 0/1 — the image HEALTHCHECK
  *   version          print build identity (M-5) and exit
@@ -18,6 +19,7 @@ export const COMMANDS = [
   'serve',
   'migrate',
   'seed',
+  'regions',
   'preflight',
   'health',
   'version',
@@ -36,10 +38,11 @@ export function parseCommand(argv: readonly string[]): Command {
 
 export function usage(): string {
   return [
-    'pemakaian: api [serve|migrate|seed|preflight|health|version|help]',
+    'pemakaian: api [serve|migrate|seed|regions|preflight|health|version|help]',
     '  serve      jalankan server HTTP + scheduler (baku)',
     '  migrate    terapkan migrasi skema yang tersemat — langkah eksplisit',
     '  seed       seed bootstrap idempoten: tenant baku, grup sistem, superadmin',
+    '  regions    muat data wilayah (bawaan: Indonesia; atau berkas .tsv/.tsv.gz/.sql), idempoten',
     '  preflight  periksa kesiapan sebelum start: env, database, migrasi, Redis, volume; keluar 0/1',
     '  health   cek /v1/health di port lokal, keluar 0/1 — dipakai HEALTHCHECK image',
     '  version  cetak identitas build (nama, versi, commit, waktu build)',
@@ -102,6 +105,28 @@ export async function main(argv: readonly string[]): Promise<number> {
     case 'seed': {
       const { runSeedAll } = await import('@core/auth/seed-all');
       await runSeedAll();
+      return 0;
+    }
+    case 'regions': {
+      const [{ getDb }, { importRegions, parseRegionsFile }] = await Promise.all([
+        import('@core/db'),
+        import('@core/db/regions'),
+      ]);
+      const arg = argv[1];
+      const src = arg
+        ? { path: arg, name: arg }
+        : (await import('./regions-data.ts')).BUNDLED_REGIONS;
+      const file = Bun.file(src.path);
+      if (!(await file.exists())) {
+        console.error(`regions: berkas tidak ditemukan: ${src.path}`);
+        return 1;
+      }
+      const rows = parseRegionsFile(src.name, new Uint8Array(await file.arrayBuffer()));
+      const started = Date.now();
+      const r = await importRegions(getDb(), rows, { log: (m) => console.log(m) });
+      console.log(
+        `regions: ${r.total} baris dari ${src.name} — ${r.inserted} baru, ${r.updated} diperbarui, ${r.unchanged} tetap (${Date.now() - started} ms)`,
+      );
       return 0;
     }
     case 'preflight': {

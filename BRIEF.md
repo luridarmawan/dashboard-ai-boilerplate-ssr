@@ -98,6 +98,7 @@ bun create module <dir> --no-install   # starter repo modul standalone (deps wor
 bun db:codegen                # deskriptor -> skema Drizzle per dialect
 bun db:migrate                # migrasi ter-versi — satu-satunya jalur produksi (Q-4)
 bun db:push                   # schema-push, DEV SAJA; menolak jalan di production
+bun db:regions [berkas]       # muat data wilayah (bawaan: Indonesia) ke tabel regions — idempoten
 bun check                     # lint + format + type-check
 ```
 

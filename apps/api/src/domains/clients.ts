@@ -166,6 +166,43 @@ function profilePatch(body: ProfileBody): Partial<ClientInsert> {
   }
   return patch as Partial<ClientInsert>;
 }
+/** Region code field → the name field it names, when the code is in `regions`. */
+const REGION_NAMES = [
+  ['provinceId', 'province'],
+  ['cityId', 'city'],
+  ['kecamatanId', 'kecamatan'],
+  ['kelurahanId', 'kelurahan'],
+] as const;
+/**
+ * Fills a region's name from its code when the body sends the code but not the name, so a
+ * picker only has to post codes. A cleared code clears its name too. A code that is not in
+ * `regions` (no data loaded, or another scheme) leaves the name to the caller.
+ */
+async function withRegionNames(db: Db, body: ProfileBody): Promise<ProfileBody> {
+  const out: ProfileBody = { ...body };
+  const wanted: string[] = [];
+  for (const [idKey, nameKey] of REGION_NAMES) {
+    if (body[nameKey] !== undefined) continue;
+    const code = body[idKey];
+    if (code === null) out[nameKey] = null;
+    else if (code) wanted.push(code);
+  }
+  if (!wanted.length) return out;
+  const found = new Map(
+    (
+      await db
+        .select({ code: schema.regions.code, name: schema.regions.name })
+        .from(schema.regions)
+        .where(inArray(schema.regions.code, wanted))
+    ).map((r) => [r.code, r.name]),
+  );
+  for (const [idKey, nameKey] of REGION_NAMES) {
+    const code = body[idKey];
+    const name = code ? found.get(code) : undefined;
+    if (body[nameKey] === undefined && name !== undefined) out[nameKey] = name;
+  }
+  return out;
+}
 /**
  * Parents of a page of tenants in one query, keyed by id. A deleted parent is still reported:
  * the link exists in the data, and hiding it would make the child look like a root.
@@ -377,7 +414,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         name: body.name.trim(),
         parent_id: body.parentId ?? null,
         settings: body.settings ?? null,
-        ...profilePatch(body),
+        ...profilePatch(await withRegionNames(db, body)),
       });
       // Usable at once: system groups, and the creator as its first member and admin (C-3).
       const groups = await seedTenantGroups(db, id);
@@ -437,7 +474,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
             'Tenant induk yang dipilih adalah sub-tenant dari tenant ini; pilih tenant lain',
           );
       }
-      const patch: Partial<ClientInsert> = profilePatch(body);
+      const patch: Partial<ClientInsert> = profilePatch(await withRegionNames(db, body));
       if (body.name !== undefined) patch.name = body.name.trim();
       if (body.parentId !== undefined) patch.parent_id = body.parentId;
       if (body.settings !== undefined) patch.settings = body.settings;

@@ -221,6 +221,7 @@ Keduanya memenuhi PRD Q-2 (< 150 MB); job CI `docker-build` gagal bila salah sat
 | `api` / `api serve` | server HTTP + scheduler (baku, `CMD` image) |
 | `api migrate` | terapkan migrasi yang disematkan saat build — langkah eksplisit, tidak pernah otomatis saat start (Q-4); menghormati `TABLE_PREFIX` (O-2) |
 | `api seed` | seed bootstrap idempoten: tenant baku, grup sistem, superadmin dari `BOOTSTRAP_ADMIN_*` (O-3) |
+| `api regions [berkas]` | muat data wilayah ke tabel `regions`, idempoten; tanpa argumen memakai data Indonesia yang tersemat di binary — mis. `dc run --rm api regions` sekali setelah `api migrate` |
 | `api health` | GET `/v1/health` di port lokal, keluar 0/1 — inilah `HEALTHCHECK` image |
 | `api version` | cetak nama, versi, `APP_COMMIT`, `APP_BUILT_AT` — mis. `dc run --rm --no-deps api version` |
 

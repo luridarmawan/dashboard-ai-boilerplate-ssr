@@ -18,6 +18,7 @@ import { outboxEmail } from './outbox_email.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
 import { queueJobs } from './queue_jobs.def.ts';
 import { rateLimits } from './rate_limits.def.ts';
+import { regions } from './regions.def.ts';
 import { schedulerJobs } from './scheduler_jobs.def.ts';
 import { schedulerRuns } from './scheduler_runs.def.ts';
 import { sessions } from './sessions.def.ts';
@@ -58,6 +59,7 @@ export const tables: readonly TableDef[] = [
   mfaChallenges,
   oauthAccounts,
   invitations,
+  regions,
   outboxEmail,
   queueJobs,
 ];

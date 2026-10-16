@@ -225,6 +225,13 @@
       "when": 1792131257327,
       "tag": "0031_perfect_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1792139118369,
+      "tag": "0032_thin_selene",
+      "breakpoints": true
     }
   ]
 }
