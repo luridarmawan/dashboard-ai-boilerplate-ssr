@@ -246,6 +246,13 @@
       "when": 1792161485071,
       "tag": "0034_large_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1792212978937,
+      "tag": "0035_glorious_valkyrie",
+      "breakpoints": true
     }
   ]
 }
