@@ -48,8 +48,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'seo',
         title: { id: 'SEO', en: 'SEO' },
         note: {
-          id: 'Apa yang boleh dirayapi mesin pencari. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
-          en: 'What search engines may crawl. The sitemap (/sitemap.xml) is generated from the public pages.',
+          id: 'Apa yang boleh dirayapi mesin pencari, dan gambar yang tampil saat tautan situs dibagikan. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
+          en: 'What search engines may crawl, and the picture shown when a link to the site is shared. The sitemap (/sitemap.xml) is generated from the public pages.',
         },
       },
       {
@@ -106,6 +106,20 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 2,
         group: 'identity',
         width: 'half',
+      },
+      {
+        key: 'app.share_image',
+        type: 'image',
+        title: { id: 'Gambar share default', en: 'Default share image' },
+        note: {
+          id: 'Gambar pratinjau (og:image) saat tautan situs dibagikan ke media sosial — halaman depan dan setiap halaman publik yang tidak punya gambar sendiri. Ideal 1200 × 630 px. Kosongkan untuk memakai /og-image.jpg bawaan.',
+          en: 'The preview image (og:image) when a link to the site is shared on social networks — the landing page and every public page without an image of its own. Ideal 1200 × 630 px. Leave empty for the built-in /og-image.jpg.',
+        },
+        default: null,
+        public: true,
+        order: 12,
+        group: 'seo',
+        width: 'full',
       },
       {
         key: 'app.landing_route',

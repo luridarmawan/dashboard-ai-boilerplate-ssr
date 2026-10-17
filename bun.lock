@@ -149,7 +149,7 @@
         "@core/db": "workspace:*",
         "@core/i18n": "workspace:*",
         "@core/module-kit": "workspace:*",
-        "@milkdown/kit": "7.22.2",
+        "@milkdown/kit": "^7.22.2",
         "dompurify": "^3.4.15",
         "elysia": "^1.4.0",
         "marked": "^18.0.11",

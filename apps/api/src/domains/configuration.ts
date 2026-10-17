@@ -1,6 +1,6 @@
 import { consumeRateLimit, rateLimitHeaders, writeAudit } from '@core/auth';
-import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
-import { unsafeAcrossTenants } from '@core/db';
+import { errorResponses, fail, Id, OkSchema, ok } from '@core/contracts';
+import { and, eq, inArray, isNull, schema, unsafeAcrossTenants } from '@core/db';
 import {
   buildTestMessage,
   createSmtpTransport,
@@ -14,6 +14,7 @@ import {
   tlsMode,
 } from '@core/mail';
 import {
+  configFields,
   GLOBAL,
   maskChanges,
   notFoundRoutesForModules,
@@ -22,6 +23,7 @@ import {
 } from '@core/settings';
 import { themes } from '@core/ui-theme';
 import { Elysia, t } from 'elysia';
+import { type FileRow, readFile } from '../files.ts';
 import { publicOrigin, smtpFor } from '../mail.ts';
 import { mqttFor, mqttState, testMqtt } from '../mqtt.ts';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
@@ -88,6 +90,40 @@ const Section = t.Object({
   fields: t.Array(Field),
 });
 
+/** What an `image` setting may hold: rasters every browser and social network can show. */
+const IMAGE_SETTING_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+/** Keys of every registered `image` setting (core and modules). */
+const imageKeys = () =>
+  [...configFields().values()].filter((f) => f.type === 'image').map((f) => f.key);
+
+/** A live, public raster file by id — the only kind of file an `image` setting may point at. */
+async function imageFile(id: string): Promise<FileRow | null> {
+  const [row] = await unsafeAcrossTenants() // a global setting may name a file of any tenant
+    .select()
+    .from(schema.files)
+    .where(
+      and(
+        eq(schema.files.id, id),
+        eq(schema.files.visibility, 'public'),
+        isNull(schema.files.deleted_at),
+      ),
+    )
+    .limit(1);
+  return row && IMAGE_SETTING_TYPES.has(row.mime) ? row : null;
+}
+
+const imageMeta = (row: FileRow) => {
+  const meta = (row.meta ?? {}) as { width?: unknown; height?: unknown };
+  const n = (v: unknown) => (typeof v === 'number' && v > 0 ? v : null);
+  return {
+    url: `/v1/configuration/image-file/${row.id}`,
+    width: n(meta.width),
+    height: n(meta.height),
+    mime: row.mime,
+  };
+};
+
 function actor(auth: AuthState | null): AuthState {
   if (!auth) throw new Error('guard missing');
   return auth;
@@ -116,6 +152,84 @@ export const configuration = new Elysia({
         summary: 'Get public settings',
         description:
           'Public values for the active tenant. No session needed; secrets are never included.',
+      },
+    },
+  )
+  .get(
+    '/image/:key',
+    async ({ params, set, requestId, tenantState }) => {
+      if (!imageKeys().includes(params.key)) {
+        set.status = 404;
+        return fail('not_found', 'Kunci gambar tidak dikenal', requestId);
+      }
+      // Same scope resolution as the public values: the tenant named by session / X-Client-ID,
+      // else the global value an anonymous visitor reads.
+      const id = await settings.get<string | null>(tenantState?.clientId ?? null, params.key);
+      const row = typeof id === 'string' && id ? await imageFile(id) : null;
+      return ok(row ? imageMeta(row) : null);
+    },
+    {
+      params: t.Object({ key: t.String({ maxLength: 191 }) }),
+      response: {
+        200: OkSchema(
+          t.Nullable(
+            t.Object({
+              url: t.String(),
+              width: t.Nullable(t.Integer()),
+              height: t.Nullable(t.Integer()),
+              mime: t.String(),
+            }),
+          ),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary: 'Get an image setting',
+        description:
+          'Public. Where the image an `image` setting names can be fetched, with its pixel size — ' +
+          'what share cards (og:image) need. Null when the setting is empty.',
+      },
+    },
+  )
+  .get(
+    '/image-file/:id',
+    async ({ params, set, requestId }) => {
+      // Only a file some `image` setting currently names, in any scope, is served here: social
+      // crawlers fetch it anonymously, without a tenant — and nothing else becomes reachable.
+      const [named] = await unsafeAcrossTenants()
+        .select({ key: schema.configurations.key })
+        .from(schema.configurations)
+        .where(
+          and(
+            inArray(schema.configurations.key, imageKeys()),
+            eq(schema.configurations.value, params.id),
+          ),
+        )
+        .limit(1);
+      const row = named ? await imageFile(params.id) : null;
+      const obj = row ? await readFile(row) : null;
+      if (!row || !obj) {
+        set.status = 404;
+        return fail('not_found', 'Gambar tidak ditemukan', requestId);
+      }
+      return new Response(new Blob([obj.bytes as unknown as ArrayBuffer]), {
+        headers: {
+          'content-type': row.mime,
+          'content-length': String(obj.bytes.byteLength),
+          'x-content-type-options': 'nosniff',
+          // Addressed by id: a new upload is a new URL, so this one may be cached for long.
+          'cache-control': 'public, max-age=86400',
+          'x-request-id': requestId,
+        },
+      });
+    },
+    {
+      params: t.Object({ id: Id }),
+      response: { 200: t.Unknown(), ...errorResponses },
+      detail: {
+        summary: 'Download an image setting',
+        description:
+          'Public. The bytes of an image an `image` setting currently names; anything else is 404.',
       },
     },
   )
@@ -297,6 +411,22 @@ export const configuration = new Elysia({
         );
       }
       const entries = Object.entries(body.values).map(([key, value]) => ({ key, value }));
+      // An `image` setting must name a file that exists, is public and is a raster image — a
+      // tenant may only point at its own files; the global scope at any (it serves everyone).
+      const images = new Set(imageKeys());
+      const badImages: Record<string, string> = {};
+      for (const e of entries) {
+        if (!images.has(e.key) || e.value === null || e.value === undefined || e.value === '')
+          continue;
+        const row = await imageFile(String(e.value).trim().toLowerCase());
+        if (!row || (scope.clientId !== null && row.client_id !== scope.clientId))
+          badImages[e.key] =
+            'berkas gambar tidak ditemukan, tidak publik, atau bukan JPEG/PNG/WebP/GIF';
+      }
+      if (Object.keys(badImages).length) {
+        set.status = 422;
+        return fail('validation_failed', 'Ada nilai yang tidak valid', requestId, badImages);
+      }
       const allowed = body.values['app.allowed_themes'];
       const enabled = await moduleState.enabledFor(scope.clientId);
       const result = await settings.save(scope.clientId, entries, {

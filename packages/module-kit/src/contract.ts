@@ -310,7 +310,13 @@ export type ConfigFieldType =
   | 'theme'
   | 'locale'
   | 'timezone'
-  | 'list';
+  | 'list'
+  /**
+   * A public raster image uploaded from the Settings form (JPEG, PNG, WebP, GIF). The stored value
+   * is the file id; anonymous visitors and crawlers fetch it from `/v1/configuration/image-file/<id>`
+   * and its URL + pixel size come from `GET /v1/configuration/image/<key>`.
+   */
+  | 'image';
 
 export interface ConfigFieldDef {
   /** `<section>.<name>`, e.g. `billing.tax_rate`. */
@@ -501,6 +507,14 @@ export interface PublicRouteDef {
    * would turn every unknown URL into a 200, which is not what "404 handler" means.
    */
   readonly notFound?: boolean;
+  /**
+   * This page renders the module's PERMALINKS (F-12): content the module registered in the core
+   * permalink registry (`claimPermalink()` from `@app/api/permalinks`) at any root URL —
+   * `/about-us`, `/shoes/sneaker-x`. Like a 404 handler it has no content of its own: the core
+   * forwards a registered URL to it and the page reads that URL with `trappedPath(event)`. At most
+   * one per module, a concrete path, and not also `notFound`.
+   */
+  readonly permalinks?: boolean;
 }
 
 const PUBLIC_PATH_RE =
@@ -543,6 +557,14 @@ export function definePublicRoutes(
     if (!r.dir.startsWith('web/') || r.dir.includes('..')) {
       throw new ModuleContractError(`route publik "${r.path}": dir harus di dalam web/ modul`);
     }
+    if (r.permalinks && (r.notFound || r.path.includes('['))) {
+      throw new ModuleContractError(
+        `route publik "${r.path}": halaman permalinks harus path konkret dan bukan sekaligus notFound`,
+      );
+    }
+  }
+  if (list.filter((r) => r.permalinks).length > 1) {
+    throw new ModuleContractError('hanya satu route publik per modul yang boleh permalinks: true');
   }
   return list;
 }

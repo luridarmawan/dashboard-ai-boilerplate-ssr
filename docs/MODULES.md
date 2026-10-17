@@ -73,7 +73,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 10 | Komponen UI | `import { Button, ConfirmDelete, DataTable, FormBuilder, Icon, Img } from '@core/ui'`; setiap aksi merusak memakai `ConfirmDelete` + `confirmed()`/`confirmFail()` di action-nya; setiap gambar memakai `Img` (lazy bawaan browser, `priority` untuk LCP — lihat §3 "Gambar & lazy load") | `modules/Example/web/routes/**`, templat modgen | svelte-check + m6 proof (hapus tanpa konfirmasi → 422) |
 | 11 | Widget dasbor | `widgets.ts` (`defineWidgets`) + `web/widgets/*.svelte` | `modules/Example/widgets.ts` | `scripts/m2-gate-proof.ts` (G-19), m6 proof |
 | 12 | Job terjadwal | `jobs.ts` (`defineJobs`) — sekali per interval di semua instance | `modules/AI/jobs.ts` | `bun scheduler:proof` (M0 #6), m6 proof: terdaftar saat boot |
-| 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap; termasuk **penangkap 404** (`app.not_found_route`, F-11) | `modules/Example/public.ts`, `web/public/resolve/` | `scripts/m4-gate-proof.ts` (F-11), m6 proof |
+| 13 | Halaman publik | `public.ts` (`definePublicRoutes`) + `web/public/**`, sitemap; termasuk **halaman permalink** (`permalinks: true`, registry F-12) dan **penangkap 404** (`app.not_found_route`, F-11) | `modules/Example/public.ts`, `web/public/resolve/` | `scripts/m4-gate-proof.ts` (F-11), m6 proof |
 | 14 | Tema | `themes/<id>/` | `modules/Dummy/themes/ocean/` | `bun theme:validate`, m2 proof #5 |
 | 15 | Layout | `layouts.ts` (`defineLayouts`) | `modules/Dummy/layouts.ts` | `scripts/ci/layout-contract.ts`, m2 proof #5 |
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
@@ -289,6 +289,47 @@ Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data
 
 Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7) — selama modulnya aktif untuk lingkup yang sedang disunting; route modul yang dinonaktifkan (G-8) tidak ditawarkan dan ditolak saat disimpan. Tabel pemiliknya dihasilkan sync di `packages/module-kit/src/generated/public-routes.ts` (`@core/module-kit/public-routes`) dan `apps/web/src/generated/public-routes.ts`. `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
 
+#### URL konten di akar situs — registry permalink (F-12, PRD §4.7 aturan 7)
+
+Halaman, artikel, kategori, produk — konten yang dibuat admin dan butuh URL di akar domain (`/tentang-kami`, `/cara-menanam-cabai`, `/sepatu/sneaker-x`) — **didaftarkan** di registry permalink core, bukan ditangkap lewat penangkap 404. Tidak ada setelan yang perlu dipilih, dan setiap modul bisa melakukannya bersamaan. Registry menjamin path unik lintas modul, menyimpan riwayat 301, dan menjawab setiap URL asing dengan satu lookup terindeks.
+
+Dua langkah:
+
+```ts
+// public.ts — one page per module renders whatever registered URL the core forwards to it
+{ path: '/articles', dir: 'web/public/permalink', sitemap: false, permalinks: true },
+```
+
+```ts
+// api/routes.ts — register inside the SAME transaction as the content itself
+import { assertPermalinkFree, claimPermalink, PermalinkConflictError, releasePermalinks,
+  setPermalinkLive } from '@app/api/permalinks';
+import { inTransaction } from '@core/db';
+
+await inTransaction(clientId, async (tx) => {
+  await claimPermalink(tx, {
+    module: 'articles',            // your namespace
+    target: article.id,            // your id for the content
+    path: `/${article.slug}`,      // any depth: /shoes/sneaker-x
+    live: article.status === 'published',
+    keepHistory: article.publishedAt !== null, // the old path becomes a 301 to the new one
+  });
+  await tx.update(schema.articlesPosts, { slug }, eq(schema.articlesPosts.id, article.id));
+});
+// unpublish → setPermalinkLive(tx, 'articles', id, false) · delete → releasePermalinks(tx, 'articles', id)
+```
+
+Halaman `permalinks: true` membaca URL pengunjung dengan `trappedPath(event)`, lalu bertanya ke API modulnya konten mana yang dimaksud (`resolvePermalink(tenantId, path)` mengembalikan `{ kind: 'content', module, target }`). Kunjungan langsung ke halaman itu = 404. Core yang menangani sisanya:
+
+- Path lama dan ejaan longgar (`/About-Us/`) dijawab **301** dengan `Location` absolut ke path kanonis, untuk browser, crawler, dan `curl` (termasuk `HEAD`). Tidak ada rantai: redirect menunjuk konten, bukan path.
+- Bentrokan dilempar sebagai `PermalinkConflictError` (`holder`: `content` · `redirect` · `route`, plus `module` pemegangnya) dan membatalkan transaksi Anda. Petakan ke 409 dengan `details.reason` agar dasbor bisa menerjemahkannya.
+- Draft (`live: false`) memegang path-nya tetapi dijawab 404, begitu pula redirect-nya.
+- Path di bawah prefix core (`CORE_PATH_PREFIXES` di `@core/contracts`) atau yang sudah dijawab route aplikasi ditolak.
+- `sitemap.xml` memuat semua permalink live dari modul yang aktif.
+- Modul yang dinonaktifkan (G-8) berhenti menjawab URL-nya.
+
+Contoh hidup: modul `Pages` (`modules/Pages/api/routes.ts`, `public.ts`, `web/public/resolve/`). Untuk modul dari repo lain (mis. commerce), kontraknya sama: daftarkan URL setiap kategori dan produk saat disimpan. Penangkap 404 di bawah ini hanya untuk bentuk URL yang **tidak bisa** didaftarkan satu per satu, misalnya URL warisan situs lama berpola.
+
 #### Menangkap URL tak dikenal — penangkap 404 (F-11, PRD §4.7 aturan 6)
 
 Toko dan blog memakai URL di akar domain tanpa awalan — `/furniture`, `/kotak-penyimpanan-…`, `/judul-artikel` — yang tidak bisa dideklarasikan lewat `public.ts` (bentuk `[...slug]` sengaja ditolak: hanya satu modul yang bisa memilikinya, dan modul lain akan bertabrakan). Jalannya: modul mendeklarasikan **satu halaman penangkap** dengan `notFound: true` di `public.ts`, lalu admin memilih **modul itu** di **Pengaturan → Aplikasi → Penangkap halaman 404** (`app.not_found_route`, tipe `not_found_route`, pilihan dilabeli `Example — /resolve`, kosong = 404 bawaan). Halaman publik lain (landing, katalog) sengaja **tidak** ditawarkan dan ditolak saat disimpan: halaman semacam itu menjawab setiap URL asing dengan 200, padahal penangkap harus **memutuskan** — URL yang tidak dikenalinya tetap 404. Sejak itu setiap request `GET` HTML yang tidak cocok route mana pun diteruskan core ke halaman itu, sebelum 404 bawaan dirender.
@@ -433,7 +474,7 @@ export default defineConfig('Billing', [
 ]);
 ```
 
-Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list`. `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di penutup blok field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list · image`. `image` digambar sebagai unggah gambar dengan pratinjau dan pilihan hapus; nilainya id berkas publik (JPEG/PNG/WebP/GIF, diunggah lewat layanan berkas core, ukuran pikselnya tercatat di `meta`). Saat disimpan, API menolak id yang bukan berkas publik raster milik lingkupnya. Halaman publik membaca URL + ukurannya dari `GET /v1/configuration/image/<key>`, dan isinya disajikan ke siapa pun, termasuk crawler tanpa tenant, di `/v1/configuration/image-file/<id>` selama sebuah setelan `image` merujuknya. Contoh core: `app.share_image` (og:image default). `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di penutup blok field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
 
 **Pengelompokan & lebar field (`groups`, `group`, `width`).** Section yang panjang boleh dipecah menjadi blok berjudul tanpa halaman Pengaturan core tahu modul apa pun:
 

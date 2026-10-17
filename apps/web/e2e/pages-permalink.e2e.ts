@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { makePng } from '../../../modules/Pages/test/fixtures/png.ts';
 
 /**
  * The Pages module's permalink form in a real browser: changing the slug of a published page goes
@@ -63,6 +64,21 @@ test('pages: changing a permalink updates in place and announces the redirect', 
   await expect(page.locator('#pages-slug')).toHaveValue(second);
   expect(page.url()).toBe(urlBefore);
   expect(await page.evaluate(() => window.__pagesMark)).toBe(mark);
+
+  // The list links the permalink itself: one click opens the published page in a new tab.
+  await page.goto(`/m/pages/pages?q=${second}`);
+  const link = page.getByTestId('pages-permalink-link');
+  await expect(link).toHaveAttribute('href', `/${second}`);
+  await expect(link).toHaveAttribute('target', '_blank');
+  // "Updated" shows the time down to the minute.
+  await expect(page.getByTestId('pages-updated').first()).toHaveText(
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
+  );
+  const [popup] = await Promise.all([page.waitForEvent('popup'), link.click()]);
+  await popup.waitForLoadState();
+  expect(new URL(popup.url()).pathname).toBe(`/${second}`);
+  await expect(popup.getByTestId('pages-title')).toHaveText(`About ${run}`);
+  await popup.close();
 });
 
 test('pages: the body editor formats, previews like the public page, and saves', async ({
@@ -233,4 +249,70 @@ test('pages: Notion-like visual editing — slash menu, selection toolbar, block
   await page.locator('main form button[type="submit"]').first().click();
   await expect(page).toHaveURL(/\/m\/pages\/pages\/[0-9a-f-]{36}/);
   await expect(page.locator('textarea[name="body"]')).toHaveValue(/## Bagian/);
+});
+
+test('pages: the featured image uploads over fetch and becomes the share card', async ({
+  page,
+}) => {
+  const run = Date.now();
+  await page.goto('/auth/login');
+  await page.fill('input[name="email"]', EMAIL);
+  await page.fill('input[name="password"]', PASSWORD);
+  await page.locator('main form button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto('/m/pages/pages/new');
+  await expect(page.locator('main form[data-enhanced="true"]')).toBeVisible();
+  await page.fill('input[name="title"]', `Gambar ${run}`);
+  await page.fill('input[name="slug"]', `e2e-${run}-image`);
+  await page.locator('main form button[type="submit"]').first().click();
+  await expect(page).toHaveURL(/\/m\/pages\/pages\/[0-9a-f-]{36}/);
+
+  const form = page.getByTestId('pages-image-form');
+  await expect(form).toHaveAttribute('data-enhanced', 'true');
+  await expect(page.getByTestId('pages-image-empty')).toBeVisible();
+  // No image of its own yet: the share preview shows the site's default image, and says so.
+  await expect(page.getByTestId('pages-share-default')).toBeVisible();
+  // (The shipped /og-image.jpg, or the one uploaded under Settings → Application.)
+  await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
+    'src',
+    /\/og-image\.jpg$|\/v1\/configuration\/image-file\//,
+  );
+  const mark = Date.now();
+  await page.evaluate((m) => {
+    (window as unknown as { __imgMark: number }).__imgMark = m;
+  }, mark);
+
+  // Picking a file previews it at once, with its size — before anything is uploaded.
+  await page.setInputFiles('#pages-image-file', {
+    name: 'hero.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(makePng(1200, 630)),
+  });
+  await expect(page.getByTestId('pages-image-size')).toHaveText('1200 × 630 px');
+  await page.fill('#pages-image-alt', 'Kantor kami');
+  await form.locator('button[type="submit"]').first().click();
+
+  const toast = page
+    .locator('[aria-live="polite"] [role="status"]')
+    .filter({ hasText: /Gambar unggulan disimpan|Featured image saved/ });
+  await expect(toast).toBeVisible({ timeout: 15_000 });
+  const current = page.getByTestId('pages-image-current').locator('img');
+  await expect(current).toHaveAttribute('src', /\/v1\/files\/[0-9a-f-]{36}\/content/);
+  await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
+    'src',
+    /\/v1\/files\//,
+  );
+  await expect(page.getByTestId('pages-share-default')).toHaveCount(0);
+  await expect(page.locator('#pages-image-alt')).toHaveValue('Kantor kami');
+  expect(await page.evaluate(() => (window as unknown as { __imgMark: number }).__imgMark)).toBe(
+    mark,
+  );
+
+  // Removing it brings the empty state back, still without a reload.
+  await page.getByTestId('pages-image-remove').click();
+  await expect(page.getByTestId('pages-image-empty')).toBeVisible({ timeout: 15_000 });
+  expect(await page.evaluate(() => (window as unknown as { __imgMark: number }).__imgMark)).toBe(
+    mark,
+  );
 });

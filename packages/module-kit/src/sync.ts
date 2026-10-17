@@ -1696,14 +1696,15 @@ function emitPublicRoutes(
   routes: readonly (PublicRouteDef & { module: string; ns: string })[],
 ): string {
   return `${GEN_HEADER}
-/** Module public routes (extension point 13): SvelteKit path, owning module + namespace, sitemap flag (F-7, G-8), 404-handler flag (F-11). */
-export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean }[] = ${JSON.stringify(
+/** Module public routes (extension point 13): SvelteKit path, owning module + namespace, sitemap flag (F-7, G-8), 404-handler flag (F-11), permalink-page flag (F-12). */
+export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean; permalinks: boolean }[] = ${JSON.stringify(
     routes.map((r) => ({
       path: r.path,
       module: r.module,
       ns: r.ns,
       sitemap: r.sitemap ?? !r.path.includes('['),
       notFound: r.notFound ?? false,
+      permalinks: r.permalinks ?? false,
     })),
     null,
     2,
@@ -1768,7 +1769,7 @@ export const moduleConfig: readonly (ConfigSectionDef & { module: string })[] = 
     'packages/module-kit/src/generated/seeds.ts': `${H}import type { ModuleSeed } from '../contract.ts';
 export const moduleSeeds: readonly { module: string; run: ModuleSeed }[] = [];
 `,
-    'packages/module-kit/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean }[] = [];
+    'packages/module-kit/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean; permalinks: boolean }[] = [];
 `,
     'packages/module-kit/src/generated/csrf-exempt.ts': `${H}export const moduleCsrfExempt: readonly { method: string; path: string; module: string; ns: string; reason: string }[] = [];
 `,
@@ -1800,7 +1801,7 @@ export const moduleAuthLayouts = {} as const;
 export interface WidgetEntry { readonly id: string; readonly title: { readonly id: string; readonly en: string }; readonly component: string; readonly permission?: string; readonly order?: number; readonly size?: 'sm' | 'md' | 'lg'; readonly module: string; readonly load: () => Promise<{ default: Component<Record<string, unknown>> }> }
 export const moduleWidgets: readonly WidgetEntry[] = [];
 `,
-    'apps/web/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean }[] = [];
+    'apps/web/src/generated/public-routes.ts': `${H}export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean; permalinks: boolean }[] = [];
 `,
     'apps/api/src/generated/modules.ts': `${H}import { Elysia } from 'elysia';
 export const modulesPlugin = new Elysia({ name: 'modules' });

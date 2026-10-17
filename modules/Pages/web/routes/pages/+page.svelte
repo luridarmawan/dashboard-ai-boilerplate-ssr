@@ -2,6 +2,7 @@
 import { Badge, Button, Icon, iconActionClass, Table } from '@core/ui';
 import { goto } from '$app/navigation';
 import { navigating } from '$app/state';
+import { formatDateTime } from '$lib/format';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 
@@ -15,9 +16,8 @@ import { hasPermission } from '$lib/permissions';
 let { data } = $props();
 const t = useT();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
-/** Eden revives ISO dates into Date objects — show them as YYYY-MM-DD. */
-const day = (v: unknown) =>
-  v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '').slice(0, 10);
+/** `yyyy-mm-dd HH:mm` (the core's fixed admin format, without seconds; Eden may hand a Date). */
+const stamp = (v: unknown) => formatDateTime(v as string | Date | null).slice(0, 16);
 const editable = $derived(can('pages.page.edit'));
 const rowAction = $derived(editable ? t('common.edit') : t('common.view'));
 
@@ -89,12 +89,19 @@ function submitSearch(event: SubmitEvent) {
         {#each data.rows as r (r.id)}
           <tr>
             <td class="font-medium">{r.title}</td>
-            <td><code>/{r.slug}</code></td>
+            <td>
+              <!-- A published page opens where visitors see it; a draft has no public URL yet (404). -->
+              {#if r.status === 'published'}
+                <a href={`/${r.slug}`} target="_blank" rel="noopener" title={t('pages.edit.open')} class="inline-flex items-center gap-1 font-mono text-sm" data-testid="pages-permalink-link"><code>/{r.slug}</code><Icon name="external-link" size={14} class="text-muted-foreground" /></a>
+              {:else}
+                <code class="text-muted-foreground" title={t('pages.list.draft_link')}>/{r.slug}</code>
+              {/if}
+            </td>
             <td><Badge variant={r.status === 'published' ? 'success' : 'secondary'}>{t(`pages.status.${r.status === 'published' ? 'published' : 'draft'}`)}</Badge></td>
-            <td class="whitespace-nowrap text-muted-foreground">{day(r.updatedAt)}</td>
+            <td class="whitespace-nowrap text-muted-foreground" title={formatDateTime(r.updatedAt as string | Date | null)} data-testid="pages-updated">{stamp(r.updatedAt)}</td>
             <td class="text-end whitespace-nowrap">
               <a href={`/m/pages/pages/${r.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={editable ? 'edit' : 'eye'} size={16} /></a>
-              {#if r.status === 'published' && data.serving}<a href={`/${r.slug}`} target="_blank" rel="noopener" title={t('pages.edit.open')} aria-label={t('pages.edit.open')} class={iconActionClass}><Icon name="external-link" size={16} /></a>{/if}
+              {#if r.status === 'published'}<a href={`/${r.slug}`} target="_blank" rel="noopener" title={t('pages.edit.open')} aria-label={t('pages.edit.open')} class={iconActionClass}><Icon name="external-link" size={16} /></a>{/if}
             </td>
           </tr>
         {:else}

@@ -16,6 +16,7 @@ import { notifications } from './notifications.def.ts';
 import { oauthAccounts } from './oauth_accounts.def.ts';
 import { outboxEmail } from './outbox_email.def.ts';
 import { passwordResetTokens } from './password_reset_tokens.def.ts';
+import { permalinks } from './permalinks.def.ts';
 import { queueJobs } from './queue_jobs.def.ts';
 import { rateLimits } from './rate_limits.def.ts';
 import { regions } from './regions.def.ts';
@@ -62,4 +63,5 @@ export const tables: readonly TableDef[] = [
   regions,
   outboxEmail,
   queueJobs,
+  permalinks,
 ];

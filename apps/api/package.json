@@ -18,7 +18,8 @@
     "./metrics": "./src/metrics.ts",
     "./webhooks": "./src/webhooks.ts",
     "./queue": "./src/queue.ts",
-    "./mqtt": "./src/mqtt.ts"
+    "./mqtt": "./src/mqtt.ts",
+    "./permalinks": "./src/permalinks.ts"
   },
   "scripts": {
     "dev": "bun --watch src/index.ts",

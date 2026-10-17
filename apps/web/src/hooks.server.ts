@@ -1,3 +1,4 @@
+import { normalizePermalink } from '@core/contracts';
 import type { Handle, RequestEvent } from '@sveltejs/kit';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { webRoutes } from '$lib/../generated/routes';
@@ -5,10 +6,10 @@ import { cfgString, landingFallback, loadPublicConfig } from '$lib/server/config
 import { resolveRequestDirection, resolveRequestLocale } from '$lib/server/locale';
 import { MAINTENANCE_PATH, requestMaintenance } from '$lib/server/maintenance';
 import { checkRequestOrigin, type OriginVerdict } from '$lib/server/origin';
-import { loadSession } from '$lib/server/session';
+import { apiFetchData, loadSession } from '$lib/server/session';
 import { resolveRequestSidebar } from '$lib/server/sidebar';
 import { resolveRequestTheme } from '$lib/server/theme';
-import { isNeverTrapped, ORIGINAL_PATH_HEADER, wantsHtml } from '$lib/server/trap';
+import { acceptsPage, isNeverTrapped, ORIGINAL_PATH_HEADER, wantsHtml } from '$lib/server/trap';
 
 /**
  * Per-request plumbing:
@@ -104,6 +105,22 @@ export const handle: Handle = async ({ event, resolve }) => {
         }),
       );
     }
+  }
+
+  // Permalink registry (F-12): a path that matches no route may be content a module registered —
+  // `/about-us` (Pages), `/shoes/sneaker-x` (Commerce). One lookup, whatever the number of modules,
+  // and asked BEFORE the 404 handler: that one is for URL shapes nobody registered. A hit renders
+  // the module's permalink page under the visitor's URL (200), or answers 301 — an old path, or
+  // the right one written loosely — for browsers, crawlers and plain HTTP clients alike.
+  if (
+    event.route.id === null &&
+    (event.request.method === 'GET' || event.request.method === 'HEAD') &&
+    acceptsPage(event.request) &&
+    !isNeverTrapped(event.url.pathname) &&
+    !event.request.headers.has(ORIGINAL_PATH_HEADER)
+  ) {
+    const permalink = await permalinkResponse(event);
+    if (permalink) return permalink;
   }
 
   // 404 trapper (§4.7 rule 6, F-11): a path that matches NO route is offered to the module page
@@ -264,6 +281,66 @@ function refuseOrigin(
       'x-request-id': event.locals.requestId,
     },
   });
+}
+
+type PermalinkHit =
+  | { kind: 'content'; module: string; page: string; path: string }
+  | { kind: 'redirect'; module: string; location: string };
+
+/** A 301 to a path on this origin, absolute as crawlers prefer. */
+function permanentRedirect(event: Parameters<Handle>[0]['event'], path: string): Response {
+  return new Response(null, {
+    status: 301,
+    headers: { location: `${event.url.origin}${path}`, 'x-request-id': event.locals.requestId },
+  });
+}
+
+/**
+ * Look an unmatched URL up in the permalink registry (F-12) and answer it: 301 for an old path or
+ * a loose spelling, the module's permalink page for live content, null when nobody registered it
+ * (or the page said 404) — the 404 handler and the built-in 404 come next.
+ */
+async function permalinkResponse(event: Parameters<Handle>[0]['event']): Promise<Response | null> {
+  const path = normalizePermalink(event.url.pathname);
+  if (!path) return null;
+  const hit = await apiFetchData<PermalinkHit>(
+    event,
+    `/v1/permalinks/resolve?path=${encodeURIComponent(path)}`,
+    event.locals.session?.clientId ?? null,
+    { signal: AbortSignal.timeout(3000) },
+  );
+  if (!hit) return null;
+  const search = event.url.search;
+  if (hit.kind === 'redirect') return permanentRedirect(event, `${hit.location}${search}`);
+  if (hit.path !== event.url.pathname) return permanentRedirect(event, `${hit.path}${search}`);
+  const forwarded = await event.fetch(new URL(hit.page, event.url.origin), {
+    headers: {
+      accept: 'text/html',
+      cookie: event.request.headers.get('cookie') ?? '',
+      [ORIGINAL_PATH_HEADER]: event.url.pathname + search,
+    },
+    redirect: 'manual',
+  });
+  if (forwarded.ok || (forwarded.status >= 300 && forwarded.status < 400)) {
+    const headers = new Headers(forwarded.headers);
+    headers.set('x-request-id', event.locals.requestId);
+    headers.set('x-permalink-module', hit.module);
+    const body = event.request.method === 'HEAD' ? null : await forwarded.text();
+    return new Response(body, { status: forwarded.status, headers });
+  }
+  if (forwarded.status >= 500) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        msg: 'halaman permalink modul gagal merender — memakai penangkap 404 / 404 bawaan',
+        module: hit.module,
+        status: forwarded.status,
+        path: event.url.pathname,
+        requestId: event.locals.requestId,
+      }),
+    );
+  }
+  return null;
 }
 
 /**

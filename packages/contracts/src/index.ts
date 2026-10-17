@@ -182,3 +182,9 @@ export {
   WebhookBody,
   WebhookUpdateBody,
 } from './forms.ts';
+export {
+  CORE_PATH_PREFIXES,
+  isPermalinkPath,
+  normalizePermalink,
+  PERMALINK_MAX,
+} from './permalink.ts';

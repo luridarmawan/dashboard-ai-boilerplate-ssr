@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  acceptsPage,
   canonicalPath,
   isNeverTrapped,
   ORIGINAL_PATH_HEADER,
@@ -39,6 +40,16 @@ describe('404 trapper helpers (§4.7 rule 6)', () => {
     expect(wantsHtml(req('application/json'))).toBe(false);
     expect(wantsHtml(req('*/*'))).toBe(false);
     expect(wantsHtml(req())).toBe(false);
+  });
+
+  test('the permalink lookup also answers clients that do not say what they want (F-12)', () => {
+    const req = (accept?: string) =>
+      new Request('http://web.test/x', accept ? { headers: { accept } } : {});
+    expect(acceptsPage(req('text/html'))).toBe(true);
+    expect(acceptsPage(req('*/*'))).toBe(true);
+    expect(acceptsPage(req())).toBe(true);
+    expect(acceptsPage(req('application/json'))).toBe(false);
+    expect(acceptsPage(req('image/png'))).toBe(false);
   });
 
   test('the original path header is parsed, and anything that is not a local path is dropped', () => {

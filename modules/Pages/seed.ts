@@ -1,10 +1,14 @@
-import { and, type Db, eq, newId, schema } from '@core/db';
+import { claimPermalink, PermalinkConflictError } from '@app/api/permalinks';
+import { and, type Db, eq, isNull, newId, schema, tenantScope } from '@core/db';
 import { defineSeed } from '@core/module-kit';
+import { MODULE, pathOf } from './api/permalinks.ts';
 
 /**
- * Idempotent seed: one published sample page, so a fresh install has something to open at
- * `/about` once the module answers unknown URLs. Matched by slug, on pages AND redirects: an
- * admin who renamed the sample keeps their rename, and re-seeding never steals an old permalink.
+ * Idempotent seed:
+ *   1. every live page gets its URL in the core permalink registry (PRD F-12) if it has none —
+ *      pages written before the registry existed, or by hand, become reachable again
+ *   2. one published sample page at `/about`, unless something already holds that URL (an
+ *      admin's own page, an old permalink, another module): re-seeding never steals a URL
  */
 const SAMPLE = {
   title: 'Tentang kami',
@@ -21,28 +25,58 @@ const SAMPLE = {
 
 export default defineSeed('Pages', async ({ db: raw, tenantId, log }) => {
   const db = raw as Db;
-  const [page] = await db
-    .select({ id: schema.pagesPages.id })
-    .from(schema.pagesPages)
-    .where(and(eq(schema.pagesPages.client_id, tenantId), eq(schema.pagesPages.slug, SAMPLE.slug)))
-    .limit(1);
-  const [redirect] = await db
-    .select({ id: schema.pagesRedirects.id })
-    .from(schema.pagesRedirects)
-    .where(
-      and(
-        eq(schema.pagesRedirects.client_id, tenantId),
-        eq(schema.pagesRedirects.old_slug, SAMPLE.slug),
-      ),
-    )
-    .limit(1);
-  if (page || redirect) return log('tidak ada yang baru');
-  await db.insert(schema.pagesPages).values({
-    id: newId(),
-    client_id: tenantId,
-    ...SAMPLE,
-    status: 'published',
-    published_at: new Date(),
-  });
-  log('1 halaman contoh dibuat');
+  const tenant = tenantScope(db, tenantId);
+  let claimed = 0;
+  const pages = await tenant.select(schema.pagesPages, isNull(schema.pagesPages.deleted_at));
+  for (const page of pages) {
+    const has = await tenant.selectOne(
+      schema.permalinks,
+      and(eq(schema.permalinks.module, MODULE), eq(schema.permalinks.target, page.id)),
+    );
+    if (has) continue;
+    try {
+      await claimPermalink(tenant, {
+        module: MODULE,
+        target: page.id,
+        path: pathOf(page.slug),
+        live: page.status === 'published',
+        keepHistory: false,
+      });
+      claimed++;
+    } catch (err) {
+      if (!(err instanceof PermalinkConflictError)) throw err;
+      log(
+        `halaman "${page.title}": alamat /${page.slug} sudah dipakai — ubah slug-nya dari dasbor`,
+      );
+    }
+  }
+
+  const taken = await tenant.selectOne(
+    schema.permalinks,
+    eq(schema.permalinks.path, pathOf(SAMPLE.slug)),
+  );
+  const sampleExists = pages.some((p) => p.slug === SAMPLE.slug);
+  let created = 0;
+  if (!taken && !sampleExists) {
+    const id = newId();
+    await tenant.insert(schema.pagesPages, {
+      id,
+      ...SAMPLE,
+      status: 'published',
+      published_at: new Date(),
+    });
+    await claimPermalink(tenant, {
+      module: MODULE,
+      target: id,
+      path: pathOf(SAMPLE.slug),
+      live: true,
+      keepHistory: false,
+    });
+    created = 1;
+  }
+  log(
+    claimed || created
+      ? `${claimed} alamat didaftarkan, ${created} halaman contoh dibuat`
+      : 'tidak ada yang baru',
+  );
 });

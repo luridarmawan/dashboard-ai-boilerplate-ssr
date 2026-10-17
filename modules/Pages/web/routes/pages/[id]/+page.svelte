@@ -15,6 +15,7 @@ import {
 import { enhance } from '$app/forms';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import FeaturedImage from '../../../lib/FeaturedImage.svelte';
 import MarkdownEditor from '../../../lib/MarkdownEditor.svelte';
 import { pageFields, slugField } from '../_form.ts';
 
@@ -35,7 +36,7 @@ const permalink = $derived(`${data.origin}/${r.slug}`);
 const slugDef = $derived(slugField(t));
 
 const mainErrors = $derived(
-  (!form?.slugForm && form?.details && typeof form.details === 'object'
+  (!form?.slugForm && !form?.imageForm && form?.details && typeof form.details === 'object'
     ? form.details
     : {}) as Record<string, string>,
 );
@@ -51,6 +52,19 @@ const slugValue = $derived(
     : r.slug,
 );
 const change = $derived(form?.slugChange ?? null);
+/** What the featured image card's last post answered (the no-JavaScript notice and errors). */
+const imageResult = $derived(
+  form?.imageForm || form?.imageSaved
+    ? {
+        saved: (form?.imageSaved as string | undefined) ?? null,
+        error: form?.imageForm ? ((form?.error as string | undefined) ?? null) : null,
+        alt: form?.imageForm
+          ? (((form?.values as Record<string, unknown> | undefined)?.alt as string | undefined) ??
+            null)
+          : null,
+      }
+    : undefined,
+);
 
 let slugBusy = $state(false);
 /** Flipped on mount, so a test can tell the fetch layer from the plain form that answers before it. */
@@ -97,16 +111,13 @@ function permalinkOverFetch(node: HTMLFormElement) {
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="flex items-center gap-3">{r.title} <Badge variant={published ? 'success' : 'secondary'}>{t(`pages.status.${published ? 'published' : 'draft'}`)}</Badge></h1>
-    {#if published && data.serving}<Button href={`/${r.slug}`} variant="outline" size="sm" target="_blank" rel="noopener"><Icon name="external-link" size={16} />{t('pages.edit.open')}</Button>{/if}
+    {#if published}<Button href={`/${r.slug}`} variant="outline" size="sm" target="_blank" rel="noopener"><Icon name="external-link" size={16} />{t('pages.edit.open')}</Button>{/if}
   </div>
 
-  {#if !data.serving}
-    <Alert variant="warning" title={t('pages.edit.not_serving_title')}>{t('pages.edit.not_serving')}</Alert>
-  {/if}
 
   <Card title={t('pages.permalink.title')} description={t('pages.permalink.lead')}>
     <p class="mb-4 break-all font-mono text-sm" data-testid="pages-permalink">
-      {#if published && data.serving}<a href={permalink} target="_blank" rel="noopener">{permalink}</a>{:else}{permalink}{/if}
+      {#if published}<a href={permalink} target="_blank" rel="noopener">{permalink}</a>{:else}{permalink}{/if}
     </p>
     {#if change?.changed}
       <!-- The durable outcome, for a post without JavaScript (and for screen readers after the toast). -->
@@ -142,8 +153,12 @@ function permalinkOverFetch(node: HTMLFormElement) {
     </div>
   </Card>
 
+  <Card title={t('pages.image.title')} description={t('pages.image.lead')}>
+    <FeaturedImage image={r.image} csrf={data.csrf} {editable} title={r.title} summary={r.summary} host={new URL(data.origin).host} {published} fallback={data.shareDefault} result={imageResult} />
+  </Card>
+
   <Card>
-    <FormBuilder fields={pageFields(t, { slug: false })} values={r as unknown as Record<string, unknown>} errors={mainErrors} csrf={data.csrf} action="?/save" ajax columns={2} readonly={!editable} cancelHref="/m/pages/pages" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('pages.list.saved') : null} error={form?.error && !form?.slugForm && form.code !== 'confirm_failed' && Object.keys(mainErrors).length === 0 ? form.error : null}>
+    <FormBuilder fields={pageFields(t, { slug: false })} values={r as unknown as Record<string, unknown>} errors={mainErrors} csrf={data.csrf} action="?/save" ajax columns={2} readonly={!editable} cancelHref="/m/pages/pages" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('pages.list.saved') : null} error={form?.error && !form?.slugForm && !form?.imageForm && form.code !== 'confirm_failed' && Object.keys(mainErrors).length === 0 ? form.error : null}>
       {#snippet extra()}
         <MarkdownEditor name="body" label={t('pages.field.body')} value={!form?.slugForm && form?.values ? ((form.values as Record<string, unknown>).body as string | undefined) : r.body} error={mainErrors.body} readonly={!editable} />
       {/snippet}
