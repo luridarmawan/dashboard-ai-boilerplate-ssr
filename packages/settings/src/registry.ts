@@ -48,8 +48,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         key: 'seo',
         title: { id: 'SEO', en: 'SEO' },
         note: {
-          id: 'Apa yang boleh dirayapi mesin pencari. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
-          en: 'What search engines may crawl. The sitemap (/sitemap.xml) is generated from the public pages.',
+          id: 'Apa yang boleh dirayapi mesin pencari, dan gambar yang tampil saat tautan situs dibagikan. Peta situs (/sitemap.xml) dibuat otomatis dari halaman publik.',
+          en: 'What search engines may crawl, and the picture shown when a link to the site is shared. The sitemap (/sitemap.xml) is generated from the public pages.',
         },
       },
       {
@@ -117,8 +117,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         },
         default: null,
         public: true,
-        order: 9,
-        group: 'identity',
+        order: 12,
+        group: 'seo',
         width: 'full',
       },
       {
