@@ -61,6 +61,10 @@ export {
 export { activeDialect, type Db, schema, tenantTables } from './generated/active.ts';
 export { createUuidV7Generator, isUuidV7, newId, uuidV7Time } from './id.ts';
 
+import { inTenantTransaction } from './transaction.ts';
+
+export { isUniqueViolation } from './transaction.ts';
+
 import { type TenantDb, tenantScope } from './tenant.ts';
 
 export { type TenantDb, TenantGuardError, tenantScope } from './tenant.ts';
@@ -154,4 +158,15 @@ export function forTenant(clientId: string): TenantDb {
  */
 export function unsafeAcrossTenants(): Db {
   return getDb();
+}
+
+/**
+ * `fn` inside one database transaction, through the tenant facade bound to it (see
+ * `transaction.ts` for the SQLite caveat). Throw to roll back.
+ */
+export function inTransaction<T>(
+  clientId: string,
+  fn: (tenant: TenantDb) => Promise<T>,
+): Promise<T> {
+  return inTenantTransaction(getDb(), clientId, fn);
 }

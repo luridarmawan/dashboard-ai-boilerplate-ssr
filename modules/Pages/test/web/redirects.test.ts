@@ -1,8 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { app } from '@app/api/app';
+import { storeUpload } from '@app/api/files';
 import { settings } from '@app/api/services';
 import { runSeed } from '@core/auth';
 import { eq, schema, unsafeAcrossTenants } from '@core/db';
+import { makePng } from '../fixtures/png.ts';
 
 /**
  * The permanent redirects over REAL HTTP, against a running web + API pair that share this
@@ -12,8 +14,9 @@ import { eq, schema, unsafeAcrossTenants } from '@core/db';
  *   INTEGRATION=1 PAGES_WEB_URL=http://127.0.0.1:5177 APP_ORIGIN=http://api.test \
  *     bun test modules/Pages/test/web
  *
- * Pages are created through the in-process app (same database); the 404 handler setting is set
- * to this module for the run and put back afterwards. Set PAGES_WEB_KEEP=<run id> to re-check
+ * Pages are created through the in-process app (same database). No setting is needed: their URLs
+ * live in the core permalink registry (F-12), which the web asks before the 404 handler — the run
+ * switches the 404 handler OFF (and once to Example's) to prove it. Set PAGES_WEB_KEEP=<run id> to re-check
  * the URLs of an earlier run without creating anything — run it once, restart the servers, run
  * it again with the printed id, and the same assertions prove the redirects survive a restart.
  */
@@ -35,6 +38,7 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
   let tenantId = '';
   let override: string | null = null;
   let globalBefore: string | null = null;
+  let shareBefore = { global: '', tenant: '' };
 
   beforeAll(async () => {
     const seeded = await runSeed(unsafeAcrossTenants(), {
@@ -51,11 +55,17 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
       rows.find((r) => (r.client ?? null) === clientId)?.value ?? null;
     override = read(tenantId);
     globalBefore = read(null);
+    const shareRows = await unsafeAcrossTenants()
+      .select({ value: schema.configurations.value, client: schema.configurations.client_id })
+      .from(schema.configurations)
+      .where(eq(schema.configurations.key, 'app.share_image'));
+    shareBefore = {
+      global: shareRows.find((r) => r.client === null)?.value ?? '',
+      tenant: shareRows.find((r) => r.client === tenantId)?.value ?? '',
+    };
+    // The 404 handler is OFF for the run: everything Pages serves comes from the registry.
     await settings.save(tenantId, [{ key: 'app.not_found_route', value: '' }]);
-    const saved = await settings.save(null, [{ key: 'app.not_found_route', value: '/pages' }], {
-      notFoundRoutes: ['/pages'],
-    });
-    expect(saved.errors).toEqual({});
+    await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
     if (keep) return;
 
     const login = await app.handle(
@@ -101,12 +111,32 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     });
     await send('PUT', `/v1/m/pages/pages/${about.id}/slug`, { slug: s('about-our-company') });
     await send('PUT', `/v1/m/pages/pages/${about.id}/slug`, { slug: s('about-qhomemart') });
+    // A featured image for the link preview (og:image), uploaded as the dashboard does.
+    const form = new FormData();
+    form.append('file', new File([makePng(1200, 630)], 'hero.png', { type: 'image/png' }));
+    form.append('alt', 'Our office');
+    const uploaded = await app.handle(
+      new Request(`${ORIGIN}/v1/m/pages/pages/${about.id}/image`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, cookie: `crk_csrf=${TOKEN}; ${session}`, 'x-csrf-token': TOKEN },
+        body: form,
+      }),
+    );
+    expect(uploaded.status).toBe(200);
+    await send('POST', '/v1/m/pages/pages', {
+      title: 'Plain',
+      slug: s('plain'),
+      status: 'published',
+      body: 'No picture of its own.',
+    });
     const draft = await send('POST', '/v1/m/pages/pages', { title: 'Draft', slug: s('draft-a') });
     await send('PUT', `/v1/m/pages/pages/${draft.id}/slug`, { slug: s('draft-b') });
     console.info(`pages web check: run id ${run} (PAGES_WEB_KEEP=${run} re-checks these URLs)`);
   });
 
   afterAll(async () => {
+    await settings.save(null, [{ key: 'app.share_image', value: shareBefore.global }]);
+    await settings.save(tenantId, [{ key: 'app.share_image', value: shareBefore.tenant }]);
     await settings.save(null, [{ key: 'app.not_found_route', value: globalBefore ?? '' }], {
       notFoundRoutes: globalBefore ? [globalBefore] : [],
     });
@@ -119,10 +149,134 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     const res = await visit(`/${s('about-qhomemart')}`);
     const html = await res.text();
     expect(res.status, html.slice(0, 300)).toBe(200);
-    expect(res.headers.get('x-not-found-route')).toBe('/pages');
+    expect(res.headers.get('x-permalink-module')).toBe('pages');
+    expect(res.headers.get('x-not-found-route')).toBeNull();
     expect(html).toContain('data-testid="pages-article"');
     expect(html).toContain('<strong>world</strong>');
     expect(html).toContain(`rel="canonical" href="${WEB}/${s('about-qhomemart')}"`);
+  });
+
+  test('the share card: an absolute og:image a crawler can fetch, with size, type and alt', async () => {
+    const html = await (await visit(`/${s('about-qhomemart')}`)).text();
+    const meta = (prop: string) =>
+      new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
+    const og = meta('og:image');
+    expect(og).toMatch(
+      new RegExp(`^${WEB.replace(/[.:/]/g, '\\$&')}/v1/m/pages/media/[0-9a-f-]{36}$`),
+    );
+    expect(meta('og:image:width')).toBe('1200');
+    expect(meta('og:image:height')).toBe('630');
+    expect(meta('og:image:type')).toBe('image/png');
+    expect(meta('og:image:alt')).toBe('Our office');
+    expect(meta('twitter:card')).toBe('summary_large_image');
+    expect(meta('twitter:image')).toBe(og);
+    expect(html).toContain('data-testid="pages-featured"');
+    // Fetched like a crawler does: no cookie, no tenant header, through the site's own origin.
+    const img = await fetch(og ?? '', { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toBe('image/png');
+  });
+
+  test('a page without a featured image shares with the default share image', async () => {
+    const metaOf = async (path: string) => {
+      const html = await (await visit(path)).text();
+      return {
+        html,
+        meta: (prop: string) =>
+          new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null,
+      };
+    };
+    const clear = async () => {
+      await settings.save(tenantId, [{ key: 'app.share_image', value: '' }]);
+      await settings.save(null, [{ key: 'app.share_image', value: '' }]);
+    };
+
+    // Nothing set in Settings: the file the deploy ships.
+    await clear();
+    const plain = await metaOf(`/${s('plain')}`);
+    expect(plain.meta('og:image')).toBe(`${WEB}/og-image.jpg`);
+    expect(plain.meta('og:image:type')).toBe('image/jpeg');
+    expect(plain.meta('og:image:width')).toBe('1672');
+    expect(plain.meta('og:image:height')).toBe('941');
+    expect(plain.meta('og:image:alt')).toBe('Plain');
+    expect(plain.meta('twitter:card')).toBe('summary_large_image');
+    // The default only illustrates the link: the article itself shows no picture.
+    expect(plain.html).not.toContain('data-testid="pages-featured"');
+    const shipped = await fetch(`${WEB}/og-image.jpg`, {
+      headers: { 'user-agent': 'facebookexternalhit/1.1' },
+    });
+    expect(shipped.status).toBe(200);
+    expect(shipped.headers.get('content-type')).toContain('image/jpeg');
+
+    // Settings → Application → Default share image (global, what anonymous visitors read).
+    const stored = await storeUpload({
+      clientId: tenantId,
+      userId: null,
+      file: new File([makePng(1200, 630, [20, 140, 90])], 'share.png', { type: 'image/png' }),
+      kind: 'setting-image',
+      visibility: 'public',
+    });
+    if (!stored.ok) throw new Error(stored.message);
+    try {
+      await settings.save(null, [{ key: 'app.share_image', value: stored.row.id }]);
+      const url = `${WEB}/v1/configuration/image-file/${stored.row.id}`;
+      for (const path of [`/${s('plain')}`, '/']) {
+        const page = await metaOf(path);
+        expect(page.meta('og:image'), path).toBe(url);
+        expect(page.meta('og:image:type'), path).toBe('image/png');
+        expect(page.meta('og:image:width'), path).toBe('1200');
+        expect(page.meta('og:image:height'), path).toBe('630');
+        expect(page.meta('twitter:image'), path).toBe(url);
+      }
+      // A page WITH a featured image keeps its own.
+      expect((await metaOf(`/${s('about-qhomemart')}`)).meta('og:image')).toContain(
+        '/v1/m/pages/media/',
+      );
+      // Fetched like a crawler: no cookie, no tenant header, through the site's origin.
+      const img = await fetch(url, { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
+      expect(img.status).toBe(200);
+      expect(img.headers.get('content-type')).toBe('image/png');
+    } finally {
+      await clear();
+    }
+  });
+
+  test('plain HTTP clients get the real 301 too: no Accept, any-type Accept, HEAD', async () => {
+    const want = `${WEB}/${s('about-qhomemart')}`;
+    for (const init of [
+      { method: 'GET', headers: {} },
+      { method: 'GET', headers: { accept: '*/*' } },
+      { method: 'HEAD', headers: { accept: '*/*' } },
+    ]) {
+      const res = await fetch(`${WEB}/${s('about-us')}`, { ...init, redirect: 'manual' });
+      expect(res.status, JSON.stringify(init)).toBe(301);
+      expect(res.headers.get('location'), JSON.stringify(init)).toBe(want);
+    }
+    // An explicit non-HTML ask is not a page request: plain 404, no lookup.
+    const json = await fetch(`${WEB}/${s('about-us')}`, {
+      headers: { accept: 'application/json' },
+      redirect: 'manual',
+    });
+    expect(json.status).toBe(404);
+  });
+
+  test('registered URLs and the 404 handler live side by side', async () => {
+    // Example's 404 handler on: it answers URL shapes nobody registered…
+    await settings.save(null, [{ key: 'app.not_found_route', value: '/resolve' }], {
+      notFoundRoutes: ['/resolve'],
+    });
+    try {
+      const page = await visit(`/${s('about-qhomemart')}`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get('x-permalink-module')).toBe('pages');
+      const trapped = await visit('/category-food');
+      expect(trapped.status).toBe(200);
+      expect(trapped.headers.get('x-not-found-route')).toBe('/resolve');
+      // …and a URL neither knows is still a plain 404.
+      expect((await visit(`/${s('nobody-has-this')}`)).status).toBe(404);
+    } finally {
+      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
+    }
   });
 
   test('every old permalink answers 301 straight to the current one', async () => {

@@ -1,13 +1,15 @@
 import { and, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
-import { extensionFor, isAllowedType, sniffMime, storage } from '@core/storage';
+import { extensionFor, imageSize, isAllowedType, sniffMime, storage } from '@core/storage';
 import { settings } from './services.ts';
 
 /**
  * Upload service (PRD Q-16) — the ONE way bytes enter the store. Core routes and modules call
  * `storeUpload()`; it validates size and type against the tenant's settings, sniffs the content
  * (a `.png` that is not a PNG is refused), writes to the configured adapter (local volume or S3)
- * and records the row in `files`. Metadata is tenant data; bytes are keyed by tenant too.
+ * and records the row in `files`. Metadata is tenant data; bytes are keyed by tenant too. A raster
+ * image also gets its pixel size in `meta.width` / `meta.height` (read from the header), which is
+ * what share cards (og:image:width/height) and layout reservation need.
  */
 
 export type FileRow = typeof schema.files.$inferSelect;
@@ -106,6 +108,11 @@ export async function storeUpload(input: StoreUploadInput): Promise<StoreUploadR
   const store = storage();
   await store.put(key, bytes, mime);
   const sha256 = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
+  // Raster images carry their size from the moment they are stored; the caller's meta wins.
+  const size2d = mime.startsWith('image/') && mime !== 'image/svg+xml' ? imageSize(bytes) : null;
+  const meta = size2d
+    ? { width: size2d.width, height: size2d.height, ...(input.meta ?? {}) }
+    : (input.meta ?? null);
   const name =
     (input.name ?? (input.file instanceof File ? input.file.name : '') ?? 'file').slice(0, 255) ||
     'file';
@@ -123,7 +130,7 @@ export async function storeUpload(input: StoreUploadInput): Promise<StoreUploadR
       sha256,
       kind: (input.kind ?? 'generic').slice(0, 64),
       visibility: input.visibility ?? 'private',
-      meta: input.meta ?? null,
+      meta,
     });
   const [row] = await unsafeAcrossTenants()
     .select()

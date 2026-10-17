@@ -48,8 +48,37 @@ export const actions: Actions = {
     const secrets = new Set(
       form.getAll('_secrets').filter((k): k is string => typeof k === 'string'),
     );
+    const images = new Set(
+      form.getAll('_images').filter((k): k is string => typeof k === 'string'),
+    );
     const values: Record<string, unknown> = {};
+    const imageErrors: Record<string, string> = {};
     for (const key of keys) {
+      if (images.has(key)) {
+        // An `image` field: a picked file is uploaded first (public, through the files API) and
+        // its id becomes the value; "remove" clears it; neither leaves the stored value alone.
+        const file = form.get(`${key}__file`);
+        if (file instanceof File && file.size > 0) {
+          const up = await apiFor(event).v1.files.post({
+            file,
+            kind: 'setting-image',
+            visibility: 'public',
+          });
+          if (up.data?.success) values[key] = up.data.data.id;
+          else {
+            const reason = (
+              up.error as { value?: { error?: { details?: { reason?: string } } } } | null
+            )?.value?.error?.details?.reason;
+            imageErrors[key] =
+              reason === 'too_large'
+                ? t('settings.image_too_large')
+                : reason === 'type_not_allowed' || reason === 'content_mismatch'
+                  ? t('settings.image_type')
+                  : t('settings.image_failed');
+          }
+        } else if (form.get(`${key}__clear`) === 'on') values[key] = '';
+        continue;
+      }
       if (lists.has(key))
         values[key] = form
           .getAll(key)
@@ -61,6 +90,16 @@ export const actions: Actions = {
         values[key] = form.get(`${key}__clear`) === 'on' ? '__clear__' : str(form, key);
       else values[key] = str(form, key);
     }
+    if (Object.keys(imageErrors).length)
+      return actionFailure(
+        {
+          status: 422,
+          code: 'validation_failed',
+          message: Object.values(imageErrors)[0] ?? '',
+          details: imageErrors,
+        },
+        { section },
+      );
     const r = unwrap(
       await apiFor(event).v1.configuration.put({
         ...(scope === 'global' ? { scope: 'global' } : {}),

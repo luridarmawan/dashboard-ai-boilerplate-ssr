@@ -338,6 +338,7 @@ $effect(() => {
   {#if f.type === 'list'}<input type="hidden" name="_lists" value={f.key} />{/if}
   {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
   {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
+  {#if f.type === 'image'}<input type="hidden" name="_images" value={f.key} />{/if}
   <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={WIDTH[f.width]}>
     {#if f.type === 'boolean'}
       <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -375,6 +376,21 @@ $effect(() => {
         {#each f.options ?? [] as o (o.value)}
           <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
         {:else}<span class="text-muted-foreground">—</span>{/each}
+      </div>
+    {:else if f.type === 'image'}
+      <!-- An uploaded public image (og:image and the like): preview, a new file, or remove. -->
+      <div class="flex flex-wrap items-start gap-4" data-testid={`image-field-${f.key}`}>
+        {#if strVal}
+          <img src={`/v1/configuration/image-file/${strVal}`} alt="" class="aspect-[1.91/1] w-60 rounded-md border bg-muted object-cover" data-testid="image-field-preview" />
+        {:else}
+          <div class="flex aspect-[1.91/1] w-60 items-center justify-center rounded-md border border-dashed bg-muted/40 text-xs text-muted-foreground" data-testid="image-field-empty">{t('settings.image_none')}</div>
+        {/if}
+        <div class="grid min-w-0 flex-1 gap-2">
+          <input {id} type="file" name={`${f.key}__file`} accept="image/jpeg,image/png,image/webp,image/gif" class="block w-full text-sm file:me-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm file:text-foreground hover:file:bg-accent" />
+          {#if strVal && f.source === (data.scope === 'global' ? 'global' : 'tenant')}
+            <label class="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox name={`${f.key}__clear`} /> {data.scope === 'global' ? t('settings.image_clear_default') : t('settings.image_clear_inherit')}</label>
+          {/if}
+        </div>
       </div>
     {:else if f.type === 'timezone'}
       <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} placeholder="Asia/Jakarta" autocomplete="off" oninput={(e) => (zones[zoneId(s.section, f.key)] = e.currentTarget.value)} />
@@ -486,14 +502,18 @@ $effect(() => {
         <form
           method="POST"
           action="?/save"
+          enctype="multipart/form-data"
           class="grid gap-4 sm:grid-cols-6"
-          use:enhance={() => {
+          use:enhance={({ formElement }) => {
             saving = s.section;
             clientError = null;
             return async ({ result, update }) => {
               saving = null;
               if (result.type === 'redirect') {
                 triggerSavedNotice(s.section);
+                // A saved upload must not ride along with the next save of this section.
+                for (const input of formElement.querySelectorAll<HTMLInputElement>('input[type="file"]')) input.value = '';
+                for (const box of formElement.querySelectorAll<HTMLInputElement>('input[name$="__clear"]')) box.checked = false;
                 await invalidateAll();
               } else if (result.type === 'failure') {
                 const failureData = result.data as { message?: string; error?: string } | undefined;

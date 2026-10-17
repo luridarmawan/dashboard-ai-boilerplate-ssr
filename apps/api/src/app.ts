@@ -14,6 +14,7 @@ import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
 import { notificationsDomain } from './domains/notifications.ts';
 import { outbox } from './domains/outbox.ts';
+import { permalinksDomain } from './domains/permalinks.ts';
 import { queueDomain } from './domains/queue.ts';
 import { regions } from './domains/regions.ts';
 import { system } from './domains/system.ts';
@@ -88,6 +89,10 @@ export const app = new Elysia()
             description: 'Uploads: local volume or S3, validated, under RBAC and tenancy',
           },
           {
+            name: 'permalinks',
+            description: 'Root URLs modules registered for their content, and their 301 history',
+          },
+          {
             name: 'tools',
             description: 'AI/MCP tools contributed by modules, under RBAC and tenancy',
           },
@@ -122,6 +127,7 @@ export const app = new Elysia()
       .use(mailTrack)
       .use(notificationsDomain)
       .use(filesDomain)
+      .use(permalinksDomain)
       .use(tokensDomain)
       .use(webhooksDomain)
       .use(queueDomain)

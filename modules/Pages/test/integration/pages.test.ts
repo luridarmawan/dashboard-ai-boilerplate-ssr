@@ -1,14 +1,17 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { app } from '@app/api/app';
-import { settings } from '@app/api/services';
+import { claimPermalink, releasePermalinks } from '@app/api/permalinks';
 import { runSeed } from '@core/auth';
-import { and, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { and, eq, inTransaction, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { makePng } from '../fixtures/png.ts';
 
 /**
  * The Pages API against the real app (INTEGRATION=1): CRUD, and every rule of the permalink
  * history — 301 targets, no chains, no loops, no redirect for drafts, conflicts, the transaction
  * that keeps a slug change and its redirect together, deletion. The HTTP 301 itself is answered
- * by the web (SvelteKit); `test/web/redirects.test.ts` checks it over real HTTP.
+ * by the web (SvelteKit); `test/web/redirects.test.ts` checks it over real HTTP. Also the
+ * featured image: upload through core storage, its public media URL (og:image), replacement,
+ * removal and the types social networks cannot show.
  */
 const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
@@ -34,7 +37,8 @@ const call = (path: string, init: RequestInit = {}, cookies: string[] = [admin])
   headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', `10.98.${Math.floor(run / 1000) % 250}.${run % 250}`);
-  if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
+  if (init.body && !(init.body instanceof FormData) && !headers.has('content-type'))
+    headers.set('content-type', 'application/json');
   return app.handle(new Request(`${ORIGIN}${path}`, { ...init, headers }));
 };
 const send = async (method: string, path: string, body?: unknown) => {
@@ -157,13 +161,17 @@ describe.skipIf(!enabled)('Pages module', () => {
     expect((same.body.data as { change: { changed: boolean } }).change.changed).toBe(false);
     expect((await detail(page.id)).redirects).toHaveLength(2);
 
-    // The redirect rows are plain database rows: nothing about them lives in process memory, so
-    // a restarted server answers the same (the web check repeats this over HTTP).
+    // The history lives in the core permalink registry — plain database rows, nothing in process
+    // memory, so a restarted server answers the same (the web check repeats this over HTTP).
     const rows = await unsafeAcrossTenants()
-      .select({ old: schema.pagesRedirects.old_slug })
-      .from(schema.pagesRedirects)
-      .where(eq(schema.pagesRedirects.page_id, page.id));
-    expect(rows.map((r) => r.old).sort()).toEqual([s('about-our-company'), s('about-us')]);
+      .select({ path: schema.permalinks.path, kind: schema.permalinks.kind })
+      .from(schema.permalinks)
+      .where(and(eq(schema.permalinks.module, 'pages'), eq(schema.permalinks.target, page.id)));
+    expect(rows.map((r) => `${r.kind} ${r.path}`).sort()).toEqual([
+      `canonical /${s('about-qhomemart')}`,
+      `redirect /${s('about-our-company')}`,
+      `redirect /${s('about-us')}`,
+    ]);
   });
 
   test('renaming back to an own old slug reclaims it: no loop, no self-redirect', async () => {
@@ -221,14 +229,22 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectPage(s('conf-b'));
   });
 
-  test('a redirect that cannot be written rolls the slug change back (one transaction)', async () => {
+  test('a page write that fails rolls the permalink change back (one transaction)', async () => {
     const page = await create({ title: 'Tx', slug: s('tx-old'), status: 'published' });
-    // Plant a row that makes the redirect insert fail on the unique index, the way a racing
-    // request would: the slug update before it already ran inside the same transaction.
+    // Plant a deleted page still holding the new slug: the registry claim goes through, then the
+    // page's own slug update hits the unique index — inside the same transaction, the way a racing
+    // request would.
     const planted = newId();
     await unsafeAcrossTenants()
-      .insert(schema.pagesRedirects)
-      .values({ id: planted, client_id: tenantId, page_id: newId(), old_slug: s('tx-old') });
+      .insert(schema.pagesPages)
+      .values({
+        id: planted,
+        client_id: tenantId,
+        title: 'Planted',
+        slug: s('tx-new'),
+        status: 'draft',
+        deleted_at: new Date(),
+      });
     try {
       const r = await rename(page.id, s('tx-new'));
       expect(r.status).toBe(409);
@@ -236,10 +252,15 @@ describe.skipIf(!enabled)('Pages module', () => {
       expect((await detail(page.id)).slug).toBe(s('tx-old'));
       expect((await detail(page.id)).redirects).toEqual([]);
       await expectNothing(s('tx-new'));
+      const registry = await unsafeAcrossTenants()
+        .select({ path: schema.permalinks.path, kind: schema.permalinks.kind })
+        .from(schema.permalinks)
+        .where(and(eq(schema.permalinks.module, 'pages'), eq(schema.permalinks.target, page.id)));
+      expect(registry).toEqual([{ path: `/${s('tx-old')}`, kind: 'canonical' }]);
     } finally {
       await unsafeAcrossTenants()
-        .delete(schema.pagesRedirects)
-        .where(eq(schema.pagesRedirects.id, planted));
+        .delete(schema.pagesPages)
+        .where(eq(schema.pagesPages.id, planted));
     }
     // With the obstacle gone the same change goes through, redirect included.
     expect((await rename(page.id, s('tx-new'))).status).toBe(200);
@@ -262,11 +283,12 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectNothing(s('gone-b'));
     const left = await unsafeAcrossTenants()
       .select()
-      .from(schema.pagesRedirects)
+      .from(schema.permalinks)
       .where(
         and(
-          eq(schema.pagesRedirects.client_id, tenantId),
-          eq(schema.pagesRedirects.page_id, page.id),
+          eq(schema.permalinks.client_id, tenantId),
+          eq(schema.permalinks.module, 'pages'),
+          eq(schema.permalinks.target, page.id),
         ),
       );
     expect(left).toEqual([]);
@@ -276,44 +298,222 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectPage(s('gone-a'));
   });
 
-  describe('sitemap', () => {
-    let override: string | null = null;
-    beforeAll(async () => {
-      const [row] = await unsafeAcrossTenants()
-        .select({ value: schema.configurations.value })
-        .from(schema.configurations)
-        .where(
-          and(
-            eq(schema.configurations.key, 'app.not_found_route'),
-            eq(schema.configurations.client_id, tenantId),
-          ),
-        );
-      override = row?.value ?? null;
-    });
-    afterAll(async () => {
-      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
-      await settings.save(tenantId, [{ key: 'app.not_found_route', value: override ?? '' }], {
-        notFoundRoutes: override ? [override] : [],
-      });
-    });
-    const sitemap = async () => {
-      const res = await app.handle(new Request(`${ORIGIN}/v1/m/pages/sitemap`));
-      return ((await res.json()) as { data: { path: string }[] }).data.map((e) => e.path);
+  describe('the core permalink registry', () => {
+    const core = async (path: string) => {
+      const res = await app.handle(
+        new Request(`${ORIGIN}/v1/permalinks/resolve?path=${encodeURIComponent(path)}`),
+      );
+      return { status: res.status, data: ((await res.json()) as { data?: unknown }).data };
     };
 
-    test('lists published pages only while the module answers root URLs', async () => {
+    test('resolves a page with no setting at all: content, redirect, loose spelling, nothing', async () => {
+      const page = await create({ title: 'Core', slug: s('core-a'), status: 'published' });
+      await rename(page.id, s('core-b'));
+      expect(await core(`/${s('core-b')}`)).toEqual({
+        status: 200,
+        data: { kind: 'content', module: 'pages', page: '/pages', path: `/${s('core-b')}` },
+      });
+      expect(await core(`/${s('core-a')}`)).toEqual({
+        status: 200,
+        data: { kind: 'redirect', module: 'pages', location: `/${s('core-b')}` },
+      });
+      // A loose spelling resolves to the canonical path; the web answers 301 to it.
+      expect((await core(`/${s('Core-B').toUpperCase()}/`)).data).toMatchObject({
+        path: `/${s('core-b')}`,
+      });
+      expect((await core(`/${s('core-nothing')}`)).status).toBe(404);
+      expect((await core('/wp-login.php')).status).toBe(404);
+    });
+
+    test('sitemap lists live pages only', async () => {
       await create({ title: 'Map', slug: s('map-pub'), status: 'published' });
       await create({ title: 'Map', slug: s('map-draft') });
-      await settings.save(tenantId, [{ key: 'app.not_found_route', value: '' }]);
-      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
-      expect(await sitemap()).not.toContain(`/${s('map-pub')}`);
-      const saved = await settings.save(null, [{ key: 'app.not_found_route', value: '/pages' }], {
-        notFoundRoutes: ['/pages'],
+      const res = await app.handle(new Request(`${ORIGIN}/v1/permalinks/sitemap`));
+      const paths = ((await res.json()) as { data: { path: string }[] }).data.map((e) => e.path);
+      expect(paths).toContain(`/${s('map-pub')}`);
+      expect(paths).not.toContain(`/${s('map-draft')}`);
+    });
+
+    test('a URL is unique across modules: another module holding it blocks a page', async () => {
+      // Another module (an articles module, say) registered this URL for its own content.
+      const other = newId();
+      await inTransaction(tenantId, (tx) =>
+        claimPermalink(tx, {
+          module: 'articles',
+          target: other,
+          path: `/${s('shared')}`,
+          live: true,
+          keepHistory: false,
+        }),
+      );
+      try {
+        const r = await send('POST', '/v1/m/pages/pages', { title: 'Shared', slug: s('shared') });
+        expect(r.status).toBe(409);
+        expect(r.body.error?.details).toMatchObject({ reason: 'slug_taken', module: 'articles' });
+        // …and Pages never answers for it: the URL is not ours.
+        expect((await resolve(`/${s('shared')}`)).status).toBe(404);
+      } finally {
+        await inTransaction(tenantId, (tx) => releasePermalinks(tx, 'articles', other));
+      }
+    });
+
+    test('slugs the app itself answers are refused', async () => {
+      for (const slug of ['dashboard', 'settings', 'pages', 'example']) {
+        const r = await send('POST', '/v1/m/pages/pages', { title: 'Reserved', slug });
+        expect(r.status, slug).toBe(409);
+        expect(r.body.error?.details?.reason, slug).toBe('slug_reserved');
+      }
+    });
+  });
+
+  describe('featured image', () => {
+    type Img = {
+      url: string;
+      width: number | null;
+      height: number | null;
+      mime: string;
+      alt: string | null;
+    };
+    const upload = async (
+      id: string,
+      bytes: Uint8Array,
+      type: string,
+      name: string,
+      alt?: string,
+    ) => {
+      const form = new FormData();
+      form.append('file', new File([bytes], name, { type }));
+      if (alt !== undefined) form.append('alt', alt);
+      const res = await app.handle(
+        new Request(`${ORIGIN}/v1/m/pages/pages/${id}/image`, {
+          method: 'POST',
+          body: form,
+          headers: {
+            origin: ORIGIN,
+            cookie: `crk_csrf=${TOKEN}; ${admin}`,
+            'x-csrf-token': TOKEN,
+          },
+        }),
+      );
+      return { status: res.status, body: (await res.json()) as Envelope };
+    };
+    const media = (url: string) => app.handle(new Request(`${ORIGIN}${url}`));
+    const imageOf = async (id: string) =>
+      ((await send('GET', `/v1/m/pages/pages/${id}`)).body.data as { image: Img | null }).image;
+    const publicImage = async (slug: string) => {
+      const r = await resolve(`/${slug}`);
+      return r.data?.kind === 'page'
+        ? (r.data.page as unknown as { image: Img | null }).image
+        : null;
+    };
+    const fileRow = async (url: string) => {
+      const id = /\/([0-9a-f-]{36})\//.exec(`${url}/`)?.[1] ?? '';
+      const [row] = await unsafeAcrossTenants()
+        .select({
+          deleted: schema.files.deleted_at,
+          kind: schema.files.kind,
+          visibility: schema.files.visibility,
+        })
+        .from(schema.files)
+        .where(eq(schema.files.id, id));
+      return row;
+    };
+
+    test('upload: stored public, sized, served to anonymous visitors only while published', async () => {
+      const page = await create({ title: 'Gambar', slug: s('img'), summary: 'Ringkas' });
+      const up = await upload(page.id, makePng(1200, 630), 'image/png', 'hero.png', 'Kantor kami');
+      expect(up.status, JSON.stringify(up.body)).toBe(200);
+      const admin = await imageOf(page.id);
+      expect(admin).toMatchObject({
+        width: 1200,
+        height: 630,
+        mime: 'image/png',
+        alt: 'Kantor kami',
       });
-      expect(saved.errors).toEqual({});
-      const on = await sitemap();
-      expect(on).toContain(`/${s('map-pub')}`);
-      expect(on).not.toContain(`/${s('map-draft')}`);
+      expect(await fileRow(admin?.url ?? '')).toMatchObject({
+        kind: 'pages.featured',
+        visibility: 'public',
+        deleted: null,
+      });
+
+      // Draft: the page does not resolve and its image is not served.
+      const mediaUrl = `/v1/m/pages/media/${/([0-9a-f-]{36})/.exec(admin?.url ?? '')?.[1]}`;
+      expect((await media(mediaUrl)).status).toBe(404);
+
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
+      const pub = await publicImage(s('img'));
+      expect(pub).toEqual({
+        url: mediaUrl,
+        width: 1200,
+        height: 630,
+        mime: 'image/png',
+        alt: 'Kantor kami',
+      });
+      // Anonymous, no X-Client-ID — exactly what a social crawler sends.
+      const got = await media(mediaUrl);
+      expect(got.status).toBe(200);
+      expect(got.headers.get('content-type')).toBe('image/png');
+      expect(got.headers.get('cache-control')).toContain('public');
+      expect(new Uint8Array(await got.arrayBuffer()).slice(0, 4)).toEqual(
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      );
+
+      // Alt text alone is editable without a new upload; empty clears it.
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { imageAlt: 'Tim kami' });
+      expect((await imageOf(page.id))?.alt).toBe('Tim kami');
+    });
+
+    test('replace removes the old file; remove clears the page and its media URL', async () => {
+      const page = await create({ title: 'Ganti', slug: s('img-swap'), status: 'published' });
+      await upload(page.id, makePng(800, 420), 'image/png', 'a.png');
+      const first = await imageOf(page.id);
+      await upload(page.id, makePng(1200, 630, [10, 120, 200]), 'image/png', 'b.png');
+      const second = await imageOf(page.id);
+      expect(second?.url).not.toBe(first?.url);
+      expect((await fileRow(first?.url ?? ''))?.deleted).not.toBeNull();
+      expect(second?.width).toBe(1200);
+
+      const removed = await send('DELETE', `/v1/m/pages/pages/${page.id}/image`);
+      expect(removed.status).toBe(200);
+      expect(await imageOf(page.id)).toBeNull();
+      expect(await publicImage(s('img-swap'))).toBeNull();
+      expect((await fileRow(second?.url ?? ''))?.deleted).not.toBeNull();
+    });
+
+    test('formats social networks cannot show are refused, and nothing changes', async () => {
+      const page = await create({ title: 'Tolak', slug: s('img-bad'), status: 'published' });
+      const svg = await upload(
+        page.id,
+        new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+        'image/svg+xml',
+        'x.svg',
+      );
+      expect(svg.status).toBe(422);
+      expect(svg.body.error?.details?.reason).toBe('type_not_allowed');
+      const fake = await upload(
+        page.id,
+        new TextEncoder().encode('not a png'),
+        'image/png',
+        'x.png',
+      );
+      expect(fake.status).toBe(422);
+      expect(fake.body.error?.details?.reason).toBe('content_mismatch');
+      expect(await imageOf(page.id)).toBeNull();
+      // Anonymous with a perfectly valid image: refused by permission, not by content.
+      const anon = new FormData();
+      anon.append('file', new File([makePng(10, 10)], 'a.png', { type: 'image/png' }));
+      expect(
+        (await call(`/v1/m/pages/pages/${page.id}/image`, { method: 'POST', body: anon }, []))
+          .status,
+      ).toBe(401);
+    });
+
+    test('deleting the page deletes its image', async () => {
+      const page = await create({ title: 'Hapus', slug: s('img-del'), status: 'published' });
+      await upload(page.id, makePng(1200, 630), 'image/png', 'c.png');
+      const img = await imageOf(page.id);
+      await send('DELETE', `/v1/m/pages/pages/${page.id}`);
+      expect((await fileRow(img?.url ?? ''))?.deleted).not.toBeNull();
     });
   });
 });
