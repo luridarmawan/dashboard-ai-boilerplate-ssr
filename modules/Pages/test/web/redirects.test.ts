@@ -114,6 +114,12 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
       }),
     );
     expect(uploaded.status).toBe(200);
+    await send('POST', '/v1/m/pages/pages', {
+      title: 'Plain',
+      slug: s('plain'),
+      status: 'published',
+      body: 'No picture of its own.',
+    });
     const draft = await send('POST', '/v1/m/pages/pages', { title: 'Draft', slug: s('draft-a') });
     await send('PUT', `/v1/m/pages/pages/${draft.id}/slug`, { slug: s('draft-b') });
     console.info(`pages web check: run id ${run} (PAGES_WEB_KEEP=${run} re-checks these URLs)`);
@@ -157,6 +163,25 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     const img = await fetch(og ?? '', { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
     expect(img.status).toBe(200);
     expect(img.headers.get('content-type')).toBe('image/png');
+  });
+
+  test('a page without a featured image shares with the site default image', async () => {
+    const html = await (await visit(`/${s('plain')}`)).text();
+    const meta = (prop: string) =>
+      new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
+    expect(meta('og:image')).toBe(`${WEB}/og-image.jpg`);
+    expect(meta('og:image:type')).toBe('image/jpeg');
+    expect(meta('og:image:width')).toBe('1672');
+    expect(meta('og:image:height')).toBe('941');
+    expect(meta('og:image:alt')).toBe('Plain');
+    expect(meta('twitter:card')).toBe('summary_large_image');
+    // The default only illustrates the link: the article itself shows no picture.
+    expect(html).not.toContain('data-testid="pages-featured"');
+    const img = await fetch(`${WEB}/og-image.jpg`, {
+      headers: { 'user-agent': 'facebookexternalhit/1.1' },
+    });
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toContain('image/jpeg');
   });
 
   test('every old permalink answers 301 straight to the current one', async () => {

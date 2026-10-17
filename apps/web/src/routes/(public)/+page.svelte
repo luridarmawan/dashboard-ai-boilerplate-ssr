@@ -3,6 +3,7 @@ import { autoSlide } from '$lib/actions/auto-slide';
 import Icon from '$lib/components/Icon.svelte';
 import { Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
+import { DEFAULT_OG_IMAGE } from '$lib/seo';
 import type { PageData } from './$types';
 
 /**
@@ -67,14 +68,14 @@ const stats = $derived([
   <meta property="og:description" content={description} />
   <meta property="og:url" content={`${data.origin}/`} />
   <meta property="og:site_name" content={siteName} />
-  <!-- Share preview (R-4): the deploy ships one image at /og-image.jpg (apps/web/static); absolute URL as the crawlers require. -->
-  <meta property="og:image" content={`${data.origin}/og-image.jpg`} />
-  <meta property="og:image:type" content="image/jpeg" />
-  <meta property="og:image:width" content="1672" />
-  <meta property="og:image:height" content="941" />
+  <!-- Share preview (R-4): the site's default image ($lib/seo); absolute URL as the crawlers require. -->
+  <meta property="og:image" content={`${data.origin}${DEFAULT_OG_IMAGE.path}`} />
+  <meta property="og:image:type" content={DEFAULT_OG_IMAGE.mime} />
+  <meta property="og:image:width" content={String(DEFAULT_OG_IMAGE.width)} />
+  <meta property="og:image:height" content={String(DEFAULT_OG_IMAGE.height)} />
   <meta property="og:image:alt" content={title} />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content={`${data.origin}/og-image.jpg`} />
+  <meta name="twitter:image" content={`${data.origin}${DEFAULT_OG_IMAGE.path}`} />
   {@html `<script type="application/ld+json">${ld}</script>`}
 </svelte:head>
 

@@ -256,6 +256,12 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   const form = page.getByTestId('pages-image-form');
   await expect(form).toHaveAttribute('data-enhanced', 'true');
   await expect(page.getByTestId('pages-image-empty')).toBeVisible();
+  // No image of its own yet: the share preview shows the site's default image, and says so.
+  await expect(page.getByTestId('pages-share-default')).toBeVisible();
+  await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
+    'src',
+    '/og-image.jpg',
+  );
   const mark = Date.now();
   await page.evaluate((m) => {
     (window as unknown as { __imgMark: number }).__imgMark = m;
@@ -277,7 +283,11 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   await expect(toast).toBeVisible({ timeout: 15_000 });
   const current = page.getByTestId('pages-image-current').locator('img');
   await expect(current).toHaveAttribute('src', /\/v1\/files\/[0-9a-f-]{36}\/content/);
-  await expect(page.getByTestId('pages-share-preview').locator('img')).toBeVisible();
+  await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
+    'src',
+    /\/v1\/files\//,
+  );
+  await expect(page.getByTestId('pages-share-default')).toHaveCount(0);
   await expect(page.locator('#pages-image-alt')).toHaveValue('Kantor kami');
   expect(await page.evaluate(() => (window as unknown as { __imgMark: number }).__imgMark)).toBe(
     mark,

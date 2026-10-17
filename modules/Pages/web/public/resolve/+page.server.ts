@@ -1,5 +1,6 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
+import { DEFAULT_OG_IMAGE } from '$lib/seo';
 import { apiFor } from '$lib/server/session';
 import { trappedPath } from '$lib/server/trap';
 
@@ -29,11 +30,27 @@ export const load: ServerLoad = async (event) => {
   const path = `/${hit.page.slug}`;
   if (trapped.pathname !== path) redirect(301, `${origin}${path}${trapped.search}`);
   const image = hit.page.image;
+  const absolute = (url: string) => (/^https?:\/\//.test(url) ? url : `${origin}${url}`);
   return {
     page: hit.page,
     canonical: `${origin}${path}`,
-    // Social crawlers need an ABSOLUTE og:image; the API hands out a path on this origin (or a
-    // full CDN URL when the store has one).
-    ogImage: image ? (/^https?:\/\//.test(image.url) ? image.url : `${origin}${image.url}`) : null,
+    // What a share shows. Social crawlers need an ABSOLUTE og:image: the page's featured image
+    // (the API hands out a path on this origin, or a CDN URL), else the site's default image, so
+    // a page without one is never shared as a bare text card.
+    share: image
+      ? {
+          url: absolute(image.url),
+          width: image.width,
+          height: image.height,
+          mime: image.mime,
+          alt: image.alt || hit.page.title,
+        }
+      : {
+          url: absolute(DEFAULT_OG_IMAGE.path),
+          width: DEFAULT_OG_IMAGE.width,
+          height: DEFAULT_OG_IMAGE.height,
+          mime: DEFAULT_OG_IMAGE.mime,
+          alt: hit.page.title,
+        },
   };
 };

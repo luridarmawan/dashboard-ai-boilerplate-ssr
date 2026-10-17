@@ -7,11 +7,13 @@ import MarkdownBody from '../../lib/MarkdownBody.svelte';
  * canonical URL is the page's own root URL, never `/pages` (the address this handler lives at).
  * The featured image leads the article and is the link preview on social networks: og:image with
  * its size, type and alt (so Facebook/LinkedIn draw the card on the first share), and a large
- * Twitter/X card. Without one, the share falls back to a plain text card.
+ * Twitter/X card. Without one, the share uses the site's default image ($lib/seo) — the article
+ * itself shows no picture then; the default only illustrates the link.
  */
 let { data } = $props();
 const p = $derived(data.page);
 const img = $derived(p.image);
+const share = $derived(data.share);
 const siteName = $derived((data as { app?: { name?: string } }).app?.name || '');
 </script>
 
@@ -24,21 +26,17 @@ const siteName = $derived((data as { app?: { name?: string } }).app?.name || '')
   {#if p.summary}<meta property="og:description" content={p.summary} />{/if}
   <meta property="og:url" content={data.canonical} />
   {#if siteName}<meta property="og:site_name" content={siteName} />{/if}
-  {#if img && data.ogImage}
-    <meta property="og:image" content={data.ogImage} />
-    {#if data.ogImage.startsWith('https://')}<meta property="og:image:secure_url" content={data.ogImage} />{/if}
-    <meta property="og:image:type" content={img.mime} />
-    {#if img.width && img.height}
-      <meta property="og:image:width" content={String(img.width)} />
-      <meta property="og:image:height" content={String(img.height)} />
-    {/if}
-    <meta property="og:image:alt" content={img.alt || p.title} />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content={data.ogImage} />
-    <meta name="twitter:image:alt" content={img.alt || p.title} />
-  {:else}
-    <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content={share.url} />
+  {#if share.url.startsWith('https://')}<meta property="og:image:secure_url" content={share.url} />{/if}
+  <meta property="og:image:type" content={share.mime} />
+  {#if share.width && share.height}
+    <meta property="og:image:width" content={String(share.width)} />
+    <meta property="og:image:height" content={String(share.height)} />
   {/if}
+  <meta property="og:image:alt" content={share.alt} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={share.url} />
+  <meta name="twitter:image:alt" content={share.alt} />
   <meta name="twitter:title" content={p.title} />
   {#if p.summary}<meta name="twitter:description" content={p.summary} />{/if}
 </svelte:head>

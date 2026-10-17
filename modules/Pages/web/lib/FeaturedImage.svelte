@@ -26,10 +26,12 @@ interface Props {
   summary: string | null;
   host: string;
   published: boolean;
+  /** The site's default share image, shown in the preview while the page has none of its own. */
+  fallback: string;
   /** Action result for this card (no-JS path), if any. */
   result?: { saved?: string | null; error?: string | null; alt?: string | null } | undefined;
 }
-let { image, csrf, editable, title, summary, host, published, result }: Props = $props();
+let { image, csrf, editable, title, summary, host, published, fallback, result }: Props = $props();
 const t = useT();
 
 /** Recommended by every network for the large card: 1.91:1, at least 1200 wide. */
@@ -149,15 +151,14 @@ function overFetch(node: HTMLFormElement) {
   <div>
     <p class="mb-2 text-sm font-medium">{t('pages.image.share_preview')}</p>
     <div class="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs" data-testid="pages-share-preview">
-      {#if shown}
-        <img src={shown.url} alt="" class="aspect-[1.91/1] w-full object-cover" />
-      {/if}
+      <img src={shown?.url ?? fallback} alt="" class="aspect-[1.91/1] w-full object-cover" data-default={shown ? null : 'true'} />
       <div class="grid gap-1 border-t bg-muted/40 px-3 py-2.5">
         <span class="text-xs uppercase tracking-wide text-muted-foreground">{host}</span>
         <span class="line-clamp-2 text-sm font-semibold">{title}</span>
         {#if summary}<span class="line-clamp-2 text-xs text-muted-foreground">{summary}</span>{/if}
       </div>
     </div>
+    {#if !shown}<p class="mt-2 text-xs text-muted-foreground" data-testid="pages-share-default">{t('pages.image.share_default')}</p>{/if}
     <p class="mt-2 text-xs text-muted-foreground">{published ? t('pages.image.share_note') : t('pages.image.share_draft')}</p>
   </div>
 </div>
