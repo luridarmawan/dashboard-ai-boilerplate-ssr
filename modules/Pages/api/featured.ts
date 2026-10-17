@@ -1,9 +1,8 @@
 import { type FileRow, fileUrl, findFile } from '@app/api/files';
-import { imageSize } from './image-size.ts';
 
 /**
  * Featured images of pages. Each one is a PUBLIC row in core `files`, stored through
- * `storeUpload()` like any upload, with its pixel size in `meta` (read once at upload). Visitors
+ * `storeUpload()` like any upload, which records its pixel size in `meta`. Visitors
  * and social crawlers never fetch it from `/v1/files/<id>/content`: that route needs the tenant
  * named in `X-Client-ID`, which a crawler does not send. They get `/v1/m/pages/media/<id>`, which
  * resolves the site tenant the way `/resolve` does and only serves the image of a PUBLISHED page.
@@ -39,8 +38,3 @@ export function featuredMeta(row: FileRow): FeaturedMeta {
 
 /** Where the DASHBOARD shows the image (any page state): the core file route, signed-in. */
 export const adminUrl = (row: FileRow) => fileUrl(row);
-
-/** Pixel size from the uploaded bytes; null when the header is not one we can read. */
-export async function sizeOf(file: Blob) {
-  return imageSize(new Uint8Array(await file.arrayBuffer()));
-}

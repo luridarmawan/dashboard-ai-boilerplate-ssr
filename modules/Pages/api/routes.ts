@@ -34,7 +34,6 @@ import {
   featuredFile,
   featuredMeta,
   mediaPath,
-  sizeOf,
 } from './featured.ts';
 import { renderMarkdown } from './markdown.ts';
 import {
@@ -521,7 +520,6 @@ export default defineApiRoutes(
           set.status = 404;
           return fail('not_found', 'Halaman tidak ditemukan', requestId);
         }
-        const dims = await sizeOf(body.file);
         const stored = await storeUpload({
           clientId,
           userId: auth?.user.id ?? null,
@@ -530,7 +528,7 @@ export default defineApiRoutes(
           visibility: 'public',
           allowedTypes: FEATURED_TYPES,
           maxBytes: FEATURED_MAX_BYTES,
-          meta: { page_id: before.id, width: dims?.width ?? null, height: dims?.height ?? null },
+          meta: { page_id: before.id },
         });
         if (!stored.ok) {
           set.status = stored.code === 'too_large' ? 413 : 422;

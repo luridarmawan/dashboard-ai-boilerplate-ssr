@@ -253,3 +253,5 @@ export const INLINE_SAFE = new Set([
   'image/vnd.microsoft.icon',
   'application/pdf',
 ]);
+
+export { type ImageSize, imageSize } from './image-size.ts';

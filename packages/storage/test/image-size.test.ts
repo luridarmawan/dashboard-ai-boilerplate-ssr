@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { imageSize } from '../api/image-size.ts';
-import { makePng } from './fixtures/png.ts';
+import { imageSize } from '../src/image-size.ts';
 
 /** og:image:width/height come from these headers — every format the upload accepts. */
 const bytes = (...parts: (number[] | string)[]) =>
@@ -9,8 +8,13 @@ const bytes = (...parts: (number[] | string)[]) =>
   );
 
 describe('imageSize', () => {
-  test('PNG (a real one)', () => {
-    expect(imageSize(makePng(1200, 630))).toEqual({ width: 1200, height: 630 });
+  test('PNG: IHDR width/height', () => {
+    const png = bytes(
+      [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13],
+      'IHDR',
+      [0, 0, 0x04, 0xb0, 0, 0, 0x02, 0x76, 8, 2, 0, 0, 0],
+    );
+    expect(imageSize(png)).toEqual({ width: 1200, height: 630 });
   });
 
   test('GIF', () => {

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { app } from '@app/api/app';
+import { storeUpload } from '@app/api/files';
 import { settings } from '@app/api/services';
 import { runSeed } from '@core/auth';
 import { eq, schema, unsafeAcrossTenants } from '@core/db';
@@ -36,6 +37,7 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
   let tenantId = '';
   let override: string | null = null;
   let globalBefore: string | null = null;
+  let shareBefore = { global: '', tenant: '' };
 
   beforeAll(async () => {
     const seeded = await runSeed(unsafeAcrossTenants(), {
@@ -52,6 +54,14 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
       rows.find((r) => (r.client ?? null) === clientId)?.value ?? null;
     override = read(tenantId);
     globalBefore = read(null);
+    const shareRows = await unsafeAcrossTenants()
+      .select({ value: schema.configurations.value, client: schema.configurations.client_id })
+      .from(schema.configurations)
+      .where(eq(schema.configurations.key, 'app.share_image'));
+    shareBefore = {
+      global: shareRows.find((r) => r.client === null)?.value ?? '',
+      tenant: shareRows.find((r) => r.client === tenantId)?.value ?? '',
+    };
     await settings.save(tenantId, [{ key: 'app.not_found_route', value: '' }]);
     const saved = await settings.save(null, [{ key: 'app.not_found_route', value: '/pages' }], {
       notFoundRoutes: ['/pages'],
@@ -126,6 +136,8 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
   });
 
   afterAll(async () => {
+    await settings.save(null, [{ key: 'app.share_image', value: shareBefore.global }]);
+    await settings.save(tenantId, [{ key: 'app.share_image', value: shareBefore.tenant }]);
     await settings.save(null, [{ key: 'app.not_found_route', value: globalBefore ?? '' }], {
       notFoundRoutes: globalBefore ? [globalBefore] : [],
     });
@@ -165,23 +177,68 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     expect(img.headers.get('content-type')).toBe('image/png');
   });
 
-  test('a page without a featured image shares with the site default image', async () => {
-    const html = await (await visit(`/${s('plain')}`)).text();
-    const meta = (prop: string) =>
-      new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
-    expect(meta('og:image')).toBe(`${WEB}/og-image.jpg`);
-    expect(meta('og:image:type')).toBe('image/jpeg');
-    expect(meta('og:image:width')).toBe('1672');
-    expect(meta('og:image:height')).toBe('941');
-    expect(meta('og:image:alt')).toBe('Plain');
-    expect(meta('twitter:card')).toBe('summary_large_image');
+  test('a page without a featured image shares with the default share image', async () => {
+    const metaOf = async (path: string) => {
+      const html = await (await visit(path)).text();
+      return {
+        html,
+        meta: (prop: string) =>
+          new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null,
+      };
+    };
+    const clear = async () => {
+      await settings.save(tenantId, [{ key: 'app.share_image', value: '' }]);
+      await settings.save(null, [{ key: 'app.share_image', value: '' }]);
+    };
+
+    // Nothing set in Settings: the file the deploy ships.
+    await clear();
+    const plain = await metaOf(`/${s('plain')}`);
+    expect(plain.meta('og:image')).toBe(`${WEB}/og-image.jpg`);
+    expect(plain.meta('og:image:type')).toBe('image/jpeg');
+    expect(plain.meta('og:image:width')).toBe('1672');
+    expect(plain.meta('og:image:height')).toBe('941');
+    expect(plain.meta('og:image:alt')).toBe('Plain');
+    expect(plain.meta('twitter:card')).toBe('summary_large_image');
     // The default only illustrates the link: the article itself shows no picture.
-    expect(html).not.toContain('data-testid="pages-featured"');
-    const img = await fetch(`${WEB}/og-image.jpg`, {
+    expect(plain.html).not.toContain('data-testid="pages-featured"');
+    const shipped = await fetch(`${WEB}/og-image.jpg`, {
       headers: { 'user-agent': 'facebookexternalhit/1.1' },
     });
-    expect(img.status).toBe(200);
-    expect(img.headers.get('content-type')).toContain('image/jpeg');
+    expect(shipped.status).toBe(200);
+    expect(shipped.headers.get('content-type')).toContain('image/jpeg');
+
+    // Settings → Application → Default share image (global, what anonymous visitors read).
+    const stored = await storeUpload({
+      clientId: tenantId,
+      userId: null,
+      file: new File([makePng(1200, 630, [20, 140, 90])], 'share.png', { type: 'image/png' }),
+      kind: 'setting-image',
+      visibility: 'public',
+    });
+    if (!stored.ok) throw new Error(stored.message);
+    try {
+      await settings.save(null, [{ key: 'app.share_image', value: stored.row.id }]);
+      const url = `${WEB}/v1/configuration/image-file/${stored.row.id}`;
+      for (const path of [`/${s('plain')}`, '/']) {
+        const page = await metaOf(path);
+        expect(page.meta('og:image'), path).toBe(url);
+        expect(page.meta('og:image:type'), path).toBe('image/png');
+        expect(page.meta('og:image:width'), path).toBe('1200');
+        expect(page.meta('og:image:height'), path).toBe('630');
+        expect(page.meta('twitter:image'), path).toBe(url);
+      }
+      // A page WITH a featured image keeps its own.
+      expect((await metaOf(`/${s('about-qhomemart')}`)).meta('og:image')).toContain(
+        '/v1/m/pages/media/',
+      );
+      // Fetched like a crawler: no cookie, no tenant header, through the site's origin.
+      const img = await fetch(url, { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
+      expect(img.status).toBe(200);
+      expect(img.headers.get('content-type')).toBe('image/png');
+    } finally {
+      await clear();
+    }
   });
 
   test('every old permalink answers 301 straight to the current one', async () => {

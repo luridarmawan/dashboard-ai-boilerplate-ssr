@@ -310,7 +310,13 @@ export type ConfigFieldType =
   | 'theme'
   | 'locale'
   | 'timezone'
-  | 'list';
+  | 'list'
+  /**
+   * A public raster image uploaded from the Settings form (JPEG, PNG, WebP, GIF). The stored value
+   * is the file id; anonymous visitors and crawlers fetch it from `/v1/configuration/image-file/<id>`
+   * and its URL + pixel size come from `GET /v1/configuration/image/<key>`.
+   */
+  | 'image';
 
 export interface ConfigFieldDef {
   /** `<section>.<name>`, e.g. `billing.tax_rate`. */

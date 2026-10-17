@@ -35,7 +35,7 @@ Kartu **Gambar unggulan** di halaman edit: pilih berkas (JPEG/PNG/WebP/GIF, maks
 
 Berkas disimpan lewat `storeUpload()` core sebagai berkas **publik** jenis `pages.featured`, dengan ukuran pikselnya di `meta` (dibaca dari header oleh `api/image-size.ts`). Gambar yang diganti atau milik halaman yang dihapus ikut dihapus. SVG ditolak karena media sosial tidak menampilkannya.
 
-Halaman publik menampilkan gambar di atas isi, lalu mengisi `og:image` (URL absolut), `og:image:width`/`height`/`type`/`alt`, `og:site_name`, dan `twitter:card=summary_large_image`. Tanpa gambar, `twitter:card=summary`. URL-nya `/v1/m/pages/media/<id>`, bukan `/v1/files/<id>/content`: route core itu butuh header `X-Client-ID` untuk pembaca anonim, yang tidak dikirim crawler. Route modul ini memakai tenant situs dan hanya menyajikan gambar halaman yang Published.
+Halaman publik menampilkan gambar di atas isi, lalu mengisi `og:image` (URL absolut), `og:image:width`/`height`/`type`/`alt`, `og:site_name`, dan `twitter:card=summary_large_image`. Tanpa gambar unggulan, kartu share memakai **gambar share default** dari Pengaturan → Aplikasi (`app.share_image`), atau `/og-image.jpg` bawaan bila kosong — lewat `shareImage(event)` di `$lib/server/seo`; artikelnya sendiri tetap tanpa gambar. URL-nya `/v1/m/pages/media/<id>`, bukan `/v1/files/<id>/content`: route core itu butuh header `X-Client-ID` untuk pembaca anonim, yang tidak dikirim crawler. Route modul ini memakai tenant situs dan hanya menyajikan gambar halaman yang Published.
 
 ## API (`/v1/m/pages`)
 

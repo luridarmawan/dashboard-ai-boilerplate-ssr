@@ -1,7 +1,8 @@
 /**
- * Pixel size of a PNG, JPEG, GIF or WebP from its header bytes — enough for `og:image:width` and
- * `og:image:height` (which let Facebook and LinkedIn render the card on the first share instead
- * of fetching the image first) and for reserving the image's box on the page. Pure, no decoding.
+ * Pixel size of a PNG, JPEG, GIF or WebP from its header bytes. `storeUpload()` records it in a
+ * file's `meta` (`width`, `height`), which is what lets pages emit `og:image:width/height` (so
+ * Facebook and LinkedIn draw the card on the first share) and reserve an image's box (no layout
+ * shift). Pure, no decoding.
  */
 export interface ImageSize {
   readonly width: number;

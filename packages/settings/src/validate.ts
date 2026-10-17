@@ -22,6 +22,7 @@ export interface ValidationFail {
 }
 
 const LOCALES = ['id', 'en'];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * An IANA zone name is valid when `Intl` accepts it — the same test the API clock helpers use;
@@ -136,6 +137,14 @@ export function validateValue(
       if (empty) return { ok: true, stored: null };
       const s = String(raw).trim();
       if (!isValidTimeZone(s)) return { ok: false, message: `zona waktu "${s}" tidak dikenal` };
+      return { ok: true, stored: s };
+    }
+    case 'image': {
+      // The file id issued by the upload; that the file exists, is public and is an image is
+      // checked where files are reachable (the configuration API), not in this pure validator.
+      if (empty) return { ok: true, stored: null };
+      const s = String(raw).trim().toLowerCase();
+      if (!UUID_RE.test(s)) return { ok: false, message: 'harus id berkas gambar' };
       return { ok: true, stored: s };
     }
     case 'locale': {

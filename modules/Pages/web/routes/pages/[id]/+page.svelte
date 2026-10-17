@@ -15,7 +15,6 @@ import {
 import { enhance } from '$app/forms';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
-import { DEFAULT_OG_IMAGE } from '$lib/seo';
 import FeaturedImage from '../../../lib/FeaturedImage.svelte';
 import MarkdownEditor from '../../../lib/MarkdownEditor.svelte';
 import { pageFields, slugField } from '../_form.ts';
@@ -158,7 +157,7 @@ function permalinkOverFetch(node: HTMLFormElement) {
   </Card>
 
   <Card title={t('pages.image.title')} description={t('pages.image.lead')}>
-    <FeaturedImage image={r.image} csrf={data.csrf} {editable} title={r.title} summary={r.summary} host={new URL(data.origin).host} {published} fallback={DEFAULT_OG_IMAGE.path} result={imageResult} />
+    <FeaturedImage image={r.image} csrf={data.csrf} {editable} title={r.title} summary={r.summary} host={new URL(data.origin).host} {published} fallback={data.shareDefault} result={imageResult} />
   </Card>
 
   <Card>

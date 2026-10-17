@@ -20,6 +20,17 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     expect(validateValue(f({ type: 'route' }), 'dashboard', { routes }).ok).toBe(false);
     expect(validateValue(f({ type: 'route' }), '/auth/login', { routes }).ok).toBe(true); // §4.7 rule 4
   });
+  test('image stores a file id, nothing else', () => {
+    const id = '01a14839-be52-7132-aa3d-08be144878e1';
+    expect(validateValue(f({ type: 'image' }), id)).toEqual({ ok: true, stored: id });
+    expect(validateValue(f({ type: 'image' }), ` ${id.toUpperCase()} `)).toEqual({
+      ok: true,
+      stored: id,
+    });
+    expect(validateValue(f({ type: 'image' }), '')).toEqual({ ok: true, stored: null });
+    for (const bad of ['/og-image.jpg', 'https://example.com/a.png', 'not-an-id'])
+      expect(validateValue(f({ type: 'image' }), bad).ok, bad).toBe(false);
+  });
   test('not_found_route accepts only a declared 404 handler page (F-11)', () => {
     const ctx = {
       routes,

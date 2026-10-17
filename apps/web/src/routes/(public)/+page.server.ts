@@ -2,6 +2,7 @@ import { LOCALES } from '@core/i18n';
 import { themes } from '@core/ui-theme';
 import { api } from '$lib/api/client';
 import { isSignupEnabled } from '$lib/server/config';
+import { shareImage } from '$lib/server/seo';
 import type { PageServerLoad } from './$types';
 
 /**
@@ -14,8 +15,12 @@ import type { PageServerLoad } from './$types';
  * part of "this installation" as far as the front door is concerned. When the enabled state could
  * not be read, `enabledModules` already holds every module, so nothing is hidden by accident.
  */
-export const load: PageServerLoad = async ({ locals, url }) => {
-  const { data, error } = await api(locals.requestId).v1.version.get();
+export const load: PageServerLoad = async (event) => {
+  const { locals, url } = event;
+  const [{ data, error }, share] = await Promise.all([
+    api(locals.requestId).v1.version.get(),
+    shareImage(event),
+  ]);
   const api_ = data?.success
     ? {
         ...data.data,
@@ -28,6 +33,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
     apiError: error ? `${error.status}` : null,
     signupEnabled: isSignupEnabled(locals.config),
     origin: url.origin,
+    /** og:image: Settings → Application → Default share image, else the shipped file. */
+    share,
     /** Facts for the hero figures — counted here so the page never imports a registry itself. */
     localeCount: LOCALES.length,
     themeCount: themes().filter((t) => t.module === 'core').length,

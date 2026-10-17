@@ -258,9 +258,10 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   await expect(page.getByTestId('pages-image-empty')).toBeVisible();
   // No image of its own yet: the share preview shows the site's default image, and says so.
   await expect(page.getByTestId('pages-share-default')).toBeVisible();
+  // (The shipped /og-image.jpg, or the one uploaded under Settings → Application.)
   await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
     'src',
-    '/og-image.jpg',
+    /\/og-image\.jpg$|\/v1\/configuration\/image-file\//,
   );
   const mark = Date.now();
   await page.evaluate((m) => {

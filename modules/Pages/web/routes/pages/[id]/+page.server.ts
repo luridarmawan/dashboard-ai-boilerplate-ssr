@@ -2,6 +2,7 @@ import { formToObject, validateForm } from '@core/contracts';
 import { createTranslator } from '@core/i18n';
 import type { Actions, ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
+import { shareImage } from '$lib/server/seo';
 import {
   actionFailure,
   apiFor,
@@ -28,6 +29,8 @@ export const load: ServerLoad = async (event) => {
       redirects: row.redirects.map((r) => ({ oldSlug: r.oldSlug, createdAt: iso(r.createdAt) })),
     },
     origin: event.url.origin,
+    /** What the share preview shows while the page has no image: the site's default share image. */
+    shareDefault: (await shareImage(event)).url,
     /** Root URLs only answer while this module is the 404 handler; the page says so when it is not. */
     serving: event.locals.config.values['app.not_found_route'] === '/pages',
     saved: event.url.searchParams.has('saved'),
