@@ -19,7 +19,8 @@ const brandLogo = $derived(data.theme.logoUrl ?? data.app.logoUrl);
 {/snippet}
 {#snippet nav({ orientation }: { orientation: 'vertical' | 'horizontal' })}
   <ul class={orientation === 'horizontal' ? 'flex items-center gap-4 text-sm' : 'grid gap-1 text-sm'}>
-    <li><LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact /></li>
+    <!-- The vertical nav is the mobile menu: an inline submenu there, not a popover over the links. -->
+    <li><LanguagePicker current={data.locale} csrf={data.csrf} back={data.path} compact={orientation === 'horizontal'} variant={orientation === 'vertical' ? 'submenu' : 'dropdown'} /></li>
     {#if data.loggedIn}
       <li><a href="/dashboard" class="text-foreground no-underline hover:underline">{t('nav.dashboard')}</a></li>
     {:else}

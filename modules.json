@@ -12,6 +12,11 @@
       "path": "modules/Example"
     },
     {
+      "name": "Pages",
+      "source": "local",
+      "path": "modules/Pages"
+    },
+    {
       "name": "AI",
       "source": "local",
       "path": "modules/AI"
