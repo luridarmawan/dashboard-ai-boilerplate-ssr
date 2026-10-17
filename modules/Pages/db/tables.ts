@@ -31,10 +31,19 @@ export default defineTables('Pages', [
        * redirect only when this is set: a page nobody could ever visit has no old URL to keep.
        */
       published_at: col.datetime().nullable(),
+      /**
+       * Featured image: a PUBLIC row in core `files` (kind `pages.featured`), shown above the body
+       * and used as `og:image`. Not a foreign key, for the same reasons as `pages_redirects`.
+       */
+      image_id: col.uuid().nullable(),
+      /** Alt text of the featured image (also `og:image:alt`). */
+      image_alt: col.varchar(191).nullable(),
     },
     indexes: [
       { columns: ['client_id', 'slug'], unique: true },
       { columns: ['client_id', 'status'] },
+      // The public media route looks a page up by its image.
+      { columns: ['client_id', 'image_id'] },
     ],
   }),
   defineTable({

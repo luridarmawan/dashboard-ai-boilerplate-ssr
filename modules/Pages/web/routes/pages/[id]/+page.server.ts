@@ -103,6 +103,56 @@ export const actions: Actions = {
     }
     return { slugChange: r.data.data.change };
   },
+  /**
+   * The featured image card: a new file (with its alt) goes up as multipart; without a file the
+   * same form just saves the alt text. Errors come back in the reader's language, mapped from the
+   * API's `details.reason`.
+   */
+  image: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    const id = String(event.params.id ?? '');
+    const alt = String(form.get('alt') ?? '').trim();
+    const back = { alt };
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        back,
+        { imageForm: true },
+      );
+    const file = form.get('file');
+    const api = apiFor(event).v1.m.pages.pages({ id });
+    const r =
+      file instanceof File && file.size > 0
+        ? unwrap(await api.image.post({ file, alt }))
+        : unwrap(await api.put({ imageAlt: alt || null }));
+    if (!r.ok) {
+      const reason = (r.failure.details as { reason?: unknown } | null)?.reason;
+      const known = ['too_large', 'type_not_allowed', 'content_mismatch', 'empty'];
+      const message =
+        typeof reason === 'string' && known.includes(reason)
+          ? t(`pages.image.err.${reason as 'too_large'}`)
+          : r.failure.status === 413
+            ? t('pages.image.err.too_large')
+            : r.failure.message;
+      return actionFailure({ ...r.failure, message }, back, { imageForm: true });
+    }
+    return { imageSaved: file instanceof File && file.size > 0 ? 'uploaded' : 'alt' };
+  },
+  imageRemove: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    const id = String(event.params.id ?? '');
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        {},
+        { imageForm: true },
+      );
+    const r = unwrap(await apiFor(event).v1.m.pages.pages({ id }).image.delete());
+    if (!r.ok) return actionFailure(r.failure, {}, { imageForm: true });
+    return { imageSaved: 'removed' };
+  },
   delete: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();

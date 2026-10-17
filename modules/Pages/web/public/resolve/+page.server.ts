@@ -28,5 +28,12 @@ export const load: ServerLoad = async (event) => {
   if (hit.kind === 'redirect') redirect(301, `${origin}${hit.location}${trapped.search}`);
   const path = `/${hit.page.slug}`;
   if (trapped.pathname !== path) redirect(301, `${origin}${path}${trapped.search}`);
-  return { page: hit.page, canonical: `${origin}${path}` };
+  const image = hit.page.image;
+  return {
+    page: hit.page,
+    canonical: `${origin}${path}`,
+    // Social crawlers need an ABSOLUTE og:image; the API hands out a path on this origin (or a
+    // full CDN URL when the store has one).
+    ogImage: image ? (/^https?:\/\//.test(image.url) ? image.url : `${origin}${image.url}`) : null,
+  };
 };

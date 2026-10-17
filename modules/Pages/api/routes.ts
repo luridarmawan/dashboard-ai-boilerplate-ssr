@@ -1,3 +1,4 @@
+import { readFile, removeFile, storeUpload } from '@app/api/files';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
@@ -25,6 +26,16 @@ import {
 } from '@core/db';
 import { defineApiRoutes } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
+import {
+  adminUrl,
+  FEATURED_KIND,
+  FEATURED_MAX_BYTES,
+  FEATURED_TYPES,
+  featuredFile,
+  featuredMeta,
+  mediaPath,
+  sizeOf,
+} from './featured.ts';
 import { renderMarkdown } from './markdown.ts';
 import {
   applySlugChange,
@@ -37,15 +48,17 @@ import {
   SlugConflictError,
   slugify,
 } from './permalinks.ts';
-import { PageBody, PageUpdateBody, SlugBody } from './schemas.ts';
+import { ImageBody, PageBody, PageUpdateBody, SlugBody } from './schemas.ts';
 
 /**
  * Pages API (extension point 2), mounted at /v1/m/pages. Two halves:
  *   public  — `/resolve` (what a root URL is: a page, an old permalink, or nothing) and
  *             `/sitemap`, both for the anonymous site; the tenant is the session's / X-Client-ID
  *             one, else the `default` tenant
+ *             plus `/media/:fileId`, the featured image of a published page (og:image)
  *   admin   — CRUD behind `pages.page.*`, through the tenant facade; every slug change runs in one
- *             transaction with the redirect it creates (see ./permalinks.ts)
+ *             transaction with the redirect it creates (see ./permalinks.ts); featured image
+ *             upload/removal through core `storeUpload()` (see ./featured.ts)
  */
 
 /** The public route the 404 handler setting must name for root URLs to be ours (see public.ts). */
@@ -73,6 +86,8 @@ const Page = t.Object({
   body: t.Nullable(t.String()),
   status: t.String(),
   publishedAt: t.Nullable(t.String()),
+  imageId: t.Nullable(t.String()),
+  imageAlt: t.Nullable(t.String()),
   createdAt: t.String(),
   updatedAt: t.String(),
 });
@@ -84,18 +99,35 @@ const view = (r: Row) => ({
   body: r.body,
   status: r.status,
   publishedAt: r.published_at ? r.published_at.toISOString() : null,
+  imageId: r.image_id,
+  imageAlt: r.image_alt,
   createdAt: r.created_at.toISOString(),
   updatedAt: r.updated_at.toISOString(),
 });
-/** A page as the dashboard edits it: plus the old permalinks that redirect to it. */
+/** A featured image: where to fetch it and what it is (size feeds og:image:width/height). */
+const Image = t.Object({
+  url: t.String(),
+  width: t.Nullable(t.Integer()),
+  height: t.Nullable(t.Integer()),
+  mime: t.String(),
+  alt: t.Nullable(t.String()),
+});
+/** A page as the dashboard edits it: plus its old permalinks and its featured image. */
 const PageDetail = t.Composite([
   Page,
-  t.Object({ redirects: t.Array(t.Object({ oldSlug: t.String(), createdAt: t.String() })) }),
+  t.Object({
+    redirects: t.Array(t.Object({ oldSlug: t.String(), createdAt: t.String() })),
+    image: t.Nullable(Image),
+  }),
 ]);
-const detail = async (tenant: TenantDb, r: Row) => ({
-  ...view(r),
-  redirects: await redirectsOf(tenant, r.id),
-});
+const detail = async (tenant: TenantDb, r: Row) => {
+  const file = r.image_id ? await featuredFile(tenant.clientId, r.image_id) : null;
+  return {
+    ...view(r),
+    redirects: await redirectsOf(tenant, r.id),
+    image: file ? { url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) } : null,
+  };
+};
 const SlugChange = t.Object({
   changed: t.Boolean(),
   redirected: t.Boolean(),
@@ -109,17 +141,23 @@ const PublicPage = t.Object({
   slug: t.String(),
   summary: t.Nullable(t.String()),
   html: t.String(),
+  /** The featured image at its public media URL — what crawlers fetch for og:image. */
+  image: t.Nullable(Image),
   publishedAt: t.Nullable(t.String()),
   updatedAt: t.String(),
 });
-const publicView = (r: Row) => ({
-  title: r.title,
-  slug: r.slug,
-  summary: r.summary,
-  html: renderMarkdown(r.body),
-  publishedAt: r.published_at ? r.published_at.toISOString() : null,
-  updatedAt: r.updated_at.toISOString(),
-});
+const publicView = async (clientId: string, r: Row) => {
+  const file = r.image_id ? await featuredFile(clientId, r.image_id) : null;
+  return {
+    title: r.title,
+    slug: r.slug,
+    summary: r.summary,
+    html: renderMarkdown(r.body),
+    image: file ? { url: mediaPath(file.id), alt: r.image_alt, ...featuredMeta(file) } : null,
+    publishedAt: r.published_at ? r.published_at.toISOString() : null,
+    updatedAt: r.updated_at.toISOString(),
+  };
+};
 const Resolved = t.Union([
   t.Object({ kind: t.Literal('page'), page: PublicPage }),
   t.Object({ kind: t.Literal('redirect'), location: t.String() }),
@@ -165,7 +203,7 @@ export default defineApiRoutes(
         }
         if (hit.kind === 'redirect')
           return ok({ kind: 'redirect' as const, location: `/${hit.page.slug}` });
-        return ok({ kind: 'page' as const, page: publicView(hit.page) });
+        return ok({ kind: 'page' as const, page: await publicView(tid as string, hit.page) });
       },
       {
         query: t.Object({ path: t.String({ maxLength: 512 }) }),
@@ -175,6 +213,50 @@ export default defineApiRoutes(
           description:
             'Public. Maps `/<slug>` to a published page, or an old permalink to the current one ' +
             '(`kind: redirect`, which the web answers with a 301). Anything else is 404.',
+        },
+      },
+    )
+    .get(
+      '/media/:fileId',
+      async ({ params, set, requestId, tenantState }) => {
+        // Crawlers fetch this anonymously (no session, no X-Client-ID): the site tenant decides,
+        // and only the image of a PUBLISHED page is served — a draft's image stays private.
+        const tid = await siteTenant(tenantState?.clientId ?? null);
+        const owner = tid
+          ? await forTenant(tid).selectOne(
+              schema.pagesPages,
+              and(
+                eq(schema.pagesPages.image_id, params.fileId),
+                eq(schema.pagesPages.status, 'published'),
+                isNull(schema.pagesPages.deleted_at),
+              ),
+            )
+          : null;
+        const file = owner && tid ? await featuredFile(tid, params.fileId) : null;
+        const obj = file ? await readFile(file) : null;
+        if (!file || !obj) {
+          set.status = 404;
+          return fail('not_found', 'Gambar tidak ditemukan', requestId);
+        }
+        return new Response(new Blob([obj.bytes as unknown as ArrayBuffer]), {
+          headers: {
+            'content-type': file.mime,
+            'content-length': String(obj.bytes.byteLength),
+            'x-content-type-options': 'nosniff',
+            // The id never changes for a given image: a new upload is a new id.
+            'cache-control': 'public, max-age=86400',
+            'x-request-id': requestId,
+          },
+        });
+      },
+      {
+        params: t.Object({ fileId: Id }),
+        response: { 200: t.Unknown(), ...errorResponses },
+        detail: {
+          summary: 'Featured image of a page',
+          description:
+            'Public, for visitors and social crawlers (og:image). Served only while the page that ' +
+            'uses it is published.',
         },
       },
     )
@@ -336,6 +418,7 @@ export default defineApiRoutes(
         if (body.body !== undefined) patch.body = body.body;
         if (body.status !== undefined) patch.status = body.status;
         if (body.status === 'published' && !before.published_at) patch.published_at = new Date();
+        if (body.imageAlt !== undefined) patch.image_alt = body.imageAlt?.trim() || null;
         try {
           await inTransaction(clientId, async (tx) => {
             // The slug moves first, judged by the page as it was: publishing and renaming in one
@@ -428,6 +511,116 @@ export default defineApiRoutes(
         },
       },
     )
+    .post(
+      '/pages/:id/image',
+      async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+        const clientId = tenantState?.clientId;
+        const tenant = tenantState?.tenant;
+        const before = tenant ? await tenant.selectOne(schema.pagesPages, live(params.id)) : null;
+        if (!tenant || !before || !clientId) {
+          set.status = 404;
+          return fail('not_found', 'Halaman tidak ditemukan', requestId);
+        }
+        const dims = await sizeOf(body.file);
+        const stored = await storeUpload({
+          clientId,
+          userId: auth?.user.id ?? null,
+          file: body.file,
+          kind: FEATURED_KIND,
+          visibility: 'public',
+          allowedTypes: FEATURED_TYPES,
+          maxBytes: FEATURED_MAX_BYTES,
+          meta: { page_id: before.id, width: dims?.width ?? null, height: dims?.height ?? null },
+        });
+        if (!stored.ok) {
+          set.status = stored.code === 'too_large' ? 413 : 422;
+          return fail('validation_failed', stored.message, requestId, {
+            field: 'image',
+            reason: stored.code,
+          });
+        }
+        const patch: Partial<typeof schema.pagesPages.$inferInsert> = { image_id: stored.row.id };
+        if (body.alt !== undefined) patch.image_alt = body.alt.trim() || null;
+        await tenant.update(schema.pagesPages, patch, eq(schema.pagesPages.id, before.id));
+        // The replaced image is nobody's any more: remove it, bytes included.
+        const old = before.image_id ? await featuredFile(clientId, before.image_id) : null;
+        if (old) await removeFile(old);
+        const after = (await tenant.selectOne(schema.pagesPages, live(before.id))) as Row;
+        await writeAudit(unsafeAcrossTenants(), {
+          clientId,
+          actorId: auth?.user.id ?? null,
+          action: 'pages.page.edit',
+          resource: 'pages.page',
+          resourceId: before.id,
+          ip: clientIp(request, server),
+          requestId,
+          before: view(before),
+          after: view(after),
+        });
+        return ok(await detail(tenant, after));
+      },
+      {
+        beforeHandle: permission('pages.page.edit'),
+        params: t.Object({ id: Id }),
+        body: ImageBody,
+        response: {
+          200: OkSchema(PageDetail),
+          ...errorResponses,
+          413: errorResponses[422],
+        },
+        detail: {
+          summary: 'Set the featured image',
+          description:
+            'Multipart: `file` (JPEG, PNG, WebP or GIF, at most 5 MB) and optional `alt`. The ' +
+            "image becomes the page's og:image; the one it replaces is deleted. 1200×630 suits " +
+            'every social network.',
+        },
+      },
+    )
+    .delete(
+      '/pages/:id/image',
+      async ({ auth, params, set, request, server, requestId, tenantState }) => {
+        const clientId = tenantState?.clientId;
+        const tenant = tenantState?.tenant;
+        const before = tenant ? await tenant.selectOne(schema.pagesPages, live(params.id)) : null;
+        if (!tenant || !before || !clientId) {
+          set.status = 404;
+          return fail('not_found', 'Halaman tidak ditemukan', requestId);
+        }
+        if (before.image_id) {
+          await tenant.update(
+            schema.pagesPages,
+            { image_id: null, image_alt: null },
+            eq(schema.pagesPages.id, before.id),
+          );
+          const old = await featuredFile(clientId, before.image_id);
+          if (old) await removeFile(old);
+          const after = (await tenant.selectOne(schema.pagesPages, live(before.id))) as Row;
+          await writeAudit(unsafeAcrossTenants(), {
+            clientId,
+            actorId: auth?.user.id ?? null,
+            action: 'pages.page.edit',
+            resource: 'pages.page',
+            resourceId: before.id,
+            ip: clientIp(request, server),
+            requestId,
+            before: view(before),
+            after: view(after),
+          });
+          return ok(await detail(tenant, after));
+        }
+        return ok(await detail(tenant, before));
+      },
+      {
+        beforeHandle: permission('pages.page.edit'),
+        params: t.Object({ id: Id }),
+        response: { 200: OkSchema(PageDetail), ...errorResponses },
+        detail: {
+          summary: 'Remove the featured image',
+          description: 'The image file is deleted; the page shares without a picture again.',
+        },
+      },
+    )
     .delete(
       '/pages/:id',
       async ({ auth, params, set, request, server, requestId, tenantState }) => {
@@ -449,6 +642,9 @@ export default defineApiRoutes(
           );
           await tx.delete(schema.pagesRedirects, eq(schema.pagesRedirects.page_id, row.id));
         });
+        // Its featured image has no page to illustrate any more.
+        const image = row.image_id ? await featuredFile(clientId, row.image_id) : null;
+        if (image) await removeFile(image);
         await writeAudit(unsafeAcrossTenants(), {
           clientId,
           actorId: auth?.user.id ?? null,
