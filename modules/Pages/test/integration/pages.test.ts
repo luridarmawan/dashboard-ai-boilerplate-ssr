@@ -3,12 +3,15 @@ import { app } from '@app/api/app';
 import { settings } from '@app/api/services';
 import { runSeed } from '@core/auth';
 import { and, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { makePng } from '../fixtures/png.ts';
 
 /**
  * The Pages API against the real app (INTEGRATION=1): CRUD, and every rule of the permalink
  * history — 301 targets, no chains, no loops, no redirect for drafts, conflicts, the transaction
  * that keeps a slug change and its redirect together, deletion. The HTTP 301 itself is answered
- * by the web (SvelteKit); `test/web/redirects.test.ts` checks it over real HTTP.
+ * by the web (SvelteKit); `test/web/redirects.test.ts` checks it over real HTTP. Also the
+ * featured image: upload through core storage, its public media URL (og:image), replacement,
+ * removal and the types social networks cannot show.
  */
 const enabled = process.env.INTEGRATION === '1';
 const ORIGIN = 'http://api.test';
@@ -34,7 +37,8 @@ const call = (path: string, init: RequestInit = {}, cookies: string[] = [admin])
   headers.set('cookie', [`crk_csrf=${TOKEN}`, ...cookies].join('; '));
   headers.set('x-csrf-token', TOKEN);
   headers.set('x-forwarded-for', `10.98.${Math.floor(run / 1000) % 250}.${run % 250}`);
-  if (init.body && !headers.has('content-type')) headers.set('content-type', 'application/json');
+  if (init.body && !(init.body instanceof FormData) && !headers.has('content-type'))
+    headers.set('content-type', 'application/json');
   return app.handle(new Request(`${ORIGIN}${path}`, { ...init, headers }));
 };
 const send = async (method: string, path: string, body?: unknown) => {
@@ -314,6 +318,157 @@ describe.skipIf(!enabled)('Pages module', () => {
       const on = await sitemap();
       expect(on).toContain(`/${s('map-pub')}`);
       expect(on).not.toContain(`/${s('map-draft')}`);
+    });
+  });
+
+  describe('featured image', () => {
+    type Img = {
+      url: string;
+      width: number | null;
+      height: number | null;
+      mime: string;
+      alt: string | null;
+    };
+    const upload = async (
+      id: string,
+      bytes: Uint8Array,
+      type: string,
+      name: string,
+      alt?: string,
+    ) => {
+      const form = new FormData();
+      form.append('file', new File([bytes], name, { type }));
+      if (alt !== undefined) form.append('alt', alt);
+      const res = await app.handle(
+        new Request(`${ORIGIN}/v1/m/pages/pages/${id}/image`, {
+          method: 'POST',
+          body: form,
+          headers: {
+            origin: ORIGIN,
+            cookie: `crk_csrf=${TOKEN}; ${admin}`,
+            'x-csrf-token': TOKEN,
+          },
+        }),
+      );
+      return { status: res.status, body: (await res.json()) as Envelope };
+    };
+    const media = (url: string) => app.handle(new Request(`${ORIGIN}${url}`));
+    const imageOf = async (id: string) =>
+      ((await send('GET', `/v1/m/pages/pages/${id}`)).body.data as { image: Img | null }).image;
+    const publicImage = async (slug: string) => {
+      const r = await resolve(`/${slug}`);
+      return r.data?.kind === 'page'
+        ? (r.data.page as unknown as { image: Img | null }).image
+        : null;
+    };
+    const fileRow = async (url: string) => {
+      const id = /\/([0-9a-f-]{36})\//.exec(`${url}/`)?.[1] ?? '';
+      const [row] = await unsafeAcrossTenants()
+        .select({
+          deleted: schema.files.deleted_at,
+          kind: schema.files.kind,
+          visibility: schema.files.visibility,
+        })
+        .from(schema.files)
+        .where(eq(schema.files.id, id));
+      return row;
+    };
+
+    test('upload: stored public, sized, served to anonymous visitors only while published', async () => {
+      const page = await create({ title: 'Gambar', slug: s('img'), summary: 'Ringkas' });
+      const up = await upload(page.id, makePng(1200, 630), 'image/png', 'hero.png', 'Kantor kami');
+      expect(up.status, JSON.stringify(up.body)).toBe(200);
+      const admin = await imageOf(page.id);
+      expect(admin).toMatchObject({
+        width: 1200,
+        height: 630,
+        mime: 'image/png',
+        alt: 'Kantor kami',
+      });
+      expect(await fileRow(admin?.url ?? '')).toMatchObject({
+        kind: 'pages.featured',
+        visibility: 'public',
+        deleted: null,
+      });
+
+      // Draft: the page does not resolve and its image is not served.
+      const mediaUrl = `/v1/m/pages/media/${/([0-9a-f-]{36})/.exec(admin?.url ?? '')?.[1]}`;
+      expect((await media(mediaUrl)).status).toBe(404);
+
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
+      const pub = await publicImage(s('img'));
+      expect(pub).toEqual({
+        url: mediaUrl,
+        width: 1200,
+        height: 630,
+        mime: 'image/png',
+        alt: 'Kantor kami',
+      });
+      // Anonymous, no X-Client-ID — exactly what a social crawler sends.
+      const got = await media(mediaUrl);
+      expect(got.status).toBe(200);
+      expect(got.headers.get('content-type')).toBe('image/png');
+      expect(got.headers.get('cache-control')).toContain('public');
+      expect(new Uint8Array(await got.arrayBuffer()).slice(0, 4)).toEqual(
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      );
+
+      // Alt text alone is editable without a new upload; empty clears it.
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { imageAlt: 'Tim kami' });
+      expect((await imageOf(page.id))?.alt).toBe('Tim kami');
+    });
+
+    test('replace removes the old file; remove clears the page and its media URL', async () => {
+      const page = await create({ title: 'Ganti', slug: s('img-swap'), status: 'published' });
+      await upload(page.id, makePng(800, 420), 'image/png', 'a.png');
+      const first = await imageOf(page.id);
+      await upload(page.id, makePng(1200, 630, [10, 120, 200]), 'image/png', 'b.png');
+      const second = await imageOf(page.id);
+      expect(second?.url).not.toBe(first?.url);
+      expect((await fileRow(first?.url ?? ''))?.deleted).not.toBeNull();
+      expect(second?.width).toBe(1200);
+
+      const removed = await send('DELETE', `/v1/m/pages/pages/${page.id}/image`);
+      expect(removed.status).toBe(200);
+      expect(await imageOf(page.id)).toBeNull();
+      expect(await publicImage(s('img-swap'))).toBeNull();
+      expect((await fileRow(second?.url ?? ''))?.deleted).not.toBeNull();
+    });
+
+    test('formats social networks cannot show are refused, and nothing changes', async () => {
+      const page = await create({ title: 'Tolak', slug: s('img-bad'), status: 'published' });
+      const svg = await upload(
+        page.id,
+        new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+        'image/svg+xml',
+        'x.svg',
+      );
+      expect(svg.status).toBe(422);
+      expect(svg.body.error?.details?.reason).toBe('type_not_allowed');
+      const fake = await upload(
+        page.id,
+        new TextEncoder().encode('not a png'),
+        'image/png',
+        'x.png',
+      );
+      expect(fake.status).toBe(422);
+      expect(fake.body.error?.details?.reason).toBe('content_mismatch');
+      expect(await imageOf(page.id)).toBeNull();
+      // Anonymous with a perfectly valid image: refused by permission, not by content.
+      const anon = new FormData();
+      anon.append('file', new File([makePng(10, 10)], 'a.png', { type: 'image/png' }));
+      expect(
+        (await call(`/v1/m/pages/pages/${page.id}/image`, { method: 'POST', body: anon }, []))
+          .status,
+      ).toBe(401);
+    });
+
+    test('deleting the page deletes its image', async () => {
+      const page = await create({ title: 'Hapus', slug: s('img-del'), status: 'published' });
+      await upload(page.id, makePng(1200, 630), 'image/png', 'c.png');
+      const img = await imageOf(page.id);
+      await send('DELETE', `/v1/m/pages/pages/${page.id}`);
+      expect((await fileRow(img?.url ?? ''))?.deleted).not.toBeNull();
     });
   });
 });

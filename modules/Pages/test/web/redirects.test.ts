@@ -3,6 +3,7 @@ import { app } from '@app/api/app';
 import { settings } from '@app/api/services';
 import { runSeed } from '@core/auth';
 import { eq, schema, unsafeAcrossTenants } from '@core/db';
+import { makePng } from '../fixtures/png.ts';
 
 /**
  * The permanent redirects over REAL HTTP, against a running web + API pair that share this
@@ -101,6 +102,18 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     });
     await send('PUT', `/v1/m/pages/pages/${about.id}/slug`, { slug: s('about-our-company') });
     await send('PUT', `/v1/m/pages/pages/${about.id}/slug`, { slug: s('about-qhomemart') });
+    // A featured image for the link preview (og:image), uploaded as the dashboard does.
+    const form = new FormData();
+    form.append('file', new File([makePng(1200, 630)], 'hero.png', { type: 'image/png' }));
+    form.append('alt', 'Our office');
+    const uploaded = await app.handle(
+      new Request(`${ORIGIN}/v1/m/pages/pages/${about.id}/image`, {
+        method: 'POST',
+        headers: { origin: ORIGIN, cookie: `crk_csrf=${TOKEN}; ${session}`, 'x-csrf-token': TOKEN },
+        body: form,
+      }),
+    );
+    expect(uploaded.status).toBe(200);
     const draft = await send('POST', '/v1/m/pages/pages', { title: 'Draft', slug: s('draft-a') });
     await send('PUT', `/v1/m/pages/pages/${draft.id}/slug`, { slug: s('draft-b') });
     console.info(`pages web check: run id ${run} (PAGES_WEB_KEEP=${run} re-checks these URLs)`);
@@ -123,6 +136,27 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     expect(html).toContain('data-testid="pages-article"');
     expect(html).toContain('<strong>world</strong>');
     expect(html).toContain(`rel="canonical" href="${WEB}/${s('about-qhomemart')}"`);
+  });
+
+  test('the share card: an absolute og:image a crawler can fetch, with size, type and alt', async () => {
+    const html = await (await visit(`/${s('about-qhomemart')}`)).text();
+    const meta = (prop: string) =>
+      new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
+    const og = meta('og:image');
+    expect(og).toMatch(
+      new RegExp(`^${WEB.replace(/[.:/]/g, '\\$&')}/v1/m/pages/media/[0-9a-f-]{36}$`),
+    );
+    expect(meta('og:image:width')).toBe('1200');
+    expect(meta('og:image:height')).toBe('630');
+    expect(meta('og:image:type')).toBe('image/png');
+    expect(meta('og:image:alt')).toBe('Our office');
+    expect(meta('twitter:card')).toBe('summary_large_image');
+    expect(meta('twitter:image')).toBe(og);
+    expect(html).toContain('data-testid="pages-featured"');
+    // Fetched like a crawler does: no cookie, no tenant header, through the site's own origin.
+    const img = await fetch(og ?? '', { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toBe('image/png');
   });
 
   test('every old permalink answers 301 straight to the current one', async () => {

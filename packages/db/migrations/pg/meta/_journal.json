@@ -253,6 +253,13 @@
       "when": 1792212979622,
       "tag": "0035_white_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792232797738,
+      "tag": "0036_greedy_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

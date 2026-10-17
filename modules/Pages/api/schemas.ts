@@ -16,8 +16,16 @@ export const PageBody = t.Object({
   summary: t.Optional(t.Nullable(t.String({ maxLength: 512 }))),
   body: t.Optional(t.Nullable(t.String({ maxLength: 100_000 }))),
   status: t.Optional(Status),
+  /** Alt text of the featured image (the image itself is uploaded separately, as multipart). */
+  imageAlt: t.Optional(t.Nullable(t.String({ maxLength: 191 }))),
 });
 export const PageUpdateBody = t.Partial(PageBody);
+
+/** Featured image upload: the file, and optionally its alt text in the same request. */
+export const ImageBody = t.Object({
+  file: t.File(),
+  alt: t.Optional(t.String({ maxLength: 191 })),
+});
 
 /** The permalink form on the edit page: the slug alone. */
 export const SlugBody = t.Object({ slug: Slug });

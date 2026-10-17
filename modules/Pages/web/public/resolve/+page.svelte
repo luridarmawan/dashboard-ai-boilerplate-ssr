@@ -1,12 +1,18 @@
 <script lang="ts">
+import { Img } from '@core/ui';
 import MarkdownBody from '../../lib/MarkdownBody.svelte';
 
 /**
  * A published page at the site root. The body arrives as sanitised HTML from the API; the
  * canonical URL is the page's own root URL, never `/pages` (the address this handler lives at).
+ * The featured image leads the article and is the link preview on social networks: og:image with
+ * its size, type and alt (so Facebook/LinkedIn draw the card on the first share), and a large
+ * Twitter/X card. Without one, the share falls back to a plain text card.
  */
 let { data } = $props();
 const p = $derived(data.page);
+const img = $derived(p.image);
+const siteName = $derived((data as { app?: { name?: string } }).app?.name || '');
 </script>
 
 <svelte:head>
@@ -17,6 +23,24 @@ const p = $derived(data.page);
   <meta property="og:title" content={p.title} />
   {#if p.summary}<meta property="og:description" content={p.summary} />{/if}
   <meta property="og:url" content={data.canonical} />
+  {#if siteName}<meta property="og:site_name" content={siteName} />{/if}
+  {#if img && data.ogImage}
+    <meta property="og:image" content={data.ogImage} />
+    {#if data.ogImage.startsWith('https://')}<meta property="og:image:secure_url" content={data.ogImage} />{/if}
+    <meta property="og:image:type" content={img.mime} />
+    {#if img.width && img.height}
+      <meta property="og:image:width" content={String(img.width)} />
+      <meta property="og:image:height" content={String(img.height)} />
+    {/if}
+    <meta property="og:image:alt" content={img.alt || p.title} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={data.ogImage} />
+    <meta name="twitter:image:alt" content={img.alt || p.title} />
+  {:else}
+    <meta name="twitter:card" content="summary" />
+  {/if}
+  <meta name="twitter:title" content={p.title} />
+  {#if p.summary}<meta name="twitter:description" content={p.summary} />{/if}
 </svelte:head>
 
 <article class="mx-auto max-w-3xl px-4 py-12" data-testid="pages-article" data-slug={p.slug}>
@@ -24,6 +48,12 @@ const p = $derived(data.page);
     <h1 class="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl" data-testid="pages-title">{p.title}</h1>
     {#if p.summary}<p class="mt-3 text-lg text-muted-foreground">{p.summary}</p>{/if}
   </header>
+  {#if img}
+    <!-- The LCP candidate: eager, high priority, its box reserved from the stored pixel size. -->
+    <figure class="mt-8 overflow-hidden rounded-xl border bg-muted" data-testid="pages-featured">
+      <Img src={img.url} alt={img.alt ?? ''} width={img.width ?? undefined} height={img.height ?? undefined} priority class="h-auto w-full object-cover" />
+    </figure>
+  {/if}
   <MarkdownBody html={p.html} class="mt-8" />
 </article>
 
