@@ -1,9 +1,9 @@
 <script lang="ts">
 import { Button, Field, Icon } from '@core/ui';
-import { untrack } from 'svelte';
 import { useT } from '$lib/i18n';
 import MarkdownBody from './MarkdownBody.svelte';
-import type { VisualEditor, VisualTool } from './visual.ts';
+import VisualEditor from './VisualEditor.svelte';
+import type { VisualTool } from './visual.ts';
 
 /**
  * Markdown editor for the page body: a plain <textarea> (it is what the form posts, with or
@@ -49,8 +49,7 @@ let hydrated = $state(false);
 let mode = $state<Mode>('write');
 let html = $state('');
 let rendering = $state(false);
-let visualRoot = $state<HTMLElement | null>(null);
-let visual: VisualEditor | null = null;
+let visual = $state<ReturnType<typeof VisualEditor> | null>(null);
 let visualReady = $state(false);
 let visualFailed = $state(false);
 
@@ -66,6 +65,7 @@ $effect(() => {
 });
 
 function setMode(next: Mode) {
+  if (next !== 'visual') visualReady = false;
   mode = next;
   try {
     localStorage.setItem(MODE_KEY, next);
@@ -95,55 +95,9 @@ $effect(() => {
   };
 });
 
-// The visual view lives while it is selected. It starts from the current Markdown (read once,
-// untracked: its own edits flow back through `edited` and must not recreate it) and is torn
-// down on leaving, after which the textarea — already up to date — is the source again.
-$effect(() => {
-  if (mode !== 'visual' || !visualRoot) return;
-  const root = visualRoot;
-  const initial = untrack(() => text);
-  let alive = true;
-  let editor: VisualEditor | null = null;
-  visualReady = false;
-  visualFailed = false;
-  import('./visual.ts')
-    .then(({ createVisual }) =>
-      createVisual(root, initial, (md) => (edited = md), {
-        readonly,
-        label,
-      }),
-    )
-    .then((created) => {
-      if (!alive) return void created.destroy();
-      editor = created;
-      visual = created;
-      visualReady = true;
-    })
-    .catch(() => {
-      // Never strand the user: the source view always works.
-      if (alive) visualFailed = true;
-    });
-  return () => {
-    alive = false;
-    visual = null;
-    void editor?.destroy();
-    root.replaceChildren();
-  };
-});
-
-/** Toolbar in the visual view: Milkdown commands; link and image ask for the address first. */
+/** Toolbar in the visual view: forwarded to Milkdown (VisualEditor asks for link/image URLs). */
 function runVisual(tool: VisualTool) {
-  if (!visual) return;
-  if (tool === 'link' || tool === 'image') {
-    const url = window.prompt(
-      t(tool === 'link' ? 'pages.editor.link_prompt' : 'pages.editor.image_prompt'),
-      'https://',
-    );
-    if (!url || url === 'https://') return;
-    visual.run(tool, { url, alt: t('pages.editor.image_alt') });
-    return;
-  }
-  visual.run(tool);
+  visual?.run(tool);
 }
 
 /** Write into the textarea the way typing would, so the form, the preview and undo all follow. */
@@ -291,9 +245,10 @@ const views = $derived([
 </script>
 
 <Field {label} for={id} {error} hint={t('pages.editor.hint')}>
-  <div class="overflow-hidden rounded-md border border-input bg-background" data-testid="pages-editor" data-mode={hydrated ? mode : null}>
+  <div class="rounded-md border border-input bg-background" data-testid="pages-editor" data-mode={hydrated ? mode : null}>
     {#if hydrated}
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-2 py-1.5">
+      <!-- No overflow clipping on the frame: the slash menu may need to float past its edge. -->
+      <div class="flex flex-wrap items-center justify-between gap-2 rounded-t-md border-b bg-muted/40 px-2 py-1.5">
         <div class="flex flex-wrap items-center gap-0.5" role="toolbar" aria-label={t('pages.editor.toolbar')}>
           {#if !readonly}
             {#each tools as tool (tool.id)}
@@ -329,9 +284,8 @@ const views = $derived([
         class="block w-full resize-y border-0 bg-transparent px-3 py-2 font-mono text-sm leading-6 focus-visible:outline-none {mode === 'preview' || (mode === 'visual' && !visualFailed) ? 'hidden' : ''} {mode === 'split' ? 'lg:border-e' : ''}"
       ></textarea>
       {#if hydrated && mode === 'visual' && !visualFailed}
-        <div class="max-h-[40rem] min-h-64 overflow-y-auto px-5 py-4" aria-busy={!visualReady}>
-          {#if !visualReady}<p class="text-sm text-muted-foreground">{t('pages.editor.loading')}</p>{/if}
-          <MarkdownBody><div bind:this={visualRoot}></div></MarkdownBody>
+        <div class="min-h-64 px-3 py-4 sm:px-5">
+          <VisualEditor bind:this={visual} value={text} {label} {readonly} onchange={(md) => (edited = md)} onready={() => (visualReady = true)} onfail={() => (visualFailed = true)} />
         </div>
       {/if}
       {#if hydrated && (mode === 'preview' || mode === 'split')}
