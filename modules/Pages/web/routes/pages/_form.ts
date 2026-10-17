@@ -5,7 +5,8 @@ import { SLUG_MAX, SLUG_PATTERN } from '../../../api/schemas.ts';
 /**
  * Field declarations for the page forms (FormBuilder), shared by new + edit. The slug is only
  * part of the CREATE form: on an existing page it has its own form (the permalink card), because
- * changing it is not an ordinary edit — it may leave a permanent redirect behind.
+ * changing it is not an ordinary edit — it may leave a permanent redirect behind. The body is not
+ * here either: it is the MarkdownEditor (../../lib), rendered in the form's `extra` slot.
  */
 export function pageFields(t: Translate, opts: { slug: boolean }): FieldDef[] {
   return [
@@ -34,7 +35,6 @@ export function pageFields(t: Translate, opts: { slug: boolean }): FieldDef[] {
       rows: 2,
       maxlength: 512,
     },
-    { name: 'body', label: t('pages.field.body'), type: 'markdown', rows: 14 },
   ];
 }
 

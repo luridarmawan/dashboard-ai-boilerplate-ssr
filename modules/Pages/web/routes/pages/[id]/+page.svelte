@@ -15,6 +15,7 @@ import {
 import { enhance } from '$app/forms';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import MarkdownEditor from '../../../lib/MarkdownEditor.svelte';
 import { pageFields, slugField } from '../_form.ts';
 
 /**
@@ -142,7 +143,11 @@ function permalinkOverFetch(node: HTMLFormElement) {
   </Card>
 
   <Card>
-    <FormBuilder fields={pageFields(t, { slug: false })} values={r as unknown as Record<string, unknown>} errors={mainErrors} csrf={data.csrf} action="?/save" ajax columns={2} readonly={!editable} cancelHref="/m/pages/pages" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('pages.list.saved') : null} error={form?.error && !form?.slugForm && form.code !== 'confirm_failed' && Object.keys(mainErrors).length === 0 ? form.error : null} />
+    <FormBuilder fields={pageFields(t, { slug: false })} values={r as unknown as Record<string, unknown>} errors={mainErrors} csrf={data.csrf} action="?/save" ajax columns={2} readonly={!editable} cancelHref="/m/pages/pages" cancelLabel={t('common.back')} notice={form?.saved || data.saved ? t('pages.list.saved') : null} error={form?.error && !form?.slugForm && form.code !== 'confirm_failed' && Object.keys(mainErrors).length === 0 ? form.error : null}>
+      {#snippet extra()}
+        <MarkdownEditor name="body" label={t('pages.field.body')} value={!form?.slugForm && form?.values ? ((form.values as Record<string, unknown>).body as string | undefined) : r.body} error={mainErrors.body} readonly={!editable} />
+      {/snippet}
+    </FormBuilder>
   </Card>
 
   {#if can('pages.page.manage')}
