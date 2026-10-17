@@ -1,0 +1,12 @@
+{
+  "name": "Pages",
+  "version": "0.1.0",
+  "description": {
+    "id": "Halaman statis di akar domain dengan permalink dan pengalihan 301 saat slug berubah",
+    "en": "Static pages at the site root with permalinks and 301 redirects when a slug changes"
+  },
+  "engines": {
+    "core": ">=0.0.0"
+  },
+  "menu": { "label": { "id": "Konten", "en": "Content" }, "order": 130 }
+}
