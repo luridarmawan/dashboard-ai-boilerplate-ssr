@@ -5,19 +5,14 @@ import { apiFor } from '$lib/server/session';
 import { trappedPath } from '$lib/server/trap';
 
 /**
- * The module's 404 handler. It has no page of its own: once an admin points
- * `app.not_found_route` at `/pages`, the web's hooks forward every unknown root URL here and hand
- * it over through `trappedPath(event)`. A direct visit (no such header) is 404.
+ * The module's permalink page (PRD F-12). It has no page of its own: the web's hooks look every
+ * unknown root URL up in the core permalink registry and, when a published page holds it, forward
+ * it here; the page reads the visitor's URL with `trappedPath(event)`. A direct visit is 404.
  *
- * The answer is decided on the SERVER, so browsers, crawlers and plain HTTP clients all get the
- * real status code:
- *   - a published page                → 200, rendered under the visitor's URL
- *   - an old permalink of one         → 301, `Location` = the page's current URL
- *   - the right page, written loosely → 301 to the exact form (`/About-Us/` → `/about-us`), so
- *                                       every page has one URL
- *   - anything else                   → 404, which lets the core render its built-in 404 page
- * The hooks return this page's 3xx untouched (status and `Location`), so the 301 a visitor gets
- * is the one thrown below — not a client-side navigation.
+ * The core already answers the 301s (old permalinks, loose spellings) before forwarding, so in
+ * practice this page renders a published page with 200. It still handles a redirect answer from
+ * the API — the registry may have moved between the two lookups — on the SERVER, so browsers,
+ * crawlers and plain HTTP clients get a real 301, never a client-side navigation.
  */
 export const load: ServerLoad = async (event) => {
   const trapped = trappedPath(event);

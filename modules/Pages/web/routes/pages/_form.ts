@@ -52,7 +52,12 @@ export function slugField(t: Translate): FieldDef {
 /** The API's slug conflicts, as a field error in the reader's language (never the API's prose). */
 export function slugError(t: Translate, details: unknown): Record<string, string> | null {
   const reason = (details as { reason?: unknown } | null)?.reason;
-  if (reason === 'slug_taken' || reason === 'slug_redirected' || reason === 'slug_race')
+  if (
+    reason === 'slug_taken' ||
+    reason === 'slug_redirected' ||
+    reason === 'slug_reserved' ||
+    reason === 'slug_race'
+  )
     return { slug: t(`pages.err.${reason}`) };
   return null;
 }

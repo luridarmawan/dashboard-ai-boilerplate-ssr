@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { app } from '@app/api/app';
-import { settings } from '@app/api/services';
+import { claimPermalink, releasePermalinks } from '@app/api/permalinks';
 import { runSeed } from '@core/auth';
-import { and, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
+import { and, eq, inTransaction, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { makePng } from '../fixtures/png.ts';
 
 /**
@@ -161,13 +161,17 @@ describe.skipIf(!enabled)('Pages module', () => {
     expect((same.body.data as { change: { changed: boolean } }).change.changed).toBe(false);
     expect((await detail(page.id)).redirects).toHaveLength(2);
 
-    // The redirect rows are plain database rows: nothing about them lives in process memory, so
-    // a restarted server answers the same (the web check repeats this over HTTP).
+    // The history lives in the core permalink registry — plain database rows, nothing in process
+    // memory, so a restarted server answers the same (the web check repeats this over HTTP).
     const rows = await unsafeAcrossTenants()
-      .select({ old: schema.pagesRedirects.old_slug })
-      .from(schema.pagesRedirects)
-      .where(eq(schema.pagesRedirects.page_id, page.id));
-    expect(rows.map((r) => r.old).sort()).toEqual([s('about-our-company'), s('about-us')]);
+      .select({ path: schema.permalinks.path, kind: schema.permalinks.kind })
+      .from(schema.permalinks)
+      .where(and(eq(schema.permalinks.module, 'pages'), eq(schema.permalinks.target, page.id)));
+    expect(rows.map((r) => `${r.kind} ${r.path}`).sort()).toEqual([
+      `canonical /${s('about-qhomemart')}`,
+      `redirect /${s('about-our-company')}`,
+      `redirect /${s('about-us')}`,
+    ]);
   });
 
   test('renaming back to an own old slug reclaims it: no loop, no self-redirect', async () => {
@@ -225,14 +229,22 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectPage(s('conf-b'));
   });
 
-  test('a redirect that cannot be written rolls the slug change back (one transaction)', async () => {
+  test('a page write that fails rolls the permalink change back (one transaction)', async () => {
     const page = await create({ title: 'Tx', slug: s('tx-old'), status: 'published' });
-    // Plant a row that makes the redirect insert fail on the unique index, the way a racing
-    // request would: the slug update before it already ran inside the same transaction.
+    // Plant a deleted page still holding the new slug: the registry claim goes through, then the
+    // page's own slug update hits the unique index — inside the same transaction, the way a racing
+    // request would.
     const planted = newId();
     await unsafeAcrossTenants()
-      .insert(schema.pagesRedirects)
-      .values({ id: planted, client_id: tenantId, page_id: newId(), old_slug: s('tx-old') });
+      .insert(schema.pagesPages)
+      .values({
+        id: planted,
+        client_id: tenantId,
+        title: 'Planted',
+        slug: s('tx-new'),
+        status: 'draft',
+        deleted_at: new Date(),
+      });
     try {
       const r = await rename(page.id, s('tx-new'));
       expect(r.status).toBe(409);
@@ -240,10 +252,15 @@ describe.skipIf(!enabled)('Pages module', () => {
       expect((await detail(page.id)).slug).toBe(s('tx-old'));
       expect((await detail(page.id)).redirects).toEqual([]);
       await expectNothing(s('tx-new'));
+      const registry = await unsafeAcrossTenants()
+        .select({ path: schema.permalinks.path, kind: schema.permalinks.kind })
+        .from(schema.permalinks)
+        .where(and(eq(schema.permalinks.module, 'pages'), eq(schema.permalinks.target, page.id)));
+      expect(registry).toEqual([{ path: `/${s('tx-old')}`, kind: 'canonical' }]);
     } finally {
       await unsafeAcrossTenants()
-        .delete(schema.pagesRedirects)
-        .where(eq(schema.pagesRedirects.id, planted));
+        .delete(schema.pagesPages)
+        .where(eq(schema.pagesPages.id, planted));
     }
     // With the obstacle gone the same change goes through, redirect included.
     expect((await rename(page.id, s('tx-new'))).status).toBe(200);
@@ -266,11 +283,12 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectNothing(s('gone-b'));
     const left = await unsafeAcrossTenants()
       .select()
-      .from(schema.pagesRedirects)
+      .from(schema.permalinks)
       .where(
         and(
-          eq(schema.pagesRedirects.client_id, tenantId),
-          eq(schema.pagesRedirects.page_id, page.id),
+          eq(schema.permalinks.client_id, tenantId),
+          eq(schema.permalinks.module, 'pages'),
+          eq(schema.permalinks.target, page.id),
         ),
       );
     expect(left).toEqual([]);
@@ -280,44 +298,71 @@ describe.skipIf(!enabled)('Pages module', () => {
     await expectPage(s('gone-a'));
   });
 
-  describe('sitemap', () => {
-    let override: string | null = null;
-    beforeAll(async () => {
-      const [row] = await unsafeAcrossTenants()
-        .select({ value: schema.configurations.value })
-        .from(schema.configurations)
-        .where(
-          and(
-            eq(schema.configurations.key, 'app.not_found_route'),
-            eq(schema.configurations.client_id, tenantId),
-          ),
-        );
-      override = row?.value ?? null;
-    });
-    afterAll(async () => {
-      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
-      await settings.save(tenantId, [{ key: 'app.not_found_route', value: override ?? '' }], {
-        notFoundRoutes: override ? [override] : [],
-      });
-    });
-    const sitemap = async () => {
-      const res = await app.handle(new Request(`${ORIGIN}/v1/m/pages/sitemap`));
-      return ((await res.json()) as { data: { path: string }[] }).data.map((e) => e.path);
+  describe('the core permalink registry', () => {
+    const core = async (path: string) => {
+      const res = await app.handle(
+        new Request(`${ORIGIN}/v1/permalinks/resolve?path=${encodeURIComponent(path)}`),
+      );
+      return { status: res.status, data: ((await res.json()) as { data?: unknown }).data };
     };
 
-    test('lists published pages only while the module answers root URLs', async () => {
+    test('resolves a page with no setting at all: content, redirect, loose spelling, nothing', async () => {
+      const page = await create({ title: 'Core', slug: s('core-a'), status: 'published' });
+      await rename(page.id, s('core-b'));
+      expect(await core(`/${s('core-b')}`)).toEqual({
+        status: 200,
+        data: { kind: 'content', module: 'pages', page: '/pages', path: `/${s('core-b')}` },
+      });
+      expect(await core(`/${s('core-a')}`)).toEqual({
+        status: 200,
+        data: { kind: 'redirect', module: 'pages', location: `/${s('core-b')}` },
+      });
+      // A loose spelling resolves to the canonical path; the web answers 301 to it.
+      expect((await core(`/${s('Core-B').toUpperCase()}/`)).data).toMatchObject({
+        path: `/${s('core-b')}`,
+      });
+      expect((await core(`/${s('core-nothing')}`)).status).toBe(404);
+      expect((await core('/wp-login.php')).status).toBe(404);
+    });
+
+    test('sitemap lists live pages only', async () => {
       await create({ title: 'Map', slug: s('map-pub'), status: 'published' });
       await create({ title: 'Map', slug: s('map-draft') });
-      await settings.save(tenantId, [{ key: 'app.not_found_route', value: '' }]);
-      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
-      expect(await sitemap()).not.toContain(`/${s('map-pub')}`);
-      const saved = await settings.save(null, [{ key: 'app.not_found_route', value: '/pages' }], {
-        notFoundRoutes: ['/pages'],
-      });
-      expect(saved.errors).toEqual({});
-      const on = await sitemap();
-      expect(on).toContain(`/${s('map-pub')}`);
-      expect(on).not.toContain(`/${s('map-draft')}`);
+      const res = await app.handle(new Request(`${ORIGIN}/v1/permalinks/sitemap`));
+      const paths = ((await res.json()) as { data: { path: string }[] }).data.map((e) => e.path);
+      expect(paths).toContain(`/${s('map-pub')}`);
+      expect(paths).not.toContain(`/${s('map-draft')}`);
+    });
+
+    test('a URL is unique across modules: another module holding it blocks a page', async () => {
+      // Another module (an articles module, say) registered this URL for its own content.
+      const other = newId();
+      await inTransaction(tenantId, (tx) =>
+        claimPermalink(tx, {
+          module: 'articles',
+          target: other,
+          path: `/${s('shared')}`,
+          live: true,
+          keepHistory: false,
+        }),
+      );
+      try {
+        const r = await send('POST', '/v1/m/pages/pages', { title: 'Shared', slug: s('shared') });
+        expect(r.status).toBe(409);
+        expect(r.body.error?.details).toMatchObject({ reason: 'slug_taken', module: 'articles' });
+        // …and Pages never answers for it: the URL is not ours.
+        expect((await resolve(`/${s('shared')}`)).status).toBe(404);
+      } finally {
+        await inTransaction(tenantId, (tx) => releasePermalinks(tx, 'articles', other));
+      }
+    });
+
+    test('slugs the app itself answers are refused', async () => {
+      for (const slug of ['dashboard', 'settings', 'pages', 'example']) {
+        const r = await send('POST', '/v1/m/pages/pages', { title: 'Reserved', slug });
+        expect(r.status, slug).toBe(409);
+        expect(r.body.error?.details?.reason, slug).toBe('slug_reserved');
+      }
     });
   });
 

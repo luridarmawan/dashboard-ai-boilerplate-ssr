@@ -1,8 +1,18 @@
 import { readFile, removeFile, storeUpload } from '@app/api/files';
+import {
+  assertPermalinkFree,
+  claimPermalink,
+  type PermalinkChange,
+  PermalinkConflictError,
+  permalinkRedirects,
+  releasePermalinks,
+  resolvePermalink,
+  setPermalinkLive,
+  siteTenant,
+} from '@app/api/permalinks';
 import { clientIp } from '@app/api/plugins/auth';
 import { requestContext } from '@app/api/plugins/request-context';
 import { permission, tenantContext } from '@app/api/plugins/tenancy';
-import { settings } from '@app/api/services';
 import { writeAudit } from '@core/auth';
 import {
   errorResponses,
@@ -18,7 +28,9 @@ import {
   and,
   eq,
   forTenant,
+  inTransaction,
   isNull,
+  isUniqueViolation,
   newId,
   schema,
   type TenantDb,
@@ -36,45 +48,20 @@ import {
   mediaPath,
 } from './featured.ts';
 import { renderMarkdown } from './markdown.ts';
-import {
-  applySlugChange,
-  assertSlugFree,
-  inTransaction,
-  isUniqueViolation,
-  redirectsOf,
-  resolvePath,
-  type SlugChangeResult,
-  SlugConflictError,
-  slugify,
-} from './permalinks.ts';
+import { MODULE, pathOf, slugify } from './permalinks.ts';
 import { ImageBody, PageBody, PageUpdateBody, SlugBody } from './schemas.ts';
 
 /**
  * Pages API (extension point 2), mounted at /v1/m/pages. Two halves:
- *   public  — `/resolve` (what a root URL is: a page, an old permalink, or nothing) and
- *             `/sitemap`, both for the anonymous site; the tenant is the session's / X-Client-ID
- *             one, else the `default` tenant
- *             plus `/media/:fileId`, the featured image of a published page (og:image)
- *   admin   — CRUD behind `pages.page.*`, through the tenant facade; every slug change runs in one
- *             transaction with the redirect it creates (see ./permalinks.ts); featured image
- *             upload/removal through core `storeUpload()` (see ./featured.ts)
+ *   public  — `/resolve` (the published page a root URL names, for the module's permalink page)
+ *             and `/media/:fileId` (the featured image of a published page, og:image); the tenant
+ *             is the session's / X-Client-ID one, else the `default` tenant
+ *   admin   — CRUD behind `pages.page.*`, through the tenant facade. A page's URL `/<slug>` lives
+ *             in the core permalink registry (PRD F-12): every slug or status change updates it in
+ *             the SAME transaction as the page, so the registry and the page never disagree, and
+ *             the registry keeps the 301 history (see `@app/api/permalinks`). Featured image
+ *             upload/removal goes through core `storeUpload()` (see ./featured.ts).
  */
-
-/** The public route the 404 handler setting must name for root URLs to be ours (see public.ts). */
-const TRAP_ROUTE = '/pages';
-
-let defaultTenantId: string | null = null;
-async function siteTenant(clientId: string | null): Promise<string | null> {
-  if (clientId) return clientId;
-  if (defaultTenantId) return defaultTenantId;
-  const [row] = await unsafeAcrossTenants()
-    .select({ id: schema.clients.id })
-    .from(schema.clients)
-    .where(and(eq(schema.clients.code, 'default'), isNull(schema.clients.deleted_at)))
-    .limit(1);
-  defaultTenantId = row?.id ?? null;
-  return defaultTenantId;
-}
 
 type Row = typeof schema.pagesPages.$inferSelect;
 const Page = t.Object({
@@ -121,9 +108,10 @@ const PageDetail = t.Composite([
 ]);
 const detail = async (tenant: TenantDb, r: Row) => {
   const file = r.image_id ? await featuredFile(tenant.clientId, r.image_id) : null;
+  const redirects = await permalinkRedirects(tenant, MODULE, r.id);
   return {
     ...view(r),
-    redirects: await redirectsOf(tenant, r.id),
+    redirects: redirects.map((x) => ({ oldSlug: x.path.slice(1), createdAt: x.createdAt })),
     image: file ? { url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) } : null,
   };
 };
@@ -132,6 +120,13 @@ const SlugChange = t.Object({
   redirected: t.Boolean(),
   from: t.String(),
   to: t.String(),
+});
+/** The registry speaks in paths; the dashboard in slugs. */
+const slugChange = (c: PermalinkChange, current: string) => ({
+  changed: c.changed,
+  redirected: c.redirected,
+  from: c.from ? c.from.slice(1) : current,
+  to: c.to.slice(1),
 });
 
 /** What a visitor sees: no draft fields, the body already rendered. */
@@ -166,15 +161,20 @@ const live = (id: string) =>
   and(eq(schema.pagesPages.id, id), isNull(schema.pagesPages.deleted_at));
 
 /** A taken slug as the envelope the dashboard maps to a field error (`details.reason`). */
-function slugConflict(err: SlugConflictError, requestId: string) {
-  return fail(
-    'conflict',
-    err.holder === 'page'
-      ? `Slug "${err.slug}" sudah dipakai halaman lain`
-      : `Slug "${err.slug}" masih dipakai sebagai alamat lama halaman lain`,
-    requestId,
-    { field: 'slug', reason: err.holder === 'page' ? 'slug_taken' : 'slug_redirected' },
-  );
+function slugConflict(err: PermalinkConflictError, requestId: string) {
+  const reason =
+    err.holder === 'route'
+      ? 'slug_reserved'
+      : err.holder === 'redirect'
+        ? 'slug_redirected'
+        : 'slug_taken';
+  const message =
+    err.holder === 'route'
+      ? `Alamat "${err.path}" dipakai aplikasi`
+      : err.holder === 'redirect'
+        ? `Alamat "${err.path}" masih dipakai sebagai alamat lama konten lain`
+        : `Alamat "${err.path}" sudah dipakai konten lain${err.module && err.module !== MODULE ? ` (modul ${err.module})` : ''}`;
+  return fail('conflict', message, requestId, { field: 'slug', reason, module: err.module });
 }
 /** Two saves racing for one slug: the unique index refuses the loser, the transaction is undone. */
 function raceConflict(requestId: string) {
@@ -194,15 +194,24 @@ export default defineApiRoutes(
     .get(
       '/resolve',
       async ({ query, set, requestId, tenantState }) => {
+        // The core registry says which content a URL names; only `pages` content is ours.
         const tid = await siteTenant(tenantState?.clientId ?? null);
-        const hit = tid ? await resolvePath(forTenant(tid), query.path) : null;
-        if (!hit) {
+        const hit = tid ? await resolvePermalink(tid, query.path) : null;
+        if (!tid || !hit || hit.module !== MODULE) {
           set.status = 404;
           return fail('not_found', 'Halaman tidak ditemukan', requestId);
         }
         if (hit.kind === 'redirect')
-          return ok({ kind: 'redirect' as const, location: `/${hit.page.slug}` });
-        return ok({ kind: 'page' as const, page: await publicView(tid as string, hit.page) });
+          return ok({ kind: 'redirect' as const, location: hit.location });
+        const row = await forTenant(tid).selectOne(
+          schema.pagesPages,
+          and(live(hit.target), eq(schema.pagesPages.status, 'published')),
+        );
+        if (!row) {
+          set.status = 404;
+          return fail('not_found', 'Halaman tidak ditemukan', requestId);
+        }
+        return ok({ kind: 'page' as const, page: await publicView(tid, row) });
       },
       {
         query: t.Object({ path: t.String({ maxLength: 512 }) }),
@@ -210,8 +219,8 @@ export default defineApiRoutes(
         detail: {
           summary: 'Resolve a root URL',
           description:
-            'Public. Maps `/<slug>` to a published page, or an old permalink to the current one ' +
-            '(`kind: redirect`, which the web answers with a 301). Anything else is 404.',
+            'Public. The published page a root URL names in the permalink registry, or its ' +
+            'current URL when the asked one is an old permalink (`kind: redirect`). Else 404.',
         },
       },
     )
@@ -259,33 +268,6 @@ export default defineApiRoutes(
         },
       },
     )
-    .get(
-      '/sitemap',
-      async ({ tenantState }) => {
-        const tid = await siteTenant(tenantState?.clientId ?? null);
-        if (!tid) return ok([]);
-        // Root URLs exist only while this module is the tenant's 404 handler: listing `/about-us`
-        // in a sitemap that answers it with 404 would be worse than not listing it at all.
-        if ((await settings.get<string | null>(tid, 'app.not_found_route')) !== TRAP_ROUTE)
-          return ok([]);
-        const rows = await forTenant(tid).select(
-          schema.pagesPages,
-          and(eq(schema.pagesPages.status, 'published'), isNull(schema.pagesPages.deleted_at)),
-        );
-        return ok(rows.map((r) => ({ path: `/${r.slug}`, lastmod: r.updated_at.toISOString() })));
-      },
-      {
-        response: {
-          200: OkSchema(t.Array(t.Object({ path: t.String(), lastmod: t.String() }))),
-          ...errorResponses,
-        },
-        detail: {
-          summary: 'Sitemap paths',
-          description: 'Published pages, while this module answers unknown URLs.',
-        },
-      },
-    )
-
     // ---- admin ----
     .get(
       '/pages',
@@ -358,7 +340,14 @@ export default defineApiRoutes(
         const status = body.status ?? 'draft';
         try {
           await inTransaction(clientId, async (tenant) => {
-            await assertSlugFree(tenant, slug);
+            await assertPermalinkFree(tenant, pathOf(slug));
+            await claimPermalink(tenant, {
+              module: MODULE,
+              target: id,
+              path: pathOf(slug),
+              live: status === 'published',
+              keepHistory: false,
+            });
             await tenant.insert(schema.pagesPages, {
               id,
               title: body.title,
@@ -371,7 +360,7 @@ export default defineApiRoutes(
           });
         } catch (err) {
           set.status = 409;
-          if (err instanceof SlugConflictError) return slugConflict(err, requestId);
+          if (err instanceof PermalinkConflictError) return slugConflict(err, requestId);
           if (isUniqueViolation(err)) return raceConflict(requestId);
           throw err;
         }
@@ -396,8 +385,9 @@ export default defineApiRoutes(
         detail: {
           summary: 'Create a page',
           description:
-            'An empty `slug` is derived from the title. A slug held by another page, or still ' +
-            'redirecting to one, is refused with 409.',
+            'An empty `slug` is derived from the title. Its URL `/<slug>` is registered in the ' +
+            'permalink registry; one held by other content (any module), by an old URL of other ' +
+            'content, or by a page of the app is refused with 409.',
         },
       },
     )
@@ -420,15 +410,27 @@ export default defineApiRoutes(
         if (body.imageAlt !== undefined) patch.image_alt = body.imageAlt?.trim() || null;
         try {
           await inTransaction(clientId, async (tx) => {
-            // The slug moves first, judged by the page as it was: publishing and renaming in one
-            // save does not count as "was published", because the old slug was never public.
-            if (body.slug !== undefined) await applySlugChange(tx, before, body.slug);
+            // The URL moves first, judged by the page as it was: publishing and renaming in one
+            // save does not count as "was public", because the old URL never was.
+            const published = (body.status ?? before.status) === 'published';
+            if (body.slug !== undefined) {
+              await claimPermalink(tx, {
+                module: MODULE,
+                target: before.id,
+                path: pathOf(body.slug),
+                live: published,
+                keepHistory: before.published_at !== null,
+              });
+              patch.slug = body.slug;
+            } else if (body.status !== undefined) {
+              await setPermalinkLive(tx, MODULE, before.id, published);
+            }
             if (Object.keys(patch).length)
               await tx.update(schema.pagesPages, patch, eq(schema.pagesPages.id, before.id));
           });
         } catch (err) {
           set.status = 409;
-          if (err instanceof SlugConflictError) return slugConflict(err, requestId);
+          if (err instanceof PermalinkConflictError) return slugConflict(err, requestId);
           if (isUniqueViolation(err)) return raceConflict(requestId);
           throw err;
         }
@@ -455,7 +457,7 @@ export default defineApiRoutes(
           summary: 'Update a page',
           description:
             'Changing `slug` on a page that has been published keeps the old URL alive as a ' +
-            'permanent redirect, written in the same transaction as the change.',
+            'permanent redirect in the permalink registry, written in the same transaction.',
         },
       },
     )
@@ -469,12 +471,27 @@ export default defineApiRoutes(
           set.status = 404;
           return fail('not_found', 'Halaman tidak ditemukan', requestId);
         }
-        let change: SlugChangeResult;
+        let change: PermalinkChange;
         try {
-          change = await inTransaction(clientId, (tx) => applySlugChange(tx, before, body.slug));
+          change = await inTransaction(clientId, async (tx) => {
+            const c = await claimPermalink(tx, {
+              module: MODULE,
+              target: before.id,
+              path: pathOf(body.slug),
+              live: before.status === 'published',
+              keepHistory: before.published_at !== null,
+            });
+            if (c.changed)
+              await tx.update(
+                schema.pagesPages,
+                { slug: body.slug },
+                eq(schema.pagesPages.id, before.id),
+              );
+            return c;
+          });
         } catch (err) {
           set.status = 409;
-          if (err instanceof SlugConflictError) return slugConflict(err, requestId);
+          if (err instanceof PermalinkConflictError) return slugConflict(err, requestId);
           if (isUniqueViolation(err)) return raceConflict(requestId);
           throw err;
         }
@@ -491,7 +508,7 @@ export default defineApiRoutes(
             before: view(before),
             after: { ...view(after), redirected: change.redirected },
           });
-        return ok({ page: await detail(tenant, after), change });
+        return ok({ page: await detail(tenant, after), change: slugChange(change, before.slug) });
       },
       {
         beforeHandle: permission('pages.page.edit'),
@@ -629,16 +646,16 @@ export default defineApiRoutes(
           set.status = 404;
           return fail('not_found', 'Halaman tidak ditemukan', requestId);
         }
-        const redirects = await redirectsOf(tenant, row.id);
+        const redirects = await permalinkRedirects(tenant, MODULE, row.id);
         await inTransaction(clientId, async (tx) => {
-          // The slug is released (the unique index counts deleted rows) and no redirect may keep
-          // pointing at a page that is gone: both old and current URLs become plain 404s.
+          // The slug is released (the unique index counts deleted rows) and every URL of the page,
+          // current and old, leaves the registry: they become plain 404s, free for new content.
           await tx.update(
             schema.pagesPages,
             { deleted_at: new Date(), slug: `deleted-${row.id}` },
             eq(schema.pagesPages.id, row.id),
           );
-          await tx.delete(schema.pagesRedirects, eq(schema.pagesRedirects.page_id, row.id));
+          await releasePermalinks(tx, MODULE, row.id);
         });
         // Its featured image has no page to illustrate any more.
         const image = row.image_id ? await featuredFile(clientId, row.image_id) : null;

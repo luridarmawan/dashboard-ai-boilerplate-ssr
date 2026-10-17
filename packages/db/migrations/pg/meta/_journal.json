@@ -260,6 +260,20 @@
       "when": 1792232797738,
       "tag": "0036_greedy_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792239213307,
+      "tag": "0037_tired_lord_tyger",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792239215890,
+      "tag": "0038_remarkable_wild_pack",
+      "breakpoints": true
     }
   ]
 }

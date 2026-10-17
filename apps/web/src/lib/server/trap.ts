@@ -1,3 +1,4 @@
+import { CORE_PATH_PREFIXES } from '@core/contracts';
 import type { RequestEvent } from '@sveltejs/kit';
 
 /**
@@ -20,33 +21,9 @@ export interface TrappedPath {
  * served by something else or is a genuine 404 — a module lookup would only cost a query.
  */
 export const NEVER_TRAPPED: readonly string[] = [
-  '/_app',
-  '/v1',
-  '/api',
-  '/m',
-  '/auth',
-  '/dashboard',
-  '/files',
-  '/join',
-  '/docs',
-  '/metrics',
-  '/settings',
-  '/modules',
-  '/users',
-  '/groups',
-  '/tenants',
-  '/profile',
-  '/examples',
-  '/notifications',
-  '/outbox',
-  '/queue',
-  '/webhooks',
-  '/themes',
-  '/permissions',
-  '/theme',
-  '/lang',
-  '/sidebar',
-  '/.well-known',
+  // Everything the core serves — the same list the permalink registry refuses (F-12) …
+  ...CORE_PATH_PREFIXES,
+  // … and the well-known files crawlers and scanners ask for.
   '/favicon.ico',
   '/robots.txt',
   '/sitemap.xml',
@@ -62,6 +39,16 @@ export function isNeverTrapped(pathname: string): boolean {
 export function wantsHtml(request: Request): boolean {
   const accept = request.headers.get('accept') ?? '';
   return accept.includes('text/html') || accept.includes('application/xhtml+xml');
+}
+
+/**
+ * Wider than `wantsHtml`, for the permalink registry (F-12): a client that asks for HTML, or does
+ * not say (the any-type wildcard or no Accept at all — curl, link checkers, some crawlers). One indexed lookup is cheap
+ * enough to answer them all with the real 200 / 301; only an explicit non-HTML ask is skipped.
+ */
+export function acceptsPage(request: Request): boolean {
+  const accept = (request.headers.get('accept') ?? '').trim();
+  return !accept || wantsHtml(request) || accept.split(',').some((a) => a.trim().startsWith('*/*'));
 }
 
 /** Parse the header value; anything that is not an absolute path on this origin is ignored. */

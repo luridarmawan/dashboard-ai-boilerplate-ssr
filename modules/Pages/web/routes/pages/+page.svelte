@@ -94,7 +94,7 @@ function submitSearch(event: SubmitEvent) {
             <td class="whitespace-nowrap text-muted-foreground">{day(r.updatedAt)}</td>
             <td class="text-end whitespace-nowrap">
               <a href={`/m/pages/pages/${r.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={editable ? 'edit' : 'eye'} size={16} /></a>
-              {#if r.status === 'published' && data.serving}<a href={`/${r.slug}`} target="_blank" rel="noopener" title={t('pages.edit.open')} aria-label={t('pages.edit.open')} class={iconActionClass}><Icon name="external-link" size={16} /></a>{/if}
+              {#if r.status === 'published'}<a href={`/${r.slug}`} target="_blank" rel="noopener" title={t('pages.edit.open')} aria-label={t('pages.edit.open')} class={iconActionClass}><Icon name="external-link" size={16} /></a>{/if}
             </td>
           </tr>
         {:else}

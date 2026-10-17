@@ -111,16 +111,13 @@ function permalinkOverFetch(node: HTMLFormElement) {
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="flex items-center gap-3">{r.title} <Badge variant={published ? 'success' : 'secondary'}>{t(`pages.status.${published ? 'published' : 'draft'}`)}</Badge></h1>
-    {#if published && data.serving}<Button href={`/${r.slug}`} variant="outline" size="sm" target="_blank" rel="noopener"><Icon name="external-link" size={16} />{t('pages.edit.open')}</Button>{/if}
+    {#if published}<Button href={`/${r.slug}`} variant="outline" size="sm" target="_blank" rel="noopener"><Icon name="external-link" size={16} />{t('pages.edit.open')}</Button>{/if}
   </div>
 
-  {#if !data.serving}
-    <Alert variant="warning" title={t('pages.edit.not_serving_title')}>{t('pages.edit.not_serving')}</Alert>
-  {/if}
 
   <Card title={t('pages.permalink.title')} description={t('pages.permalink.lead')}>
     <p class="mb-4 break-all font-mono text-sm" data-testid="pages-permalink">
-      {#if published && data.serving}<a href={permalink} target="_blank" rel="noopener">{permalink}</a>{:else}{permalink}{/if}
+      {#if published}<a href={permalink} target="_blank" rel="noopener">{permalink}</a>{:else}{permalink}{/if}
     </p>
     {#if change?.changed}
       <!-- The durable outcome, for a post without JavaScript (and for screen readers after the toast). -->

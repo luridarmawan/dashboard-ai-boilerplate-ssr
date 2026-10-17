@@ -14,8 +14,9 @@ import { makePng } from '../fixtures/png.ts';
  *   INTEGRATION=1 PAGES_WEB_URL=http://127.0.0.1:5177 APP_ORIGIN=http://api.test \
  *     bun test modules/Pages/test/web
  *
- * Pages are created through the in-process app (same database); the 404 handler setting is set
- * to this module for the run and put back afterwards. Set PAGES_WEB_KEEP=<run id> to re-check
+ * Pages are created through the in-process app (same database). No setting is needed: their URLs
+ * live in the core permalink registry (F-12), which the web asks before the 404 handler — the run
+ * switches the 404 handler OFF (and once to Example's) to prove it. Set PAGES_WEB_KEEP=<run id> to re-check
  * the URLs of an earlier run without creating anything — run it once, restart the servers, run
  * it again with the printed id, and the same assertions prove the redirects survive a restart.
  */
@@ -62,11 +63,9 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
       global: shareRows.find((r) => r.client === null)?.value ?? '',
       tenant: shareRows.find((r) => r.client === tenantId)?.value ?? '',
     };
+    // The 404 handler is OFF for the run: everything Pages serves comes from the registry.
     await settings.save(tenantId, [{ key: 'app.not_found_route', value: '' }]);
-    const saved = await settings.save(null, [{ key: 'app.not_found_route', value: '/pages' }], {
-      notFoundRoutes: ['/pages'],
-    });
-    expect(saved.errors).toEqual({});
+    await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
     if (keep) return;
 
     const login = await app.handle(
@@ -150,7 +149,8 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     const res = await visit(`/${s('about-qhomemart')}`);
     const html = await res.text();
     expect(res.status, html.slice(0, 300)).toBe(200);
-    expect(res.headers.get('x-not-found-route')).toBe('/pages');
+    expect(res.headers.get('x-permalink-module')).toBe('pages');
+    expect(res.headers.get('x-not-found-route')).toBeNull();
     expect(html).toContain('data-testid="pages-article"');
     expect(html).toContain('<strong>world</strong>');
     expect(html).toContain(`rel="canonical" href="${WEB}/${s('about-qhomemart')}"`);
@@ -238,6 +238,44 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
       expect(img.headers.get('content-type')).toBe('image/png');
     } finally {
       await clear();
+    }
+  });
+
+  test('plain HTTP clients get the real 301 too: no Accept, any-type Accept, HEAD', async () => {
+    const want = `${WEB}/${s('about-qhomemart')}`;
+    for (const init of [
+      { method: 'GET', headers: {} },
+      { method: 'GET', headers: { accept: '*/*' } },
+      { method: 'HEAD', headers: { accept: '*/*' } },
+    ]) {
+      const res = await fetch(`${WEB}/${s('about-us')}`, { ...init, redirect: 'manual' });
+      expect(res.status, JSON.stringify(init)).toBe(301);
+      expect(res.headers.get('location'), JSON.stringify(init)).toBe(want);
+    }
+    // An explicit non-HTML ask is not a page request: plain 404, no lookup.
+    const json = await fetch(`${WEB}/${s('about-us')}`, {
+      headers: { accept: 'application/json' },
+      redirect: 'manual',
+    });
+    expect(json.status).toBe(404);
+  });
+
+  test('registered URLs and the 404 handler live side by side', async () => {
+    // Example's 404 handler on: it answers URL shapes nobody registered…
+    await settings.save(null, [{ key: 'app.not_found_route', value: '/resolve' }], {
+      notFoundRoutes: ['/resolve'],
+    });
+    try {
+      const page = await visit(`/${s('about-qhomemart')}`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get('x-permalink-module')).toBe('pages');
+      const trapped = await visit('/category-food');
+      expect(trapped.status).toBe(200);
+      expect(trapped.headers.get('x-not-found-route')).toBe('/resolve');
+      // …and a URL neither knows is still a plain 404.
+      expect((await visit(`/${s('nobody-has-this')}`)).status).toBe(404);
+    } finally {
+      await settings.save(null, [{ key: 'app.not_found_route', value: '' }]);
     }
   });
 

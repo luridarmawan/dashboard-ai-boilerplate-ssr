@@ -7,8 +7,8 @@ import { landingTarget } from '../../hooks.server';
 /**
  * sitemap.xml (PRD F-7, R-4): `/`, the module public pages flagged `sitemap` (extension point
  * 13) except the one that currently answers `/`, plus the dynamic entries a module exposes at
- * `GET /v1/m/<ns>/sitemap` (convention: `{ path, lastmod }[]`). Disabled modules (G-8) and their
- * pages are left out. The rules live in `$lib/server/sitemap`; this handler only gathers inputs.
+ * `GET /v1/m/<ns>/sitemap` (convention: `{ path, lastmod }[]`) and the live permalinks of the
+ * registry (F-12, `GET /v1/permalinks/sitemap`). Disabled modules (G-8) and their pages are left out. The rules live in `$lib/server/sitemap`; this handler only gathers inputs.
  */
 const MODULE_TIMEOUT_MS = 3000;
 
@@ -22,13 +22,17 @@ export const GET: RequestHandler = async (event) => {
   const namespaces = new Set(modulePublicRoutes.filter((r) => enabled.has(r.ns)).map((r) => r.ns));
   // One bounded call per module, through the same path loaders use (identity headers, request id).
   // A module without the convention, a failing one or a slow one simply contributes nothing.
-  const dynamic = await Promise.all(
-    [...namespaces].map((ns) =>
+  const dynamic = await Promise.all([
+    ...[...namespaces].map((ns) =>
       apiFetchData<SitemapEntry[]>(event, `/v1/m/${ns}/sitemap`, null, {
         signal: AbortSignal.timeout(MODULE_TIMEOUT_MS),
       }),
     ),
-  );
+    // F-12: every live permalink modules registered (only enabled modules; the API filters).
+    apiFetchData<SitemapEntry[]>(event, '/v1/permalinks/sitemap', null, {
+      signal: AbortSignal.timeout(MODULE_TIMEOUT_MS),
+    }),
+  ]);
   const xml = renderSitemap(event.url.origin, mergeEntries(entries, ...dynamic));
   return new Response(xml, {
     headers: {

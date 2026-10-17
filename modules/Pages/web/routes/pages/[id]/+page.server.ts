@@ -31,8 +31,6 @@ export const load: ServerLoad = async (event) => {
     origin: event.url.origin,
     /** What the share preview shows while the page has no image: the site's default share image. */
     shareDefault: (await shareImage(event)).url,
-    /** Root URLs only answer while this module is the 404 handler; the page says so when it is not. */
-    serving: event.locals.config.values['app.not_found_route'] === '/pages',
     saved: event.url.searchParams.has('saved'),
     /** `confirmDelete` opens the delete confirmation; the action below checks the same flag. */
     confirmDelete: confirmed(event),

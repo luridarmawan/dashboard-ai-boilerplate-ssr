@@ -4,7 +4,7 @@ Halaman statis di akar situs (`/tentang-kami`, `/kebijakan-privasi`) dengan perm
 
 ## Menyalakan
 
-Halaman berada di akar domain, bentuk URL yang tidak bisa dideklarasikan sebagai route. Modul ini memakai **penangkap 404** core (titik perluasan 13, `notFound: true`): pilih **Pages — /pages** di **Pengaturan → Aplikasi → Penangkap halaman 404**, lingkup **Global** (pengunjung anonim membaca lingkup global). Hanya satu modul yang bisa menjadi penangkap; selama `Example — /resolve` yang dipilih, halaman Pages tidak tampil (dasbor memperingatkannya).
+Halaman berada di akar domain (`/<slug>`), tanpa setelan apa pun. Setiap halaman mendaftarkan URL-nya di **registry permalink core** (PRD F-12, `@app/api/permalinks`) di transaksi yang sama dengan halamannya, dan `public.ts` menandai `/pages` sebagai halaman `permalinks: true` yang merendernya. Penangkap 404 (`app.not_found_route`) tidak dipakai, jadi tetap bebas untuk modul lain (mis. demo pola URL Example).
 
 ## Aturan permalink
 
@@ -17,13 +17,13 @@ Halaman berada di akar domain, bentuk URL yang tidak bisa dideklarasikan sebagai
 | slug Draft yang belum pernah Published diubah | tidak ada redirect |
 | slug diubah berkali-kali (`a → b → c`) | `a` dan `b` sama-sama 301 langsung ke `c` — tanpa rantai |
 | kembali ke slug lama sendiri (`c → a`) | redirect `a` dihapus (tidak menunjuk diri sendiri), `b`,`c` → `a` |
-| slug dipakai halaman lain / masih jadi alamat lama halaman lain | 409 (`details.reason`: `slug_taken` / `slug_redirected`) |
+| slug dipakai konten lain (modul apa pun) / masih jadi alamat lama konten lain / dipakai halaman aplikasi | 409 (`details.reason`: `slug_taken` / `slug_redirected` / `slug_reserved`) |
 | halaman kembali Draft | redirect-nya nonaktif (404) sampai Published lagi |
 | halaman dihapus | slug + semua redirect-nya dihapus dalam satu transaksi → 404, slug bebas dipakai lagi |
 
-Invarian yang menjaga semua itu: dalam satu tenant, sebuah slug dimiliki **satu** halaman (slug saat ini) **atau satu** redirect (slug lama), tidak keduanya. Redirect menunjuk **halaman** (`page_id`), bukan slug tujuan, jadi rantai mustahil secara konstruksi. Perubahan slug dan penulisan redirect berjalan dalam **satu transaksi database** (MySQL/MariaDB/PostgreSQL); bila salah satunya gagal, keduanya batal. SQLite (`bun:sqlite`) tidak bisa menahan transaksi melewati `await`, jadi di sana langkahnya berurutan tanpa transaksi.
+Semua aturan ini milik registry core, bukan modul ini: dalam satu tenant sebuah path dipegang **satu** baris (unik lintas modul), redirect menunjuk **konten** (`module` + `target`) sehingga rantai mustahil, dan core yang menjawab 301 (`Location` absolut) sebelum halaman ini dirender — untuk browser, crawler, `curl`, dan `HEAD`. Perubahan slug, baris registry, dan baris halaman berjalan dalam **satu transaksi database** (`inTransaction` dari `@core/db`); bila salah satu gagal, semuanya batal. SQLite (`bun:sqlite`) tidak bisa menahan transaksi melewati `await`, jadi di sana langkahnya berurutan tanpa transaksi.
 
-Logika ada di [`api/permalinks.ts`](./api/permalinks.ts) — `planSlugChange()` murni (diuji unit), `applySlugChange()`, `resolvePath()`. Status 301 dilempar di server oleh [`web/public/resolve/+page.server.ts`](./web/public/resolve/+page.server.ts); hooks core meneruskan status dan `Location` apa adanya, jadi browser, crawler, dan klien HTTP menerima 301 sungguhan.
+Aturan murninya diuji di `apps/api/test/permalinks.test.ts`. Modul ini hanya memanggil `claimPermalink` / `setPermalinkLive` / `releasePermalinks` (`api/routes.ts`) dan merender konten yang ditunjuk registry (`web/public/resolve/`). Seed mendaftarkan halaman yang belum punya URL di registry.
 
 ## Dasbor
 
@@ -41,8 +41,7 @@ Halaman publik menampilkan gambar di atas isi, lalu mengisi `og:image` (URL abso
 
 | Route | Izin | Isi |
 |---|---|---|
-| `GET /resolve?path=` | publik | `{ kind: 'page', page }` · `{ kind: 'redirect', location }` · 404 |
-| `GET /sitemap` | publik | halaman Published, hanya selama modul ini penangkap 404 |
+| `GET /resolve?path=` | publik | halaman Published yang ditunjuk registry: `{ kind: 'page', page }` · `{ kind: 'redirect', location }` · 404 |
 | `GET/POST /pages`, `GET/PUT/DELETE /pages/:id` | `pages.page.*` | CRUD; `PUT` boleh membawa `slug` |
 | `PUT /pages/:id/slug` | `pages.page.edit` | `{ page, change: { changed, redirected, from, to } }` |
 | `POST /pages/:id/image` (multipart `file`, `alt`) · `DELETE /pages/:id/image` | `pages.page.edit` | pasang / hapus gambar unggulan |
@@ -59,6 +58,4 @@ APP_ORIGIN=http://api.test INTEGRATION=1 PAGES_WEB_URL=http://127.0.0.1:5177 bun
 WEB_URL=http://127.0.0.1:5177 ADMIN_EMAIL=… ADMIN_PASSWORD=… bunx playwright test e2e/pages-permalink.e2e.ts   # dari apps/web
 ```
 
-## Batasan yang diketahui
-
-Penangkap 404 core hanya menangani `GET` yang meminta HTML (`Accept: text/html`, seperti browser dan Googlebot). `HEAD` dan request dengan `Accept: */*` (mis. `curl` tanpa header) mendapat 404 bawaan, bukan 301. Itu perilaku core yang disengaja (`wantsHtml()` di `apps/web/src/lib/server/trap.ts`), bukan perilaku modul ini.
+Sitemap: URL halaman Published masuk `sitemap.xml` lewat registry core (`GET /v1/permalinks/sitemap`).

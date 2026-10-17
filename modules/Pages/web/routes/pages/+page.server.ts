@@ -24,7 +24,5 @@ export const load: ServerLoad = async (event) => {
     meta: res.data.meta,
     q,
     saved: event.url.searchParams.get('saved'),
-    /** Root URLs only answer while this module is the 404 handler, so "open" links only then. */
-    serving: event.locals.config.values['app.not_found_route'] === '/pages',
   };
 };
