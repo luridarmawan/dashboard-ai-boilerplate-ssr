@@ -149,3 +149,88 @@ test('pages: the visual (WYSIWYG) view edits the same Markdown the form saves', 
   });
   await expect(page.locator('textarea[name="body"]')).toHaveValue(/\*\*tebal\*\*/);
 });
+
+test('pages: Notion-like visual editing — slash menu, selection toolbar, block handle', async ({
+  page,
+}) => {
+  const run = Date.now();
+  await page.goto('/auth/login');
+  await page.fill('input[name="email"]', EMAIL);
+  await page.fill('input[name="password"]', PASSWORD);
+  await page.locator('main form button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto('/m/pages/pages/new');
+  const editor = page.getByTestId('pages-editor');
+  await expect(editor).toHaveAttribute('data-mode', /./);
+  await editor.locator('[data-view="visual"]').click();
+  const visual = page.getByTestId('pages-visual');
+  await expect(visual).toBeVisible({ timeout: 15_000 });
+  const body = page.locator('textarea[name="body"]');
+  const slash = page.getByTestId('pages-slash');
+
+  // `/` at the start of a line opens the block menu; typing filters it; Enter inserts.
+  await visual.click();
+  await page.keyboard.type('Pembuka');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/sub');
+  await expect(slash).toHaveAttribute('data-show', 'true');
+  await expect(slash.locator('[data-block="h2"]')).toBeVisible();
+  await expect(slash.locator('[data-block="table"]')).toHaveCount(0);
+  await page.keyboard.press('Enter');
+  await expect(slash).toHaveAttribute('data-show', 'false');
+  await page.keyboard.type('Bagian');
+  await expect(visual.locator('h2')).toHaveText('Bagian');
+  await expect(body).toHaveValue(/^Pembuka\n\n## Bagian\s*$/);
+
+  // Escape closes the menu and leaves the `/` as plain text.
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('/');
+  await expect(slash).toHaveAttribute('data-show', 'true');
+  await page.keyboard.press('Escape');
+  await expect(slash).toHaveAttribute('data-show', 'false');
+  await page.keyboard.press('Backspace');
+
+  // Selecting text shows the selection toolbar; Bold applies to the selection.
+  // (Selected with the keyboard: a double click lands on the empty end of a wide paragraph.)
+  await page.keyboard.press('Control+Home');
+  await page.keyboard.press('Shift+End');
+  const bar = page.getByTestId('pages-selection-bar');
+  await expect(bar).toHaveAttribute('data-show', 'true');
+  await bar.locator('[data-mark="bold"]').click();
+  await expect(visual.locator('strong')).toHaveText('Pembuka');
+
+  // The block handle: hover a block, `+` adds one below with the menu open; click a block type.
+  await visual.locator('h2').hover();
+  const handle = page.getByTestId('pages-block-handle');
+  await expect(handle).toHaveAttribute('data-show', 'true');
+  await page.getByTestId('pages-block-add').click();
+  await expect(slash).toHaveAttribute('data-show', 'true');
+  await slash.locator('[data-block="quote"]').click();
+  await page.keyboard.type('Kutipan penutup');
+  await expect(visual.locator('blockquote')).toHaveText('Kutipan penutup');
+
+  // Drag the quote's handle above the first paragraph: blocks reorder.
+  await visual.locator('blockquote').hover();
+  await expect(handle).toHaveAttribute('data-show', 'true');
+  const grip = await handle.boundingBox();
+  const first = await visual.locator('p').first().boundingBox();
+  if (!grip || !first) throw new Error('handle or first block has no box');
+  // A real drag, step by step: native drag-and-drop needs the intermediate moves.
+  await page.mouse.move(grip.x + grip.width - 6, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(first.x + 20, first.y + 6, { steps: 12 });
+  await page.mouse.move(first.x + 24, first.y + 3, { steps: 4 });
+  await page.mouse.up();
+  // Dropped on the first block's top edge: it lands right before or right after it — either way
+  // the quote is no longer last, which is the move.
+  await expect(body).toHaveValue(
+    /^(> Kutipan penutup\n\n\*\*Pembuka\*\*|\*\*Pembuka\*\*\n\n> Kutipan penutup)\n\n## Bagian\s*$/,
+  );
+
+  await page.fill('input[name="title"]', `Notion ${run}`);
+  await page.fill('input[name="slug"]', `e2e-${run}-notion`);
+  await page.locator('main form button[type="submit"]').first().click();
+  await expect(page).toHaveURL(/\/m\/pages\/pages\/[0-9a-f-]{36}/);
+  await expect(page.locator('textarea[name="body"]')).toHaveValue(/## Bagian/);
+});
