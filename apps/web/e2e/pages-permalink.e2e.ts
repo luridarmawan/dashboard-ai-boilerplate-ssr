@@ -64,6 +64,21 @@ test('pages: changing a permalink updates in place and announces the redirect', 
   await expect(page.locator('#pages-slug')).toHaveValue(second);
   expect(page.url()).toBe(urlBefore);
   expect(await page.evaluate(() => window.__pagesMark)).toBe(mark);
+
+  // The list links the permalink itself: one click opens the published page in a new tab.
+  await page.goto(`/m/pages/pages?q=${second}`);
+  const link = page.getByTestId('pages-permalink-link');
+  await expect(link).toHaveAttribute('href', `/${second}`);
+  await expect(link).toHaveAttribute('target', '_blank');
+  // "Updated" shows the time down to the minute.
+  await expect(page.getByTestId('pages-updated').first()).toHaveText(
+    /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
+  );
+  const [popup] = await Promise.all([page.waitForEvent('popup'), link.click()]);
+  await popup.waitForLoadState();
+  expect(new URL(popup.url()).pathname).toBe(`/${second}`);
+  await expect(popup.getByTestId('pages-title')).toHaveText(`About ${run}`);
+  await popup.close();
 });
 
 test('pages: the body editor formats, previews like the public page, and saves', async ({

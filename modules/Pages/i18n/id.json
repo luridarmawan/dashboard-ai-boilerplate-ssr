@@ -97,5 +97,6 @@
   "pages.image.err.content_mismatch": "Isi berkas tidak cocok dengan jenisnya. Simpan ulang gambar lalu coba lagi.",
   "pages.image.err.empty": "Berkas kosong.",
   "pages.image.share_default": "Belum ada gambar unggulan: tautan dibagikan dengan gambar default situs.",
-  "pages.err.slug_reserved": "Alamat ini sudah dipakai halaman aplikasi; pilih slug lain."
+  "pages.err.slug_reserved": "Alamat ini sudah dipakai halaman aplikasi; pilih slug lain.",
+  "pages.list.draft_link": "Belum Published — alamat ini belum bisa dibuka pengunjung"
 }

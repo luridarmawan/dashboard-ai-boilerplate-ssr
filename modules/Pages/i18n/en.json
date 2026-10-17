@@ -97,5 +97,6 @@
   "pages.image.err.content_mismatch": "The file content does not match its type. Re-save the image and try again.",
   "pages.image.err.empty": "The file is empty.",
   "pages.image.share_default": "No featured image yet: the link is shared with the site's default image.",
-  "pages.err.slug_reserved": "This address is already used by a page of the app; choose another slug."
+  "pages.err.slug_reserved": "This address is already used by a page of the app; choose another slug.",
+  "pages.list.draft_link": "Not published — visitors cannot open this address yet"
 }
