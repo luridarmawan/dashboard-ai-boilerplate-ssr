@@ -36,6 +36,17 @@ describe('menu setting values', () => {
     expect(parseSiteMenu(r.items, 4)).toEqual(r);
   });
 
+  test('an outline whose first line opens with an icon tag is not taken for JSON', () => {
+    const r = parseSiteMenu('[wa] +62-812 -> https://wa.me/62812\n[mail] Help -> mailto:a@b.co', 1);
+    if (!r.ok) throw new Error(r.message);
+    expect(r.items.map((i) => i.label.id)).toEqual(['[wa] +62-812', '[mail] Help']);
+    expect(parseSiteMenu('[]', 1)).toEqual({ ok: true, items: [] });
+    expect(parseSiteMenu('[{"label": ', 1)).toEqual({
+      ok: false,
+      message: 'JSON menu tidak valid',
+    });
+  });
+
   test('depth beyond the field limit is refused with the line number', () => {
     expect(parseSiteMenu(OUTLINE, 2)).toEqual({
       ok: false,
