@@ -55,7 +55,9 @@ const summaryClass =
               : 'ms-3 grid gap-0.5 border-s ps-2'}
           >
             {#if it.href}
+              <!--
               <li>{@render link(it, t('nav.menu_view_all'))}</li>
+              -->
             {/if}
             {@render branch(it.children, level + 1)}
           </ul>

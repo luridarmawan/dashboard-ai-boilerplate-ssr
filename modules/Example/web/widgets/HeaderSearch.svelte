@@ -36,7 +36,7 @@ const current = $derived.by(() => {
   method="GET"
   action="/catalog"
   role="search"
-  class="flex h-9 w-full items-stretch overflow-hidden rounded-full border border-input bg-background focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
+  class="flex h-9 w-full min-w-0 max-w-full items-stretch overflow-hidden rounded-full border border-input bg-background focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
   data-testid="example-header-search"
 >
   {#if categories.length}
@@ -44,7 +44,7 @@ const current = $derived.by(() => {
       id="search-category"
       name="category"
       aria-label={t('example.header.search_category')}
-      class="max-w-28 shrink-0 cursor-pointer sm:max-w-36 border-e border-input bg-muted/50 ps-3 pe-2 text-xs text-foreground outline-none"
+      class="max-w-24 shrink-0 cursor-pointer border-e border-input bg-muted/50 ps-3 pe-1 text-xs text-foreground outline-none field-sizing-content sm:max-w-36"
     >
       <option value="">{t('example.catalog.category_all')}</option>
       {#each categories as c (c.slug)}<option value={c.slug} selected={current.category === c.slug}>{c.name}</option>{/each}

@@ -26,7 +26,7 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
     <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 md:h-16 md:flex-nowrap md:py-0">
       {@render brand()}
       {#if search}
-        <div class="order-last basis-full md:order-none md:max-w-xl md:flex-1 md:basis-auto" data-testid="site-search">{@render search()}</div>
+        <div id="search-container" class="order-last min-w-0 max-w-full basis-full md:order-none md:max-w-xl md:flex-1 md:basis-auto" data-testid="site-search">{@render search()}</div>
       {/if}
       <nav class="hidden md:ms-auto md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
       {#if actions}

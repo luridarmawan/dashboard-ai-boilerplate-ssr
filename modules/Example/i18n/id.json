@@ -136,7 +136,7 @@
   "example.cart.title": "Keranjang",
   "example.cart.total": "Total",
   "example.catalog.category": "Kategori",
-  "example.catalog.category_all": "Semua kategori",
+  "example.catalog.category_all": "Semua",
   "example.header.cart": "Keranjang",
   "example.header.cart_count": "Keranjang, {count} barang",
   "example.header.search_category": "Kategori pencarian",

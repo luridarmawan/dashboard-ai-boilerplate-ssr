@@ -136,7 +136,7 @@
   "example.cart.title": "Cart",
   "example.cart.total": "Total",
   "example.catalog.category": "Category",
-  "example.catalog.category_all": "All categories",
+  "example.catalog.category_all": "All",
   "example.header.cart": "Cart",
   "example.header.cart_count": "Cart, {count} items",
   "example.header.search_category": "Search category",
