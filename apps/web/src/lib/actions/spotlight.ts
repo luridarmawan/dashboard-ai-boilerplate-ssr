@@ -7,13 +7,18 @@
  * Progressive enhancement only: without JavaScript the links keep their own hover colour. With
  * `prefers-reduced-motion: reduce` the highlight jumps instead of sliding. The container must be
  * positioned (`relative`); links must sit above the highlight (`relative z-10`).
+ *
+ * Options: `selector` picks the items that attract the highlight (default every link), `tone`
+ * its colour classes — pick one that differs from the row's background. While the action is
+ * live the container carries `data-spotlit`, so items can drop their own hover background with
+ * `in-data-[spotlit]:hover:bg-transparent` and keep it as the no-JavaScript fallback.
  */
-export function spotlight(node: HTMLElement, selector = 'a') {
+export function spotlight(node: HTMLElement, opts: { selector?: string; tone?: string } = {}) {
+  const selector = opts.selector ?? 'a';
   const light = document.createElement('span');
   light.setAttribute('aria-hidden', 'true');
   light.dataset.spotlight = '';
-  light.className =
-    'pointer-events-none absolute top-0 rounded-md bg-background shadow-sm opacity-0';
+  light.className = `pointer-events-none absolute top-0 rounded-md opacity-0 ${opts.tone ?? 'bg-background shadow-sm'}`;
   // Measured from the physical left edge (getBoundingClientRect), so anchored there in RTL too.
   light.style.left = '0';
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -23,6 +28,7 @@ export function spotlight(node: HTMLElement, selector = 'a') {
       : 'transform 220ms cubic-bezier(.2,.8,.2,1), width 220ms cubic-bezier(.2,.8,.2,1), opacity 160ms');
   motion();
   node.prepend(light);
+  node.dataset.spotlit = '';
 
   let shown = false;
   function moveTo(target: HTMLElement) {
@@ -64,6 +70,7 @@ export function spotlight(node: HTMLElement, selector = 'a') {
       node.removeEventListener('focusout', onFocusOut);
       reduce.removeEventListener('change', motion);
       light.remove();
+      delete node.dataset.spotlit;
     },
   };
 }

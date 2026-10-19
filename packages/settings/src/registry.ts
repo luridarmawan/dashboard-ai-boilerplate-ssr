@@ -283,8 +283,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'menu',
         title: { id: 'Baris atas', en: 'Top bar' },
         note: {
-          id: 'Baris tipis di atas header: teks promo, tautan bantuan. Satu item per baris, tanpa submenu. Tulis "Teks Indonesia | English text" untuk dua bahasa, dan tambahkan "-> /path" agar item menjadi tautan. Pemilih bahasa pindah ke baris ini selama baris ini tampil.',
-          en: 'A thin row above the header: promo copy, help links. One item per line, no submenus. Write "Teks Indonesia | English text" for both languages, and add "-> /path" to make an item a link. The language picker moves to this row while it is shown.',
+          id: 'Baris tipis di atas header: teks promo, tautan bantuan. Satu item per baris, tanpa submenu. Tulis "Teks Indonesia | English text" untuk dua bahasa, dan tambahkan "-> /path" atau "-> https://situs-lain.com" agar item menjadi tautan (tautan ke situs lain terbuka di tab baru). Pemilih bahasa pindah ke baris ini selama baris ini tampil.',
+          en: 'A thin row above the header: promo copy, help links. One item per line, no submenus. Write "Teks Indonesia | English text" for both languages, and add "-> /path" or "-> https://other-site.com" to make an item a link (links to other sites open in a new tab). The language picker moves to this row while it is shown.',
         },
         default: null,
         public: true,
@@ -326,8 +326,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'menu',
         title: { id: 'Menu bar', en: 'Menu bar' },
         note: {
-          id: 'Baris menu di bawah header, dengan submenu bertingkat: masukkan baris dengan 2 spasi untuk menjadikannya submenu item di atasnya. Item tanpa "-> /path" hanya membuka submenunya. Tautan ke halaman modul yang dinonaktifkan disembunyikan otomatis.',
-          en: 'A menu row under the header, with nested submenus: indent a line by 2 spaces to make it a submenu of the item above. An item without "-> /path" only opens its submenu. Links to pages of a disabled module are hidden automatically.',
+          id: 'Baris menu di bawah header, dengan submenu bertingkat: masukkan baris dengan 2 spasi untuk menjadikannya submenu item di atasnya. Tautan boleh path situs ini atau URL lengkap (https://…); item tanpa tautan hanya membuka submenunya. Tautan ke halaman modul yang dinonaktifkan disembunyikan otomatis.',
+          en: 'A menu row under the header, with nested submenus: indent a line by 2 spaces to make it a submenu of the item above. A link may be a path on this site or a full URL (https://…); an item without a link only opens its submenu. Links to pages of a disabled module are hidden automatically.',
         },
         default: null,
         public: true,
