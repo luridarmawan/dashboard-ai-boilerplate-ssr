@@ -18,15 +18,20 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
 
 <div class="flex min-h-dvh flex-col">
   {#if topbar}
-    <div id="topbar" class="border-b bg-muted text-xs text-muted-foreground" data-testid="site-topbar">
-      <div class="mx-auto flex min-h-8 max-w-6xl items-center gap-4 overflow-x-auto px-4 py-1">{@render topbar()}</div>
+    <!-- No overflow on this row: it would clip the language dropdown that opens below it (the
+         shell's own item list scrolls instead). z-40 lifts that dropdown over the sticky header. -->
+    <div id="topbar" class="relative z-40 border-b bg-muted text-xs text-muted-foreground" data-testid="site-topbar">
+      <div class="mx-auto flex min-h-8 max-w-6xl items-center gap-4 px-6 py-1">{@render topbar()}</div>
     </div>
   {/if}
   <header class="sticky top-0 z-30 bg-background/80 backdrop-blur">
     <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 md:h-16 md:flex-nowrap md:py-0">
       {@render brand()}
       {#if search}
-        <div id="search-container" class="order-last min-w-0 max-w-full basis-full md:order-none md:max-w-xl md:flex-1 md:basis-auto" data-testid="site-search">{@render search()}</div>
+        <!-- From md the container takes all the room between brand and nav and centres the box in it. -->
+        <div id="search-container" class="order-last min-w-0 max-w-full basis-full md:order-none md:flex md:flex-1 md:basis-auto md:justify-center" data-testid="site-search">
+          <div class="w-full min-w-0 md:max-w-xl">{@render search()}</div>
+        </div>
       {/if}
       <nav class="hidden md:ms-auto md:block" aria-label="Navigasi">{@render nav({ orientation: 'horizontal' })}</nav>
       {#if actions}

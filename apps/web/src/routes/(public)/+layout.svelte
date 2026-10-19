@@ -59,7 +59,7 @@ const widgetContext = $derived({
   </ul>
 {/snippet}
 {#snippet topbar()}
-  <ul class="flex min-w-0 flex-1 items-center gap-4 whitespace-nowrap">
+  <ul class="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto whitespace-nowrap">
     {#each data.topbar as item, i (`${i}:${item.label}`)}
       <li>
         {#if item.href}
