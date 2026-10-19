@@ -30,7 +30,7 @@ const summaryClass =
       class={linkClass}
       aria-current={it.current ? 'page' : undefined}
       {...it.external ? { rel: 'noopener', target: '_blank' } : {}}
-    >{label}</a>
+    ><span class="inline-flex items-center gap-1.5">{#if it.icon && label === it.label}<Icon name={it.icon} size={16} />{/if}{label}</span></a>
   {:else}
     <span class="block px-3 py-2 text-muted-foreground">{label}</span>
   {/if}
@@ -42,7 +42,7 @@ const summaryClass =
       {#if it.children.length}
         <details use:dropdown={horizontal} class="group">
           <summary class={`${summaryClass} ${it.active ? 'font-semibold text-primary' : ''}`}>
-            <span>{it.label}</span>
+            <span class="inline-flex items-center gap-1.5">{#if it.icon}<Icon name={it.icon} size={16} />{/if}{it.label}</span>
             <Icon
               name={horizontal && level > 0 ? 'chevron-right' : 'chevron-down'}
               size={16}

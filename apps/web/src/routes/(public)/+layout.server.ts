@@ -69,6 +69,10 @@ export const load: LayoutServerLoad = async (event) => {
     topbar: shown('site.topbar_visibility')
       ? resolveSiteMenu(storedSiteMenu(config.values['site.topbar']), menuOpts)
       : [],
+    /** The top bar's right-hand group, left of the language picker; same visibility switch. */
+    topbarEnd: shown('site.topbar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.topbar_end']), menuOpts)
+      : [],
     menubar: shown('site.menubar_visibility')
       ? resolveSiteMenu(storedSiteMenu(config.values['site.menubar']), menuOpts)
       : [],

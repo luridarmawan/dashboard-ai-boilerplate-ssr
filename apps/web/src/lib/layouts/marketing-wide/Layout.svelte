@@ -21,7 +21,8 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
     <!-- No overflow on this row: it would clip the language dropdown that opens below it (the
          shell's own item list scrolls instead). z-40 lifts that dropdown over the sticky header. -->
     <div id="topbar" class="relative z-40 border-b bg-muted text-xs text-muted-foreground" data-testid="site-topbar">
-      <div class="mx-auto flex min-h-8 max-w-6xl items-center gap-4 px-6 py-1">{@render topbar()}</div>
+      <!-- Thin on purpose: dropdown buttons in this row (the language picker) shrink to its height. -->
+      <div class="mx-auto flex min-h-7 max-w-6xl items-center gap-4 px-6 [&_summary]:h-6">{@render topbar()}</div>
     </div>
   {/if}
   <header class="sticky top-0 z-30 bg-background/80 backdrop-blur">

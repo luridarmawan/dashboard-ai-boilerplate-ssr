@@ -292,6 +292,19 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         order: 0,
       },
       {
+        key: 'site.topbar_end',
+        type: 'menu',
+        title: { id: 'Baris atas — kanan', en: 'Top bar — right' },
+        note: {
+          id: 'Teks atau tautan di ujung kanan baris atas, di kiri pemilih bahasa — kontak, bantuan. Satu item per baris; garis pemisah digambar otomatis. Awali label dengan [nama-ikon] untuk ikon: [wa] WhatsApp, [phone] atau [tel] telepon, [mail] email, [help], [info]. Contoh: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+          en: 'Text or links at the right end of the top bar, left of the language picker — contact, help. One item per line; separators are drawn for you. Start a label with [icon-name] for an icon: [wa] WhatsApp, [phone] or [tel] phone, [mail] e-mail, [help], [info]. Example: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+        },
+        default: null,
+        public: true,
+        max: 1,
+        order: 1,
+      },
+      {
         key: 'site.topbar_visibility',
         type: 'select',
         title: { id: 'Tampilkan baris atas', en: 'Show the top bar' },
@@ -305,7 +318,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
           { value: 'signed_in', label: { id: 'Hanya setelah masuk', en: 'Only after sign-in' } },
         ],
         public: true,
-        order: 1,
+        order: 2,
         width: 'half',
       },
       {
@@ -319,7 +332,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         default: null,
         public: true,
         max: 4,
-        order: 2,
+        order: 3,
       },
       {
         key: 'site.menubar_visibility',
@@ -335,7 +348,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
           { value: 'signed_in', label: { id: 'Hanya setelah masuk', en: 'Only after sign-in' } },
         ],
         public: true,
-        order: 3,
+        order: 4,
         width: 'half',
       },
     ],

@@ -53,6 +53,8 @@ import LogoutGlyph from '@lucide/svelte/icons/log-out';
 import MailGlyph from '@lucide/svelte/icons/mail';
 import ExpandGlyph from '@lucide/svelte/icons/maximize-2';
 import MenuGlyph from '@lucide/svelte/icons/menu';
+// Lucide has no brand logos; a chat bubble stands in for WhatsApp in this demo set.
+import WhatsappGlyph from '@lucide/svelte/icons/message-circle';
 import CollapseGlyph from '@lucide/svelte/icons/minimize-2';
 import MinusGlyph from '@lucide/svelte/icons/minus';
 import MonitorGlyph from '@lucide/svelte/icons/monitor';
@@ -60,6 +62,7 @@ import MoonGlyph from '@lucide/svelte/icons/moon';
 import PaletteGlyph from '@lucide/svelte/icons/palette';
 import PauseGlyph from '@lucide/svelte/icons/pause';
 import EditGlyph from '@lucide/svelte/icons/pencil';
+import PhoneGlyph from '@lucide/svelte/icons/phone';
 import PlayGlyph from '@lucide/svelte/icons/play';
 import PlugGlyph from '@lucide/svelte/icons/plug';
 import PlusGlyph from '@lucide/svelte/icons/plus';
@@ -93,6 +96,8 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   close: CloseGlyph as unknown as Component<Record<string, unknown>>,
   search: SearchGlyph as unknown as Component<Record<string, unknown>>,
   cart: CartGlyph as unknown as Component<Record<string, unknown>>,
+  phone: PhoneGlyph as unknown as Component<Record<string, unknown>>,
+  whatsapp: WhatsappGlyph as unknown as Component<Record<string, unknown>>,
   settings: SettingsGlyph as unknown as Component<Record<string, unknown>>,
   user: UserGlyph as unknown as Component<Record<string, unknown>>,
   users: UsersGlyph as unknown as Component<Record<string, unknown>>,

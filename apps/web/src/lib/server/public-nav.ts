@@ -4,6 +4,7 @@
  * the page it points to (G-8). Pure, so it is tested without a request.
  */
 import type { SiteMenuItem } from '@core/module-kit/site-menu';
+import { CORE_ICONS } from '@core/ui-theme';
 
 export interface PublicNavRoute {
   readonly path: string;
@@ -40,6 +41,8 @@ export function publicNavLinks(
 /** One item of an admin-assembled header row (`site.topbar`, `site.menubar`), ready to render. */
 export interface SiteMenuLink {
   readonly label: string;
+  /** Semantic icon name from a `[name]` label prefix, drawn before the label. */
+  readonly icon: string | null;
   /** null = plain text (a top-bar notice) or a heading that only opens its submenu. */
   readonly href: string | null;
   readonly external: boolean;
@@ -48,6 +51,24 @@ export interface SiteMenuLink {
   /** This item or one of its descendants is current — the trail the menu bar highlights. */
   readonly active: boolean;
   readonly children: readonly SiteMenuLink[];
+}
+
+/** Short names an admin may type in a label prefix, mapped to the semantic icon they mean. */
+const ICON_ALIASES: Readonly<Record<string, string>> = {
+  wa: 'whatsapp',
+  tel: 'phone',
+  email: 'mail',
+};
+
+/**
+ * `[wa] +62-812-…` → icon `whatsapp`, label `+62-812-…`. Only registered icon names (or their
+ * aliases) count; any other bracketed text stays part of the label, so nothing typed is lost.
+ */
+export function splitIcon(label: string): { icon: string | null; label: string } {
+  const m = /^\[([a-z0-9-]+)\]\s*(.*)$/.exec(label);
+  const name = m ? (ICON_ALIASES[m[1] as string] ?? (m[1] as string)) : null;
+  if (!m || !name || !CORE_ICONS.includes(name) || !m[2]) return { icon: null, label };
+  return { icon: name, label: m[2] };
 }
 
 /**
@@ -90,7 +111,7 @@ export function resolveSiteMenu(
         ? opts.path === pathname && opts.search === query
         : opts.path === pathname || (pathname !== '/' && opts.path.startsWith(`${pathname}/`)));
     out.push({
-      label: opts.locale === 'en' ? it.label.en || it.label.id : it.label.id || it.label.en,
+      ...splitIcon(opts.locale === 'en' ? it.label.en || it.label.id : it.label.id || it.label.en),
       href,
       external: !!href && !internal,
       current,

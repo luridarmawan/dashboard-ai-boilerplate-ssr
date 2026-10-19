@@ -170,6 +170,7 @@
         "@core/db": "workspace:*",
         "@core/logger": "workspace:*",
         "@core/module-kit": "workspace:*",
+        "@core/settings": "workspace:*",
       },
     },
     "packages/config": {
