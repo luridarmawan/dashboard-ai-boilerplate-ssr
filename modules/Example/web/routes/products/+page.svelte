@@ -1,6 +1,6 @@
 <script lang="ts">
 import Icon from '$lib/components/Icon.svelte';
-import { iconActionClass } from '$lib/components/table';
+import { ExportMenu, iconActionClass } from '$lib/components/table';
 import { Badge, Button, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -26,6 +26,7 @@ const money = (n: number, cur: string) =>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('example.admin.products')}</h1>
     <div class="flex gap-2">
+      <ExportMenu href="/m/example/products/export" />
       <Button href="/example" variant="outline" size="sm"><Icon name="external-link" size={16} />{t('example.widget.title')}</Button>
       {#if can('example.product.create')}<Button href="/m/example/products/new" size="sm"><Icon name="plus" size={16} />{t('example.admin.new_product')}</Button>{/if}
     </div>

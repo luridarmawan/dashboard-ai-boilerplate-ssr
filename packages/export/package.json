@@ -1,0 +1,14 @@
+{
+  "name": "@core/export",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Tabular export: one column definition, written as CSV or as an XLSX workbook (no third-party dependency)",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
