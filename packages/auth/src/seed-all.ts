@@ -33,22 +33,37 @@ export async function runSeedAll(log: (line: string) => void = console.log): Pro
 }
 
 /**
- * Example contact items in the top bar's right-hand group, so a fresh install shows the feature
- * (Settings → Site header). Global scope, so anonymous visitors see them too.
+ * Example rows for the public site header — top bar (left and right) and a menu bar with a
+ * submenu — so a fresh install shows the feature (Settings → Site header). Global scope, so
+ * anonymous visitors see them too. Links into the Example module (`/example`, `/product/…`)
+ * disappear by themselves when that module is disabled.
  *
  * Written ONLY on the run that created the default tenant — the first seed of an installation.
  * The seed runs on every deploy; writing whenever the value is empty would bring the demo items
  * back after an admin cleared them. Through SettingsStore, so the outline is validated like a
  * form save and the config cache version is bumped.
  */
+export const SEED_TOPBAR = ['Kopi Super -> /example', 'Contact Us -> /example#contact'].join('\n');
+
 export const SEED_TOPBAR_END = [
   'Bantuan | Help -> mailto:support@example.com',
   '[wa] +62-812-3456-7890 -> https://wa.me/6281234567890',
 ].join('\n');
 
+export const SEED_MENUBAR = [
+  'Home -> /',
+  'My Product',
+  '  Gayo Arabika -> /product/gayo-arabika',
+  '  Toraja Sapan -> /product/toraja-sapan',
+  '  Kintamani Natural -> /product/kintamani-natural',
+  'Custom Theme -> /theme',
+].join('\n');
+
 async function seedSiteHeader(log: (line: string) => void): Promise<void> {
   const r = await new SettingsStore(unsafeAcrossTenants()).save(null, [
+    { key: 'site.topbar', value: SEED_TOPBAR },
     { key: 'site.topbar_end', value: SEED_TOPBAR_END },
+    { key: 'site.menubar', value: SEED_MENUBAR },
   ]);
   const errors = Object.entries(r.errors);
   if (errors.length) {
@@ -58,6 +73,6 @@ async function seedSiteHeader(log: (line: string) => void): Promise<void> {
     return;
   }
   log(
-    'db:seed: contoh baris atas (kanan) diisi — ubah atau kosongkan di Pengaturan → Header situs',
+    'db:seed: contoh header situs (baris atas & menu bar) diisi — ubah atau kosongkan di Pengaturan → Header situs',
   );
 }
