@@ -737,7 +737,7 @@ export const GET: RequestHandler = async (event) => {
 };
 ```
 
-Di halaman, tombolnya `<ExportMenu href="/m/billing/invoices/export" />` dari `$lib/components/table`: `<details>` biasa (jalan tanpa JavaScript), satu tautan per format dengan `download`, label dari katalog core (`common.export`, `common.export_xlsx`, `common.export_csv`). Query yang sudah ada di `href` (filter) dipertahankan, `format` ditambahkan.
+Di halaman, tombolnya `<ExportMenu href="/m/billing/invoices/export" />` dari `@core/ui` (titik perluasan 10; di core: `$lib/components/table`): `<details>` biasa (jalan tanpa JavaScript), satu tautan per format dengan `download`, label dari katalog core (`common.export`, `common.export_xlsx`, `common.export_csv`). Query yang sudah ada di `href` (filter) dipertahankan, `format` ditambahkan.
 
 Yang dijaga paketnya: XLSX satu sheet dengan header tebal, dibekukan, dan bisa difilter, lebar kolom diperkirakan dari isi, kolom `text` diberi format teks, tanggal dan waktu jadi tanggal Excel sungguhan (`datetime` ditampilkan di `timeZone`, baku UTC), dan baris `heading` di atas tabel. CSV mengikuti RFC 4180 dengan BOM UTF-8, dan teks yang bisa dijalankan spreadsheet sebagai rumus (`=…`, `@…`, `+cmd`) diberi awalan `'` (nomor telepon `+62 …` dibiarkan). Respons memakai `Content-Disposition: attachment` (dengan `filename*` UTF-8) dan `Cache-Control: no-store`, karena ekspor biasanya memuat data pribadi. Contoh hidup: `/m/example/products` → `modules/Example/web/routes/products/export/+server.ts`. Bukti: `packages/export/test/export.test.ts`.
 
