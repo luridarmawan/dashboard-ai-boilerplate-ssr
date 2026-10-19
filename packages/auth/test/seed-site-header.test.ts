@@ -1,20 +1,45 @@
 import { describe, expect, test } from 'bun:test';
 import { configFields, parseValue, validateValue } from '@core/settings';
-import { SEED_TOPBAR_END } from '../src/seed-all.ts';
+import { SEED_MENUBAR, SEED_TOPBAR, SEED_TOPBAR_END } from '../src/seed-all.ts';
+
+/** The stored form of a seed value, validated exactly as a Settings form save would be. */
+function stored(key: string, value: string): unknown {
+  const field = configFields().get(key);
+  if (!field) throw new Error(`${key} is not registered`);
+  const r = validateValue(field, value);
+  if (!r.ok) throw new Error(`${key}: ${r.message}`);
+  return parseValue(field, r.stored);
+}
+const item = (label: string, href: string | null, children: unknown[] = []) => ({
+  label: { id: label, en: label },
+  href,
+  children,
+});
 
 describe('first-seed site header example', () => {
-  test('is a valid value for site.topbar_end, with the WhatsApp item', () => {
-    const field = configFields().get('site.topbar_end');
-    if (!field) throw new Error('site.topbar_end is not registered');
-    const r = validateValue(field, SEED_TOPBAR_END);
-    if (!r.ok) throw new Error(r.message);
-    expect(parseValue(field, r.stored)).toEqual([
+  test('top bar, left: two links into the Example storefront', () => {
+    expect(stored('site.topbar', SEED_TOPBAR)).toEqual([
+      item('Kopi Super', '/example'),
+      item('Contact Us', '/example#contact'),
+    ]);
+  });
+
+  test('top bar, right: help and the WhatsApp item', () => {
+    expect(stored('site.topbar_end', SEED_TOPBAR_END)).toEqual([
       { label: { id: 'Bantuan', en: 'Help' }, href: 'mailto:support@example.com', children: [] },
-      {
-        label: { id: '[wa] +62-812-3456-7890', en: '[wa] +62-812-3456-7890' },
-        href: 'https://wa.me/6281234567890',
-        children: [],
-      },
+      item('[wa] +62-812-3456-7890', 'https://wa.me/6281234567890'),
+    ]);
+  });
+
+  test('menu bar: a submenu of products between two plain links', () => {
+    expect(stored('site.menubar', SEED_MENUBAR)).toEqual([
+      item('Home', '/'),
+      item('My Product', null, [
+        item('Gayo Arabika', '/product/gayo-arabika'),
+        item('Toraja Sapan', '/product/toraja-sapan'),
+        item('Kintamani Natural', '/product/kintamani-natural'),
+      ]),
+      item('Custom Theme', '/theme'),
     ]);
   });
 });
