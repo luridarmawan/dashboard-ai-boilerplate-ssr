@@ -292,8 +292,8 @@ Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebaga
 **Tautan di header publik — `nav`.** Halaman publik konkret boleh minta tampil sebagai tautan di header setiap halaman publik, sebelum pemilih bahasa dan Login/Dashboard:
 
 ```ts
-{ path: '/catalog', dir: 'web/public/catalog', sitemap: true,
-  nav: { label: { id: 'Katalog', en: 'Catalog' }, order: 100 } },
+{ path: '/blog', dir: 'web/public/blog', sitemap: true,
+  nav: { label: { id: 'Blog', en: 'Blog' }, order: 100 } },
 ```
 
 Label mengikuti bahasa pengunjung; urutan menurut `order` (baku 500), lalu path. Tautan hilang selama modulnya nonaktif untuk tenant (G-8), dan diberi `aria-current="page"` di halaman itu dan halaman di bawahnya (`/event` menyala di `/event/liga-2026`). Ditolak sync: `nav` pada path ber-`[param]`, pada `notFound`/`permalinks`, label tanpa `id`/`en`, atau `order` bukan bilangan bulat. Tema hanya menempatkan region `nav`; tema tidak menambah atau membuang tautan (BRIEF §5). Logika: `apps/web/src/lib/server/public-nav.ts` (+ tes).
