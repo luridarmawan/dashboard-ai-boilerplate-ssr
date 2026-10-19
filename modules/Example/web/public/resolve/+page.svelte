@@ -166,7 +166,7 @@ const categoryLd = $derived(
                   <strong class="font-semibold text-foreground">{p.name}</strong>
                   {#if p.featured}<span class="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">{t('example.products.badge')}</span>{/if}
                 </span>
-                {#if p.summary}<span class="mt-0.5 line-clamp-1 block text-sm text-muted-foreground">{p.summary}</span>{/if}
+                {#if p.summary}<span class="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{p.summary}</span>{/if}
               </span>
               <span class="shrink-0 text-end">
                 <strong class="block text-foreground">{money(p.price, p.currency)}</strong>
