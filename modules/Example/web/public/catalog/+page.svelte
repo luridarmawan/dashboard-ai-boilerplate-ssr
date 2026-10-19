@@ -54,6 +54,7 @@ const href = (patch: Record<string, string | undefined> = {}) => {
     sort: f.sort === 'catalog' ? undefined : f.sort,
     order: f.sort === 'catalog' || f.order === 'desc' ? undefined : f.order,
     featured: f.featured ? '1' : undefined,
+    category: f.category || undefined,
     ...patch,
   };
   for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
@@ -68,7 +69,10 @@ const sortHref = (key: 'name' | 'price') =>
   });
 const sortIcon = (key: 'name' | 'price') =>
   f.sort !== key ? 'sort' : f.order === 'asc' ? 'chevron-up' : 'chevron-down';
-const filtered = $derived(Boolean(f.q || f.featured || f.sort !== 'catalog'));
+const filtered = $derived(Boolean(f.q || f.featured || f.category || f.sort !== 'catalog'));
+const categoryName = $derived(
+  data.categories.find((c: { slug: string }) => c.slug === f.category)?.name ?? '',
+);
 
 // ---- enhanced layer: the same controls, without the page reload ---------------------------
 const loading = $derived(navigating.to !== null);
@@ -149,6 +153,15 @@ function submitFilters(event: SubmitEvent) {
         class="h-10 rounded-xl border border-input bg-background px-3 text-sm font-normal text-foreground"
       />
     </label>
+    {#if data.categories.length}
+      <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+        {t('example.catalog.category')}
+        <select name="category" onchange={() => applyFilters()} class="h-10 rounded-xl border border-input bg-background px-3 text-sm font-normal text-foreground">
+          <option value="">{t('example.catalog.category_all')}</option>
+          {#each data.categories as c (c.slug)}<option value={c.slug} selected={f.category === c.slug}>{c.name}</option>{/each}
+        </select>
+      </label>
+    {/if}
     <label class="flex h-10 items-center gap-2 rounded-xl border border-input px-3 text-sm text-foreground">
       <input type="checkbox" name="featured" value="1" checked={f.featured} onchange={() => applyFilters()} />
       {t('example.catalog.featured_only')}
@@ -168,7 +181,7 @@ function submitFilters(event: SubmitEvent) {
   <div class="flex flex-wrap items-center justify-between gap-3">
     <p class="text-sm text-muted-foreground" data-testid="catalog-count" aria-live="polite">
       {data.total}
-      {t('example.widget.products')}{#if f.q} · “{f.q}”{/if}
+      {t('example.widget.products')}{#if categoryName} · {categoryName}{/if}{#if f.q} · “{f.q}”{/if}
     </p>
     <div class="flex items-center gap-1 text-sm">
       <span class="text-muted-foreground">{t('example.catalog.sort')}</span>

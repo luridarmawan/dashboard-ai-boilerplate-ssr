@@ -19,6 +19,8 @@ export default defineWidgets('Example', [
     title: { id: 'Pencarian produk', en: 'Product search' },
     component: 'web/widgets/HeaderSearch.svelte',
     slot: 'public-search',
+    // The category list for the select, fetched server-side before the header renders.
+    data: '/v1/m/example/categories',
     order: 100,
   },
   {

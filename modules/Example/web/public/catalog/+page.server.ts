@@ -24,21 +24,30 @@ export const load: ServerLoad = async (event) => {
   const sort: Sort = (SORTS as readonly string[]).includes(sortRaw) ? (sortRaw as Sort) : 'catalog';
   const order = event.url.searchParams.get('order') === 'asc' ? 'asc' : 'desc';
   const featured = event.url.searchParams.get('featured') === '1';
+  const categoryRaw = event.url.searchParams.get('category') ?? '';
+  const category = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(categoryRaw) ? categoryRaw : '';
 
-  const products = await apiFor(event).v1.m.example.products.get({
-    query: {
-      limit: '50',
-      ...(q ? { q } : {}),
-      ...(sort === 'catalog' ? {} : { sort, order }),
-      ...(featured ? { featured: '1' } : {}),
-    },
-  });
+  const [products, categories] = await Promise.all([
+    apiFor(event).v1.m.example.products.get({
+      query: {
+        limit: '50',
+        ...(q ? { q } : {}),
+        ...(category ? { category } : {}),
+        ...(sort === 'catalog' ? {} : { sort, order }),
+        ...(featured ? { featured: '1' } : {}),
+      },
+    }),
+    apiFor(event).v1.m.example.categories.get(),
+  ]);
   const cfg = event.locals.config.values;
   return {
     csrf: csrfToken(event),
     products: products.data?.success ? products.data.data : [],
     total: products.data?.success ? (products.data.meta?.total ?? 0) : 0,
-    filters: { q, sort, order, featured },
+    categories: categories.data?.success
+      ? categories.data.data.map((c) => ({ slug: c.slug, name: c.name }))
+      : [],
+    filters: { q, sort, order, featured, category },
     brand: (cfg['example.brand_name'] as string | undefined) ?? 'Kopi Nusantara',
     tagline: (cfg['example.tagline'] as string | null | undefined) ?? null,
     origin: event.url.origin,

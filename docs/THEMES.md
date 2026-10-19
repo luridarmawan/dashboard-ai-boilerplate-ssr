@@ -91,6 +91,8 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 
 Empat region publik `topbar`, `search`, `actions`, `menubar` (dan `aside` di dasbor) bersifat **opsional di prop, wajib di markup**: shell hanya memberikannya bila ada isinya, jadi layout memeriksa keberadaannya (`{#if topbar}{@render topbar()}{/if}`) dan tidak pernah menggambar baris kosong — tetapi layout tetap harus merendernya bila diberikan, dan `scripts/ci/layout-contract.ts` serta `modules:sync` menolak layout yang lupa. `menubar` menerima `{ orientation }` seperti `nav`: horizontal di baris bawah header, vertikal di dalam menu seluler. `marketing-wide` adalah contohnya: hanya baris utama yang lengket — topbar di atasnya dan menubar di bawahnya ikut tergulir, dan di bawah `md` kotak pencarian turun ke barisnya sendiri sementara `actions` tetap di samping tombol menu.
 
+**Kait styling.** `marketing-wide` memberi id tetap pada baris tambahan: `#topbar` (baris 1) dan `#menubar` (baris 3, hanya salinan desktop — salinan di menu seluler tanpa id agar id tetap unik). Kotak pencarian contoh dari modul Example memakai `#top-frm-search` (form), `#search-category`, `#search-input`, dan `#search-submit`. Layout publik lain sebaiknya memakai id yang sama untuk baris yang sama, supaya CSS aplikasi turunan tidak bergantung pada layout yang aktif.
+
 | Layout | Jenis | Bentuk |
 |---|---|---|
 | `sidebar-classic` | dashboard | Sidebar kiri yang bisa diciutkan + header |

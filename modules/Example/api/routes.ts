@@ -176,11 +176,24 @@ export default defineApiRoutes(
         const tid = await storefrontTenant(tenantState?.clientId ?? null);
         if (!tid) return page([], pageMeta(1, 50, 0));
         const tenant = forTenant(tid);
+        // The header search narrows by category slug; an unknown slug matches nothing rather
+        // than silently searching everything.
+        const category = query.category
+          ? await tenant.selectOne(
+              schema.exampleCategories,
+              and(
+                eq(schema.exampleCategories.slug, query.category),
+                isNull(schema.exampleCategories.deleted_at),
+              ),
+            )
+          : null;
+        if (query.category && !category) return page([], pageMeta(1, 1, 0));
         const rows = await tenant.select(
           schema.exampleProducts,
           and(
             isNull(schema.exampleProducts.deleted_at),
             query.featured === '1' ? eq(schema.exampleProducts.featured, true) : undefined,
+            category ? eq(schema.exampleProducts.category_id, category.id) : undefined,
           ),
         );
         // R-9: the catalog arrangement searches and sorts the SAME rows the storefront shows.
@@ -207,6 +220,8 @@ export default defineApiRoutes(
           limit: t.Optional(t.String()),
           /** Free-text search over name + summary (R-9). */
           q: t.Optional(t.String({ maxLength: 191 })),
+          /** Category slug: only products in that category. */
+          category: t.Optional(t.String({ maxLength: 120 })),
           sort: t.Optional(t.Union([t.Literal('name'), t.Literal('price')])),
           order: t.Optional(t.Union([t.Literal('asc'), t.Literal('desc')])),
         }),

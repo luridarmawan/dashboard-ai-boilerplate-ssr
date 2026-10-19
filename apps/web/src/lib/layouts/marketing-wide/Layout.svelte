@@ -9,13 +9,16 @@ import type { PublicRegions } from '$lib/layouts/types';
  * menu bar below it scroll away with the page, so a long menu never eats the reading area. Under
  * md the nav and the menu bar fold into the menu button; the search box drops to a full-width
  * line of its own and the actions stay beside the button.
+ *
+ * `#topbar` and `#menubar` are styling hooks for themes and derived apps; the menu bar's copy
+ * inside the mobile menu carries no id, so each id stays unique on the page.
  */
 let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicRegions = $props();
 </script>
 
 <div class="flex min-h-dvh flex-col">
   {#if topbar}
-    <div class="border-b bg-muted text-xs text-muted-foreground" data-testid="site-topbar">
+    <div id="topbar" class="border-b bg-muted text-xs text-muted-foreground" data-testid="site-topbar">
       <div class="mx-auto flex min-h-8 max-w-6xl items-center gap-4 overflow-x-auto px-4 py-1">{@render topbar()}</div>
     </div>
   {/if}
@@ -45,7 +48,7 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
   {#if menubar}
     <!-- Outside the sticky header on purpose; z-20 keeps its dropdowns above the page, while the
          stuck main row (z-30) still slides over it when scrolling. -->
-    <div class="relative z-20 hidden border-t border-b bg-background md:block" data-testid="site-menubar">
+    <div id="menubar" class="relative z-20 hidden border-t border-b bg-background md:block" data-testid="site-menubar">
       <nav class="mx-auto max-w-6xl px-2" aria-label="Menu">{@render menubar({ orientation: 'horizontal' })}</nav>
     </div>
   {/if}
