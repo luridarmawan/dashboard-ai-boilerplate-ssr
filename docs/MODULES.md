@@ -710,6 +710,37 @@ const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL 
 
 Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
 
+### Ekspor daftar ke Excel/CSV dari modul
+
+Daftar yang perlu dibawa ke spreadsheet (peserta, transaksi, laporan) diekspor lewat paket `@core/export`: kolom ditulis sekali, hasilnya XLSX atau CSV. Paketnya murni (tanpa I/O, tanpa dependensi pihak ketiga), jadi bisa dipakai dari route API, `+server.ts` SvelteKit, job, maupun CLI. Tambahkan `"@core/export": "workspace:*"` di `package.json` modul.
+
+```ts
+// modules/Billing/web/routes/invoices/export/+server.ts
+import { type Column, exportFormat, exportResponse, fileSlug } from '@core/export';
+
+export const GET: RequestHandler = async (event) => {
+  const res = await apiFor(event).v1.m.billing.invoices.get();   // API modul tetap yang memutuskan izin
+  if (!res.data?.success) error(res.status, '…');
+  const columns: Column<Invoice>[] = [
+    { header: 'Nomor', value: (r) => r.number },                  // `text` (baku): tetap teks
+    { header: 'NPWP', value: (r) => r.taxId },                    // 15–16 digit tidak jadi 3,17E+15
+    { header: 'Tanggal', value: (r) => r.issuedOn, type: 'date' },
+    { header: 'Dibayar', value: (r) => r.paidAt, type: 'datetime' },
+    { header: 'Total', value: (r) => r.total, type: 'number' },
+    { header: 'Lunas', value: (r) => r.paid, type: 'boolean' },
+  ];
+  return exportResponse(
+    { name: 'Invoice', heading: ['Invoice Oktober 2026'], columns, rows: res.data.data, timeZone: 'Asia/Jakarta' },
+    exportFormat(event.url.searchParams.get('format'), 'xlsx'),   // ?format=xlsx|csv
+    fileSlug('Invoice Oktober 2026'),
+  );
+};
+```
+
+Di halaman, tombolnya `<ExportMenu href="/m/billing/invoices/export" />` dari `@core/ui` (titik perluasan 10; di core: `$lib/components/table`): `<details>` biasa (jalan tanpa JavaScript), satu tautan per format dengan `download`, label dari katalog core (`common.export`, `common.export_xlsx`, `common.export_csv`). Query yang sudah ada di `href` (filter) dipertahankan, `format` ditambahkan.
+
+Yang dijaga paketnya: XLSX satu sheet dengan header tebal, dibekukan, dan bisa difilter, lebar kolom diperkirakan dari isi, kolom `text` diberi format teks, tanggal dan waktu jadi tanggal Excel sungguhan (`datetime` ditampilkan di `timeZone`, baku UTC), dan baris `heading` di atas tabel. CSV mengikuti RFC 4180 dengan BOM UTF-8, dan teks yang bisa dijalankan spreadsheet sebagai rumus (`=…`, `@…`, `+cmd`) diberi awalan `'` (nomor telepon `+62 …` dibiarkan). Respons memakai `Content-Disposition: attachment` (dengan `filename*` UTF-8) dan `Cache-Control: no-store`, karena ekspor biasanya memuat data pribadi. Contoh hidup: `/m/example/products` → `modules/Example/web/routes/products/export/+server.ts`. Bukti: `packages/export/test/export.test.ts`.
+
 ### Metrik dari modul (M-6)
 
 Angka operasional (bukan data produk) masuk ke registry Prometheus yang sama dengan core dan muncul di `GET /metrics`:
