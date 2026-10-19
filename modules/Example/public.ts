@@ -6,7 +6,13 @@ export default definePublicRoutes('Example', [
   // R-9: a SECOND arrangement of the same data — catalogue instead of storefront. Both are
   // landing candidates (`app.landing_route`), which is the point: one module, more than one
   // public page shape, and the admin picks which one answers `/` without a deploy (F-5).
-  { path: '/catalog', dir: 'web/public/catalog', sitemap: true },
+  // `nav`: the catalogue also gets a link in the header of every public page.
+  {
+    path: '/catalog',
+    dir: 'web/public/catalog',
+    sitemap: true,
+    nav: { label: { id: 'Katalog', en: 'Catalog' }, order: 100 },
+  },
   { path: '/product/[slug]', dir: 'web/public/product/[slug]', sitemap: false },
   // F-11: the module's 404 handler. Never a page of its own (a direct visit is 404): it renders
   // whatever root URL the visitor asked for — `/<category>` or `/<product>` — once an admin sets
