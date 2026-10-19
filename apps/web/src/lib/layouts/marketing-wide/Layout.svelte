@@ -16,7 +16,10 @@ import type { PublicRegions } from '$lib/layouts/types';
 let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicRegions = $props();
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<!-- --site-header-h: the stuck part of this header (the main row, h-16 from md), so a page can
+     place its own sticky bar right under it with top-[var(--site-header-h)]. Below md the main
+     row wraps around the search box and has no fixed height, so the variable is left unset. -->
+<div class="flex min-h-dvh flex-col md:[--site-header-h:4rem]">
   {#if topbar}
     <!-- No overflow on this row: it would clip the language dropdown that opens below it (the
          shell's own item list scrolls instead). z-40 lifts that dropdown over the sticky header. -->
@@ -52,9 +55,10 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
     </div>
   </header>
   {#if menubar}
-    <!-- Outside the sticky header on purpose; z-20 keeps its dropdowns above the page, while the
+    <!-- Outside the sticky header on purpose; z-[25] keeps its dropdowns above the page (and a page's
+         own z-20 sticky bar, like the catalogue filters), while the
          stuck main row (z-30) still slides over it when scrolling. -->
-    <div id="menubar" class="relative z-20 hidden border-t border-b bg-background md:block" data-testid="site-menubar">
+    <div id="menubar" class="relative z-[25] hidden border-t border-b bg-background md:block" data-testid="site-menubar">
       <nav class="mx-auto max-w-6xl px-2" aria-label="Menu">{@render menubar({ orientation: 'horizontal' })}</nav>
     </div>
   {/if}

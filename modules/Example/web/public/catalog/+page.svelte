@@ -131,17 +131,21 @@ function submitFilters(event: SubmitEvent) {
   </div>
 </section>
 
-<!-- filter bar: a plain GET form (base), applied as you type (enhanced) -->
-<section class="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
+<!-- filter bar: a plain GET form (base), applied as you type (enhanced). On a phone the search
+     box takes its own row and category, featured and Apply share the next one. -->
+<!-- Sticky only from md, under the layout's own sticky header (its height comes from the layout as
+     --site-header-h). On a phone the header already holds the search box; a second stuck bar
+     would leave little room for the list, so the filters scroll with the page. -->
+<section class="relative z-20 border-b bg-background/95 backdrop-blur md:sticky md:top-[var(--site-header-h,0px)]">
   <form
     method="GET"
     action="/catalog"
     bind:this={filterForm}
     onsubmit={submitFilters}
-    class="mx-auto flex max-w-6xl flex-wrap items-end gap-3 px-4 py-3"
+    class="mx-auto flex max-w-6xl flex-wrap items-end gap-1.5 px-4 py-3 sm:gap-3"
     data-testid="catalog-filters"
   >
-    <label class="grid flex-1 gap-1 text-xs font-medium text-muted-foreground sm:min-w-64">
+    <label class="grid basis-full gap-1 text-xs font-medium text-muted-foreground sm:min-w-64 sm:flex-1 sm:basis-auto">
       {t('example.catalog.search')}
       <input
         type="search"
@@ -154,15 +158,16 @@ function submitFilters(event: SubmitEvent) {
       />
     </label>
     {#if data.categories.length}
-      <label class="grid gap-1 text-xs font-medium text-muted-foreground">
-        {t('example.catalog.category')}
-        <select name="category" onchange={() => applyFilters()} class="h-10 rounded-xl border border-input bg-background px-3 text-sm font-normal text-foreground">
+      <label class="grid min-w-[4.75rem] flex-1 basis-[4.75rem] gap-1 text-xs font-medium text-muted-foreground sm:flex-none sm:basis-auto">
+        <!-- Caption hidden on a phone (still read out) so the row's three controls line up. -->
+        <span class="sr-only sm:not-sr-only">{t('example.catalog.category')}</span>
+        <select name="category" onchange={() => applyFilters()} class="h-10 w-full min-w-0 rounded-xl border border-input bg-background px-2 text-xs font-normal text-foreground sm:px-3 sm:text-sm">
           <option value="">{t('example.catalog.category_all')}</option>
           {#each data.categories as c (c.slug)}<option value={c.slug} selected={f.category === c.slug}>{c.name}</option>{/each}
         </select>
       </label>
     {/if}
-    <label class="flex h-10 items-center gap-2 rounded-xl border border-input px-3 text-sm text-foreground">
+    <label class="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-input px-2 text-xs text-foreground sm:gap-2 sm:px-3 sm:text-sm">
       <input type="checkbox" name="featured" value="1" checked={f.featured} onchange={() => applyFilters()} />
       {t('example.catalog.featured_only')}
     </label>
@@ -170,9 +175,10 @@ function submitFilters(event: SubmitEvent) {
          ordinary links below — a select alone would need JavaScript to apply. -->
     <input type="hidden" name="sort" value={f.sort === 'catalog' ? '' : f.sort} />
     <input type="hidden" name="order" value={f.sort === 'catalog' ? '' : f.order} />
-    <Button type="submit" variant="outline" class="h-10 rounded-xl">{t('example.catalog.apply')}</Button>
+    <Button type="submit" variant="outline" class="h-10 shrink-0 rounded-xl px-2.5 sm:px-4">{t('example.catalog.apply')}</Button>
     {#if filtered}
-      <a href="/catalog" class="text-sm text-muted-foreground hover:text-foreground">{t('example.catalog.reset')}</a>
+      <!-- A plain link styled as a button: resetting is just opening /catalog with no query. -->
+      <Button href="/catalog" variant="outline" class="h-10 shrink-0 rounded-xl px-2.5 text-muted-foreground sm:px-4" data-testid="catalog-reset"><Icon name="x" size={16} />{t('example.catalog.reset')}</Button>
     {/if}
   </form>
 </section>
