@@ -1,4 +1,5 @@
 <script lang="ts">
+import { spotlight } from '$lib/actions/spotlight';
 import Icon from '$lib/components/Icon.svelte';
 import LanguagePicker from '$lib/components/LanguagePicker.svelte';
 import SiteMenu from '$lib/components/SiteMenu.svelte';
@@ -62,22 +63,25 @@ const widgetContext = $derived({
 {/snippet}
 {#snippet topbarItem(item: LayoutData['topbar'][number])}
   {#if item.href}
-    <a href={item.href} class="inline-flex items-center gap-1.5 text-muted-foreground no-underline hover:text-foreground hover:underline" {...item.external ? { rel: 'noopener', target: '_blank' } : {}}>{#if item.icon}<Icon name={item.icon} size={14} />{/if}{item.label}</a>
+    <a href={item.href} class="relative z-10 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-muted-foreground no-underline hover:text-foreground hover:no-underline" {...item.external ? { rel: 'noopener', target: '_blank' } : {}}>{#if item.icon}<Icon name={item.icon} size={14} />{/if}{item.label}</a>
   {:else}
-    <span class="inline-flex items-center gap-1.5">{#if item.icon}<Icon name={item.icon} size={14} />{/if}{item.label}</span>
+    <span class="inline-flex items-center gap-1.5 px-2">{#if item.icon}<Icon name={item.icon} size={14} />{/if}{item.label}</span>
   {/if}
 {/snippet}
 {#snippet topbar()}
-  <ul class="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto whitespace-nowrap">
-    {#each data.topbar as item, i (`${i}:${item.label}`)}<li>{@render topbarItem(item)}</li>{/each}
-  </ul>
-  {#each topbarWidgets as w (w.id)}<w.Component context={widgetContext} data={w.data} />{/each}
-  <!-- The right-hand group (contact, help): never scrolls away, a divider between items. -->
-  {#if data.topbarEnd.length}
-    <ul id="topbar-end" class="flex shrink-0 items-center divide-x divide-border whitespace-nowrap">
-      {#each data.topbarEnd as item, i (`${i}:${item.label}`)}<li class="px-3 first:ps-0 last:pe-0">{@render topbarItem(item)}</li>{/each}
+  <!-- One spotlight for both groups, so the highlight glides from the left items to the right ones. -->
+  <div use:spotlight class="relative flex min-w-0 flex-1 items-center gap-2">
+    <ul class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto whitespace-nowrap">
+      {#each data.topbar as item, i (`${i}:${item.label}`)}<li>{@render topbarItem(item)}</li>{/each}
     </ul>
-  {/if}
+    {#each topbarWidgets as w (w.id)}<w.Component context={widgetContext} data={w.data} />{/each}
+    <!-- The right-hand group (contact, help): never scrolls away, a divider between items. -->
+    {#if data.topbarEnd.length}
+      <ul id="topbar-end" class="flex shrink-0 items-center divide-x divide-border whitespace-nowrap">
+        {#each data.topbarEnd as item, i (`${i}:${item.label}`)}<li class="px-1 first:ps-0 last:pe-0">{@render topbarItem(item)}</li>{/each}
+      </ul>
+    {/if}
+  </div>
   <!-- Mobile keeps the picker in its menu; the top bar is too narrow there for a dropdown. -->
   <div class="hidden md:block">{@render language('horizontal')}</div>
 {/snippet}
