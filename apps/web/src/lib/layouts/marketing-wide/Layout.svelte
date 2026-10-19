@@ -5,9 +5,10 @@ import type { PublicRegions } from '$lib/layouts/types';
 
 /**
  * `marketing-wide` — translucent sticky header, full-bleed sections, thick footer. Public pages.
- * The header is up to three rows: the top bar scrolls away with the page, the main row and the
- * menu bar stay stuck. Under md the nav and the menu bar fold into the menu button; the search box
- * drops to a full-width line of its own and the actions stay beside the button.
+ * The header is up to three rows and only the main row stays stuck: the top bar above it and the
+ * menu bar below it scroll away with the page, so a long menu never eats the reading area. Under
+ * md the nav and the menu bar fold into the menu button; the search box drops to a full-width
+ * line of its own and the actions stay beside the button.
  */
 let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicRegions = $props();
 </script>
@@ -40,12 +41,14 @@ let { brand, nav, topbar, search, actions, menubar, content, footer }: PublicReg
         </nav>
       </details>
     </div>
-    {#if menubar}
-      <div class="hidden border-t md:block" data-testid="site-menubar">
-        <nav class="mx-auto max-w-6xl px-2" aria-label="Menu">{@render menubar({ orientation: 'horizontal' })}</nav>
-      </div>
-    {/if}
   </header>
+  {#if menubar}
+    <!-- Outside the sticky header on purpose; z-20 keeps its dropdowns above the page, while the
+         stuck main row (z-30) still slides over it when scrolling. -->
+    <div class="relative z-20 hidden border-t border-b bg-background md:block" data-testid="site-menubar">
+      <nav class="mx-auto max-w-6xl px-2" aria-label="Menu">{@render menubar({ orientation: 'horizontal' })}</nav>
+    </div>
+  {/if}
   <main id="content" class="flex-1">{@render content()}</main>
   <footer class="border-t bg-card">
     <div class="mx-auto max-w-6xl px-4 py-10 text-sm text-muted-foreground">{@render footer()}</div>
