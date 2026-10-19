@@ -1,5 +1,6 @@
 import type { ConfigFieldDef } from '@core/module-kit';
 import { modulePublicRoutes } from '@core/module-kit/public-routes';
+import { parseSiteMenu, type SiteMenuItem, storedSiteMenu } from '@core/module-kit/site-menu';
 import { CUSTOM_PREFIX, CUSTOM_SLUG_RE, themeById } from '@core/ui-theme';
 import { publicWebRoutes, webRoutes } from './generated/routes.ts';
 
@@ -10,7 +11,7 @@ import { publicWebRoutes, webRoutes } from './generated/routes.ts';
  * bounds. Values are stored as strings; `normalize` produces the canonical string, `parse` turns
  * it back into a typed value.
  */
-export type ConfigValue = string | number | boolean | string[] | null;
+export type ConfigValue = string | number | boolean | string[] | SiteMenuItem[] | null;
 
 export interface ValidationOk {
   ok: true;
@@ -93,6 +94,15 @@ export function validateValue(
         if (bad.length) return { ok: false, message: `nilai tidak dikenal: ${bad.join(', ')}` };
       }
       return { ok: true, stored: list.length ? JSON.stringify(list) : null };
+    }
+    case 'menu': {
+      // An outline from the Settings form or JSON from an API client; stored as JSON either way.
+      // The links are not checked against the route registry: a menu may point at permalinks,
+      // 404-trapped category URLs and other sites, none of which the registry knows.
+      if (empty) return { ok: true, stored: null };
+      const r = parseSiteMenu(input, field.max ?? 1);
+      if (!r.ok) return { ok: false, message: r.message };
+      return { ok: true, stored: r.items.length ? JSON.stringify(r.items) : null };
     }
     case 'route':
     case 'public_route':
@@ -177,6 +187,8 @@ export function parseValue(field: ConfigFieldDef, stored: string | null | undefi
       return stored === 'true';
     case 'number':
       return Number(stored);
+    case 'menu':
+      return storedSiteMenu(stored);
     case 'list':
       try {
         const v = JSON.parse(stored);

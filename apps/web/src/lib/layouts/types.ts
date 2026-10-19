@@ -26,9 +26,21 @@ export interface DashboardRegions {
   footer: Snippet;
 }
 
+/**
+ * The public site header is up to three rows: `topbar` (thin, above), the main row (`brand`,
+ * `search`, `nav`, `actions`) and `menubar` (below, nested submenus). The four optional regions
+ * are passed ONLY when they have something to show — an admin filled the row, an enabled module
+ * contributed a widget — so a layout keys off their presence and never draws an empty row or an
+ * empty search slot. A layout must still render each of them when given (L-8).
+ */
 export interface PublicRegions {
   brand: Snippet;
   nav: Snippet<[{ orientation: NavOrientation }]>;
+  topbar?: Snippet;
+  search?: Snippet;
+  /** Icons at the end of the main row (a cart); they stay visible when the nav collapses. */
+  actions?: Snippet;
+  menubar?: Snippet<[{ orientation: NavOrientation }]>;
   content: Snippet;
   footer: Snippet;
 }

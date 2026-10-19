@@ -54,7 +54,9 @@ export {
   type ModuleSeedContext,
   type PermissionDef,
   type PublicRouteDef,
+  WIDGET_SLOTS,
   type WidgetDef,
+  type WidgetSlot,
 } from './contract.ts';
 export {
   CORE_EVENTS,
@@ -113,6 +115,14 @@ export {
   splitStatements,
   unrelatedStatements,
 } from './remove.ts';
+export {
+  formatSiteMenu,
+  parseSiteMenu,
+  SITE_MENU_DEPTH_MAX,
+  type SiteMenuItem,
+  type SiteMenuParse,
+  storedSiteMenu,
+} from './site-menu.ts';
 export {
   defineTools,
   type RegisteredTool,

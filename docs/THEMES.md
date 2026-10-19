@@ -86,8 +86,10 @@ Layout bawaan ada di `layouts/registry.json`. Region per jenis shell:
 | Jenis | Region wajib |
 |---|---|
 | `dashboard` | `brand`, `nav`, `header`, `breadcrumb`, `content`, `aside`, `footer` |
-| `public` | `brand`, `nav`, `content`, `footer` |
+| `public` | `brand`, `nav`, `topbar`, `search`, `actions`, `menubar`, `content`, `footer` |
 | `auth` | `brand`, `content`, `footer` |
+
+Empat region publik `topbar`, `search`, `actions`, `menubar` (dan `aside` di dasbor) bersifat **opsional di prop, wajib di markup**: shell hanya memberikannya bila ada isinya, jadi layout memeriksa keberadaannya (`{#if topbar}{@render topbar()}{/if}`) dan tidak pernah menggambar baris kosong — tetapi layout tetap harus merendernya bila diberikan, dan `scripts/ci/layout-contract.ts` serta `modules:sync` menolak layout yang lupa. `menubar` menerima `{ orientation }` seperti `nav`: horizontal di baris bawah header, vertikal di dalam menu seluler. `marketing-wide` adalah contohnya: topbar ikut tergulir, baris utama dan menubar lengket, dan di bawah `md` kotak pencarian turun ke barisnya sendiri sementara `actions` tetap di samping tombol menu.
 
 | Layout | Jenis | Bentuk |
 |---|---|---|

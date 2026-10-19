@@ -35,6 +35,7 @@ import {
 } from '@core/db';
 import { defineApiRoutes } from '@core/module-kit';
 import { Elysia, t } from 'elysia';
+import { parseCart } from '../cart.ts';
 import { inboundInquiry, recordInquiry } from './inquiries.ts';
 import { InquiryBody, InquiryStateBody, ProductBody, ProductUpdateBody } from './schemas.ts';
 
@@ -136,6 +137,21 @@ const Testimonial = t.Object({
   role: t.Nullable(t.String()),
   quote: t.String(),
   avatarUrl: t.Nullable(t.String()),
+});
+const CartItem = t.Object({
+  slug: t.String(),
+  name: t.String(),
+  price: t.Integer(),
+  currency: t.String(),
+  imageUrl: t.Nullable(t.String()),
+  qty: t.Integer(),
+});
+const Cart = t.Object({
+  /** Units across every line — what the header icon shows. */
+  count: t.Integer(),
+  total: t.Integer(),
+  currency: t.String(),
+  items: t.Array(CartItem),
 });
 const Inquiry = t.Object({
   id: t.String(),
@@ -268,6 +284,55 @@ export default defineApiRoutes(
       {
         response: { 200: OkSchema(t.Array(Category)), ...errorResponses },
         detail: { summary: 'List categories', description: 'Public.' },
+      },
+    )
+    .get(
+      '/cart',
+      async ({ query, tenantState }) => {
+        // The demo cart lives in the visitor's cookie (see ../cart.ts); the web page hands its
+        // value over and this only prices it. Products deleted since they were added drop out.
+        const lines = parseCart(query.items);
+        const tid = lines.length ? await storefrontTenant(tenantState?.clientId ?? null) : null;
+        const rows = tid
+          ? await forTenant(tid).select(
+              schema.exampleProducts,
+              isNull(schema.exampleProducts.deleted_at),
+            )
+          : [];
+        const bySlug = new Map(rows.map((r) => [r.slug, r]));
+        const items = lines.flatMap((l) => {
+          const r = bySlug.get(l.slug);
+          return r
+            ? [
+                {
+                  slug: r.slug,
+                  name: r.name,
+                  price: r.price,
+                  currency: r.currency,
+                  imageUrl: r.image_url,
+                  qty: l.qty,
+                },
+              ]
+            : [];
+        });
+        return ok({
+          count: items.reduce((n, i) => n + i.qty, 0),
+          total: items.reduce((n, i) => n + i.qty * i.price, 0),
+          currency: items[0]?.currency ?? 'IDR',
+          items,
+        });
+      },
+      {
+        query: t.Object({
+          /** `slug:qty` pairs joined by `.` — the `example_cart` cookie value as is. */
+          items: t.Optional(t.String({ maxLength: 4000 })),
+        }),
+        response: { 200: OkSchema(Cart), ...errorResponses },
+        detail: {
+          summary: 'Price the demo cart',
+          description:
+            'Public. Prices `items` (`slug:qty` pairs joined by `.`, the value of the `example_cart` cookie). Nothing is stored on the server; unknown slugs are left out.',
+        },
       },
     )
     .get(
