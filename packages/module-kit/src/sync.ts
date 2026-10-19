@@ -1696,8 +1696,8 @@ function emitPublicRoutes(
   routes: readonly (PublicRouteDef & { module: string; ns: string })[],
 ): string {
   return `${GEN_HEADER}
-/** Module public routes (extension point 13): SvelteKit path, owning module + namespace, sitemap flag (F-7, G-8), 404-handler flag (F-11), permalink-page flag (F-12). */
-export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean; permalinks: boolean }[] = ${JSON.stringify(
+/** Module public routes (extension point 13): SvelteKit path, owning module + namespace, sitemap flag (F-7, G-8), 404-handler flag (F-11), permalink-page flag (F-12), header link (nav). */
+export const modulePublicRoutes: readonly { path: string; module: string; ns: string; sitemap: boolean; notFound: boolean; permalinks: boolean; nav: { label: { id: string; en: string }; order: number } | null }[] = ${JSON.stringify(
     routes.map((r) => ({
       path: r.path,
       module: r.module,
@@ -1705,6 +1705,9 @@ export const modulePublicRoutes: readonly { path: string; module: string; ns: st
       sitemap: r.sitemap ?? !r.path.includes('['),
       notFound: r.notFound ?? false,
       permalinks: r.permalinks ?? false,
+      nav: r.nav
+        ? { label: { id: r.nav.label.id, en: r.nav.label.en }, order: r.nav.order ?? 500 }
+        : null,
     })),
     null,
     2,

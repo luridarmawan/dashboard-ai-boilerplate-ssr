@@ -515,6 +515,14 @@ export interface PublicRouteDef {
    * one per module, a concrete path, and not also `notFound`.
    */
   readonly permalinks?: boolean;
+  /**
+   * Show this page as a link in the header of every public page, next to the language picker
+   * and Login/Dashboard. Concrete paths only (a `[param]` page has no single URL), never on a
+   * 404 handler or a permalink page. Links are ordered by `order` (default 500, then path) and
+   * disappear while the module is disabled for the tenant. The label follows the visitor's
+   * language. Themes do not add or remove these links: the layout only places them.
+   */
+  readonly nav?: { readonly label: LocalizedText; readonly order?: number };
 }
 
 const PUBLIC_PATH_RE =
@@ -556,6 +564,17 @@ export function definePublicRoutes(
     seen.add(r.path);
     if (!r.dir.startsWith('web/') || r.dir.includes('..')) {
       throw new ModuleContractError(`route publik "${r.path}": dir harus di dalam web/ modul`);
+    }
+    if (r.nav && (r.path.includes('[') || r.notFound || r.permalinks)) {
+      throw new ModuleContractError(
+        `route publik "${r.path}": nav hanya untuk path konkret yang bukan notFound/permalinks`,
+      );
+    }
+    if (r.nav && (!r.nav.label?.id?.trim() || !r.nav.label?.en?.trim())) {
+      throw new ModuleContractError(`route publik "${r.path}": nav.label wajib berisi id dan en`);
+    }
+    if (r.nav?.order !== undefined && !Number.isInteger(r.nav.order)) {
+      throw new ModuleContractError(`route publik "${r.path}": nav.order harus bilangan bulat`);
     }
     if (r.permalinks && (r.notFound || r.path.includes('['))) {
       throw new ModuleContractError(

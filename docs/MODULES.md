@@ -289,6 +289,15 @@ Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data
 
 Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7) — selama modulnya aktif untuk lingkup yang sedang disunting; route modul yang dinonaktifkan (G-8) tidak ditawarkan dan ditolak saat disimpan. Tabel pemiliknya dihasilkan sync di `packages/module-kit/src/generated/public-routes.ts` (`@core/module-kit/public-routes`) dan `apps/web/src/generated/public-routes.ts`. `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
 
+**Tautan di header publik — `nav`.** Halaman publik konkret boleh minta tampil sebagai tautan di header setiap halaman publik, sebelum pemilih bahasa dan Login/Dashboard:
+
+```ts
+{ path: '/blog', dir: 'web/public/blog', sitemap: true,
+  nav: { label: { id: 'Blog', en: 'Blog' }, order: 100 } },
+```
+
+Label mengikuti bahasa pengunjung; urutan menurut `order` (baku 500), lalu path. Tautan hilang selama modulnya nonaktif untuk tenant (G-8), dan diberi `aria-current="page"` di halaman itu dan halaman di bawahnya (`/event` menyala di `/event/liga-2026`). Ditolak sync: `nav` pada path ber-`[param]`, pada `notFound`/`permalinks`, label tanpa `id`/`en`, atau `order` bukan bilangan bulat. Tema hanya menempatkan region `nav`; tema tidak menambah atau membuang tautan (BRIEF §5). Logika: `apps/web/src/lib/server/public-nav.ts` (+ tes).
+
 #### URL konten di akar situs — registry permalink (F-12, PRD §4.7 aturan 7)
 
 Halaman, artikel, kategori, produk — konten yang dibuat admin dan butuh URL di akar domain (`/tentang-kami`, `/cara-menanam-cabai`, `/sepatu/sneaker-x`) — **didaftarkan** di registry permalink core, bukan ditangkap lewat penangkap 404. Tidak ada setelan yang perlu dipilih, dan setiap modul bisa melakukannya bersamaan. Registry menjamin path unik lintas modul, menyimpan riwayat 301, dan menjawab setiap URL asing dengan satu lookup terindeks.

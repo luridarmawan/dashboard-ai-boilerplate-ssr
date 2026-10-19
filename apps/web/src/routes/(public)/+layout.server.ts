@@ -1,7 +1,9 @@
 import { resolveLayout } from '@core/ui-theme';
 import { error } from '@sveltejs/kit';
 import { layoutVariants } from '$lib/../generated/layout-variants';
+import { modulePublicRoutes } from '$lib/../generated/public-routes';
 import { isSignupEnabled } from '$lib/server/config';
+import { publicNavLinks } from '$lib/server/public-nav';
 import { csrfToken } from '$lib/server/session';
 import { trappedPath } from '$lib/server/trap';
 import { moduleOwning } from '../../hooks.server';
@@ -25,6 +27,13 @@ export const load: LayoutServerLoad = async (event) => {
     /** For the language dropdown in the nav (K-7): the form posts to /lang and comes back here. */
     csrf: csrfToken(event),
     path: visiblePath(event),
+    /** Header links that module public pages asked for (`nav` in public.ts). */
+    navLinks: publicNavLinks(
+      modulePublicRoutes,
+      event.locals.config.enabledModules,
+      event.locals.locale.locale,
+      visiblePath(event).split('?')[0] ?? '/',
+    ),
   };
 };
 
