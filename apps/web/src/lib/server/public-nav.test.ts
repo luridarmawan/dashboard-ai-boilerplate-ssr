@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { definePublicRoutes } from '@core/module-kit';
-import { publicNavLinks } from './public-nav.ts';
+import type { SiteMenuItem } from '@core/module-kit/site-menu';
+import { publicNavLinks, resolveSiteMenu } from './public-nav.ts';
 
 const label = (id: string, en: string) => ({ id, en });
 const routes = [
@@ -51,5 +52,71 @@ describe('public header links (module public routes with `nav`)', () => {
     expect(() =>
       definePublicRoutes('Shop', [{ ...ok, nav: { label: label('Toko', 'Shop'), order: 1.5 } }]),
     ).toThrow(/bilangan bulat/);
+  });
+});
+
+describe('admin header rows (site.menubar, site.topbar)', () => {
+  const item = (id: string, href: string | null, children: SiteMenuItem[] = []): SiteMenuItem => ({
+    label: { id, en: `${id}-en` },
+    href,
+    children,
+  });
+  const menu = [
+    item('Beranda', '/'),
+    item('Kategori', null, [item('Kopi', '/kopi', [item('Arabika', '/kopi/arabika')])]),
+    item('Toko', '/shop'),
+    item('Toko saja', null, [item('Promo', '/shop/promo')]),
+    item('Luar', 'https://example.com'),
+    item('Gratis ongkir', null),
+  ];
+  const owner = (p: string) => (p.startsWith('/shop') ? 'shop' : null);
+  const resolve = (enabled: string[], path = '/', locale = 'id') =>
+    resolveSiteMenu(menu, { locale, path, search: '', owner, enabled: new Set(enabled) });
+
+  test('links into a disabled module go, and so does a heading left empty', () => {
+    expect(resolve([]).map((l) => l.label)).toEqual([
+      'Beranda',
+      'Kategori',
+      'Luar',
+      'Gratis ongkir',
+    ]);
+    expect(resolve(['shop']).map((l) => l.label)).toContain('Toko saja');
+  });
+
+  test('current page and the trail to it', () => {
+    const [home, cat] = resolve([], '/kopi/arabika');
+    // The root only matches itself, or every page would light it up.
+    expect(home?.current).toBe(false);
+    expect(cat?.active).toBe(true);
+    expect(cat?.current).toBe(false);
+    expect(cat?.children[0]?.current).toBe(true);
+    expect(cat?.children[0]?.children[0]?.current).toBe(true);
+  });
+
+  test('labels follow the visitor language; external links are marked', () => {
+    const links = resolve([], '/', 'en');
+    expect(links[0]?.label).toBe('Beranda-en');
+    expect(links.find((l) => l.href === 'https://example.com')?.external).toBe(true);
+  });
+});
+
+describe('menu links with a query', () => {
+  const menu: SiteMenuItem[] = [
+    { label: { id: 'Semua', en: 'All' }, href: '/catalog', children: [] },
+    { label: { id: 'Arabika', en: 'Arabica' }, href: '/catalog?q=arabika', children: [] },
+  ];
+  const at = (search: string) =>
+    resolveSiteMenu(menu, {
+      locale: 'id',
+      path: '/catalog',
+      search,
+      owner: () => null,
+      enabled: new Set(),
+    }).map((l) => l.current);
+
+  test('are current only on exactly that address', () => {
+    expect(at('')).toEqual([true, false]);
+    expect(at('?q=arabika')).toEqual([true, true]);
+    expect(at('?q=robusta')).toEqual([true, false]);
   });
 });

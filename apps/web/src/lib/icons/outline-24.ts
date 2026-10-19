@@ -73,6 +73,7 @@ import SendGlyph from '@lucide/svelte/icons/send';
 import ServerGlyph from '@lucide/svelte/icons/server';
 import SettingsGlyph from '@lucide/svelte/icons/settings';
 import ShieldGlyph from '@lucide/svelte/icons/shield';
+import CartGlyph from '@lucide/svelte/icons/shopping-cart';
 import SparklesGlyph from '@lucide/svelte/icons/sparkles';
 import StopGlyph from '@lucide/svelte/icons/square';
 import StarGlyph from '@lucide/svelte/icons/star';
@@ -92,6 +93,7 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   menu: MenuGlyph as unknown as Component<Record<string, unknown>>,
   close: CloseGlyph as unknown as Component<Record<string, unknown>>,
   search: SearchGlyph as unknown as Component<Record<string, unknown>>,
+  cart: CartGlyph as unknown as Component<Record<string, unknown>>,
   settings: SettingsGlyph as unknown as Component<Record<string, unknown>>,
   user: UserGlyph as unknown as Component<Record<string, unknown>>,
   users: UsersGlyph as unknown as Component<Record<string, unknown>>,

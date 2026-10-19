@@ -105,3 +105,27 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     expect(parseValue(f({ type: 'string' }), null)).toBeNull();
   });
 });
+
+describe('menu values (header rows)', () => {
+  test('an outline is stored as JSON; the depth limit is the field max', () => {
+    const field = f({ type: 'menu', max: 2 });
+    const r = validateValue(field, 'Kategori | Categories\n  Kopi -> /kopi');
+    expect(r.ok).toBe(true);
+    const stored = r.ok ? r.stored : null;
+    expect(parseValue(field, stored)).toEqual([
+      {
+        label: { id: 'Kategori', en: 'Categories' },
+        href: null,
+        children: [{ label: { id: 'Kopi', en: 'Kopi' }, href: '/kopi', children: [] }],
+      },
+    ]);
+    expect(validateValue(field, 'A\n  B\n    C').ok).toBe(false);
+    // Without a max the menu is flat.
+    expect(validateValue(f({ type: 'menu' }), 'A\n  B').ok).toBe(false);
+  });
+
+  test('empty clears the value', () => {
+    expect(validateValue(f({ type: 'menu' }), '')).toEqual({ ok: true, stored: null });
+    expect(validateValue(f({ type: 'menu' }), [])).toEqual({ ok: true, stored: null });
+  });
+});

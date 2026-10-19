@@ -1,4 +1,6 @@
 <script lang="ts">
+import { page } from '$app/state';
+import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import Img from '$lib/components/Img.svelte';
 import { Button } from '$lib/components/ui';
@@ -104,8 +106,15 @@ const ld = $derived(
       <li class="flex items-center gap-2"><Icon name="shield" size={16} class="text-primary" />{t('example.trust.t2')}</li>
       <li class="flex items-center gap-2"><Icon name="check" size={16} class="text-primary" />{t('example.trust.t4')}</li>
     </ul>
-    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-      <Button href="/example#contact" size="lg" class="w-full rounded-full px-6 sm:w-auto">{t('example.product.order')}<Icon name="arrow-right" class="rtl:rotate-180" size={18} /></Button>
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+      <!-- The demo cart (cart.ts): a plain form post, so it works without JavaScript. The CSRF
+           token comes from the public layout's data, which every public page carries. -->
+      <form method="POST" action="/cart?/add" class="contents">
+        <Csrf token={String(page.data.csrf ?? '')} />
+        <input type="hidden" name="slug" value={p.slug} />
+        <Button type="submit" size="lg" class="w-full rounded-full px-6 sm:w-auto" data-testid="add-to-cart"><Icon name="cart" size={18} />{t('example.product.add_to_cart')}</Button>
+      </form>
+      <Button href="/example#contact" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto">{t('example.product.order')}<Icon name="arrow-right" class="rtl:rotate-180" size={18} /></Button>
       <Button href="/example#products" size="lg" variant="outline" class="w-full rounded-full px-6 sm:w-auto"><Icon name="arrow-left" size={16} />{t('example.product.back')}</Button>
     </div>
     {#if p.description}<div class="prose-sm mt-10 max-w-none whitespace-pre-line border-t pt-8 text-foreground/90">{p.description}</div>{/if}

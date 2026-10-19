@@ -268,6 +268,45 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     ],
   },
   {
+    // The public site header beyond brand and sign-in: the thin row above it and the menu bar
+    // under it. A row with no items is not drawn at all, so an empty section changes nothing.
+    section: 'site',
+    title: { id: 'Header situs', en: 'Site header' },
+    note: {
+      id: 'Baris tambahan di header halaman publik. Kotak pencarian dan ikon seperti keranjang datang dari modul, bukan dari sini.',
+      en: 'Extra rows in the header of public pages. The search box and icons such as a cart come from modules, not from here.',
+    },
+    order: 1,
+    fields: [
+      {
+        key: 'site.topbar',
+        type: 'menu',
+        title: { id: 'Baris atas', en: 'Top bar' },
+        note: {
+          id: 'Baris tipis di atas header: teks promo, tautan bantuan. Satu item per baris, tanpa submenu. Tulis "Teks Indonesia | English text" untuk dua bahasa, dan tambahkan "-> /path" agar item menjadi tautan. Pemilih bahasa pindah ke baris ini selama baris ini tampil.',
+          en: 'A thin row above the header: promo copy, help links. One item per line, no submenus. Write "Teks Indonesia | English text" for both languages, and add "-> /path" to make an item a link. The language picker moves to this row while it is shown.',
+        },
+        default: null,
+        public: true,
+        max: 1,
+        order: 0,
+      },
+      {
+        key: 'site.menubar',
+        type: 'menu',
+        title: { id: 'Menu bar', en: 'Menu bar' },
+        note: {
+          id: 'Baris menu di bawah header, dengan submenu bertingkat: masukkan baris dengan 2 spasi untuk menjadikannya submenu item di atasnya. Item tanpa "-> /path" hanya membuka submenunya. Tautan ke halaman modul yang dinonaktifkan disembunyikan otomatis.',
+          en: 'A menu row under the header, with nested submenus: indent a line by 2 spaces to make it a submenu of the item above. An item without "-> /path" only opens its submenu. Links to pages of a disabled module are hidden automatically.',
+        },
+        default: null,
+        public: true,
+        max: 4,
+        order: 1,
+      },
+    ],
+  },
+  {
     section: 'security',
     title: { id: 'Keamanan', en: 'Security' },
     order: 10,
