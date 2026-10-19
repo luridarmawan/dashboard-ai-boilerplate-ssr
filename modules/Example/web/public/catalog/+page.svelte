@@ -199,8 +199,8 @@ function submitFilters(event: SubmitEvent) {
     <ul class="mt-6 grid gap-3" data-testid="catalog-items" class:opacity-60={loading}>
       {#each data.products as p (p.id)}
         <li>
-          <a href={`/product/${p.slug}`} class="group flex items-center gap-4 rounded-2xl border bg-card p-3 no-underline transition-colors hover:bg-accent/40 hover:no-underline sm:p-4">
-            <span class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br from-primary/20 via-accent to-secondary text-2xl font-semibold text-primary/60">
+          <a href={`/product/${p.slug}`} class="group flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-3 no-underline sm:gap-4 transition-colors hover:bg-accent/40 hover:no-underline sm:p-4">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br sm:h-16 sm:w-16 from-primary/20 via-accent to-secondary text-2xl font-semibold text-primary/60">
               {#if p.imageUrl}<Img src={p.imageUrl} alt="" width={64} height={64} class="h-full w-full object-cover" />{:else}{initial(p.name)}{/if}
             </span>
             <span class="min-w-0 flex-1">
@@ -214,7 +214,7 @@ function submitFilters(event: SubmitEvent) {
               <strong class="block text-foreground">{money(p.price, p.currency)}</strong>
               <span class="text-xs text-muted-foreground">{t('example.products.per')}</span>
             </span>
-            <Icon name="chevron-right" size={18} class="shrink-0 text-muted-foreground rtl:rotate-180" />
+            <Icon name="chevron-right" size={18} class="hidden shrink-0 text-muted-foreground rtl:rotate-180 sm:block" />
           </a>
         </li>
       {/each}
