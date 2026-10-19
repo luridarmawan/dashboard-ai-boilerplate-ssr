@@ -1,8 +1,12 @@
+import { storedSiteMenu } from '@core/module-kit/site-menu';
 import { resolveLayout } from '@core/ui-theme';
 import { error } from '@sveltejs/kit';
 import { layoutVariants } from '$lib/../generated/layout-variants';
+import { modulePublicRoutes } from '$lib/../generated/public-routes';
+import { moduleWidgets } from '$lib/../generated/widgets';
 import { isSignupEnabled } from '$lib/server/config';
-import { csrfToken } from '$lib/server/session';
+import { publicNavLinks, resolveSiteMenu } from '$lib/server/public-nav';
+import { apiFetchData, csrfToken } from '$lib/server/session';
 import { trappedPath } from '$lib/server/trap';
 import { moduleOwning } from '../../hooks.server';
 import type { LayoutServerLoad } from './$types';
@@ -17,6 +21,40 @@ export const load: LayoutServerLoad = async (event) => {
   }
   const variant = layoutVariants[event.route.id ?? ''] ?? 'default';
   const layout = resolveLayout(event.locals.theme.theme, 'public', variant);
+  const { config, locale, session } = event.locals;
+  const visible = visiblePath(event);
+  const path = visible.split('?')[0] ?? '/';
+  const search = visible.slice(path.length);
+  const menuOpts = {
+    locale: locale.locale,
+    path,
+    search,
+    owner: moduleOwning,
+    enabled: config.enabledModules,
+  };
+  // A row an admin limited to signed-in users is simply empty for everyone else, so the layout
+  // does not draw it at all.
+  const shown = (key: string) => config.values[key] !== 'signed_in' || !!session;
+  // Header widgets: what enabled modules put in the public header (search box, cart). Filtered
+  // here like the dashboard's shell widgets, so a widget of a disabled module — or one behind a
+  // permission the visitor lacks — never reaches the HTML. A slow `data` call must not hold the
+  // page: past the timeout the widget renders without it.
+  const headerWidgets = await Promise.all(
+    moduleWidgets
+      .filter((w) => w.slot?.startsWith('public-'))
+      .filter((w) => config.enabledModules.has(w.module.toLowerCase()))
+      .filter((w) => !w.permission || !!session?.can(w.permission))
+      .sort((a, b) => (a.order ?? 100) - (b.order ?? 100))
+      .map(async (w) => ({
+        id: w.id,
+        slot: w.slot as 'public-topbar' | 'public-search' | 'public-actions',
+        data: w.data
+          ? await apiFetchData(event, w.data, session?.clientId ?? null, {
+              signal: AbortSignal.timeout(1500),
+            })
+          : null,
+      })),
+  );
   return {
     layoutId: layout.layout.id,
     layoutVariant: variant,
@@ -25,6 +63,20 @@ export const load: LayoutServerLoad = async (event) => {
     /** For the language dropdown in the nav (K-7): the form posts to /lang and comes back here. */
     csrf: csrfToken(event),
     path: visiblePath(event),
+    /** Header links that module public pages asked for (`nav` in public.ts). */
+    navLinks: publicNavLinks(modulePublicRoutes, config.enabledModules, locale.locale, path),
+    /** Rows an admin assembled in Settings → Site header; empty = the row is not drawn. */
+    topbar: shown('site.topbar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.topbar']), menuOpts)
+      : [],
+    /** The top bar's right-hand group, left of the language picker; same visibility switch. */
+    topbarEnd: shown('site.topbar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.topbar_end']), menuOpts)
+      : [],
+    menubar: shown('site.menubar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.menubar']), menuOpts)
+      : [],
+    headerWidgets,
   };
 };
 

@@ -61,12 +61,14 @@ import PaletteGlyph from 'phosphor-svelte/lib/PaletteIcon';
 import SendGlyph from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import PauseGlyph from 'phosphor-svelte/lib/PauseIcon';
 import EditGlyph from 'phosphor-svelte/lib/PencilSimpleIcon';
+import PhoneGlyph from 'phosphor-svelte/lib/PhoneIcon';
 import PlayGlyph from 'phosphor-svelte/lib/PlayIcon';
 import PlugGlyph from 'phosphor-svelte/lib/PlugIcon';
 import PlusGlyph from 'phosphor-svelte/lib/PlusIcon';
 import PuzzleGlyph from 'phosphor-svelte/lib/PuzzlePieceIcon';
 import HelpGlyph from 'phosphor-svelte/lib/QuestionIcon';
 import ShieldGlyph from 'phosphor-svelte/lib/ShieldIcon';
+import CartGlyph from 'phosphor-svelte/lib/ShoppingCartIcon';
 import LoginGlyph from 'phosphor-svelte/lib/SignInIcon';
 import LogoutGlyph from 'phosphor-svelte/lib/SignOutIcon';
 import SparklesGlyph from 'phosphor-svelte/lib/SparkleIcon';
@@ -83,6 +85,7 @@ import UserGlyph from 'phosphor-svelte/lib/UserIcon';
 import UsersGlyph from 'phosphor-svelte/lib/UsersIcon';
 import GroupGlyph from 'phosphor-svelte/lib/UsersThreeIcon';
 import WarningGlyph from 'phosphor-svelte/lib/WarningIcon';
+import WhatsappGlyph from 'phosphor-svelte/lib/WhatsappLogoIcon';
 import ErrorGlyph from 'phosphor-svelte/lib/XCircleIcon';
 import CloseGlyph from 'phosphor-svelte/lib/XIcon';
 import XGlyph from 'phosphor-svelte/lib/XIcon';
@@ -92,6 +95,9 @@ export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   menu: MenuGlyph as unknown as Component<Record<string, unknown>>,
   close: CloseGlyph as unknown as Component<Record<string, unknown>>,
   search: SearchGlyph as unknown as Component<Record<string, unknown>>,
+  cart: CartGlyph as unknown as Component<Record<string, unknown>>,
+  phone: PhoneGlyph as unknown as Component<Record<string, unknown>>,
+  whatsapp: WhatsappGlyph as unknown as Component<Record<string, unknown>>,
   settings: SettingsGlyph as unknown as Component<Record<string, unknown>>,
   user: UserGlyph as unknown as Component<Record<string, unknown>>,
   users: UsersGlyph as unknown as Component<Record<string, unknown>>,

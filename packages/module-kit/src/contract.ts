@@ -1,6 +1,7 @@
 import type { TableDef } from '@core/db/descriptor';
 import type { LocalizedText } from './manifest.ts';
 import { namespaceOf } from './manifest.ts';
+import { SITE_MENU_DEPTH_MAX } from './site-menu.ts';
 
 /**
  * The module contract — the shapes a module's files export (PRD §4.5).
@@ -155,8 +156,15 @@ export interface WidgetDef {
    * once on EVERY dashboard page after the layout (a floating button, a global notice; H-13). Shell
    * widgets get the page context (`path`, `breadcrumb`, `csrf`) in their `context` prop and must
    * render nothing visible when the page is not theirs.
+   *
+   * The `public-*` slots sit in the header of every PUBLIC page, visitors without a session
+   * included: `public-topbar` (the thin row above the header — a notice, an indicator),
+   * `public-search` (the search box of the main row; no box is drawn when no enabled module fills
+   * it) and `public-actions` (icons at the end of the main row — a cart). Their `context` is
+   * `{ locale, path, csrf, loggedIn, appName }`; a `permission` hides the widget from anonymous
+   * visitors as well.
    */
-  readonly slot?: 'dashboard' | 'shell';
+  readonly slot?: WidgetSlot;
   /**
    * Optional API path (`/v1/...`, query string allowed) the dashboard fetches SERVER-SIDE as the
    * signed-in user before rendering; its `data` payload reaches the component as the `data` prop.
@@ -164,6 +172,15 @@ export interface WidgetDef {
    */
   readonly data?: string;
 }
+
+export const WIDGET_SLOTS = [
+  'dashboard',
+  'shell',
+  'public-topbar',
+  'public-search',
+  'public-actions',
+] as const;
+export type WidgetSlot = (typeof WIDGET_SLOTS)[number];
 
 /** Declare the dashboard widgets a module contributes (extension point 11). */
 export function defineWidgets(
@@ -194,9 +211,9 @@ export function defineWidgets(
         );
       }
     }
-    if (w.slot !== undefined && w.slot !== 'dashboard' && w.slot !== 'shell') {
+    if (w.slot !== undefined && !(WIDGET_SLOTS as readonly string[]).includes(w.slot)) {
       throw new ModuleContractError(
-        `widget "${w.id}": slot harus "dashboard" atau "shell", bukan "${String(w.slot)}"`,
+        `widget "${w.id}": slot harus salah satu dari ${WIDGET_SLOTS.join(', ')}, bukan "${String(w.slot)}"`,
       );
     }
     if (w.data !== undefined && !/^\/v1\/[A-Za-z0-9/_.:?&=%-]+$/.test(w.data)) {
@@ -316,7 +333,14 @@ export type ConfigFieldType =
    * is the file id; anonymous visitors and crawlers fetch it from `/v1/configuration/image-file/<id>`
    * and its URL + pixel size come from `GET /v1/configuration/image/<key>`.
    */
-  | 'image';
+  | 'image'
+  /**
+   * A tree of links (`SiteMenuItem[]` from `@core/module-kit/site-menu`): a label in both
+   * languages, an optional href, children. `max` is the nesting depth it allows (unset = 1, a flat
+   * list). The form posts an indented outline, so it works without JavaScript; API clients send
+   * JSON.
+   */
+  | 'menu';
 
 export interface ConfigFieldDef {
   /** `<section>.<name>`, e.g. `billing.tax_rate`. */
@@ -331,7 +355,7 @@ export interface ConfigFieldDef {
   /** Readable by anonymous clients (E-4). Never true for `secret`. */
   readonly public?: boolean;
   readonly order?: number;
-  /** Numeric bounds / string length. */
+  /** Numeric bounds / string length; for `menu`, `max` is the nesting depth. */
   readonly min?: number;
   readonly max?: number;
   /** Key of one of the section's `groups`; the field is drawn under that group's heading. */
@@ -460,6 +484,15 @@ export function defineConfig(
       if ((f.type === 'select' || f.type === 'list') && !f.options?.length) {
         throw new ModuleContractError(`kunci "${f.key}": tipe ${f.type} butuh options`);
       }
+      if (
+        f.type === 'menu' &&
+        f.max !== undefined &&
+        (!Number.isInteger(f.max) || f.max < 1 || f.max > SITE_MENU_DEPTH_MAX)
+      ) {
+        throw new ModuleContractError(
+          `kunci "${f.key}": max untuk menu adalah kedalaman submenu, bilangan bulat 1–${SITE_MENU_DEPTH_MAX}`,
+        );
+      }
     }
     const actionKeys = new Set<string>();
     for (const a of s.actions ?? []) {
@@ -515,6 +548,14 @@ export interface PublicRouteDef {
    * one per module, a concrete path, and not also `notFound`.
    */
   readonly permalinks?: boolean;
+  /**
+   * Show this page as a link in the header of every public page, next to the language picker
+   * and Login/Dashboard. Concrete paths only (a `[param]` page has no single URL), never on a
+   * 404 handler or a permalink page. Links are ordered by `order` (default 500, then path) and
+   * disappear while the module is disabled for the tenant. The label follows the visitor's
+   * language. Themes do not add or remove these links: the layout only places them.
+   */
+  readonly nav?: { readonly label: LocalizedText; readonly order?: number };
 }
 
 const PUBLIC_PATH_RE =
@@ -556,6 +597,17 @@ export function definePublicRoutes(
     seen.add(r.path);
     if (!r.dir.startsWith('web/') || r.dir.includes('..')) {
       throw new ModuleContractError(`route publik "${r.path}": dir harus di dalam web/ modul`);
+    }
+    if (r.nav && (r.path.includes('[') || r.notFound || r.permalinks)) {
+      throw new ModuleContractError(
+        `route publik "${r.path}": nav hanya untuk path konkret yang bukan notFound/permalinks`,
+      );
+    }
+    if (r.nav && (!r.nav.label?.id?.trim() || !r.nav.label?.en?.trim())) {
+      throw new ModuleContractError(`route publik "${r.path}": nav.label wajib berisi id dan en`);
+    }
+    if (r.nav?.order !== undefined && !Number.isInteger(r.nav.order)) {
+      throw new ModuleContractError(`route publik "${r.path}": nav.order harus bilangan bulat`);
     }
     if (r.permalinks && (r.notFound || r.path.includes('['))) {
       throw new ModuleContractError(

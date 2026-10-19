@@ -61,6 +61,7 @@ import MoonGlyph from '@lucide/svelte/icons/moon';
 import PaletteGlyph from '@lucide/svelte/icons/palette';
 import PauseGlyph from '@lucide/svelte/icons/pause';
 import EditGlyph from '@lucide/svelte/icons/pencil';
+import PhoneGlyph from '@lucide/svelte/icons/phone';
 import PlayGlyph from '@lucide/svelte/icons/play';
 import PlugGlyph from '@lucide/svelte/icons/plug';
 import PlusGlyph from '@lucide/svelte/icons/plus';
@@ -73,6 +74,7 @@ import SendGlyph from '@lucide/svelte/icons/send';
 import ServerGlyph from '@lucide/svelte/icons/server';
 import SettingsGlyph from '@lucide/svelte/icons/settings';
 import ShieldGlyph from '@lucide/svelte/icons/shield';
+import CartGlyph from '@lucide/svelte/icons/shopping-cart';
 import SparklesGlyph from '@lucide/svelte/icons/sparkles';
 import StopGlyph from '@lucide/svelte/icons/square';
 import StarGlyph from '@lucide/svelte/icons/star';
@@ -87,11 +89,15 @@ import GroupGlyph from '@lucide/svelte/icons/users-round';
 import CloseGlyph from '@lucide/svelte/icons/x';
 import XGlyph from '@lucide/svelte/icons/x';
 import type { Component } from 'svelte';
+import WhatsappGlyph from './WhatsappGlyph.svelte';
 
 export const glyphs: Record<string, Component<Record<string, unknown>>> = {
   menu: MenuGlyph as unknown as Component<Record<string, unknown>>,
   close: CloseGlyph as unknown as Component<Record<string, unknown>>,
   search: SearchGlyph as unknown as Component<Record<string, unknown>>,
+  cart: CartGlyph as unknown as Component<Record<string, unknown>>,
+  phone: PhoneGlyph as unknown as Component<Record<string, unknown>>,
+  whatsapp: WhatsappGlyph as unknown as Component<Record<string, unknown>>,
   settings: SettingsGlyph as unknown as Component<Record<string, unknown>>,
   user: UserGlyph as unknown as Component<Record<string, unknown>>,
   users: UsersGlyph as unknown as Component<Record<string, unknown>>,

@@ -268,6 +268,92 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     ],
   },
   {
+    // The public site header beyond brand and sign-in: the thin row above it and the menu bar
+    // under it. A row with no items is not drawn at all, so an empty section changes nothing.
+    section: 'site',
+    title: { id: 'Header situs', en: 'Site header' },
+    note: {
+      id: 'Baris tambahan di header halaman publik. Kotak pencarian dan ikon seperti keranjang datang dari modul, bukan dari sini.',
+      en: 'Extra rows in the header of public pages. The search box and icons such as a cart come from modules, not from here.',
+    },
+    order: 1,
+    fields: [
+      {
+        key: 'site.topbar',
+        type: 'menu',
+        title: { id: 'Baris atas', en: 'Top bar' },
+        note: {
+          id: 'Baris tipis di atas header: teks promo, tautan bantuan. Satu item per baris, tanpa submenu. Tulis "Teks Indonesia | English text" untuk dua bahasa, dan tambahkan "-> /path" atau "-> https://situs-lain.com" agar item menjadi tautan (tautan ke situs lain terbuka di tab baru). Pemilih bahasa pindah ke baris ini selama baris ini tampil.',
+          en: 'A thin row above the header: promo copy, help links. One item per line, no submenus. Write "Teks Indonesia | English text" for both languages, and add "-> /path" or "-> https://other-site.com" to make an item a link (links to other sites open in a new tab). The language picker moves to this row while it is shown.',
+        },
+        default: null,
+        public: true,
+        max: 1,
+        order: 0,
+      },
+      {
+        key: 'site.topbar_end',
+        type: 'menu',
+        title: { id: 'Baris atas — kanan', en: 'Top bar — right' },
+        note: {
+          id: 'Teks atau tautan di ujung kanan baris atas, di kiri pemilih bahasa — kontak, bantuan. Satu item per baris; garis pemisah digambar otomatis. Awali label dengan [nama-ikon] untuk ikon: [wa] WhatsApp, [phone] atau [tel] telepon, [mail] email, [help], [info]. Contoh: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+          en: 'Text or links at the right end of the top bar, left of the language picker — contact, help. One item per line; separators are drawn for you. Start a label with [icon-name] for an icon: [wa] WhatsApp, [phone] or [tel] phone, [mail] e-mail, [help], [info]. Example: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+        },
+        default: null,
+        public: true,
+        max: 1,
+        order: 1,
+      },
+      {
+        key: 'site.topbar_visibility',
+        type: 'select',
+        title: { id: 'Tampilkan baris atas', en: 'Show the top bar' },
+        note: {
+          id: 'Selalu, atau hanya untuk pengguna yang sudah masuk. Pengunjung anonim tidak melihat baris ini bila dipilih "Hanya setelah masuk".',
+          en: 'Always, or only to signed-in users. Anonymous visitors do not see this row when "Only after sign-in" is chosen.',
+        },
+        default: 'always',
+        options: [
+          { value: 'always', label: { id: 'Selalu', en: 'Always' } },
+          { value: 'signed_in', label: { id: 'Hanya setelah masuk', en: 'Only after sign-in' } },
+        ],
+        public: true,
+        order: 2,
+        width: 'half',
+      },
+      {
+        key: 'site.menubar',
+        type: 'menu',
+        title: { id: 'Menu bar', en: 'Menu bar' },
+        note: {
+          id: 'Baris menu di bawah header, dengan submenu bertingkat: masukkan baris dengan 2 spasi untuk menjadikannya submenu item di atasnya. Tautan boleh path situs ini atau URL lengkap (https://…); item tanpa tautan hanya membuka submenunya. Tautan ke halaman modul yang dinonaktifkan disembunyikan otomatis.',
+          en: 'A menu row under the header, with nested submenus: indent a line by 2 spaces to make it a submenu of the item above. A link may be a path on this site or a full URL (https://…); an item without a link only opens its submenu. Links to pages of a disabled module are hidden automatically.',
+        },
+        default: null,
+        public: true,
+        max: 4,
+        order: 3,
+      },
+      {
+        key: 'site.menubar_visibility',
+        type: 'select',
+        title: { id: 'Tampilkan menu bar', en: 'Show the menu bar' },
+        note: {
+          id: 'Selalu, atau hanya untuk pengguna yang sudah masuk. Pengunjung anonim tidak melihat baris ini bila dipilih "Hanya setelah masuk".',
+          en: 'Always, or only to signed-in users. Anonymous visitors do not see this row when "Only after sign-in" is chosen.',
+        },
+        default: 'always',
+        options: [
+          { value: 'always', label: { id: 'Selalu', en: 'Always' } },
+          { value: 'signed_in', label: { id: 'Hanya setelah masuk', en: 'Only after sign-in' } },
+        ],
+        public: true,
+        order: 4,
+        width: 'half',
+      },
+    ],
+  },
+  {
     section: 'security',
     title: { id: 'Keamanan', en: 'Security' },
     order: 10,

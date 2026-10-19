@@ -18,6 +18,12 @@ describe('defineWidgets (extension point 11)', () => {
     expect(defineWidgets('Alpha', [{ ...base, slot: 'shell' }])[0]?.slot).toBe('shell');
   });
 
+  test('the public header slots are accepted', () => {
+    for (const slot of ['public-topbar', 'public-search', 'public-actions'] as const) {
+      expect(defineWidgets('Alpha', [{ ...base, slot }])[0]?.slot).toBe(slot);
+    }
+  });
+
   test('an unknown slot is refused at definition time', () => {
     expect(() =>
       defineWidgets('Alpha', [{ ...base, slot: 'sidebar' as unknown as 'shell' }]),
@@ -86,5 +92,30 @@ describe('defineCsrfExempt (extension point 17)', () => {
 
   test('the same method + path twice is refused', () => {
     expect(() => defineCsrfExempt('Alpha', [ok, ok])).toThrow(/duplikat/);
+  });
+});
+
+describe('defineConfig menu fields', () => {
+  const section = (max?: number) => [
+    {
+      section: 'alpha',
+      title: { id: 'A', en: 'A' },
+      fields: [
+        {
+          key: 'alpha.nav',
+          type: 'menu' as const,
+          title: { id: 'Nav', en: 'Nav' },
+          ...(max === undefined ? {} : { max }),
+        },
+      ],
+    },
+  ];
+
+  test('max is the nesting depth: unset, or a whole number from 1 to 6', () => {
+    expect(() => defineConfig('Alpha', section())).not.toThrow();
+    expect(() => defineConfig('Alpha', section(4))).not.toThrow();
+    for (const bad of [0, 7, 1.5]) {
+      expect(() => defineConfig('Alpha', section(bad))).toThrow(ModuleContractError);
+    }
   });
 });

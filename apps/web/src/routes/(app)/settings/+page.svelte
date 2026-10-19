@@ -11,6 +11,7 @@ import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData } from './$types';
+import MenuEditor from './MenuEditor.svelte';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
@@ -377,6 +378,9 @@ $effect(() => {
           <label class="flex items-center gap-2"><Checkbox name={f.key} value={o.value} checked={Array.isArray(f.value) && f.value.includes(o.value)} /> {L(o.label)}</label>
         {:else}<span class="text-muted-foreground">—</span>{/each}
       </div>
+    {:else if f.type === 'menu'}
+      <!-- A tree of links: posted as an outline, so the field also works without JavaScript. -->
+      <MenuEditor {id} name={f.key} value={f.value} maxDepth={f.max ?? 1} suggestions={data.publicRoutes.filter((r) => !r.includes('['))} />
     {:else if f.type === 'image'}
       <!-- An uploaded public image (og:image and the like): preview, a new file, or remove. -->
       <div class="flex flex-wrap items-start gap-4" data-testid={`image-field-${f.key}`}>

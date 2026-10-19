@@ -54,6 +54,7 @@ const href = (patch: Record<string, string | undefined> = {}) => {
     sort: f.sort === 'catalog' ? undefined : f.sort,
     order: f.sort === 'catalog' || f.order === 'desc' ? undefined : f.order,
     featured: f.featured ? '1' : undefined,
+    category: f.category || undefined,
     ...patch,
   };
   for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
@@ -68,7 +69,10 @@ const sortHref = (key: 'name' | 'price') =>
   });
 const sortIcon = (key: 'name' | 'price') =>
   f.sort !== key ? 'sort' : f.order === 'asc' ? 'chevron-up' : 'chevron-down';
-const filtered = $derived(Boolean(f.q || f.featured || f.sort !== 'catalog'));
+const filtered = $derived(Boolean(f.q || f.featured || f.category || f.sort !== 'catalog'));
+const categoryName = $derived(
+  data.categories.find((c: { slug: string }) => c.slug === f.category)?.name ?? '',
+);
 
 // ---- enhanced layer: the same controls, without the page reload ---------------------------
 const loading = $derived(navigating.to !== null);
@@ -149,6 +153,15 @@ function submitFilters(event: SubmitEvent) {
         class="h-10 rounded-xl border border-input bg-background px-3 text-sm font-normal text-foreground"
       />
     </label>
+    {#if data.categories.length}
+      <label class="grid gap-1 text-xs font-medium text-muted-foreground">
+        {t('example.catalog.category')}
+        <select name="category" onchange={() => applyFilters()} class="h-10 rounded-xl border border-input bg-background px-3 text-sm font-normal text-foreground">
+          <option value="">{t('example.catalog.category_all')}</option>
+          {#each data.categories as c (c.slug)}<option value={c.slug} selected={f.category === c.slug}>{c.name}</option>{/each}
+        </select>
+      </label>
+    {/if}
     <label class="flex h-10 items-center gap-2 rounded-xl border border-input px-3 text-sm text-foreground">
       <input type="checkbox" name="featured" value="1" checked={f.featured} onchange={() => applyFilters()} />
       {t('example.catalog.featured_only')}
@@ -168,7 +181,7 @@ function submitFilters(event: SubmitEvent) {
   <div class="flex flex-wrap items-center justify-between gap-3">
     <p class="text-sm text-muted-foreground" data-testid="catalog-count" aria-live="polite">
       {data.total}
-      {t('example.widget.products')}{#if f.q} · “{f.q}”{/if}
+      {t('example.widget.products')}{#if categoryName} · {categoryName}{/if}{#if f.q} · “{f.q}”{/if}
     </p>
     <div class="flex items-center gap-1 text-sm">
       <span class="text-muted-foreground">{t('example.catalog.sort')}</span>
@@ -186,8 +199,8 @@ function submitFilters(event: SubmitEvent) {
     <ul class="mt-6 grid gap-3" data-testid="catalog-items" class:opacity-60={loading}>
       {#each data.products as p (p.id)}
         <li>
-          <a href={`/product/${p.slug}`} class="group flex items-center gap-4 rounded-2xl border bg-card p-3 no-underline transition-colors hover:bg-accent/40 hover:no-underline sm:p-4">
-            <span class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br from-primary/20 via-accent to-secondary text-2xl font-semibold text-primary/60">
+          <a href={`/product/${p.slug}`} class="group flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-3 no-underline sm:gap-4 transition-colors hover:bg-accent/40 hover:no-underline sm:p-4">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-br sm:h-16 sm:w-16 from-primary/20 via-accent to-secondary text-2xl font-semibold text-primary/60">
               {#if p.imageUrl}<Img src={p.imageUrl} alt="" width={64} height={64} class="h-full w-full object-cover" />{:else}{initial(p.name)}{/if}
             </span>
             <span class="min-w-0 flex-1">
@@ -195,13 +208,13 @@ function submitFilters(event: SubmitEvent) {
                 <strong class="font-semibold text-foreground">{p.name}</strong>
                 {#if p.featured}<span class="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">{t('example.products.badge')}</span>{/if}
               </span>
-              {#if p.summary}<span class="mt-0.5 line-clamp-1 block text-sm text-muted-foreground">{p.summary}</span>{/if}
+              {#if p.summary}<span class="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{p.summary}</span>{/if}
             </span>
             <span class="shrink-0 text-end">
               <strong class="block text-foreground">{money(p.price, p.currency)}</strong>
               <span class="text-xs text-muted-foreground">{t('example.products.per')}</span>
             </span>
-            <Icon name="chevron-right" size={18} class="shrink-0 text-muted-foreground rtl:rotate-180" />
+            <Icon name="chevron-right" size={18} class="hidden shrink-0 text-muted-foreground rtl:rotate-180 sm:block" />
           </a>
         </li>
       {/each}

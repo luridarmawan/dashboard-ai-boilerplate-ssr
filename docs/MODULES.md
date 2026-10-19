@@ -289,6 +289,17 @@ Satu modul boleh menyumbang **lebih dari satu susunan** halaman publik atas data
 
 Route publik konkret otomatis masuk registry route, sehingga bisa dipilih sebagai `app.landing_route` di Pengaturan (§4.7) — selama modulnya aktif untuk lingkup yang sedang disunting; route modul yang dinonaktifkan (G-8) tidak ditawarkan dan ditolak saat disimpan. Tabel pemiliknya dihasilkan sync di `packages/module-kit/src/generated/public-routes.ts` (`@core/module-kit/public-routes`) dan `apps/web/src/generated/public-routes.ts`. `event.locals.config.values` (field `public`) dan `apiFor(event)` tersedia seperti halaman lain; tanpa sesi `apiFor` memanggil API secara anonim.
 
+**Tautan di header publik — `nav`.** Halaman publik konkret boleh minta tampil sebagai tautan di header setiap halaman publik, sebelum pemilih bahasa dan Login/Dashboard:
+
+```ts
+{ path: '/blog', dir: 'web/public/blog', sitemap: true,
+  nav: { label: { id: 'Blog', en: 'Blog' }, order: 100 } },
+```
+
+Label mengikuti bahasa pengunjung; urutan menurut `order` (baku 500), lalu path. Tautan hilang selama modulnya nonaktif untuk tenant (G-8), dan diberi `aria-current="page"` di halaman itu dan halaman di bawahnya (`/event` menyala di `/event/liga-2026`). Ditolak sync: `nav` pada path ber-`[param]`, pada `notFound`/`permalinks`, label tanpa `id`/`en`, atau `order` bukan bilangan bulat. Tema hanya menempatkan region `nav`; tema tidak menambah atau membuang tautan (BRIEF §5). Logika: `apps/web/src/lib/server/public-nav.ts` (+ tes).
+
+Menu bertingkat dan baris atas header **bukan** urusan modul: admin menyusunnya di **Pengaturan → Header situs** (`site.menubar`, `site.topbar`; PRD F-13). Modul cukup menyediakan halaman yang bisa ditautkan — tautan admin ke halaman modul yang nonaktif disembunyikan otomatis, dan tautan ber-query (`/catalog?q=arabika`) hanya menyala di alamat persis itu.
+
 #### URL konten di akar situs — registry permalink (F-12, PRD §4.7 aturan 7)
 
 Halaman, artikel, kategori, produk — konten yang dibuat admin dan butuh URL di akar domain (`/tentang-kami`, `/cara-menanam-cabai`, `/sepatu/sneaker-x`) — **didaftarkan** di registry permalink core, bukan ditangkap lewat penangkap 404. Tidak ada setelan yang perlu dipilih, dan setiap modul bisa melakukannya bersamaan. Registry menjamin path unik lintas modul, menyimpan riwayat 301, dan menjawab setiap URL asing dengan satu lookup terindeks.
@@ -474,7 +485,7 @@ export default defineConfig('Billing', [
 ]);
 ```
 
-Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list · image`. `image` digambar sebagai unggah gambar dengan pratinjau dan pilihan hapus; nilainya id berkas publik (JPEG/PNG/WebP/GIF, diunggah lewat layanan berkas core, ukuran pikselnya tercatat di `meta`). Saat disimpan, API menolak id yang bukan berkas publik raster milik lingkupnya. Halaman publik membaca URL + ukurannya dari `GET /v1/configuration/image/<key>`, dan isinya disajikan ke siapa pun, termasuk crawler tanpa tenant, di `/v1/configuration/image-file/<id>` selama sebuah setelan `image` merujuknya. Contoh core: `app.share_image` (og:image default). `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di penutup blok field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
+Tipe: `string · text · number · boolean · select · secret · markdown · route · public_route · theme · locale · timezone · list · image · menu`. `menu` adalah pohon tautan — `max` di sini berarti **kedalaman** submenu (baku 1 = daftar datar, 1–6) — yang digambar sebagai editor baris (label Indonesia/English, tautan, naik/turun, jadikan submenu) di atas textarea outline (`Kategori | Categories -> /kategori`, 2 spasi per tingkat). Label yang diawali `[nama-ikon]` (`[wa] +62-812-…`) digambar dengan ikon semantik itu oleh shell publik; nama yang tidak terdaftar tetap jadi bagian label. Textarea itulah yang dikirim, jadi field tetap jalan tanpa JavaScript; nilai di `event.locals.config.values` berupa `SiteMenuItem[]` dari `@core/module-kit/site-menu` (impor dari subpath itu, bukan dari akar paket, bila dipakai di komponen). `image` digambar sebagai unggah gambar dengan pratinjau dan pilihan hapus; nilainya id berkas publik (JPEG/PNG/WebP/GIF, diunggah lewat layanan berkas core, ukuran pikselnya tercatat di `meta`). Saat disimpan, API menolak id yang bukan berkas publik raster milik lingkupnya. Halaman publik membaca URL + ukurannya dari `GET /v1/configuration/image/<key>`, dan isinya disajikan ke siapa pun, termasuk crawler tanpa tenant, di `/v1/configuration/image-file/<id>` selama sebuah setelan `image` merujuknya. Contoh core: `app.share_image` (og:image default). `route` divalidasi terhadap registry route saat disimpan, `public_route` terhadap bagiannya yang bisa dibuka tanpa masuk (dipakai `app.landing_route`, §4.7); `theme` terhadap registry tema; `timezone` terhadap daftar zona yang dikenal `Intl` — dan halaman Pengaturan menggambar **jam** di penutup blok field itu, menunjukkan tanggal/jam yang berlaku di zona yang sedang diketik (dirender server lebih dulu, berdetik sendiri bila ada JavaScript); `secret` tidak pernah dikirim ke klien dalam bentuk asli (E-4) dan disamarkan di audit log. Membaca nilai di API: `settings.get(clientId, 'billing.tax_rate')` dari `apps/api/src/services.ts`; di web: `event.locals.config.values` hanya memuat field `public`.
 
 **Pengelompokan & lebar field (`groups`, `group`, `width`).** Section yang panjang boleh dipecah menjadi blok berjudul tanpa halaman Pengaturan core tahu modul apa pun:
 
@@ -550,6 +561,8 @@ export default defineWidgets('Billing', [
 Aturan: `component` wajib berkas `.svelte` di dalam `web/` modul (sync menolak yang tidak ada), `id` diawali namespace, `permission` hanya izin modul sendiri atau izin core.
 
 **Widget shell (`slot: 'shell'`, H-13):** bukan kartu di dasbor, melainkan dirender **sekali di setiap halaman dasbor** setelah layout — untuk tombol mengambang, pemberitahuan global, dan sejenisnya. Filter izin dan modul aktif sama persis dengan widget dasbor (dilakukan di server, komponennya tidak diunduh bila tidak boleh). Prop `context`-nya lebih kaya: `{ locale, clientId, permissions, csrf, path, breadcrumb: string[], appName }`. Widget shell wajib merender kosong di halaman yang bukan urusannya. Contoh hidup: `modules/AI/widgets.ts` → `ai.floating_chat` (`web/widgets/FloatingChat.svelte`) menyembunyikan diri di `/m/ai/chat`. **Widget yang mengambang di pojok kanan bawah** menandai elemen terluarnya `data-shell-dock="bottom-end"`, dan menambah `data-shell-dock-open` selama panelnya terbuka: dengan itu tombol *kembali ke atas* milik shell (F-10) menumpuk di atasnya, lalu menyingkir sepenuhnya saat panelnya terbuka — tanpa salah satu pihak perlu tahu yang lain ada.
+
+**Widget header publik (`slot: 'public-topbar' | 'public-search' | 'public-actions'`, PRD F-13):** dirender di header **setiap halaman publik**, termasuk untuk pengunjung tanpa sesi. `public-topbar` masuk ke baris tipis di atas header, `public-search` menjadi kotak pencarian di baris utama (core tidak menggambar kotak pencarian sendiri — tanpa widget di slot ini, tidak ada kotak), dan `public-actions` menjadi ikon di ujung baris utama yang tetap terlihat saat navigasi terlipat di ponsel. Filter modul aktif dan izin dilakukan di server seperti widget shell (`permission` menyembunyikan widget dari pengunjung anonim juga); `data` diambil di server dengan batas waktu 1,5 detik. Prop `context`: `{ locale, path, csrf, loggedIn, appName }` — tidak pernah sesinya sendiri. **Cookie milik modul tidak ikut diteruskan ke API** (web hanya meneruskan cookie core), jadi state di cookie modul dibaca di halaman web atau di browser, bukan lewat `data`. Contoh hidup di `modules/Example/widgets.ts`: `example.header_search` (form GET ke `/catalog` berisi pilihan kategori dari `data: '/v1/m/example/categories'`, kotak kata kunci, dan tombol **Cari**; placeholder-nya menyebut bahwa kotak ini dari modul Example) dan `example.header_cart` (ikon ke `/cart`, jumlah dibaca dari cookie `example_cart` di browser — baca `modules/Example/cart.ts`). Menonaktifkan Example menghapus keduanya dari semua halaman publik.
 
 **Widget berdata:** tambahkan `data: '/v1/m/billing/summary'` (path API di bawah `/v1/`, boleh dengan query string). Dasbor mengambilnya **di server** sebagai pengguna yang sedang login sebelum merender, lalu menyerahkan `data` dari envelope-nya sebagai prop `data` komponen (`null` bila API menolak atau gagal). Widget tidak pernah mengambil data sendiri, dan tidak bisa melihat lebih dari yang boleh dilihat penggunanya — RBAC dan tenancy tetap milik API. Contoh hidup: `modules/AI/widgets.ts` → `ai.usage` memakai `/v1/m/ai/analytics?days=30` dan `web/widgets/Usage.svelte` menerima `{ context, data }`.
 
@@ -709,6 +722,37 @@ const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL 
 ```
 
 Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
+
+### Ekspor daftar ke Excel/CSV dari modul
+
+Daftar yang perlu dibawa ke spreadsheet (peserta, transaksi, laporan) diekspor lewat paket `@core/export`: kolom ditulis sekali, hasilnya XLSX atau CSV. Paketnya murni (tanpa I/O, tanpa dependensi pihak ketiga), jadi bisa dipakai dari route API, `+server.ts` SvelteKit, job, maupun CLI. Tambahkan `"@core/export": "workspace:*"` di `package.json` modul.
+
+```ts
+// modules/Billing/web/routes/invoices/export/+server.ts
+import { type Column, exportFormat, exportResponse, fileSlug } from '@core/export';
+
+export const GET: RequestHandler = async (event) => {
+  const res = await apiFor(event).v1.m.billing.invoices.get();   // API modul tetap yang memutuskan izin
+  if (!res.data?.success) error(res.status, '…');
+  const columns: Column<Invoice>[] = [
+    { header: 'Nomor', value: (r) => r.number },                  // `text` (baku): tetap teks
+    { header: 'NPWP', value: (r) => r.taxId },                    // 15–16 digit tidak jadi 3,17E+15
+    { header: 'Tanggal', value: (r) => r.issuedOn, type: 'date' },
+    { header: 'Dibayar', value: (r) => r.paidAt, type: 'datetime' },
+    { header: 'Total', value: (r) => r.total, type: 'number' },
+    { header: 'Lunas', value: (r) => r.paid, type: 'boolean' },
+  ];
+  return exportResponse(
+    { name: 'Invoice', heading: ['Invoice Oktober 2026'], columns, rows: res.data.data, timeZone: 'Asia/Jakarta' },
+    exportFormat(event.url.searchParams.get('format'), 'xlsx'),   // ?format=xlsx|csv
+    fileSlug('Invoice Oktober 2026'),
+  );
+};
+```
+
+Di halaman, tombolnya `<ExportMenu href="/m/billing/invoices/export" />` dari `@core/ui` (titik perluasan 10; di core: `$lib/components/table`): `<details>` biasa (jalan tanpa JavaScript), satu tautan per format dengan `download`, label dari katalog core (`common.export`, `common.export_xlsx`, `common.export_csv`). Query yang sudah ada di `href` (filter) dipertahankan, `format` ditambahkan.
+
+Yang dijaga paketnya: XLSX satu sheet dengan header tebal, dibekukan, dan bisa difilter, lebar kolom diperkirakan dari isi, kolom `text` diberi format teks, tanggal dan waktu jadi tanggal Excel sungguhan (`datetime` ditampilkan di `timeZone`, baku UTC), dan baris `heading` di atas tabel. CSV mengikuti RFC 4180 dengan BOM UTF-8, dan teks yang bisa dijalankan spreadsheet sebagai rumus (`=…`, `@…`, `+cmd`) diberi awalan `'` (nomor telepon `+62 …` dibiarkan). Respons memakai `Content-Disposition: attachment` (dengan `filename*` UTF-8) dan `Cache-Control: no-store`, karena ekspor biasanya memuat data pribadi. Contoh hidup: `/m/example/products` → `modules/Example/web/routes/products/export/+server.ts`. Bukti: `packages/export/test/export.test.ts`.
 
 ### Metrik dari modul (M-6)
 

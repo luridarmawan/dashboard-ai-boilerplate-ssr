@@ -140,7 +140,7 @@ export class SettingsStore {
             max: f.max ?? null,
             group: f.group ?? null,
             width: (f.width ??
-              (f.type === 'text' || f.type === 'markdown' || f.type === 'list'
+              (f.type === 'text' || f.type === 'markdown' || f.type === 'list' || f.type === 'menu'
                 ? 'full'
                 : 'half')) as ConfigFieldWidth,
             source: e?.source ?? 'default',
