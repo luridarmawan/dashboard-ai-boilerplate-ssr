@@ -32,6 +32,9 @@ export const load: LayoutServerLoad = async (event) => {
     owner: moduleOwning,
     enabled: config.enabledModules,
   };
+  // A row an admin limited to signed-in users is simply empty for everyone else, so the layout
+  // does not draw it at all.
+  const shown = (key: string) => config.values[key] !== 'signed_in' || !!session;
   // Header widgets: what enabled modules put in the public header (search box, cart). Filtered
   // here like the dashboard's shell widgets, so a widget of a disabled module — or one behind a
   // permission the visitor lacks — never reaches the HTML. A slow `data` call must not hold the
@@ -63,8 +66,12 @@ export const load: LayoutServerLoad = async (event) => {
     /** Header links that module public pages asked for (`nav` in public.ts). */
     navLinks: publicNavLinks(modulePublicRoutes, config.enabledModules, locale.locale, path),
     /** Rows an admin assembled in Settings → Site header; empty = the row is not drawn. */
-    topbar: resolveSiteMenu(storedSiteMenu(config.values['site.topbar']), menuOpts),
-    menubar: resolveSiteMenu(storedSiteMenu(config.values['site.menubar']), menuOpts),
+    topbar: shown('site.topbar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.topbar']), menuOpts)
+      : [],
+    menubar: shown('site.menubar_visibility')
+      ? resolveSiteMenu(storedSiteMenu(config.values['site.menubar']), menuOpts)
+      : [],
     headerWidgets,
   };
 };
