@@ -409,7 +409,7 @@
   "settings.menu_as_text": "Edit as text",
   "settings.menu_down": "Move down",
   "settings.menu_empty": "No items yet — this row is not shown.",
-  "settings.menu_href": "Link, e.g. /catalog (empty = no link)",
+  "settings.menu_href": "Link: /catalog or https://other-site.com (empty = no link)",
   "settings.menu_indent": "Make it a submenu of the item above",
   "settings.menu_label_en": "English label (optional)",
   "settings.menu_label_id": "Indonesian label",

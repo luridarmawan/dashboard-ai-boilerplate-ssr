@@ -36,11 +36,18 @@ export const SITE_MENU_HREF_MAX = 512;
 export const SITE_MENU_DEPTH_MAX = 6;
 
 const HREF_RE = /^(?:\/(?!\/)[^\s]*|https?:\/\/[^\s]+|mailto:[^\s]+|tel:[+0-9() -]+)$/;
+/** A host name typed without a scheme (`supplier.carik.id`, `toko.example.com/promo`). */
+const BARE_HOST_RE = /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?::\d{1,5})?(?:[/?#]\S*)?$/i;
+
+/** Admins type domains without `https://`; that is what they mean, so it is stored that way. */
+function normalizeHref(href: string): string {
+  return BARE_HOST_RE.test(href) ? `https://${href}` : href;
+}
 
 function checkHref(href: string): string | null {
   if (href.length > SITE_MENU_HREF_MAX) return `tautan maksimal ${SITE_MENU_HREF_MAX} karakter`;
   if (!HREF_RE.test(href))
-    return `tautan "${href}" harus path yang diawali /, URL http(s), mailto:, atau tel:`;
+    return `tautan "${href}" harus path yang diawali /, URL lengkap (https://…), mailto:, atau tel:`;
   return null;
 }
 
@@ -80,7 +87,9 @@ function fromJson(raw: unknown, maxDepth: number): SiteMenuParse {
       const en = String((typeof l === 'string' ? l : (l?.en ?? l?.id)) ?? '').trim() || id;
       const labelErr = checkLabel(id) ?? checkLabel(en);
       if (labelErr) return labelErr;
-      const href = n.href === null || n.href === undefined ? '' : String(n.href).trim();
+      const href = normalizeHref(
+        n.href === null || n.href === undefined ? '' : String(n.href).trim(),
+      );
       if (href) {
         const err = checkHref(href);
         if (err) return err;
@@ -126,7 +135,7 @@ function fromOutline(text: string, maxDepth: number): SiteMenuParse {
     const body = line.trim();
     const arrow = body.lastIndexOf('->');
     const labelPart = (arrow === -1 ? body : body.slice(0, arrow)).trim();
-    const href = arrow === -1 ? '' : body.slice(arrow + 2).trim();
+    const href = normalizeHref(arrow === -1 ? '' : body.slice(arrow + 2).trim());
     const bar = labelPart.indexOf('|');
     const id = (bar === -1 ? labelPart : labelPart.slice(0, bar)).trim();
     const en = (bar === -1 ? '' : labelPart.slice(bar + 1)).trim() || id;

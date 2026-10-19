@@ -55,6 +55,27 @@ describe('menu setting values', () => {
     expect(parseSiteMenu(' | -> /x', 4)).toMatchObject({ ok: false });
   });
 
+  test('full URLs are kept, and a bare domain gets https://', () => {
+    const r = parseSiteMenu(
+      'Supplier -> https://supplier.carik.id\nToko -> toko.example.com/promo?x=1\nKatalog -> catalog',
+      1,
+    );
+    expect(r).toEqual({ ok: false, message: expect.stringContaining('baris 3') });
+    const ok = parseSiteMenu(
+      'Supplier -> https://supplier.carik.id\nToko -> toko.example.com/promo?x=1',
+      1,
+    );
+    if (!ok.ok) throw new Error(ok.message);
+    expect(ok.items.map((i) => i.href)).toEqual([
+      'https://supplier.carik.id',
+      'https://toko.example.com/promo?x=1',
+    ]);
+    expect(parseSiteMenu([{ label: 'S', href: 'supplier.carik.id' }], 1)).toMatchObject({
+      ok: true,
+      items: [{ href: 'https://supplier.carik.id' }],
+    });
+  });
+
   test('plain-text items (top bar notices) and blank lines are fine', () => {
     expect(
       parseSiteMenu('Gratis ongkir | Free shipping\n\nBantuan -> mailto:cs@example.com', 1),

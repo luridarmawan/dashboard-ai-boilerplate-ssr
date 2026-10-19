@@ -409,7 +409,7 @@
   "settings.menu_as_text": "Ubah sebagai teks",
   "settings.menu_down": "Turunkan",
   "settings.menu_empty": "Belum ada item — baris ini tidak ditampilkan.",
-  "settings.menu_href": "Tautan, mis. /catalog (kosong = tanpa tautan)",
+  "settings.menu_href": "Tautan: /catalog atau https://situs-lain.com (kosong = tanpa tautan)",
   "settings.menu_indent": "Jadikan submenu item di atasnya",
   "settings.menu_label_en": "Label English (opsional)",
   "settings.menu_label_id": "Label Indonesia",

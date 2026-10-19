@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { definePublicRoutes } from '@core/module-kit';
 import type { SiteMenuItem } from '@core/module-kit/site-menu';
-import { publicNavLinks, resolveSiteMenu } from './public-nav.ts';
+import { publicNavLinks, resolveSiteMenu, splitIcon } from './public-nav.ts';
 
 const label = (id: string, en: string) => ({ id, en });
 const routes = [
@@ -118,5 +118,19 @@ describe('menu links with a query', () => {
     expect(at('')).toEqual([true, false]);
     expect(at('?q=arabika')).toEqual([true, true]);
     expect(at('?q=robusta')).toEqual([true, false]);
+  });
+});
+
+describe('icon prefix in menu labels', () => {
+  test('[name] or an alias becomes the icon; anything else stays in the label', () => {
+    expect(splitIcon('[wa] +62-812-3456-7890')).toEqual({
+      icon: 'whatsapp',
+      label: '+62-812-3456-7890',
+    });
+    expect(splitIcon('[phone] 021-555')).toEqual({ icon: 'phone', label: '021-555' });
+    expect(splitIcon('[help] Bantuan')).toEqual({ icon: 'help', label: 'Bantuan' });
+    expect(splitIcon('[promo] 10%')).toEqual({ icon: null, label: '[promo] 10%' });
+    expect(splitIcon('[wa]')).toEqual({ icon: null, label: '[wa]' });
+    expect(splitIcon('Help')).toEqual({ icon: null, label: 'Help' });
   });
 });
