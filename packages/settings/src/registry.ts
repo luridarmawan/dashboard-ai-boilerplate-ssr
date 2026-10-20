@@ -296,8 +296,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'menu',
         title: { id: 'Baris atas — kanan', en: 'Top bar — right' },
         note: {
-          id: 'Teks atau tautan di ujung kanan baris atas, di kiri pemilih bahasa — kontak, bantuan. Satu item per baris; garis pemisah digambar otomatis. Awali label dengan [nama-ikon] untuk ikon: [wa] WhatsApp, [phone] atau [tel] telepon, [mail] email, [help], [info]. Contoh: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
-          en: 'Text or links at the right end of the top bar, left of the language picker — contact, help. One item per line; separators are drawn for you. Start a label with [icon-name] for an icon: [wa] WhatsApp, [phone] or [tel] phone, [mail] e-mail, [help], [info]. Example: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+          id: 'Teks atau tautan di ujung kanan baris atas, di kiri pemilih bahasa — kontak, bantuan. Satu item per baris; garis pemisah digambar otomatis. Awali label dengan [nama-ikon] untuk ikon: [wa] WhatsApp, [phone] atau [tel] telepon, [mail] atau [email] email, [help] atau [?] bantuan, [info] atau [i] info, [warning] atau [!] peringatan — atau nama ikon lain, mis. [clock], [home], [cart]. Contoh: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
+          en: 'Text or links at the right end of the top bar, left of the language picker — contact, help. One item per line; separators are drawn for you. Start a label with [icon-name] for an icon: [wa] WhatsApp, [phone] or [tel] phone, [mail] or [email] e-mail, [help] or [?] help, [info] or [i] info, [warning] or [!] warning — or any other icon name, e.g. [clock], [home], [cart]. Example: "[wa] +62-812-3456-7890 -> https://wa.me/6281234567890".',
         },
         default: null,
         public: true,
