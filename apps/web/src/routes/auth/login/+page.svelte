@@ -2,6 +2,8 @@
 import type { MessageKey } from '@core/i18n';
 import { tick, untrack } from 'svelte';
 import { goto } from '$app/navigation';
+import { page } from '$app/state';
+import { flagAnalyticsEventInBrowser } from '$lib/analytics/core';
 import Csrf from '$lib/components/Csrf.svelte';
 import { PasswordInput } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -104,6 +106,7 @@ async function post(path: string, body: unknown): Promise<Envelope | null> {
 
 /** The cookie is already on the browser; `invalidateAll` makes every load re-read it. */
 async function enter() {
+  if (page.data.analytics?.trackDashboard) flagAnalyticsEventInBrowser('login');
   try {
     await goto(data.next, { invalidateAll: true });
   } catch {

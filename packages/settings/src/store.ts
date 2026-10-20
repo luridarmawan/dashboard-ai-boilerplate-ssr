@@ -138,6 +138,8 @@ export class SettingsStore {
             public: !!f.public,
             min: f.min ?? null,
             max: f.max ?? null,
+            pattern: f.pattern ?? null,
+            link: f.link ?? null,
             group: f.group ?? null,
             width: (f.width ??
               (f.type === 'text' || f.type === 'markdown' || f.type === 'list' || f.type === 'menu'

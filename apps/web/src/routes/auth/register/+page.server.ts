@@ -1,4 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
+import { flagAnalyticsEvent } from '$lib/server/analytics';
 import { cfgBool, isSignupEnabled } from '$lib/server/config';
 import {
   actionFailure,
@@ -48,6 +49,7 @@ export const actions: Actions = {
     const r = unwrap(res);
     if (!r.ok) return actionFailure(r.failure, values);
     forwardSetCookies(event, res.response);
+    flagAnalyticsEvent(event, 'sign_up');
     redirect(303, '/dashboard');
   },
 };

@@ -20,6 +20,14 @@ describe('configuration values are typed, not free strings (E-3)', () => {
     expect(validateValue(f({ type: 'route' }), 'dashboard', { routes }).ok).toBe(false);
     expect(validateValue(f({ type: 'route' }), '/auth/login', { routes }).ok).toBe(true); // §4.7 rule 4
   });
+  test('a string with a pattern must match it whole', () => {
+    const ga = f({ pattern: 'G-[A-Z0-9]{4,20}' });
+    expect(validateValue(ga, 'G-ABC123XYZ')).toEqual({ ok: true, stored: 'G-ABC123XYZ' });
+    expect(validateValue(ga, 'UA-12345-1').ok).toBe(false);
+    expect(validateValue(ga, 'xG-ABC123').ok).toBe(false);
+    expect(validateValue(ga, 'G-ABC123 ').ok).toBe(false);
+    expect(validateValue(ga, '')).toEqual({ ok: true, stored: null });
+  });
   test('image stores a file id, nothing else', () => {
     const id = '01a14839-be52-7132-aa3d-08be144878e1';
     expect(validateValue(f({ type: 'image' }), id)).toEqual({ ok: true, stored: id });

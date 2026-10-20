@@ -33,6 +33,8 @@ describe('forgetBrowser (A-5)', () => {
       'crk_lang',
       'crk_dir',
       'crk_sidebar',
+      'crk_consent',
+      'crk_analytics_event',
     ])
       expect(names).toContain(must);
     // The OAuth cookie lives under its own path; deleting it at `/` would leave it behind.

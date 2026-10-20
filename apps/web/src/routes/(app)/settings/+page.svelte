@@ -402,7 +402,11 @@ $effect(() => {
     {:else if f.type === 'number'}
       <Input {id} type="number" name={f.key} value={strVal} min={f.min ?? undefined} max={f.max ?? undefined} step="any" />
     {:else}
-      <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} />
+      <Input {id} name={f.key} value={strVal} maxlength={f.max ?? undefined} pattern={f.pattern ?? undefined} />
+    {/if}
+    {#if f.link}
+      {@const external = f.link.href.startsWith('https://')}
+      <a href={f.link.href} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined} class="inline-flex w-fit items-center gap-1 text-sm text-primary underline-offset-2 hover:underline" data-testid="field-link">{L(f.link.label)}{#if external}<Icon name="external-link" size={14} />{/if}</a>
     {/if}
   </Field>
 {/snippet}
