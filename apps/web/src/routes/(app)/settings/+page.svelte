@@ -222,16 +222,17 @@ async function runAction(section: string, key: string, inputKey?: string | null)
 
 /**
  * Tab ordering specification:
- * 1. Application (section 'app')
+ * 1. Application and site header (sections 'app', 'site')
  * 2. Modules (non-core sections: e.g. AI, Dummy module, Example landing, etc.)
  * 3. Security (section 'security')
  * 4. Logs & retention (section 'logs')
  * 5. Uploaded files (section 'files')
  * 6. Email (section 'mail')
- * 7. Any other fallback section
+ * 7. Every other core section (analytics, MQTT, …), by its registry `order`
  */
-const CORE_ORDER: Record<string, number> = {
+const CORE_GROUP: Record<string, number> = {
   app: 1,
+  site: 1,
   security: 3,
   logs: 4,
   files: 5,
@@ -239,15 +240,8 @@ const CORE_ORDER: Record<string, number> = {
 };
 
 function getSectionSortOrder(s: { section: string; module: string; order?: number }) {
-  if (s.section === 'app') return { group: 1, order: s.order ?? 0 };
-  if (s.section === 'security') return { group: 3, order: s.order ?? 0 };
-  if (s.section === 'logs') return { group: 4, order: s.order ?? 0 };
-  if (s.section === 'files') return { group: 5, order: s.order ?? 0 };
-  if (s.section === 'mail') return { group: 6, order: s.order ?? 0 };
-  if (s.module !== 'core' || !CORE_ORDER[s.section]) {
-    return { group: 2, order: s.order ?? 100 };
-  }
-  return { group: 7, order: s.order ?? 999 };
+  if (s.module !== 'core') return { group: 2, order: s.order ?? 100 };
+  return { group: CORE_GROUP[s.section] ?? 7, order: s.order ?? 999 };
 }
 
 const sortedSections = $derived(
@@ -380,7 +374,12 @@ $effect(() => {
       </div>
     {:else if f.type === 'menu'}
       <!-- A tree of links: posted as an outline, so the field also works without JavaScript. -->
-      <MenuEditor {id} name={f.key} value={f.value} maxDepth={f.max ?? 1} suggestions={data.publicRoutes.filter((r) => !r.includes('['))} />
+      <!-- The editor seeds its own state from `value` once; switching scope (a client-side
+           navigation that reuses this component) or a reload of the stored value must start it
+           afresh, or it keeps showing — and would save — the other scope's menu. -->
+      {#key `${data.scope}:${JSON.stringify(f.value)}`}
+        <MenuEditor {id} name={f.key} value={f.value} maxDepth={f.max ?? 1} suggestions={data.publicRoutes.filter((r) => !r.includes('['))} />
+      {/key}
     {:else if f.type === 'image'}
       <!-- An uploaded public image (og:image and the like): preview, a new file, or remove. -->
       <div class="flex flex-wrap items-start gap-4" data-testid={`image-field-${f.key}`}>
