@@ -129,6 +129,10 @@ describe('icon prefix in menu labels', () => {
     });
     expect(splitIcon('[phone] 021-555')).toEqual({ icon: 'phone', label: '021-555' });
     expect(splitIcon('[help] Bantuan')).toEqual({ icon: 'help', label: 'Bantuan' });
+    expect(splitIcon('[i] Bantuan')).toEqual({ icon: 'info', label: 'Bantuan' });
+    expect(splitIcon('[?] Support')).toEqual({ icon: 'help', label: 'Support' });
+    expect(splitIcon('[!] Promo')).toEqual({ icon: 'warning', label: 'Promo' });
+    expect(splitIcon('[??] Huh')).toEqual({ icon: null, label: '[??] Huh' });
     expect(splitIcon('[promo] 10%')).toEqual({ icon: null, label: '[promo] 10%' });
     expect(splitIcon('[wa]')).toEqual({ icon: null, label: '[wa]' });
     expect(splitIcon('Help')).toEqual({ icon: null, label: 'Help' });

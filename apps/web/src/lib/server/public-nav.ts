@@ -58,6 +58,9 @@ const ICON_ALIASES: Readonly<Record<string, string>> = {
   wa: 'whatsapp',
   tel: 'phone',
   email: 'mail',
+  i: 'info',
+  '?': 'help',
+  '!': 'warning',
 };
 
 /**
@@ -65,7 +68,7 @@ const ICON_ALIASES: Readonly<Record<string, string>> = {
  * aliases) count; any other bracketed text stays part of the label, so nothing typed is lost.
  */
 export function splitIcon(label: string): { icon: string | null; label: string } {
-  const m = /^\[([a-z0-9-]+)\]\s*(.*)$/.exec(label);
+  const m = /^\[([a-z0-9-]+|[?!])\]\s*(.*)$/.exec(label);
   const name = m ? (ICON_ALIASES[m[1] as string] ?? (m[1] as string)) : null;
   if (!m || !name || !CORE_ICONS.includes(name) || !m[2]) return { icon: null, label };
   return { icon: name, label: m[2] };
