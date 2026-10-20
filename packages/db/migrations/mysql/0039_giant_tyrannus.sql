@@ -1,0 +1,1 @@
+ALTER TABLE `api_tokens` ADD `kind` varchar(16) CHARACTER SET ascii COLLATE ascii_bin DEFAULT 'api' NOT NULL;

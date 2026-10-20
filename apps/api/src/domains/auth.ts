@@ -26,7 +26,16 @@ import {
   writeAudit,
 } from '@core/auth';
 import { env } from '@core/config';
-import { Email, errorResponses, fail, MfaLoginBody, OkSchema, ok, Password } from '@core/contracts';
+import {
+  Email,
+  errorResponses,
+  type Fail,
+  fail,
+  MfaLoginBody,
+  OkSchema,
+  ok,
+  Password,
+} from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
@@ -217,6 +226,199 @@ export async function startMfaChallenge(p: {
   return { mfaRequired: true as const, challenge: token };
 }
 
+type Db = ReturnType<typeof unsafeAcrossTenants>;
+type UserRecord = typeof schema.users.$inferSelect;
+type ResponseSet = {
+  status?: number | string;
+  headers: Record<string, string | number | undefined>;
+};
+
+/**
+ * The password step of every sign-in, whatever it ends in — a session cookie (`/auth/login`) or
+ * an app token (`/auth/token`): rate limit (A-2), credentials, maintenance (E-10). Answers the
+ * user, or the error envelope the route returns as is (`set.status` already set).
+ */
+export async function passwordFirstFactor(p: {
+  db: Db;
+  email: string;
+  password: string;
+  ip: string;
+  requestId: string;
+  set: ResponseSet;
+}): Promise<{ user: UserRecord } | { refused: Fail }> {
+  const { db, ip, requestId, set } = p;
+  const email = p.email.trim().toLowerCase();
+  const rule = parseRateLimitRule(
+    (await settings.get<string | null>(null, 'security.login_rate_limit')) ??
+      env().LOGIN_RATE_LIMIT,
+  );
+
+  // Stricter than the general limit (A-2): per IP and per account, whichever trips first.
+  // Only FAILED attempts spend from the budget — the door is checked before the password,
+  // but the counters move in the wrong-password branch below. Someone signing in and out of
+  // several accounts from one address (a tester, a shared office machine) never locks the
+  // address; ten wrong guesses in a window still do.
+  const ipKey = `login:ip:${ip}`;
+  const emailKey = `login:email:${email}`;
+  const tightestOf = (a: RateLimitResult, b: RateLimitResult) =>
+    a.remaining <= b.remaining ? a : b;
+  const seen = tightestOf(
+    await peekRateLimit(db, ipKey, rule),
+    await peekRateLimit(db, emailKey, rule),
+  );
+  Object.assign(set.headers, rateLimitHeaders(seen));
+  if (!seen.allowed) {
+    set.status = 429;
+    return {
+      refused: fail('rate_limited', 'Terlalu banyak percobaan masuk — coba lagi nanti', requestId),
+    };
+  }
+
+  const [user] = await db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.email, email), isNull(schema.users.deleted_at)))
+    .limit(1);
+  const valid =
+    user?.status_id === STATUS.ACTIVE &&
+    (await verifyPassword(p.password, user?.password_hash ?? null));
+  if (!user || !valid) {
+    // The failed guess is what costs: spend one from both counters and report what is left.
+    const spent = tightestOf(
+      await consumeRateLimit(db, ipKey, rule),
+      await consumeRateLimit(db, emailKey, rule),
+    );
+    Object.assign(set.headers, rateLimitHeaders({ ...spent, allowed: true }));
+    await writeAudit(db, {
+      clientId: null,
+      actorId: user?.id ?? null,
+      action: 'auth.login_failed',
+      resource: 'user',
+      resourceId: user?.id ?? email,
+      ip,
+      requestId,
+    });
+    set.status = 401;
+    return { refused: fail('invalid_credentials', 'Email atau kata sandi salah', requestId) };
+  }
+
+  // E-10: a closed door is announced before the second factor is asked for.
+  const refused = await refuseLoginDuringMaintenance({
+    db,
+    user,
+    clientId: await defaultTenantOf(db, user.id),
+    ip,
+    requestId,
+    set,
+  });
+  if (refused) return { refused };
+  return { user };
+}
+
+/**
+ * The second step of a 2FA sign-in (A-11), shared by the cookie and the token flow: the
+ * challenge from the first step plus a TOTP or recovery code. Answers the user and how they
+ * proved it, or the error envelope to return.
+ */
+export async function mfaSecondFactor(p: {
+  db: Db;
+  challenge: string;
+  code: string;
+  ip: string;
+  requestId: string;
+  set: ResponseSet;
+}): Promise<{ user: UserRecord; method: 'totp' | 'recovery' } | { refused: Fail }> {
+  const { db, ip, requestId, set } = p;
+  const now = new Date();
+  const [ch] = await db
+    .select()
+    .from(schema.mfaChallenges)
+    .where(eq(schema.mfaChallenges.token_hash, hashToken(p.challenge)))
+    .limit(1);
+  /**
+   * `details.reason` separates a wrong code — the challenge survives, attempts are counted
+   * here — from a challenge that is gone, which sends the user back to the password step.
+   * Callers must not have to read the message to tell them apart: the web maps the reason to
+   * its own translated wording (K-4), on both the form-action and the fetch path.
+   */
+  const refuse = (
+    message: string,
+    reason: 'bad_code' | 'challenge_invalid' | 'too_many_attempts',
+    code: 'invalid_credentials' | 'rate_limited' = 'invalid_credentials',
+  ) => {
+    set.status = code === 'rate_limited' ? 429 : 401;
+    return { refused: fail(code, message, requestId, { reason }) };
+  };
+  if (!ch || ch.expires_at.getTime() < now.getTime()) {
+    if (ch) await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+    return refuse('Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi', 'challenge_invalid');
+  }
+  if (ch.attempts >= MFA_MAX_ATTEMPTS) {
+    await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+    return refuse('Terlalu banyak kode salah — masuk lagi', 'too_many_attempts', 'rate_limited');
+  }
+  const [user] = await db
+    .select()
+    .from(schema.users)
+    .where(and(eq(schema.users.id, ch.user_id), isNull(schema.users.deleted_at)))
+    .limit(1);
+  const [mfa] = await db
+    .select()
+    .from(schema.userMfa)
+    .where(eq(schema.userMfa.user_id, ch.user_id))
+    .limit(1);
+  if (!user || user.status_id !== STATUS.ACTIVE || !mfa?.enabled_at) {
+    await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+    return refuse('Tantangan 2FA tidak valid — masuk lagi', 'challenge_invalid');
+  }
+  // TOTP first (with replay protection), then a single-use recovery code.
+  const step = await verifyTotp(mfa.secret, p.code, { now, lastStep: mfa.last_step });
+  let method: 'totp' | 'recovery' | null = step !== null ? 'totp' : null;
+  if (step !== null) {
+    await db.update(schema.userMfa).set({ last_step: step }).where(eq(schema.userMfa.id, mfa.id));
+  } else {
+    const hashes = Array.isArray(mfa.recovery_codes)
+      ? (mfa.recovery_codes as unknown[]).filter((h): h is string => typeof h === 'string')
+      : [];
+    const h = hashRecoveryCode(p.code);
+    if (hashes.includes(h)) {
+      method = 'recovery';
+      await db
+        .update(schema.userMfa)
+        .set({ recovery_codes: hashes.filter((x) => x !== h) })
+        .where(eq(schema.userMfa.id, mfa.id));
+    }
+  }
+  if (!method) {
+    await db
+      .update(schema.mfaChallenges)
+      .set({ attempts: ch.attempts + 1 })
+      .where(eq(schema.mfaChallenges.id, ch.id));
+    await writeAudit(db, {
+      clientId: null,
+      actorId: user.id,
+      action: 'auth.mfa_failed',
+      resource: 'user',
+      resourceId: user.id,
+      ip,
+      requestId,
+    });
+    return refuse('Kode 2FA salah', 'bad_code');
+  }
+  await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
+  // E-10: maintenance may have been switched on between the two steps.
+  const refused = await refuseLoginDuringMaintenance({
+    db,
+    user,
+    clientId: await defaultTenantOf(db, user.id),
+    ip,
+    requestId,
+    set,
+  });
+  if (refused) return { refused };
+  return { user, method };
+}
+
 export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] })
   .use(requestContext)
   .use(authContext)
@@ -341,73 +543,18 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
   .post(
     '/login',
     async ({ body, set, request, requestId, cookie, server }) => {
-      const e = env();
       const db = unsafeAcrossTenants();
-      const email = body.email.trim().toLowerCase();
       const ip = clientIp(request, server) ?? 'unknown';
-      const rule = parseRateLimitRule(
-        (await settings.get<string | null>(null, 'security.login_rate_limit')) ??
-          e.LOGIN_RATE_LIMIT,
-      );
-
-      // Stricter than the general limit (A-2): per IP and per account, whichever trips first.
-      // Only FAILED attempts spend from the budget — the door is checked before the password,
-      // but the counters move in the wrong-password branch below. Someone signing in and out of
-      // several accounts from one address (a tester, a shared office machine) never locks the
-      // address; ten wrong guesses in a window still do.
-      const ipKey = `login:ip:${ip}`;
-      const emailKey = `login:email:${email}`;
-      const tightestOf = (a: RateLimitResult, b: RateLimitResult) =>
-        a.remaining <= b.remaining ? a : b;
-      const seen = tightestOf(
-        await peekRateLimit(db, ipKey, rule),
-        await peekRateLimit(db, emailKey, rule),
-      );
-      Object.assign(set.headers, rateLimitHeaders(seen));
-      if (!seen.allowed) {
-        set.status = 429;
-        return fail('rate_limited', 'Terlalu banyak percobaan masuk — coba lagi nanti', requestId);
-      }
-
-      const [user] = await db
-        .select()
-        .from(schema.users)
-        .where(and(eq(schema.users.email, email), isNull(schema.users.deleted_at)))
-        .limit(1);
-      const valid =
-        user?.status_id === STATUS.ACTIVE &&
-        (await verifyPassword(body.password, user?.password_hash ?? null));
-      if (!user || !valid) {
-        // The failed guess is what costs: spend one from both counters and report what is left.
-        const spent = tightestOf(
-          await consumeRateLimit(db, ipKey, rule),
-          await consumeRateLimit(db, emailKey, rule),
-        );
-        Object.assign(set.headers, rateLimitHeaders({ ...spent, allowed: true }));
-        await writeAudit(db, {
-          clientId: null,
-          actorId: user?.id ?? null,
-          action: 'auth.login_failed',
-          resource: 'user',
-          resourceId: user?.id ?? email,
-          ip,
-          requestId,
-        });
-        set.status = 401;
-        return fail('invalid_credentials', 'Email atau kata sandi salah', requestId);
-      }
-
-      // E-10: a closed door is announced before the second factor is asked for.
-      const refused = await refuseLoginDuringMaintenance({
+      const first = await passwordFirstFactor({
         db,
-        user,
-        clientId: await defaultTenantOf(db, user.id),
+        email: body.email,
+        password: body.password,
         ip,
         requestId,
         set,
       });
-      if (refused) return refused;
-
+      if ('refused' in first) return first.refused;
+      const { user } = first;
       const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
       if (challenge) return ok(challenge);
       return ok(await issueSession({ db, user, ip, request, cookie, requestId }));
@@ -435,103 +582,16 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
     async ({ body, set, request, requestId, cookie, server }) => {
       const db = unsafeAcrossTenants();
       const ip = clientIp(request, server) ?? 'unknown';
-      const now = new Date();
-      const [ch] = await db
-        .select()
-        .from(schema.mfaChallenges)
-        .where(eq(schema.mfaChallenges.token_hash, hashToken(body.challenge)))
-        .limit(1);
-      /**
-       * `details.reason` separates a wrong code — the challenge survives, attempts are counted
-       * here — from a challenge that is gone, which sends the user back to the password step.
-       * Callers must not have to read the message to tell them apart: the web maps the reason to
-       * its own translated wording (K-4), on both the form-action and the fetch path.
-       */
-      const refuse = (
-        message: string,
-        reason: 'bad_code' | 'challenge_invalid' | 'too_many_attempts',
-        code: 'invalid_credentials' | 'rate_limited' = 'invalid_credentials',
-      ) => {
-        set.status = code === 'rate_limited' ? 429 : 401;
-        return fail(code, message, requestId, { reason });
-      };
-      if (!ch || ch.expires_at.getTime() < now.getTime()) {
-        if (ch) await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse(
-          'Tantangan 2FA tidak valid atau kedaluwarsa — masuk lagi',
-          'challenge_invalid',
-        );
-      }
-      if (ch.attempts >= MFA_MAX_ATTEMPTS) {
-        await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse(
-          'Terlalu banyak kode salah — masuk lagi',
-          'too_many_attempts',
-          'rate_limited',
-        );
-      }
-      const [user] = await db
-        .select()
-        .from(schema.users)
-        .where(and(eq(schema.users.id, ch.user_id), isNull(schema.users.deleted_at)))
-        .limit(1);
-      const [mfa] = await db
-        .select()
-        .from(schema.userMfa)
-        .where(eq(schema.userMfa.user_id, ch.user_id))
-        .limit(1);
-      if (!user || user.status_id !== STATUS.ACTIVE || !mfa?.enabled_at) {
-        await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-        return refuse('Tantangan 2FA tidak valid — masuk lagi', 'challenge_invalid');
-      }
-      // TOTP first (with replay protection), then a single-use recovery code.
-      const step = await verifyTotp(mfa.secret, body.code, { now, lastStep: mfa.last_step });
-      let method: 'totp' | 'recovery' | null = step !== null ? 'totp' : null;
-      if (step !== null) {
-        await db
-          .update(schema.userMfa)
-          .set({ last_step: step })
-          .where(eq(schema.userMfa.id, mfa.id));
-      } else {
-        const hashes = Array.isArray(mfa.recovery_codes)
-          ? (mfa.recovery_codes as unknown[]).filter((h): h is string => typeof h === 'string')
-          : [];
-        const h = hashRecoveryCode(body.code);
-        if (hashes.includes(h)) {
-          method = 'recovery';
-          await db
-            .update(schema.userMfa)
-            .set({ recovery_codes: hashes.filter((x) => x !== h) })
-            .where(eq(schema.userMfa.id, mfa.id));
-        }
-      }
-      if (!method) {
-        await db
-          .update(schema.mfaChallenges)
-          .set({ attempts: ch.attempts + 1 })
-          .where(eq(schema.mfaChallenges.id, ch.id));
-        await writeAudit(db, {
-          clientId: null,
-          actorId: user.id,
-          action: 'auth.mfa_failed',
-          resource: 'user',
-          resourceId: user.id,
-          ip,
-          requestId,
-        });
-        return refuse('Kode 2FA salah', 'bad_code');
-      }
-      await db.delete(schema.mfaChallenges).where(eq(schema.mfaChallenges.id, ch.id));
-      // E-10: maintenance may have been switched on between the two steps.
-      const refused = await refuseLoginDuringMaintenance({
+      const second = await mfaSecondFactor({
         db,
-        user,
-        clientId: await defaultTenantOf(db, user.id),
+        challenge: body.challenge,
+        code: body.code,
         ip,
         requestId,
         set,
       });
-      if (refused) return refused;
+      if ('refused' in second) return second.refused;
+      const { user, method } = second;
       const result = await issueSession({ db, user, ip, request, cookie, requestId, mfa: method });
       return ok(result);
     },
