@@ -16,7 +16,7 @@ import {
   writeAudit,
 } from '@core/auth';
 import { env } from '@core/config';
-import { errorResponses, fail, OkSchema, ok } from '@core/contracts';
+import { errorResponses, type Fail, fail, OkSchema, ok } from '@core/contracts';
 import { and, eq, isNull, newId, STATUS, schema, unsafeAcrossTenants } from '@core/db';
 import { Elysia, t } from 'elysia';
 import { refuseLoginDuringMaintenance } from '../maintenance.ts';
@@ -46,15 +46,17 @@ import { attachDefaultTenant, issueSession, PublicUser, startMfaChallenge } from
 const PROVIDER = 'google';
 const HTTP_TIMEOUT_MS = 10_000;
 
-interface GoogleConfig {
+export interface GoogleConfig {
   enabled: boolean;
   clientId: string | null;
   clientSecret: string | null;
+  /** Extra audiences an app's ID token may carry (Android/iOS client ids); the web id always counts. */
+  appClientIds: string[];
   autoCreate: boolean;
   allowedDomains: string[];
 }
 
-async function googleConfig(): Promise<GoogleConfig> {
+export async function googleConfig(): Promise<GoogleConfig> {
   const e = env();
   const str = async (key: string) => {
     const v = await settings.get(null, key);
@@ -64,6 +66,10 @@ async function googleConfig(): Promise<GoogleConfig> {
     enabled: (await settings.get(null, 'security.google_enabled')) === true,
     clientId: (await str('security.google_client_id')) ?? e.GOOGLE_CLIENT_ID ?? null,
     clientSecret: (await str('security.google_client_secret')) ?? e.GOOGLE_CLIENT_SECRET ?? null,
+    appClientIds: ((await str('security.google_app_client_ids')) ?? '')
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
     autoCreate: (await settings.get(null, 'security.google_auto_create')) === true,
     allowedDomains: parseDomainList(await str('security.google_allowed_domains')),
   };
@@ -113,6 +119,182 @@ async function fetchIdentity(p: {
   });
   if (!infoRes.ok) return null;
   return parseGoogleUserinfo(await infoRes.json().catch(() => null));
+}
+
+type Db = ReturnType<typeof unsafeAcrossTenants>;
+interface GoogleContext {
+  db: Db;
+  ip: string;
+  requestId: string;
+  set: { status?: number | string; headers: Record<string, string | number | undefined> };
+}
+
+/** A refused Google sign-in: audited as a failed login, answered with a `reason` (K-4). */
+export async function refuseGoogle(
+  ctx: GoogleContext,
+  status: 401 | 403,
+  code: 'sso_failed' | 'sso_not_allowed' | 'invalid_credentials',
+  message: string,
+  detail: Record<string, unknown>,
+): Promise<{ refused: Fail }> {
+  await writeAudit(ctx.db, {
+    clientId: null,
+    actorId: null,
+    action: 'auth.login_failed',
+    resource: 'user',
+    resourceId: typeof detail.email === 'string' ? detail.email : PROVIDER,
+    ip: ctx.ip,
+    requestId: ctx.requestId,
+    after: { sso: PROVIDER, ...detail },
+  });
+  ctx.set.status = status;
+  // `reason` travels with the envelope so the web app can show its own translated copy
+  // (K-4); it says no more than the message it stands in for.
+  return { refused: fail(code, message, ctx.requestId, { reason: detail.reason }) };
+}
+
+/**
+ * From a Google identity to the user who may sign in, whichever way Google vouched for it (the
+ * web code exchange or an app's ID token): verified e-mail, allowed domain, then the user by link
+ * (`sub`), by verified e-mail, or — flag permitting — created. Ends with the maintenance gate.
+ */
+export async function googleUserOf(
+  p: GoogleContext & { identity: OAuthIdentity; cfg: GoogleConfig },
+): Promise<{ user: typeof schema.users.$inferSelect } | { refused: Fail }> {
+  const { db, identity, cfg, ip, requestId, set } = p;
+  if (!identity.emailVerified)
+    return refuseGoogle(p, 401, 'sso_failed', 'Email akun Google Anda belum terverifikasi', {
+      reason: 'email_unverified',
+      email: identity.email,
+    });
+  if (!emailDomainAllowed(identity.email, cfg.allowedDomains))
+    return refuseGoogle(p, 403, 'sso_not_allowed', 'Domain email ini tidak diizinkan masuk', {
+      reason: 'domain',
+      email: identity.email,
+    });
+
+  // Resolve the user: by link (sub) first, then by verified e-mail, then — flag permitting — create.
+  const [link] = await db
+    .select()
+    .from(schema.oauthAccounts)
+    .where(
+      and(
+        eq(schema.oauthAccounts.provider, PROVIDER),
+        eq(schema.oauthAccounts.provider_user_id, identity.sub),
+      ),
+    )
+    .limit(1);
+  let user: typeof schema.users.$inferSelect | undefined;
+  let created = false;
+  if (link) {
+    [user] = await db
+      .select()
+      .from(schema.users)
+      .where(and(eq(schema.users.id, link.user_id), isNull(schema.users.deleted_at)))
+      .limit(1);
+  } else {
+    [user] = await db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, identity.email))
+      .limit(1);
+    if (user?.deleted_at) {
+      /**
+       * A deleted account owns this e-mail. Signing in must NOT bring it back — that would let
+       * anyone the admin removed walk in again — and the UNIQUE on `email` would refuse a second
+       * row anyway, so the insert below used to fail with a raw 500.
+       */
+      return refuseGoogle(
+        p,
+        403,
+        'sso_not_allowed',
+        'Akun dengan email ini belum terdaftar — minta admin membuat akun Anda',
+        { reason: 'not_registered', email: identity.email },
+      );
+    }
+    if (!user) {
+      if (!cfg.autoCreate)
+        return refuseGoogle(
+          p,
+          403,
+          'sso_not_allowed',
+          'Akun dengan email ini belum terdaftar — minta admin membuat akun Anda',
+          { reason: 'not_registered', email: identity.email },
+        );
+      const userId = newId();
+      await db.insert(schema.users).values({
+        id: userId,
+        email: identity.email,
+        name: identity.name,
+        password_hash: null,
+        avatar_url: identity.avatarUrl,
+        email_verified_at: new Date(),
+      });
+      const tenantId = await attachDefaultTenant(db, userId);
+      emit('user.created', { userId, clientId: tenantId }, { requestId });
+      [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+      created = true;
+    }
+  }
+  if (!user)
+    return refuseGoogle(p, 401, 'sso_failed', 'Masuk dengan Google gagal — coba lagi', {
+      reason: 'dangling_link',
+    });
+  if (user.status_id !== STATUS.ACTIVE)
+    return refuseGoogle(p, 401, 'invalid_credentials', 'Akun ini dinonaktifkan', {
+      reason: 'inactive',
+      email: identity.email,
+    });
+
+  const now = new Date();
+  if (link) {
+    await db
+      .update(schema.oauthAccounts)
+      .set({ email: identity.email, last_login_at: now })
+      .where(eq(schema.oauthAccounts.id, link.id));
+  } else {
+    await db.insert(schema.oauthAccounts).values({
+      id: newId(),
+      user_id: user.id,
+      provider: PROVIDER,
+      provider_user_id: identity.sub,
+      email: identity.email,
+      last_login_at: now,
+    });
+  }
+  // Google vouched for the address: an unverified local account becomes verified (A-6).
+  if (!created && !user.email_verified_at) {
+    await db
+      .update(schema.users)
+      .set({ email_verified_at: now })
+      .where(eq(schema.users.id, user.id));
+    await invalidateUserSessions(user.id);
+    user = { ...user, email_verified_at: now };
+  }
+  if (!link) {
+    await writeAudit(db, {
+      clientId: null,
+      actorId: user.id,
+      action: created ? 'auth.sso_account_created' : 'auth.sso_linked',
+      resource: 'user',
+      resourceId: user.id,
+      ip,
+      requestId,
+      after: { provider: PROVIDER, email: identity.email },
+    });
+  }
+
+  // E-10: Google vouches for the identity; maintenance still decides who may enter.
+  const refused = await refuseLoginDuringMaintenance({
+    db,
+    user,
+    clientId: await defaultTenantOf(db, user.id),
+    ip,
+    requestId,
+    set,
+  });
+  if (refused) return { refused };
+  return { user };
 }
 
 export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tags: ['auth'] })
@@ -188,28 +370,6 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
         return fail('rate_limited', 'Terlalu banyak percobaan masuk — coba lagi nanti', requestId);
       }
 
-      const refuse = async (
-        status: 401 | 403,
-        code: 'sso_failed' | 'sso_not_allowed' | 'invalid_credentials',
-        message: string,
-        detail: Record<string, unknown>,
-      ) => {
-        await writeAudit(db, {
-          clientId: null,
-          actorId: null,
-          action: 'auth.login_failed',
-          resource: 'user',
-          resourceId: typeof detail.email === 'string' ? detail.email : PROVIDER,
-          ip,
-          requestId,
-          after: { sso: PROVIDER, ...detail },
-        });
-        set.status = status;
-        // `reason` travels with the envelope so the web app can show its own translated copy
-        // (K-4); it says no more than the message it stands in for.
-        return fail(code, message, requestId, { reason: detail.reason });
-      };
-
       let identity: OAuthIdentity | null = null;
       try {
         identity = await fetchIdentity({
@@ -222,140 +382,16 @@ export const authGoogle = new Elysia({ name: 'auth-google', prefix: '/auth', tag
       } catch {
         identity = null;
       }
+      const ctx = { db, ip, requestId, set };
       if (!identity)
-        return refuse(401, 'sso_failed', 'Masuk dengan Google gagal — coba lagi', {
-          reason: 'exchange',
-        });
-      if (!identity.emailVerified)
-        return refuse(401, 'sso_failed', 'Email akun Google Anda belum terverifikasi', {
-          reason: 'email_unverified',
-          email: identity.email,
-        });
-      if (!emailDomainAllowed(identity.email, cfg.allowedDomains))
-        return refuse(403, 'sso_not_allowed', 'Domain email ini tidak diizinkan masuk', {
-          reason: 'domain',
-          email: identity.email,
-        });
-
-      // Resolve the user: by link (sub) first, then by verified e-mail, then — flag permitting — create.
-      const [link] = await db
-        .select()
-        .from(schema.oauthAccounts)
-        .where(
-          and(
-            eq(schema.oauthAccounts.provider, PROVIDER),
-            eq(schema.oauthAccounts.provider_user_id, identity.sub),
-          ),
-        )
-        .limit(1);
-      let user: typeof schema.users.$inferSelect | undefined;
-      let created = false;
-      if (link) {
-        [user] = await db
-          .select()
-          .from(schema.users)
-          .where(and(eq(schema.users.id, link.user_id), isNull(schema.users.deleted_at)))
-          .limit(1);
-      } else {
-        [user] = await db
-          .select()
-          .from(schema.users)
-          .where(eq(schema.users.email, identity.email))
-          .limit(1);
-        if (user?.deleted_at) {
-          /**
-           * A deleted account owns this e-mail. Signing in must NOT bring it back — that would let
-           * anyone the admin removed walk in again — and the UNIQUE on `email` would refuse a second
-           * row anyway, so the insert below used to fail with a raw 500.
-           */
-          return refuse(
-            403,
-            'sso_not_allowed',
-            'Akun dengan email ini belum terdaftar — minta admin membuat akun Anda',
-            { reason: 'not_registered', email: identity.email },
-          );
-        }
-        if (!user) {
-          if (!cfg.autoCreate)
-            return refuse(
-              403,
-              'sso_not_allowed',
-              'Akun dengan email ini belum terdaftar — minta admin membuat akun Anda',
-              { reason: 'not_registered', email: identity.email },
-            );
-          const userId = newId();
-          await db.insert(schema.users).values({
-            id: userId,
-            email: identity.email,
-            name: identity.name,
-            password_hash: null,
-            avatar_url: identity.avatarUrl,
-            email_verified_at: new Date(),
-          });
-          const tenantId = await attachDefaultTenant(db, userId);
-          emit('user.created', { userId, clientId: tenantId }, { requestId });
-          [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-          created = true;
-        }
-      }
-      if (!user)
-        return refuse(401, 'sso_failed', 'Masuk dengan Google gagal — coba lagi', {
-          reason: 'dangling_link',
-        });
-      if (user.status_id !== STATUS.ACTIVE)
-        return refuse(401, 'invalid_credentials', 'Akun ini dinonaktifkan', {
-          reason: 'inactive',
-          email: identity.email,
-        });
-
-      const now = new Date();
-      if (link) {
-        await db
-          .update(schema.oauthAccounts)
-          .set({ email: identity.email, last_login_at: now })
-          .where(eq(schema.oauthAccounts.id, link.id));
-      } else {
-        await db.insert(schema.oauthAccounts).values({
-          id: newId(),
-          user_id: user.id,
-          provider: PROVIDER,
-          provider_user_id: identity.sub,
-          email: identity.email,
-          last_login_at: now,
-        });
-      }
-      // Google vouched for the address: an unverified local account becomes verified (A-6).
-      if (!created && !user.email_verified_at) {
-        await db
-          .update(schema.users)
-          .set({ email_verified_at: now })
-          .where(eq(schema.users.id, user.id));
-        await invalidateUserSessions(user.id);
-        user = { ...user, email_verified_at: now };
-      }
-      if (!link) {
-        await writeAudit(db, {
-          clientId: null,
-          actorId: user.id,
-          action: created ? 'auth.sso_account_created' : 'auth.sso_linked',
-          resource: 'user',
-          resourceId: user.id,
-          ip,
-          requestId,
-          after: { provider: PROVIDER, email: identity.email },
-        });
-      }
-
-      // E-10: Google vouches for the identity; maintenance still decides who may enter.
-      const refused = await refuseLoginDuringMaintenance({
-        db,
-        user,
-        clientId: await defaultTenantOf(db, user.id),
-        ip,
-        requestId,
-        set,
-      });
-      if (refused) return refused;
+        return (
+          await refuseGoogle(ctx, 401, 'sso_failed', 'Masuk dengan Google gagal — coba lagi', {
+            reason: 'exchange',
+          })
+        ).refused;
+      const signedIn = await googleUserOf({ ...ctx, identity, cfg });
+      if ('refused' in signedIn) return signedIn.refused;
+      const { user } = signedIn;
 
       const challenge = await startMfaChallenge({ db, userId: user.id, ip, requestId });
       if (challenge) return ok(challenge);

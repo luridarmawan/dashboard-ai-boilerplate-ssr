@@ -274,6 +274,13 @@
       "when": 1792239215890,
       "tag": "0038_remarkable_wild_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792480288426,
+      "tag": "0039_sloppy_wallop",
+      "breakpoints": true
     }
   ]
 }

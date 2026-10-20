@@ -3,6 +3,7 @@ import { openapi } from '@elysiajs/openapi';
 import { Elysia } from 'elysia';
 import { auth } from './domains/auth.ts';
 import { authGoogle } from './domains/auth-google.ts';
+import { authToken } from './domains/auth-token.ts';
 import { clients } from './domains/clients.ts';
 import { configuration } from './domains/configuration.ts';
 import { filesDomain } from './domains/files.ts';
@@ -113,6 +114,7 @@ export const app = new Elysia()
       .use(system)
       .use(auth)
       .use(authGoogle)
+      .use(authToken)
       .use(joinDomain)
       .use(invitationsDomain)
       .use(users)

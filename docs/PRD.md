@@ -317,6 +317,7 @@ modules/<Nama>/
 ├── icons/               # set ikon / pemetaan ikon (opsional) — titik perluasan 16
 ├── csrf-exempt.ts       # route API yang dipanggil sistem luar tanpa CSRF (opsional) — titik perluasan 17
 ├── mqtt.ts              # langganan MQTT lewat klien inti (opsional) — titik perluasan 18
+├── passwords.ts         # verifikator hash sandi format asing, mis. user hasil impor (opsional) — titik perluasan 19
 ├── permissions.ts       # resource + action yang dimiliki modul
 ├── menu.ts              # entri menu (dengan syarat izin)
 ├── config.ts            # section konfigurasi milik modul (opsional)
@@ -346,6 +347,7 @@ modules/<Nama>/
 | 16 | **Set ikon** | Menyumbang pemetaan nama ikon semantik → glyph, sehingga seluruh aplikasi bisa berganti bahasa visual tanpa menyentuh komponen |
 | 17 | **Route tanpa CSRF** | Menandai route API miliknya sendiri (method + path persis, dengan alasan) yang dipanggil sistem luar yang tidak bisa mengirim token bearer maupun pasangan CSRF — callback/webhook pihak ketiga. Request ke route itu **selalu anonim** (cookie sesi diabaikan), jadi route wajib memverifikasi pemanggilnya sendiri (A-10) |
 | 18 | **Langganan MQTT** | Mendeklarasikan topik yang dilanggan lewat **klien MQTT inti** (satu per proses API, sakelar dan broker di Pengaturan → MQTT) beserta handler-nya, dan menerbitkan pesan lewat `publish()`. Satu pesan diproses **satu** instance (shared subscription MQTT 5); handler yang gagal dicatat, tidak menjatuhkan klien (FR-S) |
+| 19 | **Verifikator sandi** | Memeriksa hash sandi berformat asing — user yang dipindahkan dari sistem lain dengan hash disalin apa adanya. Core hanya bertanya untuk hash yang bukan Argon2/bcrypt, melewati verifikator modul nonaktif, dan me-rehash akun ke Argon2id pada login berikutnya (A-1), sehingga format lama habis dengan sendirinya. Verifikator adalah kode murni tanpa database, jaringan, atau state |
 
 **Keputusan G — modul dirakit saat build, tapi kontraknya bersifat data.**
 `bun modules:sync` membaca `modules.json` dan `module.json` tiap modul, lalu meng-generate registry (route API, route web, route publik, skema DB, menu, izin, i18n, tool, tema). Menambah modul = daftarkan sumbernya + `bun modules:sync`. Core tetap tidak berubah; yang berubah hanya berkas hasil generate, yang tidak pernah diedit tangan.
@@ -561,10 +563,10 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 
 | ID | Kebutuhan |
 |---|---|
-| A-1 | **[P0]** Registrasi email + password. Password di-hash dengan **Argon2id**. Registrasi bisa dimatikan lewat flag `SIGNUP_ENABLED`. |
+| A-1 | **[P0]** Registrasi email + password. Password di-hash dengan **Argon2id**; hash bcrypt, Argon2id dengan biaya lama, atau format asing yang diverifikasi modul (titik perluasan 19) di-rehash ke Argon2id saat login berhasil. Registrasi bisa dimatikan lewat flag `SIGNUP_ENABLED`. |
 | A-2 | **[P0]** Login email + password, mengembalikan sesi. **Kegagalan** login kena rate limit lebih ketat daripada endpoint biasa (baku 10 percobaan gagal / 15 menit, konfigurabel lewat `LOGIN_RATE_LIMIT` atau `security.login_rate_limit`), dihitung per IP **dan** per akun; pintu diperiksa sebelum sandi, tapi yang menambah hitungan hanya sandi salah — login yang berhasil, penolakan mode pemeliharaan, dan tantangan 2FA tidak dihitung, sehingga berganti-ganti akun dari satu alamat tidak pernah mengunci alamat itu. |
 | A-3 | **[P0]** **Sesi berbasis cookie `httpOnly`**, bukan token di `localStorage`. Cookie: `Secure`, `SameSite=Lax`, `Path=/`. Sesi tersimpan lewat `SESSION_DRIVER`: baku ke tabel `sessions`, opsional ke Redis/Valkey (Keputusan M). Alasan: SSR butuh membaca sesi di server, dan `localStorage` rawan XSS. |
-| A-4 | **[P0]** Untuk klien non-browser (mobile, service), sediakan **API token** bearer terpisah dengan masa berlaku dan scope sendiri. Ini yang membuat "API-first" nyata. |
+| A-4 | **[P0]** Untuk klien non-browser (mobile, service), sediakan **API token** bearer terpisah dengan masa berlaku dan scope sendiri. Ini yang membuat "API-first" nyata. Aplikasi (mobile) mendapatkannya lewat **masuk aplikasi** (`/auth/token`): pemeriksaan yang sama dengan masuk browser — sandi dengan rate limit A-2, 2FA A-11, Google A-8 lewat ID token, mode pemeliharaan E-10 — tetapi hasilnya token di body, bukan cookie. Token ini berjenis `login` (token buatan user berjenis `api`): berlaku `security.app_token_minutes` (baku 60 menit), lalu masih bisa diperpanjang aplikasi selama `security.app_token_refresh_minutes` setelah kedaluwarsa (baku 2160 menit). Perpanjangan menggeser masa berlaku token yang **sama** (bukan rahasia baru), sehingga dua refresh yang berbarengan sama-sama berhasil; di luar jendela, aplikasi wajib masuk ulang. Token `api` tidak pernah bisa diperpanjang. Token login tampil di Profil → Token API dan bisa dicabut di sana atau lewat `DELETE /auth/token`. Rute masuk aplikasi tetap rute core biasa dan tunduk CSRF (A-10): aplikasi mengambil pasangan dari `GET /auth/csrf-token` dan mengirim `Origin` deployment; refresh dan keluar membawa bearer sehingga bebas CSRF secara struktural. Untuk Google, audiens ID token harus client id web atau salah satu `security.google_app_client_ids` (client id Android/iOS); client secret tidak diperlukan. |
 | A-5 | **[P0]** Logout — invalidasi sesi di server, bukan sekadar menghapus cookie. Logout yang disengaja juga **membersihkan jejak di browser**: semua cookie yang ditulis aplikasi (`crk_*` — sesi, impersonasi, CSRF, OAuth, dan cache preferensi tema/mode/bahasa/arah/sidebar; pengecualian atas L-11/L-13, karena preferensi itu milik orang yang baru pergi) dihapus satu per satu pada respons yang sama, dan Web Storage origin ini (localStorage, sessionStorage, IndexedDB, Cache Storage) dibersihkan lewat header `Clear-Site-Data: "storage"` — jalan tanpa JavaScript — ditambah pembersihan sisi klien sebelum form dikirim untuk browser yang mengabaikan header itu. Direktif `"cookies"` sengaja tidak dipakai karena menyapu seluruh domain, termasuk aplikasi tetangga. Sapuan yang sama tersedia sebagai tombol **Bersihkan cache** di footer halaman masuk — hanya saat `NODE_ENV=development`, untuk penguji yang berganti-ganti akun. |
 | A-6 | **[P0]** Verifikasi email: token + kedaluwarsa, kirim email, endpoint konfirmasi. |
 | A-7 | **[P0]** Lupa password: minta reset → validasi token → konfirmasi password baru. Token sekali pakai, punya `expires_at` dan penanda `used`. |
@@ -653,7 +655,7 @@ Notasi: **[P0]/[P1]/[P2]** prioritas.
 | G-2 | **[P0]** **Registrasi simetris.** Satu perintah `bun modules:sync` meng-generate registry untuk API *dan* web *dan* route publik *dan* skema DB *dan* menu *dan* tema *dan* seed izin. Perintah ini jalan otomatis sebelum `dev` dan `build`. Menutup D8. |
 | G-3 | **[P0]** Modul mengimpor core lewat **paket** (`@core/ui`, `@core/db`, `@core/module-kit`), bukan path relatif. Memindahkan folder modul — atau memindahkannya ke repositori lain — tidak boleh merusak apa pun (§4.9 poin 1). |
 | G-4 | **[P0]** Generator modul CLI (`bun modgen`) — hasilkan CRUD lengkap: tabel, migrasi, route API dengan skema, halaman list+form, entri menu, seed izin, berkas i18n. Mode interaktif dan non-interaktif. |
-| G-5 | **[P0]** **18 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
+| G-5 | **[P0]** **19 titik perluasan pada §4.5 tersedia seluruhnya**, terdokumentasi, dan masing-masing punya contoh yang jalan. |
 | G-6 | **[P0]** **Menambah atau menghapus modul tidak mengubah berkas core mana pun.** Ditegakkan di CI: pipeline menjalankan `modgen`, lalu memeriksa bahwa `git diff` hanya menyentuh `modules/`, `modules.json`, dan direktori hasil generate. Ini mengubah janji modularitas dari niat menjadi sesuatu yang terukur. |
 | G-7 | **[P0]** Kegagalan satu modul saat inisialisasi tidak boleh mematikan aplikasi; catat galatnya, tandai modul sebagai gagal di UI admin, lanjutkan. |
 | G-8 | **[P0]** Modul bisa diaktifkan/nonaktifkan **per tenant** lewat tabel `modules`. Modul nonaktif: menu hilang, section-nya di Pengaturan hilang (nilai tersimpan tidak disentuh), route menolak dan hilang dari dokumen API (`/openapi.json`, `/docs`) untuk tenant itu, tema & route publiknya tidak terdaftar, tabelnya tetap ada. |
@@ -992,7 +994,7 @@ Cakupan minimum yang harus tersedia pada rilis P0. Route modul (`/v1/m/<nama>/*`
 
 | Grup | Endpoint |
 |---|---|
-| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `GET /google/start` · `POST /google-login` · `GET /join/:code` · `POST /join` |
+| `auth` | `POST /register` · `POST /login` · `POST /logout` · `GET /csrf-token` · `GET /verify-email` · `GET /google/start` · `POST /google-login` · `GET /join/:code` · `POST /join` · `POST /token` · `POST /token/mfa` · `POST /token/google` · `POST /token/refresh` · `DELETE /token` (masuk aplikasi, A-4) |
 | `invitations` | `GET /` · `POST /` · `DELETE /:id` (undangan ke tenant aktif, A-13) |
 | `auth-public` | `POST /reset-password/request` · `POST /reset-password/validate-token` · `POST /reset-password/confirm` |
 | `tokens` | `GET /` · `POST /` · `DELETE /:id` (API token untuk klien non-browser, A-4) |

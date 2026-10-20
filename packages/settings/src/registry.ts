@@ -456,6 +456,48 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         max: 500,
         order: 7,
       },
+      {
+        key: 'security.google_app_client_ids',
+        type: 'string',
+        title: { id: 'Client id Google aplikasi', en: 'Google app client ids' },
+        note: {
+          id: 'Client id Android/iOS yang ID token-nya diterima saat aplikasi masuk dengan Google, dipisah koma. Client id web di atas selalu diterima.',
+          en: 'Android/iOS client ids whose ID tokens are accepted when an app signs in with Google, comma-separated. The web client id above is always accepted.',
+        },
+        default: null,
+        max: 1000,
+        order: 9,
+      },
+      // ---- App sign-in tokens: what a mobile app gets from /auth/token (A-4).
+      {
+        key: 'security.app_token_minutes',
+        type: 'number',
+        title: { id: 'Umur token aplikasi (menit)', en: 'App token lifetime (minutes)' },
+        note: {
+          id: 'Token yang diterima aplikasi saat masuk berlaku selama ini; baku 60 menit.',
+          en: 'The token an app receives at sign-in is valid this long; default 60 minutes.',
+        },
+        default: 60,
+        min: 5,
+        max: 43200,
+        order: 10,
+      },
+      {
+        key: 'security.app_token_refresh_minutes',
+        type: 'number',
+        title: {
+          id: 'Jendela refresh token aplikasi (menit)',
+          en: 'App token refresh window (minutes)',
+        },
+        note: {
+          id: 'Selama ini setelah kedaluwarsa, aplikasi masih bisa memperpanjang tokennya tanpa masuk ulang; baku 2160 menit (36 jam).',
+          en: 'For this long after expiry an app can still extend its token without signing in again; default 2160 minutes (36 hours).',
+        },
+        default: 2160,
+        min: 0,
+        max: 525600,
+        order: 11,
+      },
     ],
   },
   {

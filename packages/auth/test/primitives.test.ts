@@ -13,6 +13,38 @@ describe('password (A-1)', () => {
     expect(needsRehash(h)).toBe(false);
     expect(needsRehash('$2b$10$bcrypt')).toBe(true);
   });
+  test('bcrypt verifies natively; foreign formats only through a matching verifier', async () => {
+    const bcrypt = await Bun.password.hash('correct horse battery', 'bcrypt');
+    expect(await verifyPassword('correct horse battery', bcrypt)).toBe(true);
+    const legacy = [
+      {
+        name: 'x.reverse',
+        matches: (h: string) => h.startsWith('$rev$'),
+        verify: (p: string, h: string) => h === `$rev$${[...p].reverse().join('')}`,
+      },
+      {
+        name: 'x.broken',
+        matches: (h: string) => h.startsWith('$boom$'),
+        verify: () => {
+          throw new Error('boom');
+        },
+      },
+    ];
+    const lookups: number[] = [];
+    const lazy = () => {
+      lookups.push(1);
+      return legacy;
+    };
+    expect(await verifyPassword('abc', '$rev$cba', lazy)).toBe(true);
+    expect(await verifyPassword('abd', '$rev$cba', lazy)).toBe(false);
+    expect(await verifyPassword('abc', '$boom$x', lazy)).toBe(false);
+    expect(await verifyPassword('abc', '$unknown$abc', lazy)).toBe(false);
+    expect(await verifyPassword('abc', '$rev$cba')).toBe(false);
+    // Native hashes never consult the module verifiers.
+    const before = lookups.length;
+    await verifyPassword('correct horse battery', bcrypt, lazy);
+    expect(lookups.length).toBe(before);
+  });
   test('policy', () => {
     expect(passwordProblems('short')).toEqual(['minimal 10 karakter']);
     expect(passwordProblems(' padded password ')).toContain('tidak boleh diawali/diakhiri spasi');

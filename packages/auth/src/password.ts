@@ -9,14 +9,41 @@ export async function hashPassword(plain: string): Promise<string> {
   return Bun.password.hash(plain, ARGON2);
 }
 
-export async function verifyPassword(plain: string, hash: string | null): Promise<boolean> {
+/**
+ * A hash format the core does not know, verified on behalf of a module (`passwords.ts`) — e.g.
+ * the hashes of users imported from another system. The account is rehashed to Argon2id on its
+ * next successful login, so a verifier is only needed until every imported user has signed in.
+ */
+export interface LegacyPasswordVerifier {
+  /** `<ns>.<name>`, for logs and the module overview. */
+  readonly name: string;
+  /** Cheap, pure: does this verifier understand the stored hash (usually a prefix check)? */
+  readonly matches: (hash: string) => boolean;
+  readonly verify: (plain: string, hash: string) => boolean | Promise<boolean>;
+}
+
+/** Formats `Bun.password.verify` understands: Argon2 and bcrypt. */
+const NATIVE_HASH_RE = /^\$(argon2(id|i|d)|2[abxy])\$/;
+
+/**
+ * Check a password against a stored hash. Argon2 and bcrypt are verified natively; any other
+ * format goes to the first `legacy` verifier that `matches` it (resolved lazily — only a foreign
+ * hash pays for the lookup). Unknown formats never verify.
+ */
+export async function verifyPassword(
+  plain: string,
+  hash: string | null,
+  legacy?: () => Promise<readonly LegacyPasswordVerifier[]> | readonly LegacyPasswordVerifier[],
+): Promise<boolean> {
   if (!hash) {
     // Constant-ish time for accounts without a password (OAuth-only) — do not reveal that.
     await Bun.password.hash(plain, ARGON2);
     return false;
   }
   try {
-    return await Bun.password.verify(plain, hash);
+    if (NATIVE_HASH_RE.test(hash)) return await Bun.password.verify(plain, hash);
+    const verifier = (legacy ? await legacy() : []).find((v) => v.matches(hash));
+    return verifier ? (await verifier.verify(plain, hash)) === true : false;
   } catch {
     return false;
   }

@@ -3,6 +3,7 @@ import {
   emailDomainAllowed,
   googleAuthorizeUrl,
   parseDomainList,
+  parseGoogleIdTokenInfo,
   parseGoogleUserinfo,
   pkceChallenge,
   pkcePair,
@@ -110,5 +111,43 @@ describe('parseGoogleUserinfo', () => {
     expect(parseGoogleUserinfo(null)).toBeNull();
     expect(parseGoogleUserinfo({ email: 'x@y.z' })).toBeNull();
     expect(parseGoogleUserinfo({ sub: 's', email: 'not-an-email' })).toBeNull();
+  });
+});
+
+describe('parseGoogleIdTokenInfo', () => {
+  const now = new Date('2026-10-20T00:00:00Z');
+  const claims = {
+    iss: 'https://accounts.google.com',
+    aud: 'web.apps.googleusercontent.com',
+    sub: '42',
+    email: 'Person@Example.com',
+    email_verified: 'true',
+    name: 'A Person',
+    exp: String(now.getTime() / 1000 + 600),
+  };
+  const audiences = ['web.apps.googleusercontent.com', 'android.apps.googleusercontent.com'];
+  test('accepts a token for one of our client ids', () => {
+    const id = parseGoogleIdTokenInfo(claims, audiences, now);
+    expect(id?.sub).toBe('42');
+    expect(id?.email).toBe('person@example.com');
+    expect(id?.emailVerified).toBe(true);
+    expect(
+      parseGoogleIdTokenInfo(
+        { ...claims, aud: 'android.apps.googleusercontent.com', iss: 'accounts.google.com' },
+        audiences,
+        now,
+      )?.sub,
+    ).toBe('42');
+  });
+  test('refuses a foreign audience, a foreign issuer, or an expired token', () => {
+    expect(parseGoogleIdTokenInfo({ ...claims, aud: 'other' }, audiences, now)).toBeNull();
+    expect(
+      parseGoogleIdTokenInfo({ ...claims, iss: 'https://evil.test' }, audiences, now),
+    ).toBeNull();
+    expect(
+      parseGoogleIdTokenInfo({ ...claims, exp: String(now.getTime() / 1000 - 1) }, audiences, now),
+    ).toBeNull();
+    expect(parseGoogleIdTokenInfo({ ...claims, exp: undefined }, audiences, now)).toBeNull();
+    expect(parseGoogleIdTokenInfo(null, audiences, now)).toBeNull();
   });
 });

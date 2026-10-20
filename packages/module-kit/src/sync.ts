@@ -87,13 +87,16 @@ export interface WebRouteRecord {
   readonly kind: 'svelte' | 'ts';
 }
 
-/** A module that ships `hooks.ts` (9), `jobs.ts` (12), `api/tools.ts` (8) or `mqtt.ts` (18). */
+/**
+ * A module that ships `hooks.ts` (9), `jobs.ts` (12), `api/tools.ts` (8), `mqtt.ts` (18) or
+ * `passwords.ts` (19).
+ */
 export interface RuntimeModuleRecord {
   readonly name: string;
   readonly ns: string;
   /** Module-relative file, POSIX. */
   readonly file: string;
-  /** Event names (hooks), job names (jobs), tool names (tools) or subscription names (mqtt) declared — for the registry and the admin UI. */
+  /** Event names (hooks), job names (jobs), tool names (tools), subscription names (mqtt) or verifier names (passwords) declared — for the registry and the admin UI. */
   readonly items: readonly string[];
 }
 
@@ -108,6 +111,7 @@ export interface SyncResult {
   readonly jobModules: readonly RuntimeModuleRecord[];
   readonly toolModules: readonly RuntimeModuleRecord[];
   readonly mqttModules: readonly RuntimeModuleRecord[];
+  readonly passwordModules: readonly RuntimeModuleRecord[];
   readonly files: readonly string[];
   /** Non-fatal findings, e.g. a submodule with local modifications (§4.9 point 5). */
   readonly warnings: readonly string[];
@@ -165,6 +169,8 @@ export interface ModuleContributions {
   readonly tools: readonly string[];
   /** Subscription names declared in `mqtt.ts` (extension point 18). */
   readonly mqtt: readonly string[];
+  /** Verifier names declared in `passwords.ts` (extension point 19). */
+  readonly passwords: readonly string[];
   readonly themes: number;
   readonly layouts: number;
   readonly iconSets: number;
@@ -248,6 +254,8 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
   const toolModules: RuntimeModuleRecord[] = [];
   const mqttModules: RuntimeModuleRecord[] = [];
   const mqttOwner = new Map<string, string>();
+  const passwordModules: RuntimeModuleRecord[] = [];
+  const passwordOwner = new Map<string, string>();
   const toolOwner = new Map<string, string>();
   // Extension point 7 (K-6): module messages, merged into one typed catalogue per locale.
   const i18n: Record<string, Record<string, string>> = {};
@@ -615,6 +623,49 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         }
         if (names.length)
           mqttModules.push({ name: manifest.name, ns, file: 'mqtt.ts', items: names });
+      }
+    }
+
+    // ---- passwords.ts (extension point 19) ----
+    const pw = await loadDefault<readonly { name?: string; matches?: unknown; verify?: unknown }[]>(
+      join(dir, 'passwords.ts'),
+      problems,
+      tag,
+    );
+    if (pw !== undefined) {
+      if (!Array.isArray(pw))
+        problems.push(
+          `${tag}: passwords.ts harus meng-export default array (pakai definePasswordVerifiers)`,
+        );
+      else {
+        const names: string[] = [];
+        for (const v of pw) {
+          if (
+            typeof v?.name !== 'string' ||
+            typeof v.matches !== 'function' ||
+            typeof v.verify !== 'function'
+          ) {
+            problems.push(
+              `${tag}: passwords.ts memuat entri tanpa name/matches/verify (pakai definePasswordVerifiers)`,
+            );
+            continue;
+          }
+          if (!v.name.startsWith(`${ns}.`)) {
+            problems.push(`${tag}: verifikator sandi "${v.name}" harus diawali "${ns}."`);
+            continue;
+          }
+          const owner = passwordOwner.get(v.name);
+          if (owner)
+            problems.push(
+              `verifikator sandi "${v.name}" didefinisikan oleh ${owner} dan ${manifest.name}`,
+            );
+          else {
+            passwordOwner.set(v.name, manifest.name);
+            names.push(v.name);
+          }
+        }
+        if (names.length)
+          passwordModules.push({ name: manifest.name, ns, file: 'passwords.ts', items: names });
       }
     }
 
@@ -1039,6 +1090,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
         jobs: jobModules.find((j) => j.name === m.name)?.items ?? [],
         tools: toolModules.find((t) => t.name === m.name)?.items ?? [],
         mqtt: mqttModules.find((q) => q.name === m.name)?.items ?? [],
+        passwords: passwordModules.find((p) => p.name === m.name)?.items ?? [],
         themes: themesContrib.filter((t) => t.module === m.name).length,
         layouts: layoutsContrib.filter((l) => l.module === m.name).length,
         iconSets: iconSetsContrib.filter((i) => i.module === m.name).length,
@@ -1061,7 +1113,16 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
       files.push(
         await writeFile(
           out,
-          emitApiModules(apiModules, ordered, root, out, hookModules, jobModules, mqttModules),
+          emitApiModules(
+            apiModules,
+            ordered,
+            root,
+            out,
+            hookModules,
+            jobModules,
+            mqttModules,
+            passwordModules,
+          ),
         ),
       );
       const toolsOut = join(root, 'apps/api/src/generated/tools.ts');
@@ -1139,6 +1200,7 @@ export async function syncModules(opts: SyncOptions): Promise<SyncResult> {
     hookModules,
     jobModules,
     mqttModules,
+    passwordModules,
     toolModules,
     files,
     warnings,
@@ -1308,6 +1370,7 @@ function emitRegistry(
     jobs: [],
     tools: [],
     mqtt: [],
+    passwords: [],
     themes: 0,
     layouts: 0,
     iconSets: 0,
@@ -1352,6 +1415,7 @@ export function emitApiModules(
   hookModules: readonly RuntimeModuleRecord[] = [],
   jobModules: readonly RuntimeModuleRecord[] = [],
   mqttModules: readonly RuntimeModuleRecord[] = [],
+  passwordModules: readonly RuntimeModuleRecord[] = [],
 ): string {
   const byName = new Map(ordered.map((m) => [m.name, m]));
   const imports: string[] = [];
@@ -1383,6 +1447,12 @@ export function emitApiModules(
     imports.push(`import ${ident} from '${relTo(qm.name, qm.file)}';`);
     mqttEntries.push(`  { module: '${qm.name}', subscriptions: ${ident} },`);
   }
+  const passwordEntries: string[] = [];
+  for (const pm of passwordModules) {
+    const ident = `passwords_${pm.ns.replace(/[^a-z0-9]/g, '_')}`;
+    imports.push(`import ${ident} from '${relTo(pm.name, pm.file)}';`);
+    passwordEntries.push(`  { module: '${pm.name}', verifiers: ${ident} },`);
+  }
   for (const am of apiModules) {
     const mod = byName.get(am.name);
     if (!mod) continue;
@@ -1413,6 +1483,11 @@ ${jobEntries.join('\n')}
 /** MQTT subscriptions declared by modules (extension point 18); the core client subscribes them. */
 export const moduleMqtt = [
 ${mqttEntries.join('\n')}
+];
+
+/** Password verifiers declared by modules (extension point 19), in module order. */
+export const modulePasswordVerifiers = [
+${passwordEntries.join('\n')}
 ];
 `;
 }
@@ -1811,6 +1886,7 @@ export const modulesPlugin = new Elysia({ name: 'modules' });
 export const mountedModules = [] as const;
 export const moduleHooks = [];
 export const moduleJobs = [];
+export const modulePasswordVerifiers = [];
 `,
   };
   for (const [rel, content] of Object.entries(files)) {

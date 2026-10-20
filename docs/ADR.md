@@ -41,7 +41,7 @@ Lapisan menurut graph: `db`, `contracts`, `auth`, `config`, `i18n` adalah core (
 - **API terpisah dari web** (Keputusan A). Web adalah konsumen pertama API-nya sendiri.
 - **Tidak ada token di browser** (Keputusan B). Cookie `httpOnly` `SameSite=Lax`; `load` di server memanggil API.
 - **Modul dirakit saat build** (Keputusan C, G). `bun modules:sync` membaca `modules.json` dan `module.json`, lalu meng-generate registry API, web, publik, DB, menu, izin, i18n, tool, dan tema. Berkas hasil generate tidak pernah diedit tangan.
-- **Kontrak modul tertutup: 18 titik perluasan** (PRD §4.5). Kebutuhan modul yang tidak terlayani berarti kontraknya yang diperbaiki, bukan core yang ditambal. Namespace: tabel `<nama>_*`, API `/v1/m/<nama>/*`, halaman `/m/<nama>/*`, izin/i18n/tema `<nama>.*`.
+- **Kontrak modul tertutup: 19 titik perluasan** (PRD §4.5). Kebutuhan modul yang tidak terlayani berarti kontraknya yang diperbaiki, bukan core yang ditambal. Namespace: tabel `<nama>_*`, API `/v1/m/<nama>/*`, halaman `/m/<nama>/*`, izin/i18n/tema `<nama>.*`.
 - **Dogfooding** (Keputusan H). `AI` dan `Example` memakai kontrak yang sama dengan modul pihak ketiga.
 - **Modul lintas repo** (Keputusan L). Sumber `local` / `submodule` (baku) / `package`; `@core/*` adalah paket nyata.
 - **Kontrak API dari satu definisi.** Skema TypeBox ditulis bersama route → validasi, tipe, dan OpenAPI.

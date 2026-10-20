@@ -9,6 +9,9 @@ import { randomToken } from './tokens.ts';
 export const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 export const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 export const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
+/** Checks an ID token's signature and expiry for us and answers its claims. */
+export const GOOGLE_TOKENINFO_URL = 'https://oauth2.googleapis.com/tokeninfo';
+const GOOGLE_ISSUERS = new Set(['accounts.google.com', 'https://accounts.google.com']);
 
 /** base64url(SHA-256(verifier)) — the S256 code challenge. */
 export function pkceChallenge(verifier: string): string {
@@ -76,6 +79,25 @@ export interface OAuthIdentity {
   avatarUrl: string | null;
   /** Google Workspace domain when the account belongs to one. */
   hostedDomain: string | null;
+}
+
+/**
+ * Claims of a Google ID token as answered by the tokeninfo endpoint (sign-in from a native app).
+ * Google has already checked the signature; this checks what is ours to check: the token was
+ * minted for one of `audiences` (our client ids), by Google, and has not expired. Null otherwise.
+ */
+export function parseGoogleIdTokenInfo(
+  raw: unknown,
+  audiences: readonly string[],
+  now = new Date(),
+): OAuthIdentity | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.aud !== 'string' || !audiences.includes(r.aud)) return null;
+  if (typeof r.iss !== 'string' || !GOOGLE_ISSUERS.has(r.iss)) return null;
+  const exp = Number(r.exp);
+  if (!Number.isFinite(exp) || exp * 1000 <= now.getTime()) return null;
+  return parseGoogleUserinfo(r);
 }
 
 /** Normalise Google's `userinfo` document; anything malformed becomes null. */

@@ -13,6 +13,9 @@ import { hashToken, randomToken } from './tokens.ts';
 
 export type ApiTokenRow = typeof schema.apiTokens.$inferSelect;
 
+/** `api` = minted by the user; `login` = issued by an app sign-in and refreshable. */
+export type ApiTokenKind = 'api' | 'login';
+
 export interface NewApiToken {
   readonly userId: string;
   /** Tenant the token acts in; null = the user's default tenant at call time. */
@@ -21,6 +24,8 @@ export interface NewApiToken {
   /** Permission strings the token is limited to; null = the user's full permissions. */
   readonly scopes: readonly string[] | null;
   readonly expiresAt: Date | null;
+  /** Defaults to `api`. */
+  readonly kind?: ApiTokenKind;
 }
 
 export interface CreatedApiToken {
@@ -41,6 +46,7 @@ export async function createApiToken(db: Db, t: NewApiToken): Promise<CreatedApi
     user_id: t.userId,
     client_id: t.clientId,
     name: t.name.trim().slice(0, 100),
+    kind: t.kind ?? 'api',
     token_hash: hashToken(token),
     scopes: t.scopes ? [...t.scopes] : null,
     expires_at: t.expiresAt,
@@ -79,6 +85,49 @@ export async function findApiToken(
       .where(eq(schema.apiTokens.id, row.token.id));
   }
   return row;
+}
+
+export type RefreshLookup =
+  | { readonly ok: true; readonly token: ApiTokenRow; readonly user: UserRow }
+  | { readonly ok: false; readonly reason: 'token_invalid' | 'refresh_expired' };
+
+/**
+ * Resolve a `login` token for a refresh: it may already be past `expires_at`, but not by more
+ * than `windowMs`. Revoked tokens, `api` tokens and tokens of inactive users never qualify.
+ */
+export async function findRefreshableToken(
+  db: Db,
+  token: string,
+  windowMs: number,
+  now = new Date(),
+): Promise<RefreshLookup> {
+  const rows = await db
+    .select({ token: schema.apiTokens, user: schema.users })
+    .from(schema.apiTokens)
+    .innerJoin(schema.users, eq(schema.users.id, schema.apiTokens.user_id))
+    .where(
+      and(
+        eq(schema.apiTokens.token_hash, hashToken(token)),
+        eq(schema.apiTokens.kind, 'login'),
+        isNull(schema.apiTokens.deleted_at),
+        isNull(schema.users.deleted_at),
+        eq(schema.users.status_id, STATUS.ACTIVE),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row?.token.expires_at) return { ok: false, reason: 'token_invalid' };
+  if (now.getTime() > row.token.expires_at.getTime() + windowMs)
+    return { ok: false, reason: 'refresh_expired' };
+  return { ok: true, token: row.token, user: row.user };
+}
+
+/** Move a token's expiry (a refresh keeps the same secret, so concurrent refreshes agree). */
+export async function extendApiToken(db: Db, id: string, expiresAt: Date): Promise<void> {
+  await db
+    .update(schema.apiTokens)
+    .set({ expires_at: expiresAt, last_used_at: new Date() })
+    .where(eq(schema.apiTokens.id, id));
 }
 
 /** The user's live tokens, newest first — never the hash. */
