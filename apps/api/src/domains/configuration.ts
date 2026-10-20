@@ -49,6 +49,10 @@ const Field = t.Object({
   public: t.Boolean(),
   min: t.Nullable(t.Number()),
   max: t.Nullable(t.Number()),
+  /** For `string`: the regular expression the whole value must match. */
+  pattern: t.Nullable(t.String()),
+  /** Help link drawn under the field: where to find the value it asks for. */
+  link: t.Nullable(t.Object({ href: t.String(), label: Localized })),
   /** Key of the section group the field is drawn under; null = before every group. */
   group: t.Nullable(t.String()),
   /** Layout hint for wide screens; the registry default is already applied. */
@@ -323,6 +327,8 @@ export const configuration = new Elysia({
             public: f.public,
             min: f.min,
             max: f.max,
+            pattern: f.pattern,
+            link: f.link ? { href: f.link.href, label: { ...f.link.label } } : null,
             group: f.group,
             width: f.width,
             source: f.source,

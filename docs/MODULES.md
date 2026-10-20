@@ -504,6 +504,8 @@ Tipe: `string · text · number · boolean · select · secret · markdown · ro
 
 Murni tampilan: nilai, validasi, dan tombol **Simpan** tetap satu per section. `width` berlaku di layar lebar — `full` satu baris penuh, `half` dua per baris, `third` tiga per baris (mulai `lg`; di bawahnya dua) — dan ponsel selalu satu per baris; tanpa `width`, `text`/`markdown`/`list` penuh, selebihnya `half`. Field tanpa `group` digambar lebih dulu, di atas grup pertama; grup tanpa field tidak digambar. `defineConfig` menolak `group` yang tidak dideklarasikan section-nya, key grup ganda, dan key yang bukan slug. Jam milik field `timezone` digambar di **penutup blok** tempat field itu berada. Contoh nyata: section `app` core (`packages/settings/src/registry.ts`) — *Aplikasi* · *Halaman baku* · *Tema & tata letak*.
 
+**Format field `string` (`pattern`).** Field `string` boleh membawa `pattern`: regex (sumber, tanpa flag) yang harus cocok dengan **seluruh** nilai, mis. `pattern: 'G-[A-Z0-9]{4,20}'`. Diperiksa saat simpan (galat "format tidak sesuai") dan dipasang sebagai atribut `pattern` di input form. Field mana pun juga boleh membawa `link: { href, label }` — tautan bantuan di bawah field, mis. ke halaman yang menjelaskan cara mendapatkan nilainya; `href` wajib URL `https://` (dibuka di tab baru) atau path situs ini yang diawali `/`, selain itu `defineConfig` menolaknya. Contoh nyata keduanya: `analytics.ga_measurement_id` di section `analytics` core.
+
 **Mode pemeliharaan (E-10).** Core punya dua sakelar yang menutup aplikasi untuk semua orang kecuali superadmin dan anggota group Administrator: `app.maintenance_mode` di Pengaturan (per tenant) dan `MAINTENANCE_MODE=true` di `.env` (seluruh deployment). Yang `.env` menutup semua URL — API modul ikut 503 — jadi modul tidak perlu berbuat apa pun. Yang dari Pengaturan sengaja **membiarkan halaman dan API publik tetap tayang** untuk pengunjung anonim; di sinilah modul memutuskan apa yang dimatikan: di API, `const m = await maintenanceState(tenantState.clientId)` dari `@app/api/maintenance` lalu tolak transaksi dengan `maintenanceFailure(requestId, m.source)` (503 kode `maintenance`) sementara `GET` katalog tetap dilayani; di halaman, `event.locals.maintenance.active` (loader) atau `page.data.maintenance.active` (komponen) untuk menyembunyikan tombol beli/kirim dan menampilkan pemberitahuan. Pengguna bersesi yang bukan administrator tidak pernah sampai ke halaman modul selama mode aktif — hooks sudah menjawab mereka dengan halaman `/maintenance`.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
@@ -769,6 +771,18 @@ importSeconds.observeMs({ source: 'csv' }, performance.now() - t0);
 ```
 
 Aturannya: nama Prometheus (`<ns>_…_total`, akhiran satuan), nilai label **terbatas** — jenis, status, sumber; **tidak pernah** id user, id tenant, atau teks bebas. Nama yang sama didaftarkan dua kali mengembalikan instrumen yang sama. Panduan pemakaian dan daftar metrik core: [`DEPLOY.md` §7a](./DEPLOY.md).
+
+### Event analitik dari modul (E-11)
+
+Kunjungan halaman modul sudah dilaporkan core. Untuk aksi yang memang penting bagi produk, panggil `track()` dari kode browser (komponen Svelte, handler `onclick`, sesudah form berhasil):
+
+```ts
+import { track } from '@core/module-kit/analytics';
+
+track('billing.invoice_paid', { method: 'transfer', items: 3 });
+```
+
+Aturannya: nama event **wajib** `<ns>.<nama>` (huruf kecil, angka, `_`; dikirim ke penyedia sebagai `billing_invoice_paid`, maksimal 40 karakter); parameter hanya string pendek (≤ 100 karakter), angka, atau boolean, dan kunci yang berbau data pribadi (`email`, `phone`, `name`, `user…`, `address`, `token`, …) **dibuang** — jangan pernah mengirim id record, id user, atau isi yang diketik pengguna. Modul tidak perlu memeriksa apa pun: bila analitik mati, area halaman itu tidak dilacak, atau pengunjung belum menyetujui, `track()` tidak melakukan apa-apa. Aksi CRUD **tidak** dilaporkan otomatis oleh core — modul yang memutuskan aksi mana yang bermakna. Bukti: `packages/module-kit/test/analytics.test.ts`.
 
 ### Data wilayah dari modul
 

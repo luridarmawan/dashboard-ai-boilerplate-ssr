@@ -1,3 +1,5 @@
+import { ANALYTICS_EVENT_COOKIE, CONSENT_COOKIE } from '../analytics/core.ts';
+
 /**
  * Every cookie the web app writes, in one place. The modules that own each cookie re-export its
  * name from here, so callers keep importing from them; this registry exists so the logout sweep
@@ -16,6 +18,12 @@ export const MODE_COOKIE = 'crk_mode';
 export const LANG_COOKIE = 'crk_lang';
 export const DIR_COOKIE = 'crk_dir';
 export const SIDEBAR_COOKIE = 'crk_sidebar';
+/**
+ * Analytics consent and the one-shot event flag. Both are read and written in the browser too,
+ * so their names live with the client code; the consent is swept on logout like the other
+ * preferences — the next person at a shared machine is asked again, not handed someone's answer.
+ */
+export { ANALYTICS_EVENT_COOKIE, CONSENT_COOKIE };
 
 /** All of the above with the path each one was set under — a cookie is only deleted at its own path. */
 export const APP_COOKIES: readonly { readonly name: string; readonly path: string }[] = [
@@ -28,4 +36,6 @@ export const APP_COOKIES: readonly { readonly name: string; readonly path: strin
   { name: LANG_COOKIE, path: '/' },
   { name: DIR_COOKIE, path: '/' },
   { name: SIDEBAR_COOKIE, path: '/' },
+  { name: CONSENT_COOKIE, path: '/' },
+  { name: ANALYTICS_EVENT_COOKIE, path: '/' },
 ];

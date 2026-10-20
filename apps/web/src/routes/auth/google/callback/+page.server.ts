@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { flagAnalyticsEvent } from '$lib/server/analytics';
 import { cfgString } from '$lib/server/config';
 import { OAUTH_COOKIE, OAUTH_COOKIE_PATH, safeNext } from '$lib/server/oauth';
 import { apiFor, csrfToken, forwardSetCookies, unwrap } from '$lib/server/session';
@@ -63,5 +64,6 @@ export const load: PageServerLoad = async (event) => {
   if (r.data.data.mfaRequired && r.data.data.challenge)
     return { csrf, mfa: { challenge: r.data.data.challenge, next } };
   forwardSetCookies(event, res.response);
+  flagAnalyticsEvent(event, 'login');
   redirect(303, next);
 };

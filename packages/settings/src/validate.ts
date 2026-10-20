@@ -171,6 +171,8 @@ export function validateValue(
         return { ok: false, message: `maksimal ${field.max} karakter` };
       if (field.min !== undefined && s.length < field.min)
         return { ok: false, message: `minimal ${field.min} karakter` };
+      if (field.type === 'string' && field.pattern && !new RegExp(`^(?:${field.pattern})$`).test(s))
+        return { ok: false, message: 'format tidak sesuai' };
       return { ok: true, stored: s };
     }
   }

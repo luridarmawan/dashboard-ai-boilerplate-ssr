@@ -1,5 +1,6 @@
 import { ANONYMOUS_NAMESPACES, messagesFor } from '@core/i18n';
 import { modulePublicRoutes } from '$lib/../generated/public-routes';
+import { analyticsConfig } from '$lib/server/analytics';
 import { brandedMessages } from '$lib/server/branding';
 import { cfgString } from '$lib/server/config';
 import type { LayoutServerLoad } from './$types';
@@ -45,6 +46,8 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
   },
   locale: locals.locale.locale,
   dir: locals.dir,
+  /** Visitor analytics (Settings → Analytics); null = off, and the browser loads nothing for it. */
+  analytics: analyticsConfig(locals.config),
   /**
    * Maintenance mode (E-10) as every page — module pages included — may read it: on/off, which
    * switch, and whether this visitor is exempt. A public module page uses `active` to switch a

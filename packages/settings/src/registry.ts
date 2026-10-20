@@ -694,6 +694,99 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     ],
   },
   {
+    // Visitor analytics. Every value is public: the web shell reads them on anonymous pages to
+    // decide whether to load the provider's script, and a measurement id is not a secret.
+    section: 'analytics',
+    title: { id: 'Analitik', en: 'Analytics' },
+    note: {
+      id: 'Pelacakan kunjungan halaman dan aktivitas pengguna. Halaman dasbor dikirim sebagai pola route (mis. /users/[id]), tanpa id, query, maupun data pengguna. Analitik memproses data pribadi — sebutkan di kebijakan privasi.',
+      en: 'Tracking of page views and user activity. Dashboard pages are sent as route patterns (e.g. /users/[id]), without ids, query strings or user data. Analytics is personal-data processing — mention it in your privacy policy.',
+    },
+    order: 22,
+    fields: [
+      {
+        key: 'analytics.enabled',
+        type: 'boolean',
+        title: { id: 'Aktifkan analitik', en: 'Enable analytics' },
+        default: false,
+        public: true,
+        order: 0,
+        width: 'full',
+      },
+      {
+        key: 'analytics.provider',
+        type: 'select',
+        title: { id: 'Penyedia', en: 'Provider' },
+        options: [
+          { value: 'google', label: { id: 'Google Analytics 4', en: 'Google Analytics 4' } },
+        ],
+        default: 'google',
+        public: true,
+        order: 1,
+        link: {
+          href: 'https://analytics.google.com/analytics/web/',
+          label: {
+            id: 'Lihat data analitik di Google Analytics',
+            en: 'View analytics data in Google Analytics',
+          },
+        },
+      },
+      {
+        key: 'analytics.ga_measurement_id',
+        type: 'string',
+        title: { id: 'Measurement ID', en: 'Measurement ID' },
+        note: {
+          id: 'Dari Google Analytics → Admin → Aliran data, bentuknya G-XXXXXXXXXX. Analitik tidak berjalan selama ini kosong.',
+          en: 'From Google Analytics → Admin → Data streams, shaped G-XXXXXXXXXX. Analytics stays off while this is empty.',
+        },
+        default: null,
+        public: true,
+        max: 32,
+        pattern: 'G-[A-Z0-9]{4,20}',
+        link: {
+          href: 'https://support.google.com/analytics/answer/12270356',
+          label: { id: 'Cara menemukan Measurement ID', en: 'How to find your Measurement ID' },
+        },
+        order: 2,
+      },
+      {
+        key: 'analytics.track_public',
+        type: 'boolean',
+        title: { id: 'Lacak halaman publik', en: 'Track public pages' },
+        default: true,
+        public: true,
+        order: 3,
+        width: 'third',
+      },
+      {
+        key: 'analytics.track_dashboard',
+        type: 'boolean',
+        title: { id: 'Lacak dasbor', en: 'Track the dashboard' },
+        note: {
+          id: 'Kunjungan halaman, masuk/keluar, pencarian, dan event yang dikirim modul.',
+          en: 'Page views, sign-in/out, searches, and events modules send.',
+        },
+        default: true,
+        public: true,
+        order: 4,
+        width: 'third',
+      },
+      {
+        key: 'analytics.require_consent',
+        type: 'boolean',
+        title: { id: 'Minta persetujuan pengunjung', en: 'Ask visitors for consent' },
+        note: {
+          id: 'Menampilkan banner cookie; skrip analitik baru dimuat setelah pengunjung menyetujuinya. Matikan hanya bila dasar hukum lain berlaku (mis. aplikasi internal).',
+          en: 'Shows a cookie banner; the analytics script loads only after the visitor agrees. Switch off only when another legal basis applies (e.g. an internal app).',
+        },
+        default: true,
+        public: true,
+        order: 5,
+        width: 'third',
+      },
+    ],
+  },
+  {
     section: 'mqtt',
     title: { id: 'MQTT', en: 'MQTT' },
     note: {
