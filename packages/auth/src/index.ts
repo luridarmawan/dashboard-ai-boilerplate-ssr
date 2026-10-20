@@ -36,7 +36,13 @@ export {
   pkceChallenge,
   pkcePair,
 } from './oauth.ts';
-export { hashPassword, needsRehash, passwordProblems, verifyPassword } from './password.ts';
+export {
+  hashPassword,
+  type LegacyPasswordVerifier,
+  needsRehash,
+  passwordProblems,
+  verifyPassword,
+} from './password.ts';
 export {
   grantSatisfies,
   hasPermission,

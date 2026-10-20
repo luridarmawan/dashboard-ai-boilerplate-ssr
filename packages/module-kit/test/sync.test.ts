@@ -316,6 +316,10 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
     expect(r.mqttModules).toEqual([
       { name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] },
     ]);
+    // So does passwords.ts (extension point 19).
+    expect(r.passwordModules).toEqual([
+      { name: 'Alpha', ns: 'alpha', file: 'passwords.ts', items: ['alpha.legacy'] },
+    ]);
   });
 
   test('unknown event, unprefixed job and sub-second interval are all reported', async () => {
@@ -347,6 +351,13 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       p.some((x) => /Naughty.*"naughty\.broken".*"#" hanya boleh di level terakhir/.test(x)),
     ).toBe(true);
     expect(p.some((x) => /Naughty.*"naughty\.shared".*\$share/.test(x))).toBe(true);
+    // passwords.ts (extension point 19): foreign prefix, an entry without verify
+    expect(
+      p.some((x) => /Naughty.*verifikator sandi "legacy" harus diawali "naughty\."/.test(x)),
+    ).toBe(true);
+    expect(
+      p.some((x) => /Naughty.*passwords\.ts memuat entri tanpa name\/matches\/verify/.test(x)),
+    ).toBe(true);
   });
 
   test('emitApiModules exports moduleHooks and moduleJobs from the module files', () => {
@@ -368,7 +379,10 @@ describe('syncModules — hooks & jobs (extension points 9 & 12)', () => {
       [{ name: 'Alpha', ns: 'alpha', file: 'hooks.ts', items: ['system.ping'] }],
       [{ name: 'Alpha', ns: 'alpha', file: 'jobs.ts', items: ['alpha.sweep'] }],
       [{ name: 'Alpha', ns: 'alpha', file: 'mqtt.ts', items: ['alpha.readings'] }],
+      [{ name: 'Alpha', ns: 'alpha', file: 'passwords.ts', items: ['alpha.legacy'] }],
     );
+    expect(out).toContain("import passwords_alpha from '../../../../modules/Alpha/passwords.ts';");
+    expect(out).toContain("{ module: 'Alpha', verifiers: passwords_alpha },");
     expect(out).toContain("import hooks_alpha from '../../../../modules/Alpha/hooks.ts';");
     expect(out).toContain("import jobs_alpha from '../../../../modules/Alpha/jobs.ts';");
     expect(out).toContain("import mqtt_alpha from '../../../../modules/Alpha/mqtt.ts';");

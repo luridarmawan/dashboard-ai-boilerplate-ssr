@@ -101,6 +101,7 @@ export {
   type MqttSubscriptionDef,
   matchTopic,
 } from './mqtt.ts';
+export { definePasswordVerifiers, type PasswordVerifierDef } from './passwords.ts';
 export {
   BREAKPOINT,
   cleanupStatements,

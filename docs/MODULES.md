@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Versi 2 — kontrak M6. Semua titik perluasan yang bisa dipakai hari ini ada di §2a; yang belum ada ditandai di §6 dan tidak boleh diasumsikan |
-| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (18 titik perluasan), §4.9 (modul lintas repositori), FR-G |
+| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (19 titik perluasan), §4.9 (modul lintas repositori), FR-G |
 | **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
 | **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
 | **Tutorial** | Langkah demi langkah, dengan penjelasan tiap perintah: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) (modul di dalam repo ini) · [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) (repositori sendiri, termasuk repo privat). Dokumen ini kontraknya; keduanya alurnya |
@@ -57,7 +57,7 @@ INTEGRATION=1 bun test modules/Billing/test
 
 Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langkah "regenerate" yang akan menimpanya.
 
-### 2a. Peta 18 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
+### 2a. Peta 19 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
 
 | # | Titik perluasan | Berkas di modul | Contoh hidup | Dibuktikan oleh |
 |---|---|---|---|---|
@@ -79,6 +79,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
 | 17 | Route tanpa CSRF | `csrf-exempt.ts` (`defineCsrfExempt`) — route API yang dipanggil sistem luar tanpa bearer maupun pasangan CSRF; request-nya selalu anonim | `modules/Example/csrf-exempt.ts` → `POST /v1/m/example/inbound/inquiries` | `apps/api/test/csrf.test.ts`, `apps/api/test/integration/example.test.ts` |
 | 18 | Langganan MQTT | `mqtt.ts` (`defineMqtt`) — topik yang dilanggan lewat klien MQTT **inti** (satu per proses, sakelar di **Pengaturan → MQTT**); `shared: true` = satu pesan diproses satu instance; publish lewat `publish()` dari `@app/api/mqtt` ([`MQTT.md`](./MQTT.md)) | `modules/Example/mqtt.ts` → `example/<tenant>/inquiries` | `apps/api/test/mqtt.test.ts`, `packages/module-kit/test/mqtt.test.ts`, `scripts/ci/mqtt-smoke.ts`, `apps/api/test/integration/example.test.ts` |
+| 19 | Verifikator sandi | `passwords.ts` (`definePasswordVerifiers`) — memeriksa hash sandi format asing (user hasil impor dari sistem lain); core hanya bertanya untuk hash yang bukan Argon2/bcrypt, melewati modul yang nonaktif, dan me-rehash akun ke Argon2id pada login berikutnya | `modules/Example/passwords.ts` → hash WordPress (`$wp$` dan phpass `$P$`) | `modules/Example/test/passwords.test.ts`, `packages/auth/test/primitives.test.ts`, `packages/module-kit/test/sync.test.ts`, `apps/api/test/integration/app-token.test.ts` |
 
 ### 2b. Secara manual (kalau ingin memahami tiap berkas)
 
@@ -662,6 +663,24 @@ export default defineMqtt('Billing', [
 
 Core memegang **satu** klien MQTT per proses API — broker, kredensial, versi protokol, dan sakelar on/off ada di **Pengaturan → MQTT** (lingkup global; `MQTT_*` di `.env` sebagai bootstrap), berlaku tanpa restart. Modul tidak mengimpor pustaka MQTT dan tidak mengelola koneksi. Awalan topik deployment (`mqtt.topic_prefix`) ditambahkan ke langganan dan publish, dan dihilangkan sebelum pesan sampai ke handler. Handler berjalan tanpa request, di instance yang menerima pesan; yang melempar dicatat dan dihitung, tidak menjatuhkan klien (G-7). Tenant tidak ikut dalam sesi broker — bawa di topik atau isi pesan. Menerbitkan dari mana saja: `publish(topic, payload, { qos, retain })` dari `@app/api/mqtt`, tidak pernah melempar (`{ ok: false, reason: 'disabled' }` saat klien mati), dan `mqttState()` untuk status. Rincian, metrik, dan broker dev/prod di [`MQTT.md`](./MQTT.md).
 
+### `passwords.ts` — verifikator sandi (titik perluasan 19)
+
+```ts
+import { definePasswordVerifiers } from '@core/module-kit';
+
+export default definePasswordVerifiers('Legacy', [
+  {
+    name: 'legacy.oldapp',                             // wajib "legacy.*"
+    matches: (hash) => hash.startsWith('$old$'),       // murah & murni: format milik verifikator ini?
+    verify: (plain, hash) => oldAppCheck(plain, hash), // boolean atau Promise<boolean>
+  },
+]);
+```
+
+Untuk aplikasi yang memindahkan user dari sistem lain dan menyalin hash sandinya **apa adanya** ke `users.password_hash`. Core memverifikasi Argon2 dan bcrypt sendiri; hash dengan format lain diserahkan ke verifikator pertama yang `matches`-nya `true` (urutan modul). Verifikator milik modul yang **nonaktif** tidak dipakai. Setelah sandi terbukti benar, core langsung me-**rehash** akun ke Argon2id — hash asing hilang setelah satu kali login, dan verifikatornya boleh dibuang begitu semua user hasil impor sudah pernah masuk. Verifikator adalah kode murni: tanpa database, tanpa jaringan, tanpa state; pengecualian dihitung sebagai sandi salah. Berlaku untuk masuk browser, masuk aplikasi (`/auth/token`), konfirmasi sandi saat mematikan 2FA, dan ganti sandi.
+
+Contoh hidup `modules/Example/passwords.ts` memeriksa hash WordPress persis seperti `wp_check_password()`: `$wp$2y$…` (WordPress 6.8+, bcrypt atas HMAC-SHA384) dan `$P$…` (phpass portable). Salin berkas itu ke modul Anda bila mengimpor user WordPress.
+
 ### Notifikasi dari modul (J-4)
 
 Modul memberi tahu pengguna lewat bel di header dengan memanggil layanan core — bukan menulis tabelnya sendiri:
@@ -866,6 +885,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Tool tanpa prefiks / izin tak dideklarasikan / skema bukan objek | `… nama tool "other.thing" harus diawali "billing." (G-9)` · `… tool "billing.ghost" menuntut izin "billing.nothing.read" yang tidak ada di permissions.ts` · `… tool "billing.bare": input harus JSON Schema bertipe object` |
 | Pengecualian CSRF salah bentuk / tanpa route | `… pengecualian CSRF "GET /feed" tidak valid` · `… pengecualian CSRF "POST /inbound" tanpa reason` · `… pengecualian CSRF "POST /ghost" tidak cocok dengan route mana pun di api/routes.ts` |
 | Langganan MQTT tanpa prefiks / filter rusak / `$share/` tulisan tangan | `… langganan MQTT "readings" harus diawali "billing."` · `… langganan MQTT "billing.broken": filter topik tidak valid — "#" hanya boleh di level terakhir` · `… jangan tulis $share/ — pakai \`shared: true\`` |
+| Verifikator sandi tanpa prefiks / tanpa fungsi | `… verifikator sandi "oldapp" harus diawali "billing."` · `… passwords.ts memuat entri tanpa name/matches/verify (pakai definePasswordVerifiers)` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -895,7 +915,7 @@ Mencabut modul (G-15): `bun modules:remove <Nama>` — tampilkan rencananya lebi
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua 18 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
+Semua 19 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
 
 | Hal | Status |
 |---|---|

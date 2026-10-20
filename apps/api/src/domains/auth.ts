@@ -10,6 +10,7 @@ import {
   hashToken,
   invalidateUserSessions,
   isMaintenanceExempt,
+  needsRehash,
   parseRateLimitRule,
   passwordProblems,
   peekRateLimit,
@@ -21,7 +22,6 @@ import {
   revokeSession,
   setActiveTenant,
   tenantsOf,
-  verifyPassword,
   verifyTotp,
   writeAudit,
 } from '@core/auth';
@@ -41,6 +41,7 @@ import { markActed } from '@core/mail';
 import { Elysia, t } from 'elysia';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
 import { maintenanceState, refuseLoginDuringMaintenance } from '../maintenance.ts';
+import { checkPassword } from '../passwords.ts';
 import {
   authContext,
   clientIp,
@@ -281,7 +282,7 @@ export async function passwordFirstFactor(p: {
     .limit(1);
   const valid =
     user?.status_id === STATUS.ACTIVE &&
-    (await verifyPassword(p.password, user?.password_hash ?? null));
+    (await checkPassword(p.password, user?.password_hash ?? null));
   if (!user || !valid) {
     // The failed guess is what costs: spend one from both counters and report what is left.
     const spent = tightestOf(
@@ -300,6 +301,13 @@ export async function passwordFirstFactor(p: {
     });
     set.status = 401;
     return { refused: fail('invalid_credentials', 'Email atau kata sandi salah', requestId) };
+  }
+
+  // The password just proved itself: an older cost, bcrypt, or a hash imported from another
+  // system (extension point 19) becomes current Argon2id now, so the old format dies out.
+  if (user.password_hash && needsRehash(user.password_hash)) {
+    const password_hash = await hashPassword(p.password);
+    await db.update(schema.users).set({ password_hash }).where(eq(schema.users.id, user.id));
   }
 
   // E-10: a closed door is announced before the second factor is asked for.

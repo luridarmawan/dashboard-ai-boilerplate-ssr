@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createApiToken } from '@core/auth';
 import { resetEnvCache } from '@core/config';
-import { type Db, eq, schema, unsafeAcrossTenants } from '@core/db';
+import { type Db, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { settings } from '../../src/services.ts';
 
@@ -149,6 +149,50 @@ describe.skipIf(!enabled)('app sign-in tokens (A-4)', () => {
     const res = await signIn('/v1/auth/token', { email, password: 'not the right one at all' });
     expect(res.status).toBe(401);
     expect((await json(res)).error?.code).toBe('invalid_credentials');
+  });
+
+  test('a bcrypt hash signs in and is upgraded to Argon2id on the way', async () => {
+    const hashOf = async () =>
+      (
+        await db
+          .select({ h: schema.users.password_hash })
+          .from(schema.users)
+          .where(eq(schema.users.email, email))
+          .limit(1)
+      )[0]?.h ?? '';
+    await db
+      .update(schema.users)
+      .set({ password_hash: await Bun.password.hash(password, 'bcrypt') })
+      .where(eq(schema.users.email, email));
+    expect((await hashOf()).startsWith('$2')).toBe(true);
+    const res = await signIn('/v1/auth/token', { email, password });
+    expect(res.status).toBe(200);
+    expect((await hashOf()).startsWith('$argon2id$')).toBe(true);
+  });
+
+  test('users imported from WordPress sign in through the Example module verifier', async () => {
+    // Generated with WordPress' own code for this password (extension point 19).
+    const imported = 'an imported wordpress password';
+    const hashes = {
+      phpass: '$P$BiHhcmbVbHoXNCs8qgDxg/OI0K.K6I/',
+      wp: '$wp$2y$10$IDrsT8L6KxpgSPSv7VEa5O.4BMHvOP1Ek9bpzWs2LAZ64gkMqQjw2',
+    };
+    for (const [kind, hash] of Object.entries(hashes)) {
+      const wpEmail = `wp-${kind}-${run}@example.test`;
+      await db
+        .insert(schema.users)
+        .values({ id: newId(), email: wpEmail, name: `WP ${kind}`, password_hash: hash });
+      const wrong = await signIn('/v1/auth/token', { email: wpEmail, password: 'not it at all!' });
+      expect(wrong.status).toBe(401);
+      const res = await signIn('/v1/auth/token', { email: wpEmail, password: imported });
+      expect(res.status).toBe(200);
+      const [row] = await db
+        .select({ h: schema.users.password_hash })
+        .from(schema.users)
+        .where(eq(schema.users.email, wpEmail))
+        .limit(1);
+      expect(row?.h?.startsWith('$argon2id$')).toBe(true);
+    }
   });
 
   test('the token opens the API without cookie or CSRF', async () => {
