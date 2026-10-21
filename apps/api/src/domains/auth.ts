@@ -674,12 +674,13 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         return fail('rate_limited', 'Terlalu banyak permintaan — coba lagi nanti', requestId);
       }
       const [user] = await db
-        .select({ id: schema.users.id })
+        .select({ id: schema.users.id, name: schema.users.name })
         .from(schema.users)
         .where(and(eq(schema.users.email, email), isNull(schema.users.deleted_at)))
         .limit(1);
       if (user) {
         const token = randomToken();
+        const name = (user.name ?? '').trim();
         await db.insert(schema.passwordResetTokens).values({
           id: newId(),
           user_id: user.id,
@@ -688,10 +689,11 @@ export const auth = new Elysia({ name: 'auth', prefix: '/auth', tags: ['auth'] }
         });
         await sendTemplate(db, {
           to: email,
+          toName: name || null,
           template: 'reset-password',
           locale: await mailLocale({ request }),
           clientId: null,
-          data: { name: '', link: publicLink(`/auth/reset?token=${token}`, request) },
+          data: { name, link: publicLink(`/auth/reset?token=${token}`, request) },
         });
       }
       // Always the same answer: whether the email exists is not for the caller to learn.

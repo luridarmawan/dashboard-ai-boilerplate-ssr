@@ -28,6 +28,23 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(id.html).toContain('Acme Dash');
     expect(id.text).toContain('https://acme.test/auth/reset?token=abc');
   });
+  test('the greeting carries the name, and degrades to a plain "Hello," without one', () => {
+    const link = 'https://acme.test/auth/reset?token=abc';
+    expect(
+      renderTemplate('reset-password', 'en', { name: 'Luri Darmawan', link }, brand).html,
+    ).toContain('<p>Hello Luri Darmawan,</p>');
+    expect(renderTemplate('reset-password', 'id', { name: 'Budi', link }, brand).html).toContain(
+      '<p>Halo Budi,</p>',
+    );
+    // No name (an imported account, or a caller that has none): no dangling " ," in the mail.
+    expect(renderTemplate('reset-password', 'en', { name: '', link }, brand).html).toContain(
+      '<p>Hello,</p>',
+    );
+    expect(renderTemplate('reset-password', 'id', { link }, brand).html).toContain('<p>Halo,</p>');
+    expect(renderTemplate('reset-password', 'en', { name: '  ', link }, brand).html).not.toContain(
+      'Hello ,',
+    );
+  });
   test('the header carries the app name, beside the logo when there is one', () => {
     const plain = renderTemplate('invite', 'id', { link: 'https://acme.test/join/abc' }, brand);
     expect(plain.html).toContain('>Acme Dash</strong>');
