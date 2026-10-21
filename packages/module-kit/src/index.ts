@@ -25,6 +25,7 @@ export {
   type ConfigActionResult,
   type ConfigFieldDef,
   type ConfigFieldGroupDef,
+  type ConfigFieldLinkDef,
   type ConfigFieldType,
   type ConfigFieldWidth,
   type ConfigSectionActionDef,
@@ -100,6 +101,7 @@ export {
   type MqttSubscriptionDef,
   matchTopic,
 } from './mqtt.ts';
+export { definePasswordVerifiers, type PasswordVerifierDef } from './passwords.ts';
 export {
   BREAKPOINT,
   cleanupStatements,

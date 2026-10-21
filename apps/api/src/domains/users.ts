@@ -17,7 +17,6 @@ import {
   randomToken,
   revokeAllSessions,
   revokeSession,
-  verifyPassword,
   verifyTotp,
   writeAudit,
 } from '@core/auth';
@@ -57,6 +56,7 @@ import { fileIdFromUrl, findAvatarFile, removeFile, storeUpload } from '../files
 import { conflict, Id, ListQuery, likePattern, notFound, paging, scopeOf } from '../lib/http.ts';
 import { isIpLiteral, lookupIp } from '../lib/ip-lookup.ts';
 import { mailLocale, publicLink, sendTemplate } from '../mail.ts';
+import { checkPassword } from '../passwords.ts';
 import {
   type AuthState,
   clientIp,
@@ -725,7 +725,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
     async ({ auth, body, set, request, server, requestId, tenantState }) => {
       const a = actor(auth);
       const db = unsafeAcrossTenants();
-      if (!(await verifyPassword(body.password, a.user.password_hash ?? null))) {
+      if (!(await checkPassword(body.password, a.user.password_hash ?? null))) {
         set.status = 401;
         return fail('invalid_credentials', 'Kata sandi salah', requestId);
       }
@@ -1049,7 +1049,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
     async ({ auth, body, set, request, server, requestId, tenantState }) => {
       const a = actor(auth);
       const db = unsafeAcrossTenants();
-      if (!(await verifyPassword(body.currentPassword, a.user.password_hash))) {
+      if (!(await checkPassword(body.currentPassword, a.user.password_hash))) {
         set.status = 401;
         return fail('invalid_credentials', 'Kata sandi saat ini salah', requestId);
       }

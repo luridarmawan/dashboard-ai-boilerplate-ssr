@@ -62,6 +62,17 @@ describe('defineConfig field groups (extension point 6)', () => {
       ModuleContractError,
     );
   });
+
+  test('a help link is an https URL or a path on this site', () => {
+    const withLink = (href: string) => {
+      const s = section([]);
+      return [{ ...s, fields: s.fields.map((f) => ({ ...f, link: { href, label: title } })) }];
+    };
+    expect(() => defineConfig('Alpha', withLink('https://example.com/help'))).not.toThrow();
+    expect(() => defineConfig('Alpha', withLink('/docs'))).not.toThrow();
+    for (const bad of ['http://example.com', '//evil.test', 'javascript:alert(1)'])
+      expect(() => defineConfig('Alpha', withLink(bad))).toThrow(ModuleContractError);
+  });
 });
 
 describe('defineCsrfExempt (extension point 17)', () => {

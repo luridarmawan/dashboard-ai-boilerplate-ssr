@@ -1,0 +1,1 @@
+ALTER TABLE `api_tokens` ADD `kind` text(16) DEFAULT 'api' NOT NULL;

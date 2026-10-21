@@ -36,6 +36,7 @@ Diagram interaktif: komponen, jalur permintaan, dan pekerjaan latar — tiap nod
 | [`docs/MCP.md`](./docs/MCP.md) | MCP server di `/v1/mcp`, token API bearer, dan MCP client (server MCP eksternal untuk asisten) |
 | [`docs/DEPLOY.md`](./docs/DEPLOY.md) | **Deploy ke VPS kosong sampai HTTPS**, backup/restore, operasi harian |
 | [`docs/RELEASE-CHECKLIST.md`](./docs/RELEASE-CHECKLIST.md) | 25 kriteria terima: mana yang dibuktikan CI, mana yang manual |
+| [`SECURITY.md`](./SECURITY.md) | Kebijakan keamanan: cara melaporkan kerentanan secara privat, cakupan, catatan untuk deployer |
 
 ## Mulai dalam 5 menit
 

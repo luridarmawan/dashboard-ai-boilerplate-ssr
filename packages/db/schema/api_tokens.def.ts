@@ -9,6 +9,11 @@ export const apiTokens = defineTable({
     /** Tenant the token acts in; NULL = the user's default tenant at call time. */
     client_id: col.uuid().references('clients', 'set null').nullable(),
     name: col.varchar(100),
+    /**
+     * `api` = minted by the user, fixed expiry. `login` = issued by an app sign-in: short-lived,
+     * and extendable by the app while inside the refresh window.
+     */
+    kind: col.identifier(16).default('api'),
     token_hash: col.identifier(64),
     /** Permission strings this token is limited to; NULL = the user's full permissions. */
     scopes: col.json().nullable(),

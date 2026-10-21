@@ -1,11 +1,15 @@
 export {
+  type ApiTokenKind,
   type ApiTokenRow,
   type CreatedApiToken,
   createApiToken,
   defaultTenantOf,
+  extendApiToken,
   findApiToken,
+  findRefreshableToken,
   listApiTokens,
   type NewApiToken,
+  type RefreshLookup,
   revokeApiToken,
 } from './api-tokens.ts';
 export { type AuditEntry, writeAudit } from './audit.ts';
@@ -21,16 +25,24 @@ export {
   emailDomainAllowed,
   GOOGLE_AUTHORIZE_URL,
   GOOGLE_TOKEN_URL,
+  GOOGLE_TOKENINFO_URL,
   GOOGLE_USERINFO_URL,
   type GoogleAuthorizeParams,
   googleAuthorizeUrl,
   type OAuthIdentity,
   parseDomainList,
+  parseGoogleIdTokenInfo,
   parseGoogleUserinfo,
   pkceChallenge,
   pkcePair,
 } from './oauth.ts';
-export { hashPassword, needsRehash, passwordProblems, verifyPassword } from './password.ts';
+export {
+  hashPassword,
+  type LegacyPasswordVerifier,
+  needsRehash,
+  passwordProblems,
+  verifyPassword,
+} from './password.ts';
 export {
   grantSatisfies,
   hasPermission,

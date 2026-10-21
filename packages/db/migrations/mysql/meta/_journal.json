@@ -274,6 +274,13 @@
       "when": 1792239215219,
       "tag": "0038_silly_nighthawk",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "5",
+      "when": 1792480286662,
+      "tag": "0039_giant_tyrannus",
+      "breakpoints": true
     }
   ]
 }

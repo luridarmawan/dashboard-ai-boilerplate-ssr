@@ -2,6 +2,7 @@
 import '../app.css';
 import { onMount, setContext } from 'svelte';
 import { initLazy } from '$lib/actions/lazy';
+import Analytics from '$lib/components/Analytics.svelte';
 import ScrollTop from '$lib/components/ScrollTop.svelte';
 import Toaster from '$lib/components/ui/Toaster.svelte';
 import { provideI18n } from '$lib/i18n';
@@ -74,4 +75,5 @@ onMount(() => initLazy());
 
 {@render children()}
 <ScrollTop />
+<Analytics config={data.analytics} />
 <Toaster />

@@ -358,6 +358,16 @@ export interface ConfigFieldDef {
   /** Numeric bounds / string length; for `menu`, `max` is the nesting depth. */
   readonly min?: number;
   readonly max?: number;
+  /**
+   * For `string`: a regular expression (source, no flags) the WHOLE value must match, e.g.
+   * `G-[A-Z0-9]{4,20}`. Checked on save and mirrored as the input's `pattern` attribute.
+   */
+  readonly pattern?: string;
+  /**
+   * A help link drawn under the field — where to find the value it asks for. `href` is an
+   * `https://` URL (opened in a new tab) or a path on this site.
+   */
+  readonly link?: ConfigFieldLinkDef;
   /** Key of one of the section's `groups`; the field is drawn under that group's heading. */
   readonly group?: string;
   /**
@@ -369,6 +379,11 @@ export interface ConfigFieldDef {
 }
 
 export type ConfigFieldWidth = 'full' | 'half' | 'third';
+
+export interface ConfigFieldLinkDef {
+  readonly href: string;
+  readonly label: LocalizedText;
+}
 
 /**
  * A titled block inside a section's form. Purely presentational: values, validation and the save
@@ -478,6 +493,11 @@ export function defineConfig(
       requirePrefix('kunci konfigurasi', f.key, `${ns}.`);
       if (seen.has(f.key)) throw new ModuleContractError(`kunci konfigurasi "${f.key}" duplikat`);
       seen.add(f.key);
+      if (f.link && !/^(https:\/\/|\/(?!\/))/.test(f.link.href)) {
+        throw new ModuleContractError(
+          `kunci "${f.key}": link harus URL https:// atau path yang diawali /`,
+        );
+      }
       if (f.type === 'secret' && f.public) {
         throw new ModuleContractError(`kunci "${f.key}": field secret tidak boleh public`);
       }

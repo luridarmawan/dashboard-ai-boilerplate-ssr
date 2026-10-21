@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Versi 2 — kontrak M6. Semua titik perluasan yang bisa dipakai hari ini ada di §2a; yang belum ada ditandai di §6 dan tidak boleh diasumsikan |
-| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (18 titik perluasan), §4.9 (modul lintas repositori), FR-G |
+| **Kontrak lengkap** | [`PRD.md` §4.5](./PRD.md) (19 titik perluasan), §4.9 (modul lintas repositori), FR-G |
 | **Contoh hidup** | [`modules/Example/`](../modules/Example) (referensi publik + CRUD), [`modules/AI/`](../modules/AI) (fitur berat, SSE, job), [`modules/Dummy/`](../modules/Dummy) (tema/layout/ikon), dan modul hasil `bun modgen` |
 | **Jalur tercepat** | `bun modgen <Nama> --fields "name:string!,qty:number"` → modul lengkap yang langsung jalan (§2) |
 | **Tutorial** | Langkah demi langkah, dengan penjelasan tiap perintah: [`Build-Module-for-Boilerplate.md`](./Build-Module-for-Boilerplate.md) (modul di dalam repo ini) · [`Build-Module-for-Your-Apps.md`](./Build-Module-for-Your-Apps.md) (repositori sendiri, termasuk repo privat). Dokumen ini kontraknya; keduanya alurnya |
@@ -57,7 +57,7 @@ INTEGRATION=1 bun test modules/Billing/test
 
 Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langkah "regenerate" yang akan menimpanya.
 
-### 2a. Peta 18 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
+### 2a. Peta 19 titik perluasan — masing-masing dengan contoh yang jalan (G-5)
 
 | # | Titik perluasan | Berkas di modul | Contoh hidup | Dibuktikan oleh |
 |---|---|---|---|---|
@@ -79,6 +79,7 @@ Semua hasil generator adalah **kode Anda** — ubah sesuka hati; tidak ada langk
 | 16 | Set ikon | `icons.ts` (`defineIconSets`) + `web/icons/<set>.ts` | `modules/Dummy/icons.ts` | `scripts/ci/icon-coverage.ts` |
 | 17 | Route tanpa CSRF | `csrf-exempt.ts` (`defineCsrfExempt`) — route API yang dipanggil sistem luar tanpa bearer maupun pasangan CSRF; request-nya selalu anonim | `modules/Example/csrf-exempt.ts` → `POST /v1/m/example/inbound/inquiries` | `apps/api/test/csrf.test.ts`, `apps/api/test/integration/example.test.ts` |
 | 18 | Langganan MQTT | `mqtt.ts` (`defineMqtt`) — topik yang dilanggan lewat klien MQTT **inti** (satu per proses, sakelar di **Pengaturan → MQTT**); `shared: true` = satu pesan diproses satu instance; publish lewat `publish()` dari `@app/api/mqtt` ([`MQTT.md`](./MQTT.md)) | `modules/Example/mqtt.ts` → `example/<tenant>/inquiries` | `apps/api/test/mqtt.test.ts`, `packages/module-kit/test/mqtt.test.ts`, `scripts/ci/mqtt-smoke.ts`, `apps/api/test/integration/example.test.ts` |
+| 19 | Verifikator sandi | `passwords.ts` (`definePasswordVerifiers`) — memeriksa hash sandi format asing (user hasil impor dari sistem lain); core hanya bertanya untuk hash yang bukan Argon2/bcrypt, melewati modul yang nonaktif, dan me-rehash akun ke Argon2id pada login berikutnya | `modules/Example/passwords.ts` → hash WordPress (`$wp$` dan phpass `$P$`) | `modules/Example/test/passwords.test.ts`, `packages/auth/test/primitives.test.ts`, `packages/module-kit/test/sync.test.ts`, `apps/api/test/integration/app-token.test.ts` |
 
 ### 2b. Secara manual (kalau ingin memahami tiap berkas)
 
@@ -504,6 +505,8 @@ Tipe: `string · text · number · boolean · select · secret · markdown · ro
 
 Murni tampilan: nilai, validasi, dan tombol **Simpan** tetap satu per section. `width` berlaku di layar lebar — `full` satu baris penuh, `half` dua per baris, `third` tiga per baris (mulai `lg`; di bawahnya dua) — dan ponsel selalu satu per baris; tanpa `width`, `text`/`markdown`/`list` penuh, selebihnya `half`. Field tanpa `group` digambar lebih dulu, di atas grup pertama; grup tanpa field tidak digambar. `defineConfig` menolak `group` yang tidak dideklarasikan section-nya, key grup ganda, dan key yang bukan slug. Jam milik field `timezone` digambar di **penutup blok** tempat field itu berada. Contoh nyata: section `app` core (`packages/settings/src/registry.ts`) — *Aplikasi* · *Halaman baku* · *Tema & tata letak*.
 
+**Format field `string` (`pattern`).** Field `string` boleh membawa `pattern`: regex (sumber, tanpa flag) yang harus cocok dengan **seluruh** nilai, mis. `pattern: 'G-[A-Z0-9]{4,20}'`. Diperiksa saat simpan (galat "format tidak sesuai") dan dipasang sebagai atribut `pattern` di input form. Field mana pun juga boleh membawa `link: { href, label }` — tautan bantuan di bawah field, mis. ke halaman yang menjelaskan cara mendapatkan nilainya; `href` wajib URL `https://` (dibuka di tab baru) atau path situs ini yang diawali `/`, selain itu `defineConfig` menolaknya. Contoh nyata keduanya: `analytics.ga_measurement_id` di section `analytics` core.
+
 **Mode pemeliharaan (E-10).** Core punya dua sakelar yang menutup aplikasi untuk semua orang kecuali superadmin dan anggota group Administrator: `app.maintenance_mode` di Pengaturan (per tenant) dan `MAINTENANCE_MODE=true` di `.env` (seluruh deployment). Yang `.env` menutup semua URL — API modul ikut 503 — jadi modul tidak perlu berbuat apa pun. Yang dari Pengaturan sengaja **membiarkan halaman dan API publik tetap tayang** untuk pengunjung anonim; di sinilah modul memutuskan apa yang dimatikan: di API, `const m = await maintenanceState(tenantState.clientId)` dari `@app/api/maintenance` lalu tolak transaksi dengan `maintenanceFailure(requestId, m.source)` (503 kode `maintenance`) sementara `GET` katalog tetap dilayani; di halaman, `event.locals.maintenance.active` (loader) atau `page.data.maintenance.active` (komponen) untuk menyembunyikan tombol beli/kirim dan menampilkan pemberitahuan. Pengguna bersesi yang bukan administrator tidak pernah sampai ke halaman modul selama mode aktif — hooks sudah menjawab mereka dengan halaman `/maintenance`.
 
 **Tombol aksi di samping "Simpan" (`actions`).** Sebuah section boleh menawarkan tombol — "uji koneksi" dan sejenisnya — tanpa halaman Pengaturan core tahu modul apa pun:
@@ -660,6 +663,24 @@ export default defineMqtt('Billing', [
 
 Core memegang **satu** klien MQTT per proses API — broker, kredensial, versi protokol, dan sakelar on/off ada di **Pengaturan → MQTT** (lingkup global; `MQTT_*` di `.env` sebagai bootstrap), berlaku tanpa restart. Modul tidak mengimpor pustaka MQTT dan tidak mengelola koneksi. Awalan topik deployment (`mqtt.topic_prefix`) ditambahkan ke langganan dan publish, dan dihilangkan sebelum pesan sampai ke handler. Handler berjalan tanpa request, di instance yang menerima pesan; yang melempar dicatat dan dihitung, tidak menjatuhkan klien (G-7). Tenant tidak ikut dalam sesi broker — bawa di topik atau isi pesan. Menerbitkan dari mana saja: `publish(topic, payload, { qos, retain })` dari `@app/api/mqtt`, tidak pernah melempar (`{ ok: false, reason: 'disabled' }` saat klien mati), dan `mqttState()` untuk status. Rincian, metrik, dan broker dev/prod di [`MQTT.md`](./MQTT.md).
 
+### `passwords.ts` — verifikator sandi (titik perluasan 19)
+
+```ts
+import { definePasswordVerifiers } from '@core/module-kit';
+
+export default definePasswordVerifiers('Legacy', [
+  {
+    name: 'legacy.oldapp',                             // wajib "legacy.*"
+    matches: (hash) => hash.startsWith('$old$'),       // murah & murni: format milik verifikator ini?
+    verify: (plain, hash) => oldAppCheck(plain, hash), // boolean atau Promise<boolean>
+  },
+]);
+```
+
+Untuk aplikasi yang memindahkan user dari sistem lain dan menyalin hash sandinya **apa adanya** ke `users.password_hash`. Core memverifikasi Argon2 dan bcrypt sendiri; hash dengan format lain diserahkan ke verifikator pertama yang `matches`-nya `true` (urutan modul). Verifikator milik modul yang **nonaktif** tidak dipakai. Setelah sandi terbukti benar, core langsung me-**rehash** akun ke Argon2id — hash asing hilang setelah satu kali login, dan verifikatornya boleh dibuang begitu semua user hasil impor sudah pernah masuk. Verifikator adalah kode murni: tanpa database, tanpa jaringan, tanpa state; pengecualian dihitung sebagai sandi salah. Berlaku untuk masuk browser, masuk aplikasi (`/auth/token`), konfirmasi sandi saat mematikan 2FA, dan ganti sandi.
+
+Contoh hidup `modules/Example/passwords.ts` memeriksa hash WordPress persis seperti `wp_check_password()`: `$wp$2y$…` (WordPress 6.8+, bcrypt atas HMAC-SHA384) dan `$P$…` (phpass portable). Salin berkas itu ke modul Anda bila mengimpor user WordPress.
+
 ### Notifikasi dari modul (J-4)
 
 Modul memberi tahu pengguna lewat bel di header dengan memanggil layanan core — bukan menulis tabelnya sendiri:
@@ -770,6 +791,18 @@ importSeconds.observeMs({ source: 'csv' }, performance.now() - t0);
 
 Aturannya: nama Prometheus (`<ns>_…_total`, akhiran satuan), nilai label **terbatas** — jenis, status, sumber; **tidak pernah** id user, id tenant, atau teks bebas. Nama yang sama didaftarkan dua kali mengembalikan instrumen yang sama. Panduan pemakaian dan daftar metrik core: [`DEPLOY.md` §7a](./DEPLOY.md).
 
+### Event analitik dari modul (E-11)
+
+Kunjungan halaman modul sudah dilaporkan core. Untuk aksi yang memang penting bagi produk, panggil `track()` dari kode browser (komponen Svelte, handler `onclick`, sesudah form berhasil):
+
+```ts
+import { track } from '@core/module-kit/analytics';
+
+track('billing.invoice_paid', { method: 'transfer', items: 3 });
+```
+
+Aturannya: nama event **wajib** `<ns>.<nama>` (huruf kecil, angka, `_`; dikirim ke penyedia sebagai `billing_invoice_paid`, maksimal 40 karakter); parameter hanya string pendek (≤ 100 karakter), angka, atau boolean, dan kunci yang berbau data pribadi (`email`, `phone`, `name`, `user…`, `address`, `token`, …) **dibuang** — jangan pernah mengirim id record, id user, atau isi yang diketik pengguna. Modul tidak perlu memeriksa apa pun: bila analitik mati, area halaman itu tidak dilacak, atau pengunjung belum menyetujui, `track()` tidak melakukan apa-apa. Aksi CRUD **tidak** dilaporkan otomatis oleh core — modul yang memutuskan aksi mana yang bermakna. Bukti: `packages/module-kit/test/analytics.test.ts`.
+
 ### Data wilayah dari modul
 
 Core membawa data wilayah administratif Indonesia (provinsi → kabupaten/kota → kecamatan → kelurahan/desa, ±91 ribu baris) di tabel global `regions`. Tabelnya dibuat migrasi, isinya dimuat terpisah dengan `bun db:regions` (produksi: `api regions`) — idempoten, aman diulang. Tanpa argumen yang dimuat data bawaan `packages/db/data/regions-id.tsv.gz`; berkas lain boleh `.tsv`, `.tsv.gz`, atau dump MySQL `.sql` dengan kolom `code`, `parent_code`, `country_code`, `level`, `name` (isi dump hanya dibaca, tidak pernah dieksekusi).
@@ -852,6 +885,7 @@ Semua masalah dilaporkan **sekaligus**, dengan nama modulnya. Contoh pesan nyata
 | Tool tanpa prefiks / izin tak dideklarasikan / skema bukan objek | `… nama tool "other.thing" harus diawali "billing." (G-9)` · `… tool "billing.ghost" menuntut izin "billing.nothing.read" yang tidak ada di permissions.ts` · `… tool "billing.bare": input harus JSON Schema bertipe object` |
 | Pengecualian CSRF salah bentuk / tanpa route | `… pengecualian CSRF "GET /feed" tidak valid` · `… pengecualian CSRF "POST /inbound" tanpa reason` · `… pengecualian CSRF "POST /ghost" tidak cocok dengan route mana pun di api/routes.ts` |
 | Langganan MQTT tanpa prefiks / filter rusak / `$share/` tulisan tangan | `… langganan MQTT "readings" harus diawali "billing."` · `… langganan MQTT "billing.broken": filter topik tidak valid — "#" hanya boleh di level terakhir` · `… jangan tulis $share/ — pakai \`shared: true\`` |
+| Verifikator sandi tanpa prefiks / tanpa fungsi | `… verifikator sandi "oldapp" harus diawali "billing."` · `… passwords.ts memuat entri tanpa name/matches/verify (pakai definePasswordVerifiers)` |
 | Dependensi tak dideklarasikan | `… api/routes.ts gagal dimuat — Cannot find package 'x'` |
 
 Sync juga menolak menghapus `apps/web/src/routes/(app)/m/` atau `(public)/(modules)/` bila direktori itu ada tanpa penanda hasil generate — supaya tidak pernah menghapus pekerjaan tangan siapa pun.
@@ -881,7 +915,7 @@ Mencabut modul (G-15): `bun modules:remove <Nama>` — tampilkan rencananya lebi
 
 ## 6. Yang belum ada — jangan diasumsikan
 
-Semua 18 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
+Semua 19 titik perluasan di §2a **tersedia**, begitu pula uninstall bersih (`bun modules:remove`, G-15). Yang belum ada:
 
 | Hal | Status |
 |---|---|

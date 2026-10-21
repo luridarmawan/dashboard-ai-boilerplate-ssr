@@ -194,9 +194,13 @@ const envSchema = z
      */
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
-    /** Test seams only: point the code exchange and identity lookup at a local stand-in for Google. */
+    /**
+     * Test seams only: point the code exchange, identity lookup and ID-token check at a local
+     * stand-in for Google.
+     */
     GOOGLE_OAUTH_TOKEN_URL: z.url().optional(),
     GOOGLE_OAUTH_USERINFO_URL: z.url().optional(),
+    GOOGLE_OAUTH_TOKENINFO_URL: z.url().optional(),
     /**
      * Where the user list looks up the city and country of a login / last-active IP: a URL
      * template with `{ip}`, answering JSON in the ipwho.is or ip-api.com shape. The address is

@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { flagAnalyticsEvent } from '$lib/server/analytics';
 import { cfgBool, cfgString, isSignupEnabled } from '$lib/server/config';
 import {
   actionFailure,
@@ -64,6 +65,7 @@ export const actions: Actions = {
     if (r.data.data.mfaRequired && r.data.data.challenge)
       return { mfa: { challenge: r.data.data.challenge, next: str(form, 'next') }, values };
     forwardSetCookies(event, res.response);
+    flagAnalyticsEvent(event, 'login');
     redirect(
       303,
       safeNext(str(form, 'next'), cfgString(event.locals.config, 'app.home_route', '/dashboard')),
@@ -91,5 +93,6 @@ async function mfaStep(event: Parameters<NonNullable<Actions['default']>>[0], fo
     return actionFailure(r.failure, {}, keep ? { mfa: { challenge, next } } : {});
   }
   forwardSetCookies(event, res.response);
+  flagAnalyticsEvent(event, 'login');
   redirect(303, safeNext(next, cfgString(event.locals.config, 'app.home_route', '/dashboard')));
 }

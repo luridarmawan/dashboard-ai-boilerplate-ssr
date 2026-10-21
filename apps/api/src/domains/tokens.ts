@@ -25,6 +25,8 @@ import { tenantContext } from '../plugins/tenancy.ts';
 const TokenView = t.Object({
   id: t.String(),
   name: t.String(),
+  /** `api` = minted here; `login` = issued to an app at sign-in (POST /auth/token). */
+  kind: t.String(),
   clientId: t.Nullable(t.String()),
   scopes: t.Nullable(t.Array(t.String())),
   expiresAt: t.Nullable(t.String()),
@@ -34,6 +36,7 @@ const TokenView = t.Object({
 const view = (r: Awaited<ReturnType<typeof listApiTokens>>[number]) => ({
   id: r.id,
   name: r.name,
+  kind: r.kind,
   clientId: r.client_id,
   scopes: Array.isArray(r.scopes)
     ? (r.scopes as unknown[]).filter((s): s is string => typeof s === 'string')

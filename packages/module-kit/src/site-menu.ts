@@ -63,7 +63,8 @@ export function parseSiteMenu(input: unknown, maxDepth: number): SiteMenuParse {
   if (input === null || input === undefined) return { ok: true, items: [] };
   if (Array.isArray(input)) return fromJson(input, depth);
   const text = String(input);
-  if (text.trim().startsWith('[')) {
+  // A JSON menu opens with `[{` or `[]`; an outline may open with an icon tag such as `[wa] …`.
+  if (/^\s*\[\s*[{\]]/.test(text)) {
     try {
       return fromJson(JSON.parse(text), depth);
     } catch {

@@ -1,0 +1,1 @@
+ALTER TABLE "api_tokens" ADD COLUMN "kind" varchar(16) DEFAULT 'api' NOT NULL;
