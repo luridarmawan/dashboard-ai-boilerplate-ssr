@@ -43,6 +43,7 @@ type Dict = Record<string, string>;
 const T: Record<'id' | 'en', Dict> = {
   id: {
     hello: 'Halo {name},',
+    'hello.anon': 'Halo,',
     'verify.subject': 'Verifikasi email Anda — {app}',
     'verify.body':
       'Terima kasih telah mendaftar. Klik tombol di bawah untuk memverifikasi alamat email Anda.',
@@ -78,6 +79,7 @@ const T: Record<'id' | 'en', Dict> = {
   },
   en: {
     hello: 'Hello {name},',
+    'hello.anon': 'Hello,',
     'verify.subject': 'Verify your email — {app}',
     'verify.body': 'Thanks for signing up. Click the button below to verify your email address.',
     'verify.cta': 'Verify email',
@@ -118,6 +120,11 @@ function tr(locale: string, key: string, params: Record<string, unknown> = {}): 
   return s.replace(/\{(\w+)\}/g, (m, k: string) =>
     k in params ? escapeHtml(String(params[k])) : m,
   );
+}
+/** The opening line — "Hello Budi," — or a plain "Hello," when the caller has no name to show. */
+function greeting(locale: string, name: string): string {
+  const n = name.trim();
+  return n ? tr(locale, 'hello', { name: n }) : tr(locale, 'hello.anon');
 }
 function escapeHtml(s: string): string {
   return s.replace(
@@ -171,7 +178,7 @@ export function renderTemplate(
   switch (id) {
     case 'verify-email': {
       const subject = tr(locale, 'verify.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'verify.body')}</p>${button(cta, tr(locale, 'verify.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'verify.body')}</p>${button(cta, tr(locale, 'verify.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
       return {
         subject,
         html: shellHtml(locale, subject, body),
@@ -180,7 +187,7 @@ export function renderTemplate(
     }
     case 'reset-password': {
       const subject = tr(locale, 'reset.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'reset.body')}</p>${button(cta, tr(locale, 'reset.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'reset.body')}</p>${button(cta, tr(locale, 'reset.cta'), brand.primary)}${fallback(locale, link)}<p style="color:#71717a">${tr(locale, 'ignore')}</p>`;
       return {
         subject,
         html: shellHtml(locale, subject, body),
@@ -189,7 +196,7 @@ export function renderTemplate(
     }
     case 'set-password': {
       const subject = tr(locale, 'set.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'set.body')}</p>${button(cta, tr(locale, 'set.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'set.body')}</p>${button(cta, tr(locale, 'set.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
         html: shellHtml(locale, subject, body),
@@ -202,7 +209,7 @@ export function renderTemplate(
         data.hours === undefined
           ? ''
           : `<p>${tr(locale, 'invite.expires', { hours: String(data.hours) })}</p>`;
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${hours}${button(cta, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'invite.body', { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') })}</p>${hours}${button(cta, tr(locale, 'invite.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
         html: shellHtml(locale, subject, body),
@@ -212,7 +219,7 @@ export function renderTemplate(
     case 'invite-existing': {
       const vars = { inviter: String(data.inviter ?? ''), tenant: String(data.tenant ?? '') };
       const subject = tr(locale, 'invite_existing.subject', { app });
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'invite_existing.body', vars)}</p>${button(cta, tr(locale, 'invite_existing.cta'), brand.primary)}${fallback(locale, link)}`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'invite_existing.body', vars)}</p>${button(cta, tr(locale, 'invite_existing.cta'), brand.primary)}${fallback(locale, link)}`;
       return {
         subject,
         html: shellHtml(locale, subject, body),
@@ -224,7 +231,7 @@ export function renderTemplate(
       // the visitor's own words quoted back, so they can see exactly what arrived.
       const subject = `${tr(locale, 'contact_ack.subject')} — ${app}`;
       const msg = escapeHtml(String(data.message ?? '')).replace(/\n/g, '<br>');
-      const body = `<p>${tr(locale, 'hello', { name })}</p><p>${tr(locale, 'contact_ack.body')}</p><p style="color:#71717a;font-size:13px;margin-bottom:4px">${tr(locale, 'contact_ack.copy')}</p><blockquote style="margin:4px 0 24px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${msg}</blockquote><p style="color:#71717a;font-size:12px">${tr(locale, 'contact_ack.noreply')}</p>`;
+      const body = `<p>${greeting(locale, name)}</p><p>${tr(locale, 'contact_ack.body')}</p><p style="color:#71717a;font-size:13px;margin-bottom:4px">${tr(locale, 'contact_ack.copy')}</p><blockquote style="margin:4px 0 24px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${msg}</blockquote><p style="color:#71717a;font-size:12px">${tr(locale, 'contact_ack.noreply')}</p>`;
       return {
         subject,
         html: shellHtml(locale, subject, body),

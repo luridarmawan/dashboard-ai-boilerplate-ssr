@@ -1,5 +1,6 @@
 import type { Locale } from '@core/i18n';
 import { moduleMenu, modules } from '@core/module-kit/registry';
+import { webRoutePatterns } from '../../generated/routes.ts';
 import type { Session } from './session.ts';
 
 /**
@@ -343,11 +344,34 @@ export interface Crumb {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Breadcrumb from the route structure (F-4); menu labels where known, the segment otherwise. */
+/**
+ * Does a page exist at this path? Matched against the generated route patterns, where a `[param]`
+ * segment stands for any one segment — so `/users/<uuid>` is a page while `/m` or `/m/ai` is not.
+ */
+function hasPage(path: string, patterns: readonly string[]): boolean {
+  const want = path.split('/').filter(Boolean);
+  return patterns.some((p) => {
+    const have = p.split('/').filter(Boolean);
+    return (
+      have.length === want.length &&
+      have.every((h, i) => (h.startsWith('[') && h.endsWith(']')) || h === want[i])
+    );
+  });
+}
+
+/**
+ * Breadcrumb from the route structure (F-4). Labels come from the menu where the path is a menu
+ * entry, from the module's group title for the namespace segment of a module page, and from the
+ * segment itself otherwise. The `/m` prefix is only the home of module pages (G-9), not a place,
+ * so it never appears. A crumb LINKS only when a page exists at its path (`webRoutePatterns`):
+ * an intermediate segment without one — `/m/ai` has no index page — is plain text, so the trail
+ * never offers a 404.
+ */
 export function buildBreadcrumb(
   pathname: string,
   menu: MenuItem[],
   locale: Locale = 'id',
+  routes: readonly string[] = webRoutePatterns,
 ): Crumb[] {
   const labels = new Map<string, string>();
   const collect = (list: MenuItem[]) => {
@@ -357,25 +381,28 @@ export function buildBreadcrumb(
     }
   };
   collect(menu);
+  const groupLabel = (ns: string): string | undefined => {
+    const def = allGroups().find((g) => g.id === ns);
+    return def ? (def.label[locale] ?? def.label.id) : undefined;
+  };
   const segments = pathname.split('/').filter(Boolean);
   const crumbs: Crumb[] = [{ label: locale === 'en' ? 'Home' : 'Beranda', href: '/dashboard' }];
   let acc = '';
   segments.forEach((seg, i) => {
     acc += `/${seg}`;
-    if (acc === '/dashboard') return;
+    if (acc === '/dashboard' || acc === '/m') return;
     const last = i === segments.length - 1;
     const label =
       labels.get(acc) ??
+      (acc === `/m/${seg}` ? groupLabel(seg) : undefined) ??
       (UUID_RE.test(seg)
-        ? locale === 'en'
-          ? 'Detail'
-          : 'Detail'
+        ? 'Detail'
         : seg === 'new'
           ? locale === 'en'
             ? 'New'
             : 'Baru'
           : seg.charAt(0).toUpperCase() + seg.slice(1));
-    crumbs.push({ label, href: last ? null : acc });
+    crumbs.push({ label, href: !last && hasPage(acc, routes) ? acc : null });
   });
   return crumbs;
 }

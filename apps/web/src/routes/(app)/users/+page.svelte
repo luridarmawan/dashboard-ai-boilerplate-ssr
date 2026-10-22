@@ -188,7 +188,7 @@ const deactivateConfirm = {
     caption={t('users.caption')}
     searchPlaceholder={t('users.search_placeholder')}
     emptyTitle={t('users.empty_title')}
-    emptyHint={data.state.q || data.state.extra?.group ? t('users.empty_hint_search') : t('users.empty_hint_add')}
+    emptyHint={data.state.q || data.state.extra?.group || data.state.extra?.status ? t('users.empty_hint_search') : t('users.empty_hint_add')}
     {rowActions}
     bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm }] : []}
   >
@@ -206,6 +206,13 @@ const deactivateConfirm = {
       {:else if data.state.extra?.group}
         <input type="hidden" name="group" value={data.state.extra.group} />
       {/if}
+      <!-- Filter by account status: active (1) or inactive (0); blank lists both. -->
+      <label class="sr-only" for="users-status">{t('users.filter_status')}</label>
+      <select id="users-status" name="status" class="h-9 rounded-md border border-input bg-background px-2 text-sm" data-testid="users-status">
+        <option value="">{t('users.filter_status_all')}</option>
+        <option value="1" selected={data.state.extra?.status === '1'}>{t('users.filter_status_active')}</option>
+        <option value="0" selected={data.state.extra?.status === '0'}>{t('users.filter_status_inactive')}</option>
+      </select>
     {/snippet}
     {#snippet cell(row, col)}
       {@const ip = col.key === 'lastActiveIp' ? row.lastActiveIp : col.key === 'lastLoginIp' ? row.lastLoginIp : null}

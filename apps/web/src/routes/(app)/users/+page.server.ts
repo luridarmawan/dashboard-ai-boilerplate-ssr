@@ -24,16 +24,19 @@ const SORTABLE = new Set(['name', 'email', 'created_at', 'last_login_at', 'last_
 
 /**
  * Users of the active tenant (D-1). The URL is the table state; `load` fetches, DataTable renders.
- * `group` is the one page-specific filter: a group id of this tenant, narrowing to its members.
+ * Page-specific filters: `group` (a group id of this tenant, narrowing to its members) and
+ * `status` (`1` active, `0` inactive; any other value is ignored, so a stale URL still lists all).
  */
 export const load: PageServerLoad = async (event) => {
-  const st = tableStateFrom(event.url, { sort: 'name', extra: ['group'] });
+  const st = tableStateFrom(event.url, { sort: 'name', extra: ['group', 'status'] });
   const sort = SORTABLE.has(st.sort) ? st.sort : 'name';
   const group = st.extra?.group;
+  const status = st.extra?.status === '1' ? 1 : st.extra?.status === '0' ? 0 : undefined;
   const res = await apiFor(event).v1.users.get({
     query: {
       ...(st.q ? { q: st.q } : {}),
       ...(group ? { group } : {}),
+      ...(status !== undefined ? { status } : {}),
       page: st.page,
       limit: st.limit,
       sort,
