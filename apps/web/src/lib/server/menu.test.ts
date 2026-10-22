@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildMenu } from './menu.ts';
+import { buildBreadcrumb, buildMenu } from './menu.ts';
 import type { Session } from './session.ts';
 
 /** Sidebar shape (F-3) against the real generated registry: top level, then groups, Documentation last. */
@@ -123,5 +123,76 @@ describe('buildMenu (F-3 groups)', () => {
     expect(has(off)).toBe(false);
     // the Example module keeps its own group and entries — only the core showcase goes
     expect(group(off, 'example')).toBeDefined();
+  });
+});
+
+describe('buildBreadcrumb (F-4)', () => {
+  const menu = buildMenu(admin, '/m/ai/providers', 'en');
+  const menuId = buildMenu(admin, '/m/ai/providers', 'id');
+  const routes = [
+    '/dashboard',
+    '/users',
+    '/users/[id]',
+    '/users/new',
+    '/m/ai/providers',
+    '/m/ai/providers/[id]',
+    '/m/ai/providers/new',
+  ];
+  const trail = (path: string, locale: 'id' | 'en' = 'en') =>
+    buildBreadcrumb(path, locale === 'en' ? menu : menuId, locale, routes).map((c) => [
+      c.label,
+      c.href,
+    ]);
+
+  test('a module page: no `/m` crumb, the namespace shows the module group title, unlinked', () => {
+    expect(trail('/m/ai/providers')).toEqual([
+      ['Home', '/dashboard'],
+      ['AI Platform', null],
+      ['AI providers', null],
+    ]);
+    expect(trail('/m/ai/providers', 'id')).toEqual([
+      ['Beranda', '/dashboard'],
+      ['Platform AI', null],
+      ['Penyedia AI', null],
+    ]);
+  });
+
+  test('a detail page links the list, which exists, and names the record Detail', () => {
+    expect(trail('/m/ai/providers/0f0d5521-1234-4abc-8def-9b850ee00000')).toEqual([
+      ['Home', '/dashboard'],
+      ['AI Platform', null],
+      ['AI providers', '/m/ai/providers'],
+      ['Detail', null],
+    ]);
+    expect(trail('/users/new', 'id')).toEqual([
+      ['Beranda', '/dashboard'],
+      ['Pengguna', '/users'],
+      ['Baru', null],
+    ]);
+  });
+
+  test('a segment without a page is never a link — even outside `/m`', () => {
+    // `/users/<uuid>` is a page (pattern `/users/[id]`); an imaginary `/edit` under it is not.
+    const id = '0f0d5521-1234-4abc-8def-9b850ee00000';
+    expect(trail(`/users/${id}/edit`)).toEqual([
+      ['Home', '/dashboard'],
+      ['Users', '/users'],
+      ['Detail', `/users/${id}`],
+      ['Edit', null],
+    ]);
+    expect(trail('/settings/nothing/here').map((c) => c[1])).toEqual([
+      '/dashboard',
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  test('an unknown namespace falls back to the capitalised segment, still unlinked', () => {
+    expect(trail('/m/zzz/things')).toEqual([
+      ['Home', '/dashboard'],
+      ['Zzz', null],
+      ['Things', null],
+    ]);
   });
 });
