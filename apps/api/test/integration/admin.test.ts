@@ -153,6 +153,12 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
   test('user edit: deactivation ends the session on the next request; reactivation restores', async () => {
     expect((await put(`/v1/users/${bobId}`, { statusId: 0 }, [admin])).status).toBe(200);
     expect((await call('/v1/auth/me', {}, [bob])).status).toBe(401);
+    // List filter by status: `?status=0` finds the deactivated account, `?status=1` no longer does.
+    const inactive = await json(await call(`/v1/users?status=0&q=bob-${run}`, {}, [admin]));
+    expect(inactive.meta?.total).toBe(1);
+    const active = await json(await call(`/v1/users?status=1&q=bob-${run}`, {}, [admin]));
+    expect(active.meta?.total).toBe(0);
+    expect((await call('/v1/users?status=7', {}, [admin])).status).toBe(422);
     const back = await put(
       `/v1/users/${bobId}`,
       { statusId: 1, name: 'Robert', phone: '0812 999' },

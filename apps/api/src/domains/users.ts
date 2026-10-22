@@ -99,10 +99,16 @@ const SORT = {
 const sortColumn = (key: string | undefined) =>
   key && key in SORT ? SORT[key as keyof typeof SORT] : SORT.name;
 
-/** The list query plus `group`: a group id of the active tenant; only its members are returned. */
+/**
+ * The list query plus `group` (a group id of the active tenant; only its members are returned)
+ * and `status` (a `status_id` value, see STATUS; only accounts in that state are returned).
+ */
 const UsersListQuery = t.Composite([
   ListQuery,
-  t.Object({ group: t.Optional(t.String({ maxLength: 36 })) }),
+  t.Object({
+    group: t.Optional(t.String({ maxLength: 36 })),
+    status: t.Optional(t.Numeric({ minimum: 0, maximum: 2 })),
+  }),
 ]);
 
 const PublicUser = t.Object({
@@ -1122,6 +1128,9 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
                 ),
             )
           : undefined,
+        // Status filter: the account's own state (STATUS), not the membership's — the map is
+        // already restricted to live rows above. Absent means "any".
+        query.status !== undefined ? eq(schema.users.status_id, query.status) : undefined,
       );
       const base = () =>
         db
@@ -1151,7 +1160,7 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       detail: {
         summary: 'List users',
         description:
-          'Users of the active tenant; paginated, searchable, sortable and filterable by group.',
+          'Users of the active tenant; paginated, searchable, sortable and filterable by group and status.',
       },
     },
   )
