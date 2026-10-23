@@ -515,7 +515,7 @@
   "tenants.region_pick_parent": "Pilih tingkat di atasnya dulu; tanpa JavaScript, simpan agar pilihannya muncul.",
   "tenants.total_receipts": "Total penerimaan",
   "tenants.url": "Situs web",
-  "tenants.code": "Kode",
+  "tenants.code": "Slug",
   "tenants.code_hint": "Diisi otomatis dari nama (huruf kecil, spasi dan tanda baca menjadi \"_\"); boleh diketik sendiri.",
   "tenants.created": "Dibuat",
   "tenants.detail.active": "Aktif",

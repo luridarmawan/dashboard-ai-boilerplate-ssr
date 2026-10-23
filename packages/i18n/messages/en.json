@@ -515,7 +515,7 @@
   "tenants.region_pick_parent": "Choose the level above first; without JavaScript, save to load the choices.",
   "tenants.total_receipts": "Total receipts",
   "tenants.url": "Website",
-  "tenants.code": "Code",
+  "tenants.code": "Slug",
   "tenants.code_hint": "Filled in from the name (lower case, spaces and punctuation become \"_\"); you can type your own.",
   "tenants.created": "Created",
   "tenants.detail.active": "Active",

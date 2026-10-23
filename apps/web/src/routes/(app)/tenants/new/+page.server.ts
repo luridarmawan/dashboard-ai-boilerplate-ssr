@@ -3,6 +3,7 @@ import { createTranslator } from '@core/i18n';
 import { redirect } from '@sveltejs/kit';
 import { actionFailure, apiFor, checkCsrf, unwrap } from '$lib/server/session';
 import { parentCandidates, parentOptions } from '$lib/server/tenants';
+import { shortCodeValue } from '$lib/tenants';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => ({
@@ -13,8 +14,12 @@ export const actions: Actions = {
   default: async (event) => {
     const t = createTranslator(event.locals.locale.locale);
     const form = await event.request.formData();
-    // An empty parent choice means "top level": null, not a missing field.
-    const input = formToObject(form, { nullable: ['parentId'] });
+    // An empty parent choice means "top level", and an empty profile box means "not set": null,
+    // not a missing field. An empty slug stays out, so the API derives it from the name.
+    const input = formToObject(form, {
+      nullable: ['parentId', 'shortCode', 'referenceId', 'joinDate', 'description'],
+    });
+    input.shortCode = shortCodeValue(input.shortCode);
     if (!checkCsrf(event, form)) {
       return actionFailure(
         { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
