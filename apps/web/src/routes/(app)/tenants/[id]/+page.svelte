@@ -78,7 +78,13 @@ const addressFields: FieldDef[] = $derived(
       ],
 );
 const fields: FieldDef[] = $derived([
-  ...identityFields(t, data.parents),
+  // The slug is shown for reference only: it cannot change once the tenant exists.
+  ...identityFields(t, data.parents, {
+    name: 'code',
+    type: 'string',
+    label: t('tenants.code'),
+    disabled: true,
+  }),
   { ...text('url', t('tenants.url'), 2048), type: 'string', autocomplete: 'url' },
   { ...text('mapsUrl', t('tenants.maps_url'), 2048), autocomplete: 'url' },
   { name: 'address', type: 'text', label: t('tenants.address'), maxlength: 2000, rows: 2, span: 2 },
@@ -112,6 +118,7 @@ const fields: FieldDef[] = $derived([
 ]);
 const values = $derived({
   name: c.name,
+  code: c.code,
   parentId: c.parentId ?? '',
   shortCode: c.shortCode,
   description: c.description,

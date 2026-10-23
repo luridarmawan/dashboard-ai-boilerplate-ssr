@@ -545,7 +545,7 @@
   "tenants.postal_code": "Postal code",
   "tenants.reference_id": "Reference ID",
   "tenants.reference_id_hint": "E.g. the cooperation agreement, certificate, or contract number.",
-  "tenants.short_code": "Code",
+  "tenants.short_code": "Short Code",
   "tenants.short_code_hint": "Short code, up to 3 capital letters (e.g. JKT). Unique across tenants.",
   "tenants.status": "Status",
   "webhooks.add": "Add webhook",

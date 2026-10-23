@@ -545,7 +545,7 @@
   "tenants.postal_code": "Kode pos",
   "tenants.reference_id": "ID referensi",
   "tenants.reference_id_hint": "Mis. nomor perjanjian kerja sama, sertifikat, atau kontrak.",
-  "tenants.short_code": "Kode",
+  "tenants.short_code": "Kode Singkat",
   "tenants.short_code_hint": "Kode singkat, maksimal 3 huruf besar (mis. JKT). Unik antartenant.",
   "tenants.status": "Status",
   "webhooks.add": "Tambah webhook",
