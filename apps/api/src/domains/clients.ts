@@ -53,6 +53,7 @@ const ParentRef = t.Object({ id: t.String(), code: t.String(), name: t.String() 
  * decimal strings that default to "0" — money never travels as a float.
  */
 const PROFILE = {
+  shortCode: 'short_code',
   description: 'description',
   referenceId: 'reference_id',
   balance: 'balance',
@@ -91,6 +92,7 @@ const Client = t.Object({
   statusId: t.Integer(),
   createdAt: t.String(),
   // Profile block — spelled out so the OpenAPI document and the typed client see each field.
+  shortCode: t.Nullable(t.String()),
   description: t.Nullable(t.String()),
   referenceId: t.Nullable(t.String()),
   /** `YYYY-MM-DD`. */
@@ -187,6 +189,29 @@ function invalidJoinDate(set: { status?: number | string }, requestId: string) {
   set.status = 422;
   return fail('validation_failed', 'Periksa isian', requestId, {
     joinDate: 'Tanggal tidak ada di kalender',
+  });
+}
+/**
+ * A short code is unique across tenants, deleted ones included (the unique index sees them), so a
+ * clash is answered field-wise before the write instead of surfacing as a database error.
+ */
+async function shortCodeTaken(
+  db: Db,
+  shortCode: string | null | undefined,
+  exceptId: string | null,
+): Promise<boolean> {
+  if (!shortCode) return false;
+  const [dup] = await db
+    .select({ id: schema.clients.id })
+    .from(schema.clients)
+    .where(eq(schema.clients.short_code, shortCode))
+    .limit(1);
+  return !!dup && dup.id !== exceptId;
+}
+function shortCodeConflict(set: { status?: number | string }, requestId: string, code: string) {
+  set.status = 409;
+  return fail('conflict', 'Kode singkat sudah dipakai', requestId, {
+    shortCode: `Kode "${code}" sudah dipakai tenant lain`,
   });
 }
 /** Region code field → the name field it names, when the code is in `regions`. */
@@ -430,6 +455,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
         if (!parent || !(await canActInTenant(db, a.user, parent.id)))
           return notFound(set, requestId, 'Tenant induk');
       }
+      if (await shortCodeTaken(db, body.shortCode, null))
+        return shortCodeConflict(set, requestId, body.shortCode as string);
       const joinDate = joinDateValue(body.joinDate);
       if (joinDate === 'invalid') return invalidJoinDate(set, requestId);
       const id = newId();
@@ -500,6 +527,8 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
             'Tenant induk yang dipilih adalah sub-tenant dari tenant ini; pilih tenant lain',
           );
       }
+      if (await shortCodeTaken(db, body.shortCode, before.id))
+        return shortCodeConflict(set, requestId, body.shortCode as string);
       const joinDate = joinDateValue(body.joinDate);
       if (joinDate === 'invalid') return invalidJoinDate(set, requestId);
       const patch: Partial<ClientInsert> = profilePatch(await withRegionNames(db, body));
@@ -532,7 +561,7 @@ export const clients = new Elysia({ name: 'clients', prefix: '/clients', tags: [
       detail: {
         summary: 'Update a tenant',
         description:
-          'Name, parent, settings, status and the profile block (description, reference id, join date, ledger amounts, address and region fields, coordinates, links). The code cannot change. A null `parentId` makes it a top-level tenant; a parent that is one of its own sub-tenants is refused. Amounts and coordinates are decimal strings; `joinDate` is `YYYY-MM-DD`.',
+          'Name, parent, settings, status and the profile block (short code, description, reference id, join date, ledger amounts, address and region fields, coordinates, links). The code cannot change. A null `parentId` makes it a top-level tenant; a parent that is one of its own sub-tenants is refused. Amounts and coordinates are decimal strings; `joinDate` is `YYYY-MM-DD`.',
       },
     },
   )

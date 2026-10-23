@@ -458,6 +458,22 @@ describe.skipIf(!enabled)('administration (D-1…D-4, C-3, C-4, C-6)', () => {
     expect(noDate.data?.joinDate).toBeNull();
     expect(noDate.data?.referenceId).toBe('PKS/012/X/2026');
 
+    // Short code: 1–3 capital letters, unique across tenants; re-saving its own code is fine.
+    // Random per run: the shared dev DB keeps rows (and their codes) from earlier runs.
+    const short = Array.from({ length: 3 }, () =>
+      String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+    ).join('');
+    const coded = await json(await put(`/v1/clients/${leaf.id}`, { shortCode: short }, [admin]));
+    expect(coded.data?.shortCode).toBe(short);
+    expect((await put(`/v1/clients/${leaf.id}`, { shortCode: short }, [admin])).status).toBe(200);
+    const taken = await put(`/v1/clients/${branch.id}`, { shortCode: short }, [admin]);
+    expect(taken.status).toBe(409);
+    expect((await json(taken)).error?.details).toEqual({ shortCode: expect.any(String) });
+    for (const bad of ['abc', 'ABCD', 'A1'])
+      expect((await put(`/v1/clients/${branch.id}`, { shortCode: bad }, [admin])).status).toBe(422);
+    const uncoded = await json(await put(`/v1/clients/${leaf.id}`, { shortCode: null }, [admin]));
+    expect(uncoded.data?.shortCode).toBeNull();
+
     // Loops are refused: itself, and any of its own descendants.
     expect((await put(`/v1/clients/${root.id}`, { parentId: root.id }, [admin])).status).toBe(409);
     expect((await put(`/v1/clients/${root.id}`, { parentId: leaf.id }, [admin])).status).toBe(409);

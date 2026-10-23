@@ -133,6 +133,8 @@ const Url = OptText(2048);
  * can clear one with an empty value. Address and region fields are free text plus opaque ids.
  */
 const ClientProfile = {
+  /** Short display code (`JKT`): 1–3 upper-case letters; unique across tenants when set. */
+  shortCode: t.Optional(t.Nullable(t.String({ pattern: '^[A-Z]{1,3}$' }))),
   description: OptText(2000),
   referenceId: OptText(191),
   /** Calendar date, `YYYY-MM-DD`; the API refuses impossible dates such as `2026-02-30`. */

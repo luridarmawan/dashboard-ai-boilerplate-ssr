@@ -50,6 +50,11 @@ export interface FieldDef {
    * two thirds in a three-column one. Default: text/markdown full width, everything else 1.
    */
   span?: 1 | 2 | 3;
+  /**
+   * Legend of the group this field belongs to. Consecutive fields with the same group render in
+   * one bordered <fieldset> spanning the whole form; ungrouped fields stay in the plain grid.
+   */
+  group?: string;
 }
 
 export type FormValues = Record<string, unknown>;

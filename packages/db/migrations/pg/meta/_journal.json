@@ -281,6 +281,13 @@
       "when": 1792480288426,
       "tag": "0039_sloppy_wallop",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792785457910,
+      "tag": "0040_parched_thor_girl",
+      "breakpoints": true
     }
   ]
 }

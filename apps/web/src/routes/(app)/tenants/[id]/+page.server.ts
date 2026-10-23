@@ -12,6 +12,7 @@ import type { Actions, PageServerLoad } from './$types';
  * later features and only move through the API.
  */
 const PROFILE_FIELDS = [
+  'shortCode',
   'description',
   'referenceId',
   'joinDate',
@@ -92,6 +93,9 @@ export const actions: Actions = {
     const profile: Record<string, unknown> = Object.fromEntries(
       PROFILE_FIELDS.map((k) => [k, raw[k] ?? null]),
     );
+    // The short code is stored upper case; typing `jkt` is not worth a validation error.
+    if (typeof profile.shortCode === 'string')
+      profile.shortCode = profile.shortCode.trim().toUpperCase() || null;
     if (form.has('_regionPicker')) {
       // Picker mode: the names are not on the form — the API fills them — and a level that no
       // longer sits under its parent (the parent changed) is cleared with everything below it.

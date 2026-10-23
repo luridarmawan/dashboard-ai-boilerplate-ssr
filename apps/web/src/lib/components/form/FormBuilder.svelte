@@ -96,6 +96,15 @@ const spanOf = (f: FieldDef) =>
     | 3;
 const full = $derived(COL_SPAN[columns]);
 const hasFile = $derived(fields.some((f) => f.type === 'file'));
+/** Runs of consecutive fields sharing a `group`; ungrouped runs render straight into the grid. */
+const segments = $derived(
+  fields.reduce<{ group: string | undefined; fields: FieldDef[] }[]>((out, f) => {
+    const last = out.at(-1);
+    if (last && last.group === f.group) last.fields.push(f);
+    else out.push({ group: f.group, fields: [f] });
+    return out;
+  }, []),
+);
 
 let submitting = $state(false);
 /**
@@ -124,6 +133,84 @@ function submitOverFetch(node: HTMLFormElement) {
 }
 </script>
 
+{#snippet control(f: FieldDef)}
+  {@const id = `f-${f.name}`}
+  {@const err = errors[f.name] ?? null}
+  {#if f.type === 'hidden'}
+    <input type="hidden" name={f.name} value={str(values[f.name])} />
+  {:else if f.type === 'boolean'}
+    <div class={cn('flex items-center gap-2 self-end pb-2', COL_SPAN[spanOf(f)])}>
+      <Checkbox {id} name={f.name} checked={Boolean(values[f.name])} disabled={readonly || f.disabled} aria-invalid={err ? 'true' : undefined} />
+      <label for={id} class="text-sm">{f.label ?? f.name}</label>
+      {#if err}<p class="text-sm text-destructive" role="alert">{err}</p>{/if}
+    </div>
+  {:else}
+    <Field label={f.label ?? f.name} for={id} hint={f.hint} error={err} required={f.required} class={cn(COL_SPAN[spanOf(f)])}>
+      {#if f.type === 'text' || f.type === 'markdown'}
+        <Textarea {id} name={f.name} rows={f.rows ?? (f.type === 'markdown' ? 8 : 3)} placeholder={f.placeholder} required={f.required} disabled={readonly || f.disabled} maxlength={f.maxlength} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined} class={f.type === 'markdown' ? 'font-mono text-xs' : ''} />
+        {#if f.type === 'markdown'}<p class="text-xs text-muted-foreground">Markdown</p>{/if}
+      {:else if f.type === 'select'}
+        <Select {id} name={f.name} required={f.required} disabled={readonly || f.disabled} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined}>
+          {#if !f.required}<option value="">—</option>{/if}
+          {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={str(values[f.name]) === o.value}>{o.label}</option>{/each}
+        </Select>
+      {:else if f.type === 'multiselect' && f.multiselectAs === 'select'}
+        <Select {id} name={f.name} multiple disabled={readonly || f.disabled} class="h-auto min-h-24">
+          {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={list(values[f.name]).includes(o.value)}>{o.label}</option>{/each}
+        </Select>
+      {:else if f.type === 'multiselect'}
+        <!-- A long option list scrolls inside its own box: with hundreds of groups the grid would
+             otherwise push the form's buttons far below the fold. -->
+        <div class="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 overflow-y-auto rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
+          {#each f.options ?? [] as o (o.value)}
+            <label class="flex items-center gap-2 text-sm">
+              <Checkbox name={f.name} value={o.value} checked={list(values[f.name]).includes(o.value)} disabled={readonly || f.disabled} />
+              {o.label}
+            </label>
+          {:else}
+            <span class="text-sm text-muted-foreground">—</span>
+          {/each}
+        </div>
+      {:else if f.type === 'file'}
+        <Input {id} type="file" name={f.name} accept={f.accept} required={f.required} disabled={readonly || f.disabled} />
+      {:else if f.type === 'password'}
+        <!-- Never seeded with a value; carries its own show/hide toggle. -->
+        <PasswordInput
+          {id}
+          name={f.name}
+          placeholder={f.placeholder}
+          required={f.required}
+          disabled={readonly || f.disabled}
+          autocomplete={f.autocomplete}
+          minlength={f.minlength}
+          maxlength={f.maxlength}
+          pattern={f.pattern}
+          value=""
+          aria-invalid={err ? 'true' : undefined}
+        />
+      {:else}
+        <Input
+          {id}
+          name={f.name}
+          type={f.type === 'string' ? 'text' : f.type === 'date' ? 'date' : f.type}
+          placeholder={f.placeholder}
+          required={f.required}
+          disabled={readonly || f.disabled}
+          autocomplete={f.autocomplete}
+          min={f.min}
+          max={f.max}
+          step={f.step}
+          minlength={f.minlength}
+          maxlength={f.maxlength}
+          pattern={f.pattern}
+          value={val(f, values[f.name])}
+          aria-invalid={err ? 'true' : undefined}
+        />
+      {/if}
+    </Field>
+  {/if}
+{/snippet}
+
 <form
   {method}
   {action}
@@ -146,81 +233,14 @@ function submitOverFetch(node: HTMLFormElement) {
          fields flow around it (and so a screen reader meets it in visual order). -->
     {@render aside?.()}
 
-    {#each fields as f (f.name)}
-      {@const id = `f-${f.name}`}
-      {@const err = errors[f.name] ?? null}
-      {#if f.type === 'hidden'}
-        <input type="hidden" name={f.name} value={str(values[f.name])} />
-      {:else if f.type === 'boolean'}
-        <div class={cn('flex items-center gap-2 self-end pb-2', COL_SPAN[spanOf(f)])}>
-          <Checkbox {id} name={f.name} checked={Boolean(values[f.name])} disabled={readonly || f.disabled} aria-invalid={err ? 'true' : undefined} />
-          <label for={id} class="text-sm">{f.label ?? f.name}</label>
-          {#if err}<p class="text-sm text-destructive" role="alert">{err}</p>{/if}
-        </div>
+    {#each segments as seg, i (i)}
+      {#if seg.group}
+        <fieldset class={cn('grid gap-4 rounded-md border p-4', GRID_COLS[columns], full)}>
+          <legend class="px-1 text-sm font-semibold">{seg.group}</legend>
+          {#each seg.fields as f (f.name)}{@render control(f)}{/each}
+        </fieldset>
       {:else}
-        <Field label={f.label ?? f.name} for={id} hint={f.hint} error={err} required={f.required} class={cn(COL_SPAN[spanOf(f)])}>
-          {#if f.type === 'text' || f.type === 'markdown'}
-            <Textarea {id} name={f.name} rows={f.rows ?? (f.type === 'markdown' ? 8 : 3)} placeholder={f.placeholder} required={f.required} disabled={readonly || f.disabled} maxlength={f.maxlength} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined} class={f.type === 'markdown' ? 'font-mono text-xs' : ''} />
-            {#if f.type === 'markdown'}<p class="text-xs text-muted-foreground">Markdown</p>{/if}
-          {:else if f.type === 'select'}
-            <Select {id} name={f.name} required={f.required} disabled={readonly || f.disabled} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined}>
-              {#if !f.required}<option value="">—</option>{/if}
-              {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={str(values[f.name]) === o.value}>{o.label}</option>{/each}
-            </Select>
-          {:else if f.type === 'multiselect' && f.multiselectAs === 'select'}
-            <Select {id} name={f.name} multiple disabled={readonly || f.disabled} class="h-auto min-h-24">
-              {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={list(values[f.name]).includes(o.value)}>{o.label}</option>{/each}
-            </Select>
-          {:else if f.type === 'multiselect'}
-            <!-- A long option list scrolls inside its own box: with hundreds of groups the grid would
-                 otherwise push the form's buttons far below the fold. -->
-            <div class="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 overflow-y-auto rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
-              {#each f.options ?? [] as o (o.value)}
-                <label class="flex items-center gap-2 text-sm">
-                  <Checkbox name={f.name} value={o.value} checked={list(values[f.name]).includes(o.value)} disabled={readonly || f.disabled} />
-                  {o.label}
-                </label>
-              {:else}
-                <span class="text-sm text-muted-foreground">—</span>
-              {/each}
-            </div>
-          {:else if f.type === 'file'}
-            <Input {id} type="file" name={f.name} accept={f.accept} required={f.required} disabled={readonly || f.disabled} />
-          {:else if f.type === 'password'}
-            <!-- Never seeded with a value; carries its own show/hide toggle. -->
-            <PasswordInput
-              {id}
-              name={f.name}
-              placeholder={f.placeholder}
-              required={f.required}
-              disabled={readonly || f.disabled}
-              autocomplete={f.autocomplete}
-              minlength={f.minlength}
-              maxlength={f.maxlength}
-              pattern={f.pattern}
-              value=""
-              aria-invalid={err ? 'true' : undefined}
-            />
-          {:else}
-            <Input
-              {id}
-              name={f.name}
-              type={f.type === 'string' ? 'text' : f.type === 'date' ? 'date' : f.type}
-              placeholder={f.placeholder}
-              required={f.required}
-              disabled={readonly || f.disabled}
-              autocomplete={f.autocomplete}
-              min={f.min}
-              max={f.max}
-              step={f.step}
-              minlength={f.minlength}
-              maxlength={f.maxlength}
-              pattern={f.pattern}
-              value={val(f, values[f.name])}
-              aria-invalid={err ? 'true' : undefined}
-            />
-          {/if}
-        </Field>
+        {#each seg.fields as f (f.name)}{@render control(f)}{/each}
       {/if}
     {/each}
 

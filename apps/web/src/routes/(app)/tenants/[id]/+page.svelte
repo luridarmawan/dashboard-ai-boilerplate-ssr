@@ -76,14 +76,35 @@ const addressFields: FieldDef[] = $derived(
         { ...text('regency', t('tenants.regency'), 191), span: 2 },
       ],
 );
+const identity = $derived(t('tenants.group_identity'));
 const fields: FieldDef[] = $derived([
-  { name: 'name', type: 'string', label: t('tenants.name'), required: true, maxlength: 191 },
+  {
+    name: 'name',
+    type: 'string',
+    label: t('tenants.name'),
+    required: true,
+    maxlength: 191,
+    group: identity,
+  },
   {
     name: 'parentId',
     type: 'select',
     label: t('tenants.parent'),
     hint: t('tenants.parent_hint'),
     options: data.parents,
+    group: identity,
+  },
+  {
+    // Lower case is accepted on the way in; the action upper-cases it before validation.
+    name: 'shortCode',
+    type: 'string',
+    label: t('tenants.short_code'),
+    hint: t('tenants.short_code_hint'),
+    maxlength: 3,
+    pattern: '[A-Za-z]{1,3}',
+    placeholder: 'JKT',
+    autocomplete: 'off',
+    group: identity,
   },
   {
     name: 'referenceId',
@@ -92,9 +113,17 @@ const fields: FieldDef[] = $derived([
     hint: t('tenants.reference_id_hint'),
     maxlength: 191,
     autocomplete: 'off',
+    group: identity,
   },
-  { name: 'joinDate', type: 'date', label: t('tenants.join_date') },
-  { name: 'description', type: 'text', label: t('tenants.description'), maxlength: 2000, span: 2 },
+  { name: 'joinDate', type: 'date', label: t('tenants.join_date'), group: identity },
+  {
+    name: 'description',
+    type: 'text',
+    label: t('tenants.description'),
+    maxlength: 2000,
+    span: 2,
+    group: identity,
+  },
   { ...text('url', t('tenants.url'), 2048), type: 'string', autocomplete: 'url' },
   { ...text('mapsUrl', t('tenants.maps_url'), 2048), autocomplete: 'url' },
   { name: 'address', type: 'text', label: t('tenants.address'), maxlength: 2000, rows: 2, span: 2 },
@@ -129,6 +158,7 @@ const fields: FieldDef[] = $derived([
 const values = $derived({
   name: c.name,
   parentId: c.parentId ?? '',
+  shortCode: c.shortCode,
   description: c.description,
   referenceId: c.referenceId,
   joinDate: c.joinDate,
