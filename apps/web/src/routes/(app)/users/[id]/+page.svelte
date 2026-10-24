@@ -4,7 +4,16 @@ import Csrf from '$lib/components/Csrf.svelte';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
-import { Alert, Badge, Button, Card, Field, Input } from '$lib/components/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ConfirmDelete,
+  Field,
+  Input,
+  Select,
+} from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import { presenceText } from '$lib/presence';
@@ -140,6 +149,63 @@ const passwordFields: FieldDef[] = $derived([
       error={form?.error && !scope && Object.keys(fieldErrors).length === 0 ? form.error : null}
     />
     <p class="mt-4 text-sm text-muted-foreground">{t('users.detail.meta', { created: new Date(u.createdAt).toLocaleString(dateLocale), lastLogin: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString(dateLocale) : '—' })}</p>
+  </Card>
+
+  <!-- Tenant access (B-2/B-4): every tenant this user may open that the viewer may see, each revocable in place; one more can be granted below. -->
+  <Card title={t('users.detail.tenants.title')} description={t('users.detail.tenants.desc')}>
+    <div class="grid gap-4" id="tenants" data-testid="tenant-access">
+      {#if form?.tenantAdded}<p class="notice" role="status">{t('users.detail.tenants.added', { name: u.name, tenant: form.tenantAdded })}</p>{/if}
+      {#if form?.tenantRemoved}<p class="notice" role="status">{t('users.detail.tenants.removed', { name: u.name, tenant: form.tenantRemoved })}</p>{/if}
+      {#if scope === 'tenants' && form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+      <ul class="divide-y rounded-md border">
+        {#each data.tenants.memberships as m (m.id)}
+          <li class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+            <Icon name="building" size={16} class="text-muted-foreground" />
+            <span class="min-w-0 flex-1 truncate">{m.name} <span class="text-muted-foreground">({m.code})</span></span>
+            {#if m.id === data.clientId}<Badge variant="secondary">{t('users.detail.tenants.current')}</Badge>{/if}
+            {#if m.isDefault}<Badge variant="outline">{t('users.detail.tenants.default')}</Badge>{/if}
+            {#if m.canRemove}
+              <ConfirmDelete
+                compact
+                icon="x"
+                csrf={data.csrf}
+                action="?/removeTenant"
+                href="?confirm=delete&tenant={m.id}#tenants"
+                cancelHref="/users/{u.id}#tenants"
+                confirming={data.confirmTenantId === m.id}
+                variant="ghost"
+                size="sm"
+                class="text-destructive"
+                label={t('users.detail.tenants.remove')}
+                title={t('users.detail.tenants.remove')}
+                confirmLabel={t('users.detail.tenants.remove_confirm_submit')}
+                description={t('users.detail.tenants.remove_confirm_lead', { name: u.name, tenant: m.name })}
+              >
+                {#snippet fields()}<input type="hidden" name="clientId" value={m.id} /><input type="hidden" name="tenantName" value={m.name} />{/snippet}
+              </ConfirmDelete>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      {#if data.tenants.hidden > 0}
+        <p class="text-sm text-muted-foreground">{t('users.detail.tenants.hidden', { n: data.tenants.hidden })}</p>
+      {/if}
+      {#if data.tenants.candidates.length > 0}
+        <form method="POST" action="?/addTenant" class="grid gap-3 sm:max-w-md" data-testid="add-tenant-form" use:enhance>
+          <Csrf token={data.csrf} />
+          <Field label={t('users.detail.tenants.add_label')} for="add-tenant" hint={t('users.detail.tenants.add_hint')}>
+            <Select id="add-tenant" name="clientId" required>
+              {#each data.tenants.candidates as c (c.id)}
+                <option value={c.id}>{c.name} ({c.code})</option>
+              {/each}
+            </Select>
+          </Field>
+          <div><Button type="submit" variant="outline"><Icon name="plus" size={16} />{t('users.detail.tenants.add_submit')}</Button></div>
+        </form>
+      {:else}
+        <p class="text-sm text-muted-foreground">{t('users.detail.tenants.none_to_add')}</p>
+      {/if}
+    </div>
   </Card>
 
   {#if canPassword}

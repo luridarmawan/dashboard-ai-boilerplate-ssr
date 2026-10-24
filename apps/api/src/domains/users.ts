@@ -1,5 +1,6 @@
 import {
   allPermissionStrings,
+  canActInTenant,
   createSession,
   defaultTenantOf,
   detachTenantFromSessions,
@@ -17,6 +18,7 @@ import {
   randomToken,
   revokeAllSessions,
   revokeSession,
+  tenantsOf,
   verifyTotp,
   writeAudit,
 } from '@core/auth';
@@ -42,6 +44,7 @@ import {
   count,
   desc,
   eq,
+  forTenant,
   inArray,
   isNull,
   newId,
@@ -49,6 +52,7 @@ import {
   STATUS,
   schema,
   sql,
+  type TenantDb,
   unsafeAcrossTenants,
 } from '@core/db';
 import { Elysia, t } from 'elysia';
@@ -317,6 +321,120 @@ async function setGroups(
     );
   }
   return null;
+}
+
+// ---- tenant access (B-2, B-4) -------------------------------------------------------------------
+
+/** The group a new membership lands in: the tenant's Regular User group, as an invitation does. */
+const DEFAULT_GROUP_CODE = 'user';
+
+const TenantRef = t.Object({ id: t.String(), code: t.String(), name: t.String() });
+const TenantAccess = t.Intersect([
+  TenantRef,
+  t.Object({
+    /** Opened after login when the user has several tenants (B-4). */
+    isDefault: t.Boolean(),
+    /** May the caller revoke this membership (`user.manage` there, not oneself, superadmin rules)? */
+    canRemove: t.Boolean(),
+  }),
+]);
+const UserTenants = t.Object({
+  /** Live memberships in tenants the CALLER may act in \u2014 the rest are counted, never named (B-3). */
+  memberships: t.Array(TenantAccess),
+  hidden: t.Integer(),
+  /** Tenants of the caller where this user is not a member yet and the caller holds `user.create`. */
+  candidates: t.Array(TenantRef),
+});
+
+/**
+ * Permission of the caller in a tenant that is NOT necessarily the active one. Same rule as the
+ * route guard: effective permissions there, narrowed by an API token's scopes (A-4); a superadmin
+ * passes everything (C-5). Membership comes first: a permission in a tenant one cannot act in is
+ * no permission.
+ */
+async function canInTenant(a: AuthState, clientId: string, required: string): Promise<boolean> {
+  const db = unsafeAcrossTenants(); // membership + permissions are read across tenants by definition
+  if (!(await canActInTenant(db, a.user, clientId))) return false;
+  if (a.scopes && !hasPermission(a.scopes, required)) return false;
+  return (
+    a.user.is_superadmin ||
+    hasPermission(await effectivePermissions(db, a.user, clientId), required)
+  );
+}
+
+/** Live memberships of `userId`, with the tenant, across every tenant (the caller filters). */
+async function membershipsOf(userId: string) {
+  const db = unsafeAcrossTenants(); // deliberately across tenants: that is the question being asked
+  return db
+    .select({
+      id: schema.clients.id,
+      code: schema.clients.code,
+      name: schema.clients.name,
+      isDefault: schema.clientUserMaps.is_default,
+    })
+    .from(schema.clientUserMaps)
+    .innerJoin(schema.clients, eq(schema.clients.id, schema.clientUserMaps.client_id))
+    .where(
+      and(
+        eq(schema.clientUserMaps.user_id, userId),
+        isNull(schema.clientUserMaps.deleted_at),
+        isNull(schema.clients.deleted_at),
+      ),
+    )
+    .orderBy(asc(schema.clients.name));
+}
+
+/**
+ * Take `userId` out of ONE tenant: groups there dropped, membership soft-deleted, sessions pinned
+ * to that tenant detached; the account itself is soft-deleted (and every session ended) once no
+ * membership remains. Shared by "remove from the active tenant" and "revoke access to tenant X".
+ * The caller has already checked who may do this; the audit row lands in the tenant left.
+ */
+async function removeFromTenant(p: {
+  tenant: TenantDb;
+  clientId: string;
+  user: UserRow;
+  actorId: string;
+  ip: string | null;
+  requestId: string;
+}): Promise<{ accountDeleted: boolean }> {
+  const db = unsafeAcrossTenants();
+  await p.tenant.delete(schema.groupUserMaps, eq(schema.groupUserMaps.user_id, p.user.id));
+  await p.tenant.update(
+    schema.clientUserMaps,
+    { deleted_at: new Date() },
+    eq(schema.clientUserMaps.user_id, p.user.id),
+  );
+  // Sessions pinned to this tenant lose it; the account survives while other tenants remain.
+  await detachTenantFromSessions(db, p.clientId, p.user.id);
+  const [remaining] = await db
+    .select({ n: count() })
+    .from(schema.clientUserMaps)
+    .where(
+      and(eq(schema.clientUserMaps.user_id, p.user.id), isNull(schema.clientUserMaps.deleted_at)),
+    );
+  const accountDeleted = Number(remaining?.n ?? 0) === 0;
+  if (accountDeleted) {
+    await db
+      .update(schema.users)
+      .set({ deleted_at: new Date() })
+      .where(eq(schema.users.id, p.user.id));
+    await invalidateUserSessions(p.user.id);
+    await revokeAllSessions(db, p.user.id);
+    emit('user.deleted', { userId: p.user.id, clientId: p.clientId }, { requestId: p.requestId });
+  }
+  await writeAudit(db, {
+    clientId: p.clientId,
+    actorId: p.actorId,
+    action: 'user.delete',
+    resource: 'user',
+    resourceId: p.user.id,
+    ip: p.ip,
+    requestId: p.requestId,
+    before: publicUser(p.user),
+    after: { accountDeleted },
+  });
+  return { accountDeleted };
 }
 
 export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'] })
@@ -1229,6 +1347,194 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
       detail: { summary: 'Get a user' },
     },
   )
+  .get(
+    '/:id/tenants',
+    async ({ auth, params, set, requestId, tenantState }) => {
+      const a = actor(auth);
+      const ts = tenantOf(tenantState);
+      const row = ts ? await memberRow(ts.tenant, params.id) : null;
+      if (!ts || !row) return notFound(set, requestId, 'Pengguna');
+      // Only tenants the caller may act in are named; the switcher's own rule (B-4), reused.
+      const mine = await tenantsOf(unsafeAcrossTenants(), a.user);
+      const visible = new Set(mine.map((c) => c.id));
+      const all = await membershipsOf(row.id);
+      const memberships: (typeof TenantAccess.static)[] = [];
+      for (const m of all) {
+        if (!visible.has(m.id)) continue;
+        const canRemove =
+          row.id !== a.user.id &&
+          (!row.is_superadmin || a.user.is_superadmin) &&
+          (await canInTenant(a, m.id, 'user.manage'));
+        memberships.push({
+          id: m.id,
+          code: m.code,
+          name: m.name,
+          isDefault: m.isDefault === true,
+          canRemove,
+        });
+      }
+      const has = new Set(all.map((m) => m.id));
+      const candidates: (typeof TenantRef.static)[] = [];
+      for (const c of mine) {
+        if (has.has(c.id)) continue;
+        if (await canInTenant(a, c.id, 'user.create'))
+          candidates.push({ id: c.id, code: c.code, name: c.name });
+      }
+      return ok({ memberships, hidden: all.length - memberships.length, candidates });
+    },
+    {
+      beforeHandle: permission('user.read'),
+      params: t.Object({ id: Id }),
+      response: { 200: OkSchema(UserTenants), ...errorResponses },
+      detail: {
+        summary: "List a user's tenant access",
+        description:
+          'Which tenants this user (a member of the active tenant) may open, limited to tenants the caller may act in; `candidates` are the tenants the caller could add them to (`user.create` there).',
+      },
+    },
+  )
+  .post(
+    '/:id/tenants',
+    async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const ts = tenantOf(tenantState);
+      const row = ts ? await memberRow(ts.tenant, params.id) : null;
+      if (!ts || !row) return notFound(set, requestId, 'Pengguna');
+      // The same bar as `POST /users` with a known address, but in the named tenant. A tenant the
+      // caller cannot act in reads as "no such tenant" \u2014 never "exists, but not yours" (B-3).
+      if (!(await canInTenant(a, body.clientId, 'user.create')))
+        return notFound(set, requestId, 'Tenant');
+      const db = unsafeAcrossTenants(); // the target tenant is not the active one by design
+      if (await isMemberOf(db, row.id, body.clientId))
+        return conflict(set, requestId, 'Pengguna sudah menjadi anggota tenant ini');
+      const target = forTenant(body.clientId);
+      // Membership: revive a soft-deleted row if there is one, else insert (unique per tenant+user).
+      const old = await target.selectOne(
+        schema.clientUserMaps,
+        eq(schema.clientUserMaps.user_id, row.id),
+      );
+      if (old) {
+        await target.update(
+          schema.clientUserMaps,
+          { deleted_at: null, is_default: false },
+          eq(schema.clientUserMaps.id, old.id),
+        );
+      } else {
+        await target.insert(schema.clientUserMaps, {
+          id: newId(),
+          user_id: row.id,
+          is_default: false,
+        });
+      }
+      // Land them in the tenant's Regular User group (as an invitation does), so the access is
+      // usable at once; a tenant without that group leaves them without a group.
+      const group = await target.selectOne(
+        schema.groups,
+        and(eq(schema.groups.code, DEFAULT_GROUP_CODE), isNull(schema.groups.deleted_at)),
+      );
+      if (group) {
+        const has = await target.selectOne(
+          schema.groupUserMaps,
+          and(
+            eq(schema.groupUserMaps.group_id, group.id),
+            eq(schema.groupUserMaps.user_id, row.id),
+          ),
+        );
+        if (!has)
+          await target.insert(schema.groupUserMaps, {
+            id: newId(),
+            group_id: group.id,
+            user_id: row.id,
+          });
+      }
+      const [client] = await db
+        .select({ id: schema.clients.id, code: schema.clients.code, name: schema.clients.name })
+        .from(schema.clients)
+        .where(eq(schema.clients.id, body.clientId))
+        .limit(1);
+      await writeAudit(db, {
+        clientId: body.clientId,
+        actorId: a.user.id,
+        action: 'user.add_member',
+        resource: 'user',
+        resourceId: row.id,
+        ip: clientIp(request, server),
+        requestId,
+        after: {
+          email: row.email,
+          groupIds: group ? [group.id] : [],
+          ...(old ? { restored: true } : {}),
+        },
+      });
+      set.status = 201;
+      return ok({
+        added: true as const,
+        tenant: client as typeof TenantRef.static,
+        group: group ? { id: group.id, code: group.code, name: group.name } : null,
+      });
+    },
+    {
+      beforeHandle: permission('user.read'),
+      params: t.Object({ id: Id }),
+      body: t.Object({ clientId: Id }),
+      response: {
+        201: OkSchema(
+          t.Object({
+            added: t.Literal(true),
+            tenant: TenantRef,
+            group: t.Nullable(t.Object({ id: t.String(), code: t.String(), name: t.String() })),
+          }),
+        ),
+        ...errorResponses,
+      },
+      detail: {
+        summary: 'Give a user access to a tenant',
+        description:
+          "Adds this user (a member of the active tenant) to `clientId`, a tenant where the caller holds `user.create`; they join that tenant's Regular User group. A tenant the caller cannot act in is `not_found`, an existing membership `conflict`.",
+      },
+    },
+  )
+  .delete(
+    '/:id/tenants/:clientId',
+    async ({ auth, params, set, request, server, requestId, tenantState }) => {
+      const a = actor(auth);
+      const ts = tenantOf(tenantState);
+      const row = ts ? await memberRow(ts.tenant, params.id) : null;
+      if (!ts || !row) return notFound(set, requestId, 'Pengguna');
+      if (!(await canInTenant(a, params.clientId, 'user.manage')))
+        return notFound(set, requestId, 'Tenant');
+      if (row.id === a.user.id)
+        return conflict(set, requestId, 'Anda tidak bisa menghapus diri sendiri');
+      if (row.is_superadmin && !a.user.is_superadmin) {
+        set.status = 403;
+        return fail('forbidden', 'Superadmin hanya bisa dihapus oleh superadmin', requestId);
+      }
+      if (!(await isMemberOf(unsafeAcrossTenants(), row.id, params.clientId)))
+        return notFound(set, requestId, 'Keanggotaan');
+      const r = await removeFromTenant({
+        tenant: forTenant(params.clientId),
+        clientId: params.clientId,
+        user: row,
+        actorId: a.user.id,
+        ip: clientIp(request, server),
+        requestId,
+      });
+      return ok({ deleted: true as const, ...r });
+    },
+    {
+      beforeHandle: permission('user.read'),
+      params: t.Object({ id: Id, clientId: Id }),
+      response: {
+        200: OkSchema(t.Object({ deleted: t.Literal(true), accountDeleted: t.Boolean() })),
+        ...errorResponses,
+      },
+      detail: {
+        summary: "Revoke a user's access to a tenant",
+        description:
+          'Removes this user (a member of the active tenant) from `clientId`, a tenant where the caller holds `user.manage` \u2014 the same step as removing them from the active tenant: groups there dropped, sessions detached, the account soft-deleted once no tenant remains.',
+      },
+    },
+  )
   .post(
     '/',
     async ({ auth, body, set, request, server, requestId, tenantState }) => {
@@ -1432,43 +1738,15 @@ export const users = new Elysia({ name: 'users', prefix: '/users', tags: ['user'
         set.status = 403;
         return fail('forbidden', 'Superadmin hanya bisa dihapus oleh superadmin', requestId);
       }
-      const db = unsafeAcrossTenants();
-      await ts.tenant.delete(schema.groupUserMaps, eq(schema.groupUserMaps.user_id, row.id));
-      await ts.tenant.update(
-        schema.clientUserMaps,
-        { deleted_at: new Date() },
-        eq(schema.clientUserMaps.user_id, row.id),
-      );
-      // Sessions pinned to this tenant lose it; the account survives while other tenants remain.
-      await detachTenantFromSessions(db, ts.clientId, row.id);
-      const [remaining] = await db
-        .select({ n: count() })
-        .from(schema.clientUserMaps)
-        .where(
-          and(eq(schema.clientUserMaps.user_id, row.id), isNull(schema.clientUserMaps.deleted_at)),
-        );
-      const accountDeleted = Number(remaining?.n ?? 0) === 0;
-      if (accountDeleted) {
-        await db
-          .update(schema.users)
-          .set({ deleted_at: new Date() })
-          .where(eq(schema.users.id, row.id));
-        await invalidateUserSessions(row.id);
-        await revokeAllSessions(db, row.id);
-        emit('user.deleted', { userId: row.id, clientId: ts.clientId }, { requestId });
-      }
-      await writeAudit(db, {
+      const r = await removeFromTenant({
+        tenant: ts.tenant,
         clientId: ts.clientId,
+        user: row,
         actorId: a.user.id,
-        action: 'user.delete',
-        resource: 'user',
-        resourceId: row.id,
         ip: clientIp(request, server),
         requestId,
-        before: publicUser(row),
-        after: { accountDeleted },
       });
-      return ok({ deleted: true as const, accountDeleted });
+      return ok({ deleted: true as const, ...r });
     },
     {
       beforeHandle: permission('user.manage'),
