@@ -257,7 +257,7 @@ const confirmPost = (b: BulkAction) =>
       <Button type="submit" variant="outline" size="sm"><Icon name={refreshing ? 'refresh' : 'search'} size={16} class={refreshing ? 'animate-spin' : ''} />{L.search}</Button>
     </form>
     <details class="relative shrink-0">
-      <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"><Icon name="columns" size={16} />{L.columns}</summary>
+      <summary title={L.columns} aria-label={L.columns} class="inline-flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent"><Icon name="columns" size={16} /></summary>
       <form method="GET" class="absolute end-0 z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
         {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
         <input type="hidden" name="sort" value={tableState.sort} />
