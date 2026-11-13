@@ -37,7 +37,33 @@ export type TemplateId =
   | 'invite'
   | 'invite-existing'
   | 'contact'
-  | 'contact-ack';
+  | 'contact-ack'
+  | 'notice';
+
+/**
+ * Payload of the generic `notice` template: a module composes the message in the recipient's
+ * language and the template only lays it out (and escapes every string). This is how a module
+ * sends mail of its own without a template in core.
+ */
+export interface NoticeData {
+  /** Subject line; ` — <app name>` is appended. */
+  readonly subject: string;
+  /** Heading of the message; the subject when empty. */
+  readonly title?: string;
+  /** Greets the recipient by name ("Hello Budi,"); empty = a plain greeting, absent = none. */
+  readonly name?: string;
+  /** Paragraphs before the table; blank lines separate paragraphs. */
+  readonly intro?: string;
+  /** Label/value pairs shown as a table (the data a form sent, an order, …). */
+  readonly rows?: readonly { readonly label: string; readonly value: string }[];
+  /** Titled blocks after the table; line breaks are kept. */
+  readonly sections?: readonly { readonly title?: string; readonly body: string }[];
+  /** Call to action: `link` with `cta` as the button label (tracked like the other templates). */
+  readonly link?: string;
+  readonly cta?: string;
+  /** Small print at the end. */
+  readonly note?: string;
+}
 
 type Dict = Record<string, string>;
 const T: Record<'id' | 'en', Dict> = {
@@ -238,6 +264,8 @@ export function renderTemplate(
         text: `${tr(locale, 'contact_ack.body')}\n\n${tr(locale, 'contact_ack.copy')}\n${String(data.message ?? '')}\n\n${tr(locale, 'contact_ack.noreply')}`,
       };
     }
+    case 'notice':
+      return renderNotice(locale, data as unknown as NoticeData, brand, cta, shellHtml);
     case 'contact': {
       const subject = tr(locale, 'contact.subject', { app, name });
       const msg = escapeHtml(String(data.message ?? '')).replace(/\n/g, '<br>');
@@ -249,4 +277,70 @@ export function renderTemplate(
       };
     }
   }
+}
+
+/** Text with its line breaks, safe for HTML. */
+const multiline = (s: string) => escapeHtml(s).replace(/\r?\n/g, '<br>');
+const str = (v: unknown) =>
+  typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v);
+
+function renderNotice(
+  locale: string,
+  d: NoticeData,
+  brand: Brand,
+  cta: string,
+  shellHtml: (locale: string, subject: string, body: string) => string,
+): Rendered {
+  const subject = `${str(d.subject)} — ${brand.appName}`;
+  const title = str(d.title) || str(d.subject);
+  const html: string[] = [];
+  const text: string[] = [];
+  if (d.name !== undefined) {
+    const name = str(d.name).trim();
+    html.push(`<p>${greeting(locale, name)}</p>`);
+    // The text part carries the name as typed, not HTML-escaped.
+    const dict = T[locale === 'id' ? 'id' : 'en'];
+    text.push(name ? (dict.hello ?? '').replace('{name}', name) : (dict['hello.anon'] ?? ''));
+  }
+  const paragraphs = str(d.intro)
+    .split(/\r?\n\s*\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  for (const para of paragraphs) {
+    html.push(`<p>${multiline(para)}</p>`);
+    text.push(para);
+  }
+  const rows = Array.isArray(d.rows) ? d.rows.filter((r) => r && str(r.value).trim()) : [];
+  if (rows.length) {
+    const cell = 'padding:6px 0;vertical-align:top;border-bottom:1px solid #f4f4f5';
+    html.push(
+      `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:16px 0;border-collapse:collapse;font-size:14px">${rows
+        .map(
+          (r) =>
+            `<tr><td style="${cell};padding-right:12px;color:#71717a;white-space:nowrap">${escapeHtml(str(r.label))}</td><td style="${cell}">${multiline(str(r.value))}</td></tr>`,
+        )
+        .join('')}</table>`,
+    );
+    text.push(rows.map((r) => `${str(r.label)}: ${str(r.value)}`).join('\n'));
+  }
+  for (const sec of Array.isArray(d.sections) ? d.sections : []) {
+    if (!sec || !str(sec.body).trim()) continue;
+    const head = str(sec.title)
+      ? `<p style="margin:24px 0 4px;font-weight:600">${escapeHtml(str(sec.title))}</p>`
+      : '';
+    html.push(
+      `${head}<div style="margin:4px 0 16px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${multiline(str(sec.body))}</div>`,
+    );
+    text.push(str(sec.title) ? `${str(sec.title)}\n${str(sec.body)}` : str(sec.body));
+  }
+  const link = str(d.link);
+  if (link) {
+    html.push(button(cta, escapeHtml(str(d.cta) || link), brand.primary), fallback(locale, link));
+    text.push(str(d.cta) ? `${str(d.cta)}: ${link}` : link);
+  }
+  if (str(d.note).trim()) {
+    html.push(`<p style="color:#71717a;font-size:12px">${multiline(str(d.note))}</p>`);
+    text.push(str(d.note));
+  }
+  return { subject, html: shellHtml(locale, title, html.join('')), text: text.join('\n\n') };
 }

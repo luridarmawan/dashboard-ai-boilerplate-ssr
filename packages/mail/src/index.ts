@@ -50,6 +50,7 @@ export {
 } from './smtp-test.ts';
 export {
   type Brand,
+  type NoticeData,
   type Rendered,
   renderTemplate,
   type TemplateId,

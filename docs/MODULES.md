@@ -702,6 +702,34 @@ await notify({
 
 `notify()` tidak pernah melempar ke request pemanggil (kegagalan dicatat di log), menerbitkan event `notification.created` yang bisa didengar `hooks.ts` modul lain (mis. meneruskan ke webhook), dan barisnya adalah data tenant biasa: hanya pemiliknya yang bisa membaca lewat `/v1/notifications`. Notifikasi yang sudah dibaca dipangkas job retensi sesuai **Pengaturan → Log & retensi**. Contoh hidup: `modules/Example/api/routes.ts` (pesan kontak baru → pemegang `example.inquiry.read`).
 
+### Email dari modul (J-3)
+
+Modul tidak menambah template ke core. Untuk email miliknya sendiri, modul menyusun isi dalam bahasa penerima lalu memakai template generik **`notice`** lewat outbox; template yang menata (header brand, tabel, tombol) dan meng-*escape* setiap string, sehingga isian pengguna aman ditaruh apa adanya:
+
+```ts
+import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
+
+await sendTemplate(unsafeAcrossTenants(), {
+  to: row.email, toName: row.name, template: 'notice', clientId,
+  locale: await mailLocale({ request, clientId }),
+  data: {                                   // bentuk: `NoticeData` dari `@core/mail`
+    subject: 'Pendaftaran diterima: Liga Hedef', // ` — <nama app>` ditambahkan otomatis
+    title: 'Pendaftaran diterima',          // opsional; baku = subject
+    name: row.name,                          // sapaan "Halo …,"; tanpa kunci ini = tanpa sapaan
+    intro: 'Paragraf satu.
+
+Paragraf dua.', // baris kosong memisahkan paragraf
+    rows: [{ label: 'Nama', value: row.name }], // baris berisi kosong dilewati
+    sections: [{ title: 'Pembayaran', body: 'BCA 123
+a.n. Panitia' }],
+    link: publicLink('/event/x', request), cta: 'Lihat event', // tombol; klik dilacak seperti template lain
+    note: 'Email ini dikirim otomatis.',
+  },
+});
+```
+
+Email yang isinya bergantung pada langkah berikutnya (mis. berkas yang diunggah sesaat setelah form disimpan) sebaiknya disusun oleh task antrean (lihat bagian berikut), bukan di request, supaya task membaca keadaan terakhir saat berjalan. Bukti: `packages/mail/test/templates.test.ts`.
+
 ### Antrean pekerjaan dari modul (P2: retry, prioritas, dead-letter)
 
 Pekerjaan yang terjadi **karena sesuatu** (impor, laporan, kiriman massal, panggilan pihak ketiga yang lambat) tidak dijalankan di dalam request dan bukan pula job berkala (G-18). Daftarkan handler-nya saat modul dimuat, lalu enqueue dari route:
