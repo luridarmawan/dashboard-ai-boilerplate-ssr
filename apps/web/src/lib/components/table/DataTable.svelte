@@ -238,10 +238,14 @@ const confirmPost = (b: BulkAction) =>
   `${b.action}${b.action.includes('?') ? '&' : '?'}confirm=${b.confirm?.token ?? ''}`;
 </script>
 
-<div bind:this={root} class={cn('dt grid gap-3', className)}>
-  <!-- toolbar: search (+ page filters) and column picker, both plain GET forms; JS only swaps the reload for goto() -->
-  <div class="flex flex-wrap items-center gap-2">
-    <form method="GET" class="flex flex-wrap items-center gap-2" role="search" onsubmit={submitSearch} onchange={filterChanged} data-testid="dt-search" data-enhanced={enhanced}>
+<div bind:this={root} class={cn('dt grid grid-cols-[minmax(0,1fr)] gap-3', className)}>
+  <!--
+    toolbar: search (+ page filters) and column picker, both plain GET forms; JS only swaps the reload for goto().
+    One line only: the search form scrolls sideways when its controls outgrow the width (phones). The column
+    picker stays outside that scroller, since an overflow container would clip its popover.
+  -->
+  <div class="flex items-center gap-2">
+    <form method="GET" class="-m-1 flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0" role="search" onsubmit={submitSearch} onchange={filterChanged} data-testid="dt-search" data-enhanced={enhanced}>
       {#if tableState.sort}<input type="hidden" name="sort" value={tableState.sort} />{/if}
       <input type="hidden" name="order" value={tableState.order} />
       {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
@@ -252,9 +256,9 @@ const confirmPost = (b: BulkAction) =>
       {#if filters}{@render filters()}{/if}
       <Button type="submit" variant="outline" size="sm"><Icon name={refreshing ? 'refresh' : 'search'} size={16} class={refreshing ? 'animate-spin' : ''} />{L.search}</Button>
     </form>
-    <details class="relative">
+    <details class="relative shrink-0">
       <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"><Icon name="columns" size={16} />{L.columns}</summary>
-      <form method="GET" class="absolute z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
+      <form method="GET" class="absolute end-0 z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
         {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
         <input type="hidden" name="sort" value={tableState.sort} />
         <input type="hidden" name="order" value={tableState.order} />
@@ -266,7 +270,7 @@ const confirmPost = (b: BulkAction) =>
         <Button type="submit" size="sm" class="mt-1">{L.apply}</Button>
       </form>
     </details>
-    {#if toolbar}<div class="ms-auto flex items-center gap-2">{@render toolbar()}</div>{/if}
+    {#if toolbar}<div class="flex shrink-0 items-center gap-2">{@render toolbar()}</div>{/if}
   </div>
 
   {#if error}
