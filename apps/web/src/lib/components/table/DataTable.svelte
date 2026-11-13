@@ -301,8 +301,8 @@ const confirmPost = (b: BulkAction) =>
           {#if loading}
             {#each { length: 5 } as _, i (i)}
               <tr class="border-b last:border-0">
-                {#if hasBulk}<td class="px-3 py-3"></td>{/if}
-                {#each visible as c (c.key)}<td class="px-3 py-3"><Skeleton class="h-4 w-full" /></td>{/each}
+                {#if hasBulk}<td class="px-3 py-1"></td>{/if}
+                {#each visible as c (c.key)}<td class="px-3 py-1"><Skeleton class="h-4 w-full" /></td>{/each}
                 {#if rowActions.length}<td></td>{/if}
               </tr>
             {/each}
@@ -316,15 +316,15 @@ const confirmPost = (b: BulkAction) =>
             </tr>
           {:else}
             {#each rows as row (row.id)}
-              <tr class="border-b last:border-0 hover:bg-muted/50">
-                {#if hasBulk}<td class="px-3 py-2"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 cursor-pointer accent-primary" aria-label={L.select} onchange={syncSelected} /></td>{/if}
+              <tr class="h-9 border-b last:border-0 hover:bg-muted/50">
+                {#if hasBulk}<td class="px-3"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 cursor-pointer accent-primary" aria-label={L.select} onchange={syncSelected} /></td>{/if}
                 {#each visible as c (c.key)}
-                  <td class={cn('px-3 py-2 align-middle', align(c), c.class)}>
+                  <td class={cn('px-3 align-middle', align(c), c.class)}>
                     {#if cell}{@render cell(row, c)}{:else}{c.value ? (c.value(row) ?? '—') : '—'}{/if}
                   </td>
                 {/each}
                 {#if rowActions.length}
-                  <td class="px-3 py-2 text-end whitespace-nowrap">
+                  <td class="px-3 text-end whitespace-nowrap">
                     {#each rowActions as a (a.label)}
                       {#if !a.when || a.when(row)}
                         {#if a.href}

@@ -45,7 +45,10 @@ const columns: ColumnDef<Row>[] = [
 <svelte:head><title>{t('examples.prefix')} · {t('examples.list.short')}</title></svelte:head>
 
 <div class="page">
-  <h1>{t('examples.list.title')}</h1>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1>{t('examples.list.title')}</h1>
+    <Button href="/examples/form" size="sm"><Icon name="plus" size={16} />{t('examples.list.new_product')}</Button>
+  </div>
   {#if form?.archived !== undefined}<p class="notice">{t('examples.list.archived', { n: form.archived })}</p>{/if}
   <DataTable
     rows={data.rows}
@@ -60,7 +63,6 @@ const columns: ColumnDef<Row>[] = [
     ]}
     bulkActions={[{ action: '?/archive', label: t('examples.list.archive'), icon: 'folder' }]}
   >
-    {#snippet toolbar()}<Button href="/examples/form" size="sm"><Icon name="plus" size={16} />{t('examples.list.new_product')}</Button>{/snippet}
     {#snippet cell(row, col)}
       {#if col.key === 'status'}<Badge variant={row.status === 'aktif' ? 'success' : 'secondary'}>{row.status}</Badge>
       {:else if col.key === 'stock'}<span class={row.stock === 0 ? 'text-destructive' : ''}>{row.stock}</span>

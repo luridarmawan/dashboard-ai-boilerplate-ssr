@@ -158,6 +158,7 @@ const deactivateConfirm = {
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('nav.users')}</h1>
+    {#if can('user.create')}<Button href="/users/new" size="sm"><Icon name="plus" size={16} />{t('users.add')}</Button>{/if}
   </div>
   {#if deactivated}<p class="notice">{t('users.deactivated', { n: deactivated })}</p>{/if}
   <!-- A refused impersonation belongs above the table, not inside the invite card below it. -->
@@ -192,9 +193,6 @@ const deactivateConfirm = {
     {rowActions}
     bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm }] : []}
   >
-    {#snippet toolbar()}
-      {#if can('user.create')}<Button href="/users/new" size="sm"><Icon name="plus" size={16} />{t('users.add')}</Button>{/if}
-    {/snippet}
     {#snippet filters()}
       <!-- Filter by group (D-1): submits with the search box; the enhanced layer applies it on change. -->
       {#if data.groups}
