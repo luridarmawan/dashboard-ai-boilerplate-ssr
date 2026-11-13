@@ -41,23 +41,27 @@ const columns: ColumnDef<Row>[] = [
   {
     key: 'lastActive',
     label: t('users.last_active'),
+    class: 'whitespace-nowrap',
     sortKey: 'last_active_at',
     value: (r) => formatDateTime(r.lastActiveAt),
   },
   {
     key: 'lastActiveIp',
     label: t('users.last_active_ip'),
+    class: 'whitespace-nowrap',
     value: (r) => r.lastActiveIp || '—',
   },
   {
     key: 'lastLogin',
     label: t('users.last_login'),
+    class: 'whitespace-nowrap',
     sortKey: 'last_login_at',
     value: (r) => formatDateTime(r.lastLoginAt),
   },
   {
     key: 'lastLoginIp',
     label: t('users.last_login_ip'),
+    class: 'whitespace-nowrap',
     hidden: true,
     value: (r) => r.lastLoginIp || '—',
   },
