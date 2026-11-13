@@ -22,7 +22,7 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
 type Row = (typeof data.users)[number];
 
 const columns: ColumnDef<Row>[] = [
-  { key: 'name', label: t('users.name'), sortKey: 'name', value: (r) => r.name },
+  { key: 'name', label: t('users.name'), sortKey: 'name', class: 'whitespace-nowrap', value: (r) => r.name },
   { key: 'email', label: t('users.email'), sortKey: 'email', value: (r) => r.email },
   { key: 'phone', label: t('users.phone'), value: (r) => r.phone || '—' },
   {
