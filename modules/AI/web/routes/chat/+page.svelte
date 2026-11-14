@@ -477,7 +477,7 @@ function copy(text: string) {
       </p>
     {/if}
     {#if errorText || streamError || form?.error}<p class="error m-4" role="alert">{streamError ?? errorText ?? form?.error}</p>{/if}
-    <div id="messages-list" bind:this={listEl} onscroll={onListScroll} class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-4" data-testid="messages">
+    <div id="messages-list" bind:this={listEl} onscroll={onListScroll} class="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 text-sm sm:p-4" data-testid="messages">
       {#each messages as m (m.id)}
         <article class={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`} data-role={m.role}>
           <div class={`max-w-[88%] rounded-lg px-3 py-2 sm:max-w-[80%] sm:px-4 ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
