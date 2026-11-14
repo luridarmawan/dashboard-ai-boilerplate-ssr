@@ -870,6 +870,8 @@ export default defineTools('Billing', [
 
 Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (chat AI, `POST /v1/tools/call`, MCP nanti):
 
+> Pintu luar registry — `GET/POST /v1/tools`, `/v1/mcp`, dan pembuatan token API — hanya terbuka bagi akun pemegang `ai.mcp.use` ([`MCP.md`](./MCP.md#siapa-yang-boleh-memakai-integrasi)). Chat AI memanggil registry di dalam proses dan diatur izin `ai.chat.*`.
+
 | Jaminan | Cara |
 |---|---|
 | Hanya terlihat & terpanggil bila user punya `permission` | registry RBAC yang sama dengan route API; tanpa izin, tool **tidak ditawarkan** ke model dan panggilan langsung ditolak `forbidden` |

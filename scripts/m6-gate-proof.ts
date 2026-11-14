@@ -306,7 +306,9 @@ let id = '';
   const visible = ((await memberTools.json()) as { data?: { name: string }[] }).data ?? [];
   check(
     `member without ${NS}.${RES}.read: tool ${NS}.list_${PLURAL} is not offered (I-3)`,
-    memberTools.status === 200 && !visible.some((t) => t.name === `${NS}.list_${PLURAL}`),
+    // 403 = the member was not given the AI/MCP integration at all; 200 = given it, tool hidden.
+    [200, 403].includes(memberTools.status) &&
+      !visible.some((t) => t.name === `${NS}.list_${PLURAL}`),
     `${memberTools.status} ${visible.map((t) => t.name).join(',')}`,
   );
 }

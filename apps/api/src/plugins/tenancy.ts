@@ -40,6 +40,11 @@ export interface TenantState {
   readonly tenant: TenantDb | null;
   readonly perms: readonly string[];
   readonly can: (permission: string) => boolean;
+  /**
+   * What the USER holds in the active tenant, ignoring the scopes of an API token. For the
+   * few checks about the account itself rather than about what this request may touch.
+   */
+  readonly holds: (permission: string) => boolean;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,7 +52,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const tenantContext = new Elysia({ name: 'tenant-context' })
   .use(authContext)
   .resolve({ as: 'global' }, async ({ auth, request, set }) => {
-    const empty: TenantState = { clientId: null, tenant: null, perms: [], can: () => false };
+    const empty: TenantState = {
+      clientId: null,
+      tenant: null,
+      perms: [],
+      can: () => false,
+      holds: () => false,
+    };
     if (!auth) {
       // Public reads (storefront, public config, enabled modules): anonymous may name a live tenant.
       // No permissions come with it; module routes still guard writes with permission().
@@ -65,6 +76,7 @@ export const tenantContext = new Elysia({ name: 'tenant-context' })
               tenant: forTenant(row.id),
               perms: [],
               can: () => false,
+              holds: () => false,
             },
           };
       }
@@ -101,6 +113,7 @@ export const tenantContext = new Elysia({ name: 'tenant-context' })
       can: (p) =>
         (auth.user.is_superadmin || hasPermission(granted, p)) &&
         (!scopes || hasPermission(scopes, p)),
+      holds: (p) => auth.user.is_superadmin || hasPermission(granted, p),
     };
     return { tenantState: state, tenantRejection: null as ReturnType<typeof fail> | null };
   })

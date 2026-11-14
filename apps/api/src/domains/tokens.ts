@@ -13,6 +13,7 @@ import { notify } from '../notifications.ts';
 import { type AuthState, clientIp, sessionOnly } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { tenantContext } from '../plugins/tenancy.ts';
+import { requireToolAccess } from '../plugins/tool-access.ts';
 
 /**
  * API tokens (PRD A-4, Appendix A `tokens`): a logged-in user mints bearer tokens for their own
@@ -120,7 +121,8 @@ export const tokensDomain = new Elysia({ name: 'tokens', prefix: '/tokens', tags
       });
     },
     {
-      beforeHandle: sessionOnly,
+      // A token exists to connect an assistant: only accounts given that integration mint one.
+      beforeHandle: [sessionOnly, requireToolAccess],
       body: t.Object({
         name: t.String({ minLength: 1, maxLength: 100 }),
         /** Permission strings; omit for the user's full permissions. Can only narrow. */
