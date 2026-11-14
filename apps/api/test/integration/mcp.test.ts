@@ -5,6 +5,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { app } from '../../src/app.ts';
+import { grantToolAccess } from './_tool-access.ts';
 
 /**
  * Integration (INTEGRATION=1): API tokens (A-4) and the MCP server (FR-I) against a real database.
@@ -94,6 +95,7 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
   let adminToken = '';
   let adminTokenId = '';
   let memberToken = '';
+  let revokeMemberAccess = async () => {};
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -114,6 +116,8 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
     memberId = (
       (await json(await call('/v1/auth/me', {}, [member]))).data as { user: { id: string } }
     ).user.id;
+    // The member is given the AI/MCP integration and nothing else.
+    revokeMemberAccess = await grantToolAccess(db, tenantId, memberId);
     acmeId = newId();
     await db
       .insert(schema.clients)
@@ -360,5 +364,40 @@ describe.skipIf(!enabled)('API tokens (A-4) and MCP server (I-1, I-2, I-3, I-6)'
       200,
     );
     expect((await bearer(adminToken, '/v1/auth/me')).status).toBe(401);
+  });
+
+  test('the integration is for accounts given it: no token, no tools, no MCP without the permission', async () => {
+    const outsider = sessionCookie(
+      await post('/v1/auth/register', {
+        email: `mcp-outsider-${run}@example.test`,
+        password: memberPassword,
+        name: 'Outsider',
+      }),
+    );
+    const minted = await post('/v1/tokens', { name: 'not for me' }, [outsider]);
+    expect(minted.status).toBe(403);
+    expect((await json(minted)).error?.details?.permission).toBe('ai.mcp.use');
+    // Listing and revoking one's own tokens stay open: cleaning up needs no integration.
+    expect((await call('/v1/tokens', {}, [outsider])).status).toBe(200);
+
+    // Taking the permission away closes the door for a token minted while it was held — on the
+    // next request, although the token itself is still valid for the rest of the API.
+    const rpc = {
+      method: 'POST',
+      headers: { accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    };
+    const held = (
+      (await json(await post('/v1/tokens', { name: 'while held' }, [member]))).data as {
+        token: string;
+      }
+    ).token;
+    expect((await bearer(held, '/v1/mcp', rpc)).status).toBe(200);
+    await revokeMemberAccess();
+    const closed = await bearer(held, '/v1/mcp', rpc);
+    expect(closed.status).toBe(403);
+    expect((await json(closed)).error?.code).toBe('forbidden');
+    expect((await bearer(held, '/v1/tools')).status).toBe(403);
+    expect((await bearer(held, '/v1/auth/me')).status).toBe(200);
   });
 });

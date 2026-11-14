@@ -4,6 +4,7 @@ import { type Db, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { notify, usersWithPermission } from '../../src/notifications.ts';
 import { runLogRetentionOnce } from '../../src/retention.ts';
+import { grantToolAccess } from './_tool-access.ts';
 
 /**
  * Integration (INTEGRATION=1): in-app notifications (PRD J-4) — the `notify()` backend (explicit
@@ -177,6 +178,8 @@ describe.skipIf(!enabled)('in-app notifications (J-4)', () => {
   });
 
   test('producers: a minted API token notifies its owner; a module toggle notifies module managers (not the actor); an inquiry notifies readers', async () => {
+    // Minting a token needs the AI/MCP integration.
+    await grantToolAccess(db, tenantId, memberId);
     await post('/v1/tokens', { name: `bell-${run}` }, [member]);
     const afterToken = await mine([member], '?unread=1');
     expect(

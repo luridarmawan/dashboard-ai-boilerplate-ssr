@@ -5,6 +5,7 @@
 | **Status** | MCP **server** (I-1, I-2, I-3, I-6) dan MCP **client** (I-4, I-5) tersedia — FR-I lengkap. Transport: **HTTP / Streamable HTTP saja** (keputusan 2026-09-08; klien juga menerima SSE lama), lihat bagian akhir |
 | **Endpoint** | `POST /v1/mcp` — MCP *Streamable HTTP* memakai SDK resmi `@modelcontextprotocol/sdk` (I-1), stateless, respons JSON |
 | **Autentikasi** | `Authorization: Bearer <token API>` (PRD A-4) — dibuat di **Profil → Token API**; sesi cookie juga diterima (dengan CSRF) |
+| **Siapa yang boleh** | Hanya akun pemegang izin **`ai.mcp.use`** — lihat [Siapa yang boleh memakai integrasi](#siapa-yang-boleh-memakai-integrasi) |
 | **Isi** | `tools/list` & `tools/call` dari registry tool core (titik perluasan 8, [`MODULES.md` §3](./MODULES.md)), `resources/read crk://me`, `prompts/get dashboard_context` |
 
 ## Mengapa ini bukan pintu belakang (I-6)
@@ -13,6 +14,7 @@ MCP server adalah **kulit tipis** di atas registry tool yang sama dengan yang di
 
 | Jaminan | Cara |
 |---|---|
+| Akun tanpa `ai.mcp.use` → **403** sebelum JSON-RPC dibaca | `requireToolAccess` di `/v1/mcp`, `/v1/tools`, dan `POST /v1/tokens`; diperiksa di **setiap** request, jadi mencabut izin langsung menutup token yang sudah dibuat |
 | Tanpa token/sesi → **401** sebelum JSON-RPC dibaca | `beforeHandle` di `/v1/mcp`; token yang dicabut atau kedaluwarsa diperiksa di **setiap** request (tanpa cache) |
 | Tenant tunggal | Token membawa `client_id` (baku: tenant default user). `X-Client-ID` boleh mengganti hanya bila user anggotanya (superadmin: tenant hidup mana pun) — selainnya `403 tenant_forbidden` |
 | Izin user, dipersempit scope | `tools/list` hanya memuat tool yang izinnya dipegang; `tools/call` menolak selainnya. Scope token adalah **langit-langit**: `dummy.note.read` saja berarti hanya tool berizin itu (dan tool tanpa izin) yang terlihat |
@@ -21,6 +23,22 @@ MCP server adalah **kulit tipis** di atas registry tool yang sama dengan yang di
 | Teraudit | Setiap `tools/call` menulis `audit_log` (`tool.call`) di tenant tempat ia berjalan (M-2) |
 
 Bukti: `apps/api/test/integration/mcp.test.ts` — klien SDK resmi melakukan `initialize → tools/list → tools/call → resources/read → prompts/get`; 401 tanpa bearer; token member hanya melihat `dummy_ping`; isolasi tenant lewat `X-Client-ID`; pencabutan token langsung memutus akses.
+
+## Siapa yang boleh memakai integrasi
+
+Izin tiap tool hanya menjawab "bolehkah user ini membaca anggota?", bukan "bolehkah user ini menyambungkan asisten ke dasbor?". Pertanyaan kedua dijawab satu izin: **`ai.mcp.use`**. Tanpa izin itu, akun yang sudah login pun ditolak **403** di:
+
+| Endpoint | Tanpa `ai.mcp.use` |
+|---|---|
+| `GET /v1/tools`, `POST /v1/tools/call` | 403, termasuk untuk tool yang tidak butuh izin (mis. jam) |
+| `/v1/mcp` | 403 sebelum JSON-RPC dibaca, juga untuk token yang dibuat saat izinnya masih dipegang |
+| `POST /v1/tokens` | 403 — token tidak bisa dibuat. Melihat dan mencabut token milik sendiri tetap boleh |
+
+Yang diperiksa adalah izin **user**, bukan scope token: token yang dipersempit ke `example.product.read` tetap sah selama pemiliknya memegang `ai.mcp.use`. Superadmin dan pemegang wildcard (grup Administrator, `*.*`) selalu lolos. Izin ini milik modul AI — izin yang sama mengatur tool dari server MCP eksternal — sehingga pada instalasi tanpa modul AI hanya superadmin dan pemegang wildcard yang bisa memakai integrasi.
+
+Admin memberi akses lewat **Grup → izin "use" pada Server MCP eksternal**. Chat AI di dasbor tidak lewat endpoint ini: ia diatur izinnya sendiri (`ai.chat.*`) dan memanggil registry di dalam proses.
+
+Bukti: `apps/api/test/integration/tools.test.ts` dan `mcp.test.ts` (akun tanpa izin ditolak di ketiga endpoint; mencabut izin menutup token yang sudah ada).
 
 ## Menyambungkan klien
 
@@ -48,10 +66,10 @@ Nama tool di kawat adalah `<ns>_<nama>` (mis. `example_list_products`), karena O
 | Endpoint | Arti |
 |---|---|
 | `GET /v1/tokens` | Token milik saya — tanpa rahasia |
-| `POST /v1/tokens` `{ name, expiresInDays?, scopes?, clientId? }` | Buat token; **balasan satu-satunya yang memuat `token`** (201). Hanya dari sesi cookie — token tidak bisa membuat token |
+| `POST /v1/tokens` `{ name, expiresInDays?, scopes?, clientId? }` | Buat token; **balasan satu-satunya yang memuat `token`** (201). Hanya dari sesi cookie — token tidak bisa membuat token — dan hanya untuk pemegang `ai.mcp.use` |
 | `DELETE /v1/tokens/:id` | Cabut. Berlaku pada request berikutnya di semua instance |
 
-Endpointnya sendiri tetap milik setiap user yang punya sesi (token adalah miliknya sendiri, A-4); yang dibatasi izin `ai.mcp.use` adalah **kartu Token API di halaman Profil** beserta kedua aksinya — inti tidak bergantung pada izin milik modul. Yang disimpan hanya hash SHA-256 (seperti sesi). `scopes` harus izin yang terdaftar (`user.read`, `example.product.read`, …) dan hanya bisa **mempersempit** izin user; `clientId` harus tenant yang boleh dimasuki user. Aksi khusus sesi — logout, ganti tenant, membuat token — dijawab `403` dengan `reason: session_only` bila dipanggil dengan bearer. Request bearer tidak membawa cookie, jadi plugin CSRF mengecualikannya secara struktural (bukan per route).
+Melihat dan mencabut token tetap milik setiap user yang punya sesi (token adalah miliknya sendiri, A-4); **membuat** token butuh `ai.mcp.use`, baik lewat kartu Token API di halaman Profil maupun langsung ke API. Token masuk aplikasi (`/auth/token`, dipakai aplikasi mobile) tidak terpengaruh. Yang disimpan hanya hash SHA-256 (seperti sesi). `scopes` harus izin yang terdaftar (`user.read`, `example.product.read`, …) dan hanya bisa **mempersempit** izin user; `clientId` harus tenant yang boleh dimasuki user. Aksi khusus sesi — logout, ganti tenant, membuat token — dijawab `403` dengan `reason: session_only` bila dipanggil dengan bearer. Request bearer tidak membawa cookie, jadi plugin CSRF mengecualikannya secara struktural (bukan per route).
 
 ## MCP client — server eksternal untuk asisten (I-4, I-5)
 

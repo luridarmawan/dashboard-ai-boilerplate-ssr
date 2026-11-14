@@ -3,11 +3,13 @@ import { runSeed } from '@core/auth';
 import { and, type Db, desc, eq, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { app } from '../../src/app.ts';
 import { allTools, callTool, listTools } from '../../src/tools.ts';
+import { grantToolAccess } from './_tool-access.ts';
 
 /**
  * Integration (INTEGRATION=1): the tool registry (extension point 8) is not a back door — PRD I-3
  * and I-6 against a real database:
- *   - no session → 401 on list and call;
+ *   - no session → 401 on list and call; a session without access to the AI/MCP integration →
+ *     403 on both, whatever the tool;
  *   - a tool is visible/callable only with its permission, and only while its module is enabled;
  *   - arguments are validated against the declared schema;
  *   - a tool sees the ACTIVE tenant's rows only (X-Client-ID switches it, membership required);
@@ -22,6 +24,7 @@ const adminEmail = `tools-admin-${run}@example.test`;
 const adminPassword = 'a bootstrap admin password';
 const memberEmail = `tools-member-${run}@example.test`;
 const memberPassword = 'a regular member password';
+const outsiderEmail = `tools-outsider-${run}@example.test`;
 
 interface Envelope {
   success: boolean;
@@ -59,6 +62,7 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
   let adminId = '';
   let member = '';
   let memberId = '';
+  let outsider = '';
 
   beforeAll(async () => {
     if (!enabled) return;
@@ -82,6 +86,15 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
     memberId = (
       (await json(await call('/v1/auth/me', {}, [member]))).data as { user: { id: string } }
     ).user.id;
+    // The member is given the integration and nothing else; the outsider is not given it.
+    await grantToolAccess(db, tenantId, memberId);
+    outsider = sessionCookie(
+      await post('/v1/auth/register', {
+        email: outsiderEmail,
+        password: memberPassword,
+        name: 'Outsider',
+      }),
+    );
   });
 
   test('the registry holds the core’s internal tools and the built-in modules’ tools', () => {
@@ -97,6 +110,17 @@ describe.skipIf(!enabled)('tool registry — RBAC, tenancy, schema, audit (I-3, 
   test('no session → 401 on list and call (I-6)', async () => {
     expect((await call('/v1/tools')).status).toBe(401);
     expect((await post('/v1/tools/call', { name: 'dummy.ping' })).status).toBe(401);
+  });
+
+  test('without access to the integration → 403 on list and call, even for a free tool', async () => {
+    const list = await call('/v1/tools', {}, [outsider]);
+    expect(list.status).toBe(403);
+    expect((await json(list)).error?.details?.permission).toBe('ai.mcp.use');
+    // `dummy.ping` needs no permission of its own; the door in front of the registry still does.
+    expect((await post('/v1/tools/call', { name: 'dummy.ping' }, [outsider])).status).toBe(403);
+    expect(
+      (await post('/v1/tools/call', { name: 'core.get_current_datetime' }, [outsider])).status,
+    ).toBe(403);
   });
 
   test('visibility follows the permission: superadmin sees all, a bare member only the free tool (I-3)', async () => {

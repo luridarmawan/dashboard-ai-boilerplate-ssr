@@ -4,6 +4,7 @@ import { Elysia, t } from 'elysia';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { tenantContext } from '../plugins/tenancy.ts';
+import { requireToolAccess } from '../plugins/tool-access.ts';
 import { callTool, describeTool, listTools } from '../tools.ts';
 
 /**
@@ -53,11 +54,12 @@ export const toolsDomain = new Elysia({ name: 'tools', prefix: '/tools', tags: [
       return ok(tools.map(describeTool));
     },
     {
-      beforeHandle: requireSession,
+      beforeHandle: [requireSession, requireToolAccess],
       response: { 200: OkSchema(t.Array(Descriptor)), ...errorResponses },
       detail: {
         summary: 'List tools',
-        description: 'AI/MCP tools you can call in the active tenant.',
+        description:
+          'AI/MCP tools you can call in the active tenant. Needs access to the AI/MCP integration.',
       },
     },
   )
@@ -104,7 +106,7 @@ export const toolsDomain = new Elysia({ name: 'tools', prefix: '/tools', tags: [
       );
     },
     {
-      beforeHandle: requireSession,
+      beforeHandle: [requireSession, requireToolAccess],
       body: t.Object({
         name: t.String({ minLength: 3, maxLength: 80 }),
         input: t.Optional(t.Record(t.String(), t.Unknown())),
@@ -115,7 +117,8 @@ export const toolsDomain = new Elysia({ name: 'tools', prefix: '/tools', tags: [
       },
       detail: {
         summary: 'Call a tool',
-        description: 'By name: `<ns>.<name>` or `<ns>_<name>`.',
+        description:
+          'By name: `<ns>.<name>` or `<ns>_<name>`. Needs access to the AI/MCP integration.',
       },
     },
   );
