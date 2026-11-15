@@ -17,7 +17,9 @@ export default defineConfig(({ mode }) => {
     // the build time in production and the dev-server start time in development.
     define: {
       __APP_VERSION__: JSON.stringify(rootPkg.version),
-      __APP_BUILD__: JSON.stringify(buildStamp(new Date())),
+      // SvelteKit evaluates this config once per build pass (server, then client); pin the stamp
+      // in the process env so both bundles carry the same value even across a minute boundary.
+      __APP_BUILD__: JSON.stringify((process.env.APP_BUILD_STAMP ??= buildStamp(new Date()))),
     },
     server: {
       port: Number(env.WEB_PORT ?? 5173),
