@@ -9,6 +9,8 @@ import type { ResolvedTheme } from '$lib/server/theme';
 declare global {
   /** Root package.json version, inlined by Vite (see vite.config.ts). */
   const __APP_VERSION__: string;
+  /** Build stamp `mmdd.hhnn` (Asia/Jakarta), inlined by Vite (see vite.config.ts). */
+  const __APP_BUILD__: string;
 
   namespace App {
     interface Locals {

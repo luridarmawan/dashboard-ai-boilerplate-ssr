@@ -13,7 +13,12 @@ export default defineConfig(({ mode }) => {
     plugins: [tailwindcss(), sveltekit()],
     // Product version shown in the dashboard footer: the root package.json, the same source as
     // the API's /v1/version, inlined at build time.
-    define: { __APP_VERSION__: JSON.stringify(rootPkg.version) },
+    // Build stamp next to it (mmdd.hhnn, Asia/Jakarta): the moment this config was evaluated, i.e.
+    // the build time in production and the dev-server start time in development.
+    define: {
+      __APP_VERSION__: JSON.stringify(rootPkg.version),
+      __APP_BUILD__: JSON.stringify(buildStamp(new Date())),
+    },
     server: {
       port: Number(env.WEB_PORT ?? 5173),
       strictPort: true,
@@ -43,6 +48,23 @@ export default defineConfig(({ mode }) => {
     preview: { port: 4173, strictPort: true, allowedHosts: allowedHosts(env.APP_ORIGIN) },
   };
 });
+
+/** `mmdd.hhnn` in Asia/Jakarta — fixed zone so a UTC build host stamps the same wall clock. */
+function buildStamp(at: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Jakarta',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.month}${parts.day}.${parts.hour}${parts.minute}`;
+}
 
 /** Hostnames of the comma-separated APP_ORIGIN entries (full origins or bare hosts). */
 function allowedHosts(raw: string | undefined): string[] {
