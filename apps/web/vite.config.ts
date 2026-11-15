@@ -17,9 +17,7 @@ export default defineConfig(({ mode }) => {
     // the build time in production and the dev-server start time in development.
     define: {
       __APP_VERSION__: JSON.stringify(rootPkg.version),
-      // SvelteKit evaluates this config once per build pass (server, then client); pin the stamp
-      // in the process env so both bundles carry the same value even across a minute boundary.
-      __APP_BUILD__: JSON.stringify((process.env.APP_BUILD_STAMP ??= buildStamp(new Date()))),
+      __APP_BUILD__: JSON.stringify(buildStamp()),
     },
     server: {
       port: Number(env.WEB_PORT ?? 5173),
@@ -51,8 +49,14 @@ export default defineConfig(({ mode }) => {
   };
 });
 
-/** `mmdd.hhnn` in Asia/Jakarta — fixed zone so a UTC build host stamps the same wall clock. */
-function buildStamp(at: Date): string {
+/**
+ * `mmdd.hhnn` in Asia/Jakarta — fixed zone so a UTC build host stamps the same wall clock.
+ * SvelteKit evaluates the config once per build pass (server, then client); the first value is
+ * pinned in the process env so both bundles carry the same stamp even across a minute boundary.
+ */
+function buildStamp(): string {
+  const pinned = process.env.APP_BUILD_STAMP;
+  if (pinned) return pinned;
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Jakarta',
@@ -62,10 +66,12 @@ function buildStamp(at: Date): string {
       minute: '2-digit',
       hourCycle: 'h23',
     })
-      .formatToParts(at)
+      .formatToParts(new Date())
       .map((p) => [p.type, p.value]),
   );
-  return `${parts.month}${parts.day}.${parts.hour}${parts.minute}`;
+  const stamp = `${parts.month}${parts.day}.${parts.hour}${parts.minute}`;
+  process.env.APP_BUILD_STAMP = stamp;
+  return stamp;
 }
 
 /** Hostnames of the comma-separated APP_ORIGIN entries (full origins or bare hosts). */
