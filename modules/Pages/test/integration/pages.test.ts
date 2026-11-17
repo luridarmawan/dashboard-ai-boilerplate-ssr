@@ -368,6 +368,7 @@ describe.skipIf(!enabled)('Pages module', () => {
 
   describe('featured image', () => {
     type Img = {
+      fileId: string;
       url: string;
       width: number | null;
       height: number | null;
@@ -437,12 +438,14 @@ describe.skipIf(!enabled)('Pages module', () => {
       });
 
       // Draft: the page does not resolve and its image is not served.
-      const mediaUrl = `/v1/m/pages/media/${/([0-9a-f-]{36})/.exec(admin?.url ?? '')?.[1]}`;
+      const mediaUrl = `/v1/m/pages/media/${admin?.fileId}`;
       expect((await media(mediaUrl)).status).toBe(404);
 
       await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
       const pub = await publicImage(s('img'));
+      const fileId = admin?.fileId ?? '';
       expect(pub).toEqual({
+        fileId,
         url: mediaUrl,
         width: 1200,
         height: 630,
@@ -456,6 +459,13 @@ describe.skipIf(!enabled)('Pages module', () => {
       expect(got.headers.get('cache-control')).toContain('public');
       expect(new Uint8Array(await got.arrayBuffer()).slice(0, 4)).toEqual(
         new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      );
+      // Its share card (core): one 1200 × 630 JPEG, also anonymous.
+      const card = await media(`/v1/opengraph/${fileId}`);
+      expect(card.status).toBe(200);
+      expect(card.headers.get('content-type')).toBe('image/jpeg');
+      expect(new Uint8Array(await card.arrayBuffer()).slice(0, 3)).toEqual(
+        new Uint8Array([0xff, 0xd8, 0xff]),
       );
 
       // Alt text alone is editable without a new upload; empty clears it.

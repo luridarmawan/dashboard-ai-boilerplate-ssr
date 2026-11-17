@@ -276,7 +276,7 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   // (The shipped /og-image.jpg, or the one uploaded under Settings → Application.)
   await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
     'src',
-    /\/og-image\.jpg$|\/v1\/configuration\/image-file\//,
+    /\/og-image\.jpg$|\/v1\/opengraph\//,
   );
   const mark = Date.now();
   await page.evaluate((m) => {
@@ -290,6 +290,8 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
     buffer: Buffer.from(makePng(1200, 630)),
   });
   await expect(page.getByTestId('pages-image-size')).toHaveText('1200 × 630 px');
+  // Not uploaded yet: the share preview draws the card locally.
+  await expect(page.getByTestId('pages-share-local')).toBeVisible();
   await page.fill('#pages-image-alt', 'Kantor kami');
   await form.locator('button[type="submit"]').first().click();
 
@@ -299,9 +301,10 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   await expect(toast).toBeVisible({ timeout: 15_000 });
   const current = page.getByTestId('pages-image-current').locator('img');
   await expect(current).toHaveAttribute('src', /\/v1\/files\/[0-9a-f-]{36}\/content/);
+  // The share preview is the real card the core makes for crawlers.
   await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
     'src',
-    /\/v1\/files\//,
+    /\/v1\/opengraph\/[0-9a-f-]{36}$/,
   );
   await expect(page.getByTestId('pages-share-default')).toHaveCount(0);
   await expect(page.locator('#pages-image-alt')).toHaveValue('Kantor kami');
