@@ -13,6 +13,16 @@ const PUBLIC_MODULE_NS = [...new Set(modulePublicRoutes.map((r) => r.ns))];
 const usableAsset = (v: string | undefined) =>
   v && (v.startsWith('/') || /^https?:\/\//.test(v)) ? v : null;
 
+const hexColor = (v: string) =>
+  /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim()) ? v.trim() : null;
+/** `@handle`, `handle` or an x.com / twitter.com profile URL → `@handle`. */
+function twitterHandle(v: string): string | null {
+  const m = v
+    .trim()
+    .match(/^(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/)?@?([A-Za-z0-9_]{1,15})\/?$/);
+  return m ? `@${m[1]}` : null;
+}
+
 /**
  * `app.landing_lead` (Pengaturan → Aplikasi) is the tenant's own line under the brand name. Set,
  * it wins over APP_LANDING_LEAD and the translated copy — the same way `app.name` wins in the UI —
@@ -43,6 +53,14 @@ export const load: LayoutServerLoad = async ({ locals }) => ({
     name: cfgString(locals.config, 'app.name', ''),
     logoUrl: usableAsset(cfgString(locals.config, 'app.logo_url', '') || undefined),
     faviconUrl: usableAsset(cfgString(locals.config, 'app.favicon_url', '') || undefined),
+    /** Home-screen icon (180 px PNG); null = fall back to the favicon or the built-in one. */
+    appleTouchIconUrl: usableAsset(
+      cfgString(locals.config, 'app.apple_touch_icon_url', '') || undefined,
+    ),
+    /** `<meta name="theme-color">`; only a CSS hex colour is accepted, anything else is dropped. */
+    themeColor: hexColor(cfgString(locals.config, 'app.theme_color', '')),
+    /** `twitter:site` handle, always with its leading `@`; null = not set. */
+    twitterSite: twitterHandle(cfgString(locals.config, 'app.twitter_site', '')),
   },
   locale: locals.locale.locale,
   dir: locals.dir,
