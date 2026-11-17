@@ -92,6 +92,8 @@ const view = (r: Row) => ({
 });
 /** A featured image: where to fetch it and what it is (size feeds og:image:width/height). */
 const Image = t.Object({
+  /** The (public) file's id — its 1200 × 630 share card is `/v1/opengraph/<id>`. */
+  fileId: t.String(),
   url: t.String(),
   width: t.Nullable(t.Integer()),
   height: t.Nullable(t.Integer()),
@@ -112,7 +114,9 @@ const detail = async (tenant: TenantDb, r: Row) => {
   return {
     ...view(r),
     redirects: redirects.map((x) => ({ oldSlug: x.path.slice(1), createdAt: x.createdAt })),
-    image: file ? { url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) } : null,
+    image: file
+      ? { fileId: file.id, url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) }
+      : null,
   };
 };
 const SlugChange = t.Object({
@@ -147,7 +151,9 @@ const publicView = async (clientId: string, r: Row) => {
     slug: r.slug,
     summary: r.summary,
     html: renderMarkdown(r.body),
-    image: file ? { url: mediaPath(file.id), alt: r.image_alt, ...featuredMeta(file) } : null,
+    image: file
+      ? { fileId: file.id, url: mediaPath(file.id), alt: r.image_alt, ...featuredMeta(file) }
+      : null,
     publishedAt: r.published_at ? r.published_at.toISOString() : null,
     updatedAt: r.updated_at.toISOString(),
   };

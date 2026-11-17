@@ -1,6 +1,7 @@
 import { and, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
 import { extensionFor, imageSize, isAllowedType, sniffMime, storage } from '@core/storage';
+import { removeOgCard } from './lib/og-image.ts';
 import { settings } from './services.ts';
 
 /**
@@ -193,6 +194,7 @@ export async function removeFile(row: FileRow): Promise<void> {
     .update(schema.files)
     .set({ deleted_at: new Date() })
     .where(eq(schema.files.id, row.id));
+  await removeOgCard(row.id);
   try {
     await storage().delete(row.key);
   } catch (err) {

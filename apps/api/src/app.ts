@@ -14,6 +14,7 @@ import { mcpDomain } from './domains/mcp.ts';
 import { menuDomain } from './domains/menu.ts';
 import { moduleDomain } from './domains/modules.ts';
 import { notificationsDomain } from './domains/notifications.ts';
+import { opengraphDomain } from './domains/opengraph.ts';
 import { outbox } from './domains/outbox.ts';
 import { permalinksDomain } from './domains/permalinks.ts';
 import { queueDomain } from './domains/queue.ts';
@@ -129,6 +130,7 @@ export const app = new Elysia()
       .use(mailTrack)
       .use(notificationsDomain)
       .use(filesDomain)
+      .use(opengraphDomain)
       .use(permalinksDomain)
       .use(tokensDomain)
       .use(webhooksDomain)
