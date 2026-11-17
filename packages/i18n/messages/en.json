@@ -1024,5 +1024,13 @@
   "examples.not_found.declare_lead": "The notFound: true flag makes the page selectable in Settings. Other public pages are not offered, because they would answer every unknown URL with a 200.",
   "examples.not_found.resolve": "2. Decide in its loader",
   "examples.not_found.resolve_lead": "The handler page has no content of its own. It decides whether the URL is its own, or answers 404.",
-  "examples.not_found.docs": "Full details are in docs/MODULES.md, section 404 handler, and in the opening comment of modules/Example/trap.ts."
+  "examples.not_found.docs": "Full details are in docs/MODULES.md, section 404 handler, and in the opening comment of modules/Example/trap.ts.",
+  "groups.detail.member_added": "Member added.",
+  "groups.detail.member_removed": "Member removed.",
+  "groups.detail.permissions_saved": "Permissions saved — they apply to every member at once.",
+  "groups.detail.deleted": "Group deleted.",
+  "tenants.detail.deleted": "Tenant deleted.",
+  "profile.tokens.revoke_confirm": "Revoke token?",
+  "profile.tokens.revoke_confirm_lead": "Token “{name}” will be revoked. Clients using it (MCP, apps, scripts) lose access at once and it cannot be restored; create a new token if you still need one.",
+  "profile.tokens.revoke_confirm_submit": "Yes, revoke"
 }

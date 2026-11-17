@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import { ConfirmDelete } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -47,18 +49,27 @@ const candidates = $derived(data.tenantUsers.filter((u) => !memberIds.has(u.id))
 const editable = $derived(can('group.edit'));
 /** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
 const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
+/**
+ * Every POST here saves over fetch and reports as a toast (docs/FORMS.md). The in-page notice is
+ * only for a plain POST: once hydrated, the toast already said it.
+ */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 </script>
 
 <svelte:head><title>{t('groups.detail.title', { name: g.name })}</title></svelte:head>
 
 <div class="page">
   <h1>{g.name} <code>{g.code}</code>{#if g.isSystem} <span class="muted">{t('groups.detail.system')}</span>{/if}</h1>
-  {#if form?.saved}<p class="notice">{t('groups.detail.saved')}</p>{/if}
+  {#if form?.saved && !hydrated}<p class="notice">{t('groups.detail.saved')}</p>{/if}
   {#if form?.error && form.code !== 'confirm_failed'}
     <p class="error">{form.error}{#if form.details && typeof form.details === 'object' && 'unknown' in form.details} — {(form.details as { unknown: string[] }).unknown.join(', ')}{/if}</p>
   {/if}
 
-  <form method="POST" action="?/save" class="stack">
+  <form method="POST" action="?/save" class="stack" use:enhance={save({ success: t('groups.detail.saved') })}>
     <Csrf token={data.csrf} />
     <label>{t('groups.name')} <input name="name" required maxlength="191" value={g.name} disabled={!editable} /></label>
     <label>{t('groups.description')} <textarea name="description" rows="2" disabled={!editable}>{g.description ?? ''}</textarea></label>
@@ -66,7 +77,7 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
   </form>
 
   <h2>{t('groups.permissions')}</h2>
-  <form method="POST" action="?/permissions" class="stack" style="max-width: none">
+  <form method="POST" action="?/permissions" class="stack" style="max-width: none" use:enhance={save({ success: t('groups.detail.permissions_saved') })}>
     <Csrf token={data.csrf} />
     <table>
       <thead><tr><th>{t('groups.detail.resource')}</th><th>{t('groups.detail.module')}</th><th>{t('common.actions')}</th></tr></thead>
@@ -120,6 +131,7 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
                 title={t('groups.detail.remove_member')}
                 confirmLabel={t('groups.detail.remove_confirm_submit')}
                 description={t('groups.detail.remove_confirm_lead', { name: m.name, group: g.name })}
+                enhance={save({ success: t('groups.detail.member_removed') })}
               >
                 {#snippet fields()}<input type="hidden" name="userId" value={m.userId} />{/snippet}
               </ConfirmDelete>
@@ -148,7 +160,7 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
       <button type="submit">{t('common.search')}</button>
     </form>
     {#if candidates.length}
-      <form method="POST" action="?/addMember" class="row" style="margin-top:.5rem">
+      <form method="POST" action="?/addMember" class="row" style="margin-top:.5rem" use:enhance={save({ success: t('groups.detail.member_added') })}>
         <Csrf token={data.csrf} />
         <select name="userId">
           {#each candidates as u (u.id)}<option value={u.id}>{u.name} — {u.email}</option>{/each}
@@ -166,7 +178,7 @@ const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed
     {#if confirming}
       <!-- Two-step confirmation (no JavaScript required): the code has to be typed, and the action checks it again. -->
       <p class="error" role="alert">{t('groups.detail.delete_confirm_lead', { name: g.name, n: g.members.length })}</p>
-      <form method="POST" action="?/delete&confirm=delete" class="stack">
+      <form method="POST" action="?/delete&confirm=delete" class="stack" use:enhance={save({ success: t('groups.detail.deleted'), failureTitle: t('groups.detail.delete') })}>
         <Csrf token={data.csrf} />
         <label>{t('groups.detail.delete_confirm_code', { code: g.code })}
           <input name="code" autocomplete="off" autocapitalize="none" spellcheck="false" required />

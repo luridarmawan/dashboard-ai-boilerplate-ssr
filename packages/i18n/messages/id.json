@@ -1024,5 +1024,13 @@
   "examples.not_found.declare_lead": "Flag notFound: true membuat halaman itu bisa dipilih di Pengaturan. Halaman publik lain tidak ditawarkan, karena akan menjawab setiap URL asing dengan 200.",
   "examples.not_found.resolve": "2. Putuskan di loader-nya",
   "examples.not_found.resolve_lead": "Halaman penangkap tidak punya isi sendiri. Ia memutuskan apakah URL itu miliknya, atau menjawab 404.",
-  "examples.not_found.docs": "Rincian lengkap ada di docs/MODULES.md bagian penangkap 404 dan di komentar pembuka modules/Example/trap.ts."
+  "examples.not_found.docs": "Rincian lengkap ada di docs/MODULES.md bagian penangkap 404 dan di komentar pembuka modules/Example/trap.ts.",
+  "groups.detail.member_added": "Anggota ditambahkan.",
+  "groups.detail.member_removed": "Anggota dikeluarkan.",
+  "groups.detail.permissions_saved": "Izin tersimpan — langsung berlaku untuk semua anggota.",
+  "groups.detail.deleted": "Grup dihapus.",
+  "tenants.detail.deleted": "Tenant dihapus.",
+  "profile.tokens.revoke_confirm": "Cabut token?",
+  "profile.tokens.revoke_confirm_lead": "Token “{name}” akan dicabut. Klien yang memakainya (MCP, aplikasi, skrip) langsung kehilangan akses dan tidak bisa dipulihkan; buat token baru bila masih diperlukan.",
+  "profile.tokens.revoke_confirm_submit": "Ya, cabut"
 }
