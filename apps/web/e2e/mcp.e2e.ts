@@ -174,7 +174,7 @@ test('mcp: testing a server and reloading its tools run over fetch, not page loa
   // A server that cannot be reached fails in place too: the error is shown, the page stays.
   await page.fill('input[name="url"]', 'http://127.0.0.1:9/mcp');
   await page.locator('form[action="?/save"] button[type="submit"]').click();
-  await expect(page.locator('.notice').first()).toBeVisible();
+  await expect(page.locator('[role="status"][data-variant]').last()).toBeVisible();
   await page.evaluate((m) => {
     window.__mcpMark = m;
   }, mark);

@@ -31,6 +31,8 @@
   "common.saved": "Tersimpan.",
   "common.running": "Menjalankan…",
   "common.action_failed": "Aksi gagal dijalankan.",
+  "common.save_failed": "Gagal menyimpan",
+  "common.fields_to_fix": "{n} isian perlu diperbaiki.",
   "common.active": "aktif",
   "common.inactive": "nonaktif",
   "common.form_expired": "Sesi formulir kedaluwarsa — muat ulang halaman",

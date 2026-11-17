@@ -31,6 +31,8 @@
   "common.saved": "Saved.",
   "common.running": "Running…",
   "common.action_failed": "The action failed.",
+  "common.save_failed": "Could not save",
+  "common.fields_to_fix": "{n} fields need fixing.",
   "common.active": "active",
   "common.inactive": "inactive",
   "common.form_expired": "The form session expired — reload the page",
