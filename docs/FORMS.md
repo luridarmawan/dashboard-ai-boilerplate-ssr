@@ -34,7 +34,26 @@ Form yang bisa dideklarasikan sebagai daftar field cukup memakai `FormBuilder` (
   error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
 ```
 
-Pola manual di bawah dipakai untuk form yang ditulis tangan.
+## Form tulis tangan: `useSaveForm`
+
+Form yang tidak cocok untuk `FormBuilder` (tabel izin, tambah anggota, konfirmasi hapus) memakai `useSaveForm` dari `$lib/components/form`. Perilakunya sama dengan `FormBuilder`: fetch, tombol submit nonaktif selama proses, popup hijau/merah, gulir ke field yang salah.
+
+```svelte
+<script lang="ts">
+import { enhance } from '$app/forms';
+import { useSaveForm } from '$lib/components/form';
+const save = useSaveForm(); // saat inisialisasi komponen
+</script>
+
+<form method="POST" action="?/permissions" use:enhance={save({ success: t('groups.detail.permissions_saved') })}>…</form>
+
+<!-- konfirmasi hapus: teruskan ke ConfirmDelete -->
+<ConfirmDelete … enhance={save({ success: t('webhooks.deleted') })} />
+```
+
+Opsi: `success` (teks, fungsi yang dibaca setelah hasil action diterapkan, atau `false`), `failureTitle`, `reset`, `onStart`, `onDone`. Pesan `notice` di halaman cukup tampil untuk jalur tanpa JavaScript (`{#if form?.saved && !hydrated}`). Contoh hidup: `groups/[id]`, cabut token di `profile`, hapus webhook dan tenant.
+
+Pola manual di bawah hanya untuk kebutuhan yang tidak tertampung `useSaveForm`.
 
 ## Popup
 
@@ -143,7 +162,7 @@ onMount(() => {
 
 ## Hapus dan aksi berbahaya
 
-Hapus tetap lewat `ConfirmDelete` (konfirmasi dulu, L-22). Setelah aksi berhasil, beri popup `success` dengan kalimat yang sesuai (mis. "Dihapus."). Bila gagal, beri popup `error` seperti di atas.
+Hapus, cabut, dan aksi lain yang tidak bisa dibatalkan selalu lewat `ConfirmDelete` (konfirmasi dulu, L-22), dan action server ikut memeriksa `confirmed(event, '<token>')`. Teruskan `enhance={save({ success: … })}` ke `ConfirmDelete` supaya hasilnya juga popup: hijau dengan kalimat yang sesuai (mis. "Webhook dihapus."), merah bila gagal.
 
 ## i18n
 
@@ -170,7 +189,7 @@ Tunggu `form[data-enhanced="true"]` sebelum mengisi form, supaya yang diuji adal
 
 ## Status
 
-Per 2026-11-17, yang sudah mengikuti kesepakatan ini (popup berhasil dan gagal): halaman Pengaturan, dan semua halaman yang memakai `FormBuilder` (user, grup, tenant, profil, webhook, produk Example, Pages, penyedia dan server MCP AI).
+Per 2026-11-17, yang sudah mengikuti kesepakatan ini (popup berhasil dan gagal): halaman Pengaturan, semua halaman yang memakai `FormBuilder` (user, grup baru, tenant, profil, webhook, produk Example, Pages, penyedia dan server MCP AI), detail grup, cabut token API, serta hapus tenant dan webhook.
 
 Baru sebagian:
 
@@ -179,6 +198,6 @@ Baru sebagian:
 
 Belum sesuai (dirapikan bertahap, tidak wajib sekaligus):
 
-- Form core yang ditulis tangan tanpa `use:enhance`: sebagian profil, detail user dan grup (selain field FormBuilder-nya), tema, modul, antrean, notifikasi.
+- Form core yang ditulis tangan tanpa `use:enhance`: sebagian profil, detail user (selain field FormBuilder-nya), tema, modul, antrean, notifikasi.
 
 Saat menyentuh salah satu form di atas, rapikan sekalian mengikuti dokumen ini. Aplikasi turunan boleh menambah daftar status form modulnya sendiri di dokumen modulnya.
