@@ -389,6 +389,7 @@
   "settings.bool_set": "Set:",
   "settings.error_forbidden": "You do not have permission to view the configuration",
   "settings.error_load": "The configuration could not be loaded",
+  "settings.save_failed": "Settings were not saved",
   "settings.hint_public": "public",
   "settings.hint_source": "source: {source}",
   "settings.inherit_default": "follow default",
