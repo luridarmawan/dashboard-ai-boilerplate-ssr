@@ -18,12 +18,30 @@ Contoh hidup yang sudah sesuai: halaman Pengaturan (`apps/web/src/routes/(app)/s
 | 6 | Selama dikirim, tombol simpan `disabled` dan menampilkan ikon berputar. Form diberi `aria-busy="true"`. |
 | 7 | Warna popup tidak diatur sendiri. `Toaster` sudah memakai token tema (`--success`, `--destructive`). Jangan membuat komponen popup lain. |
 
+## Cara termudah: `FormBuilder`
+
+Form yang bisa dideklarasikan sebagai daftar field cukup memakai `FormBuilder` (`$lib/components/form`); kesepakatan ini sudah dijalankan di dalamnya:
+
+- dikirim lewat fetch secara bawaan (`ajax` aktif; `ajax={false}` untuk POST biasa);
+- berhasil → popup hijau, berjudul `successMessage`, atau teks `notice` yang dihitung halaman dari hasil action, atau "Tersimpan."; `notice` tidak lagi tampil di dalam form selama JavaScript aktif;
+- redirect (buat → detail) → popup hijau sebelum pindah halaman;
+- gagal → popup merah berjudul `failureTitle` (bawaan "Gagal menyimpan") dengan alasan dari server atau "N isian perlu diperbaiki", lalu gulir ke field pertama yang salah; banner `error` tetap tampil di form;
+- `successMessage={false}` bila halaman mengumumkan hasilnya sendiri.
+
+```svelte
+<FormBuilder {fields} values={...} errors={fieldErrors} csrf={data.csrf} action="?/save"
+  notice={form?.saved ? t('common.saved') : null}
+  error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+```
+
+Pola manual di bawah dipakai untuk form yang ditulis tangan.
+
 ## Popup
 
 | Hasil | `variant` | Judul | Deskripsi | Durasi |
 |---|---|---|---|---|
 | Berhasil (`success` atau `redirect`) | `success` | `common.saved` ("Tersimpan."), atau kalimat yang lebih spesifik (mis. `example.product.saved`) | — | 3000 ms |
-| Gagal validasi (`failure`) | `error` | `<ns>.<entitas>.save_failed` (mis. "Gagal menyimpan") | `data.error` dari server. Bila lebih dari satu field salah: "N isian perlu diperbaiki" (`<ns>.<entitas>.fields_to_fix`) | 8000 ms |
+| Gagal validasi (`failure`) | `error` | `common.save_failed` ("Gagal menyimpan") atau `<ns>.<entitas>.save_failed` yang lebih spesifik | `data.error` dari server. Bila lebih dari satu field salah: `common.fields_to_fix` ("N isian perlu diperbaiki.") | 8000 ms |
 | Galat tak terduga (`error`) | `error` | sama seperti di atas | `common.action_failed` | 8000 ms |
 
 Popup gagal tampil lebih lama karena pengguna perlu membaca alasannya. `Toaster` sudah terpasang sekali di layout root, jadi halaman cukup memanggil `toast()`.
@@ -133,8 +151,9 @@ Hapus tetap lewat `ConfirmDelete` (konfirmasi dulu, L-22). Setelah aksi berhasil
 |---|---|
 | `common.saved` | judul popup berhasil yang umum |
 | `common.action_failed` | deskripsi popup saat galat tak terduga |
-| `<ns>.<entitas>.save_failed` | judul popup gagal milik modul/halaman (mis. `settings.save_failed`) |
-| `<ns>.<entitas>.fields_to_fix` | "N isian perlu diperbaiki", dengan parameter `{n}` |
+| `common.save_failed` | judul popup gagal yang umum |
+| `common.fields_to_fix` | "N isian perlu diperbaiki.", dengan parameter `{n}` |
+| `<ns>.<entitas>.save_failed` | judul popup gagal yang lebih spesifik (mis. `settings.save_failed`) |
 
 Semua teks lewat katalog i18n: kunci core di `packages/i18n/messages/{id,en}.json`, kunci modul di `modules/<Modul>/i18n/{id,en}.json`. Jangan menulis teks popup langsung di kode.
 
@@ -151,7 +170,7 @@ Tunggu `form[data-enhanced="true"]` sebelum mengisi form, supaya yang diuji adal
 
 ## Status
 
-Per 2026-11-17, yang sudah mengikuti kesepakatan ini (popup berhasil dan gagal): halaman Pengaturan.
+Per 2026-11-17, yang sudah mengikuti kesepakatan ini (popup berhasil dan gagal): halaman Pengaturan, dan semua halaman yang memakai `FormBuilder` (user, grup, tenant, profil, webhook, produk Example, Pages, penyedia dan server MCP AI).
 
 Baru sebagian:
 
@@ -160,7 +179,6 @@ Baru sebagian:
 
 Belum sesuai (dirapikan bertahap, tidak wajib sekaligus):
 
-- **`FormBuilder`**: opsi `ajax` sudah mengirim lewat fetch, tetapi belum memunculkan popup. Halaman yang memakainya (user, grup, tenant, webhook baru, produk Example, Pages, penyedia dan server MCP AI) masih menampilkan `notice`/`error` di dalam halaman.
-- Form core lain tanpa `use:enhance`: profil (sebagian), detail user dan grup, tema, modul, antrean, notifikasi.
+- Form core yang ditulis tangan tanpa `use:enhance`: sebagian profil, detail user dan grup (selain field FormBuilder-nya), tema, modul, antrean, notifikasi.
 
 Saat menyentuh salah satu form di atas, rapikan sekalian mengikuti dokumen ini. Aplikasi turunan boleh menambah daftar status form modulnya sendiri di dokumen modulnya.

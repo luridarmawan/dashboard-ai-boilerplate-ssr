@@ -1,5 +1,5 @@
 <script lang="ts">
-import type { Snippet } from 'svelte';
+import { type Snippet, tick } from 'svelte';
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
@@ -11,6 +11,7 @@ import {
   PasswordInput,
   Select,
   Textarea,
+  toast,
 } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
@@ -39,11 +40,23 @@ interface Props {
    * Post over fetch instead of reloading the page (L-22: the same form still posts the ordinary
    * way when JavaScript never arrives — this only takes the shorter route when it can). The
    * action, its validation and its result stay exactly the same; what changes is that the page
-   * is not thrown away, so scroll position and anything typed stay put.
+   * is not thrown away, so scroll position and anything typed stay put. On by default (see
+   * docs/FORMS.md); `ajax={false}` keeps a plain full-page POST.
    */
   ajax?: boolean;
+  /**
+   * Title of the green toast after a successful save. Defaults to `notice` as the page renders it
+   * after the save, else "Saved.". `false` = no toast (the page announces the outcome itself).
+   */
+  successMessage?: string | false;
+  /** Title of the red toast after a failed save; defaults to "Could not save". */
+  failureTitle?: string;
   /** A form-level error banner (e.g. the API's message). */
   error?: string | null;
+  /**
+   * The success message of a plain POST. With JavaScript it is shown as the success toast instead,
+   * so it is not repeated inside the form.
+   */
   notice?: string | null;
   extra?: Snippet;
   /**
@@ -68,7 +81,9 @@ let {
   columns = 1,
   class: className,
   readonly = false,
-  ajax = false,
+  ajax = true,
+  successMessage,
+  failureTitle,
   error = null,
   notice = null,
   extra,
@@ -115,19 +130,64 @@ let hydrated = $state(false);
 $effect(() => {
   hydrated = true;
 });
+/** With JavaScript the outcome is a toast, so the in-form success notice would only repeat it. */
+const enhanced = $derived(ajax && hydrated);
+
+/** Scroll to the first invalid field (or the error banner) after a failed save. */
+function revealProblem(form: HTMLFormElement) {
+  const target =
+    form.querySelector<HTMLElement>('[aria-invalid="true"]') ??
+    form.querySelector<HTMLElement>('[role="alert"]');
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (target.matches('input, select, textarea')) target.focus({ preventScroll: true });
+}
+
 /**
  * `use:` cannot be applied conditionally, so the action itself decides: without `ajax` it returns
  * nothing and the form stays a plain POST. `update({ reset: false })` re-runs `load` and applies
  * the action result in place — without it the fields would snap back to the values the page was
- * rendered with.
+ * rendered with. The outcome is announced as a toast (docs/FORMS.md): green on success, red with
+ * the reason on failure.
  */
 function submitOverFetch(node: HTMLFormElement) {
   if (!ajax) return;
   return enhance(node, () => {
     submitting = true;
-    return async ({ update }) => {
+    return async ({ update, result }) => {
+      // The toast store outlives client-side navigation, so a redirect (create → detail) is
+      // announced here, before `update()` follows it to a page this form is not on.
+      if (result.type === 'redirect' && successMessage !== false) {
+        toast({ title: successMessage || t('common.saved'), variant: 'success' }, 3000);
+      }
       await update({ reset: false });
       submitting = false;
+      if (result.type === 'success') {
+        // `notice` is the page's own wording for this save, derived from the fresh action result.
+        await tick();
+        if (successMessage !== false) {
+          toast({ title: successMessage || notice || t('common.saved'), variant: 'success' }, 3000);
+        }
+        return;
+      }
+      if (result.type !== 'failure' && result.type !== 'error') return;
+      const data = (result.type === 'failure' ? result.data : undefined) as
+        | { error?: string; message?: string; details?: Record<string, string> | null }
+        | undefined;
+      const fields = data?.details ? Object.keys(data.details).length : 0;
+      toast(
+        {
+          title: failureTitle || t('common.save_failed'),
+          description:
+            fields > 1
+              ? t('common.fields_to_fix', { n: fields })
+              : data?.error || data?.message || t('common.action_failed'),
+          variant: 'error',
+        },
+        8000,
+      );
+      await tick();
+      revealProblem(node);
     };
   });
 }
@@ -226,7 +286,7 @@ function submitOverFetch(node: HTMLFormElement) {
        placed by hand (an `aside` at `row-start-1`) would collide with it the moment a save
        succeeded — the fields would reflow around the aside instead of beside it. -->
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if notice && !enhanced}<p class="notice" role="status">{notice}</p>{/if}
 
   <div class={cn('grid gap-4', GRID_COLS[columns], className)}>
     <!-- Before the fields, so its own placement classes decide where it lands and the auto-placed
