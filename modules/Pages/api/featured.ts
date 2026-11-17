@@ -1,4 +1,4 @@
-import { type FileRow, fileUrl, findFile } from '@app/api/files';
+import { type FileRow, findFile } from '@app/api/files';
 
 /**
  * Featured images of pages: rows in core `files`, stored through `storeUpload()` like any upload,
@@ -42,5 +42,9 @@ export function featuredMeta(row: FileRow): FeaturedMeta {
   return { width: n(meta.width), height: n(meta.height), mime: row.mime };
 }
 
-/** Where the DASHBOARD shows the image (any page state): the core file route, signed-in. */
-export const adminUrl = (row: FileRow) => fileUrl(row);
+/**
+ * Where the DASHBOARD shows the image (any page state): this module's route under
+ * `pages.page.read`. The core file route would refuse a draft's private image to an editor
+ * without `file.read` (only its uploader and `file.read` holders may read private files).
+ */
+export const adminUrl = (row: Pick<FileRow, 'id'>) => `/v1/m/pages/images/${row.id}`;

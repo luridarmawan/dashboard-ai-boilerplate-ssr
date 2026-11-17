@@ -437,6 +437,13 @@ describe.skipIf(!enabled)('Pages module', () => {
         deleted: null,
       });
 
+      // The editor reads it through the module's own route, private or not.
+      expect(admin?.url).toBe(`/v1/m/pages/images/${admin?.fileId}`);
+      const adminImg = await call(admin?.url ?? '', { method: 'GET' });
+      expect(adminImg.status).toBe(200);
+      expect(adminImg.headers.get('content-type')).toBe('image/png');
+      expect(adminImg.headers.get('cache-control')).toContain('private');
+
       // Draft: the page does not resolve and its image is not served — not even as a share card.
       const mediaUrl = `/v1/m/pages/media/${admin?.fileId}`;
       expect((await media(mediaUrl)).status).toBe(404);

@@ -300,11 +300,11 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
     .filter({ hasText: /Gambar unggulan disimpan|Featured image saved/ });
   await expect(toast).toBeVisible({ timeout: 15_000 });
   const current = page.getByTestId('pages-image-current').locator('img');
-  await expect(current).toHaveAttribute('src', /\/v1\/files\/[0-9a-f-]{36}\/content/);
+  await expect(current).toHaveAttribute('src', /\/v1\/m\/pages\/images\/[0-9a-f-]{36}$/);
   // A draft's image is private, so it has no core share card yet: the preview draws it locally.
   await expect(page.getByTestId('pages-share-local').locator('img').last()).toHaveAttribute(
     'src',
-    /\/v1\/files\/[0-9a-f-]{36}\/content/,
+    /\/v1\/m\/pages\/images\/[0-9a-f-]{36}$/,
   );
   await expect(page.getByTestId('pages-share-default')).toHaveCount(0);
   await expect(page.locator('#pages-image-alt')).toHaveValue('Kantor kami');

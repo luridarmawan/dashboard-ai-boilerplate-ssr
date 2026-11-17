@@ -540,6 +540,37 @@ export default defineApiRoutes(
         },
       },
     )
+    .get(
+      '/images/:fileId',
+      async ({ params, set, requestId, tenantState }) => {
+        const clientId = tenantState?.clientId;
+        const file = clientId ? await featuredFile(clientId, params.fileId) : null;
+        const obj = file ? await readFile(file) : null;
+        if (!file || !obj) {
+          set.status = 404;
+          return fail('not_found', 'Gambar tidak ditemukan', requestId);
+        }
+        return new Response(new Blob([obj.bytes as unknown as ArrayBuffer]), {
+          headers: {
+            'content-type': file.mime,
+            'content-length': String(obj.bytes.byteLength),
+            'x-content-type-options': 'nosniff',
+            'cache-control': 'private, max-age=300',
+            'x-request-id': requestId,
+          },
+        });
+      },
+      {
+        beforeHandle: permission('pages.page.read'),
+        params: t.Object({ fileId: Id }),
+        response: { 200: t.Unknown(), ...errorResponses },
+        detail: {
+          summary: 'Featured image (dashboard)',
+          description:
+            'A featured image of the active tenant, public or private (private while its page is a draft). For the editor; visitors use the public media route.',
+        },
+      },
+    )
     .post(
       '/pages/:id/image',
       async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
