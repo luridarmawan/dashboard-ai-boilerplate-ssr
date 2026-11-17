@@ -389,6 +389,7 @@
   "settings.bool_set": "Tetapkan:",
   "settings.error_forbidden": "Anda tidak punya izin melihat konfigurasi",
   "settings.error_load": "Konfigurasi tidak bisa dimuat",
+  "settings.save_failed": "Pengaturan gagal disimpan",
   "settings.hint_public": "publik",
   "settings.hint_source": "sumber: {source}",
   "settings.inherit_default": "ikuti baku",
