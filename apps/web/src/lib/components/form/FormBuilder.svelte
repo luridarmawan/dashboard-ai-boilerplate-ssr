@@ -1,5 +1,5 @@
 <script lang="ts">
-import { type Snippet, tick } from 'svelte';
+import type { Snippet } from 'svelte';
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
@@ -11,11 +11,11 @@ import {
   PasswordInput,
   Select,
   Textarea,
-  toast,
 } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import type { FieldDef, FormErrors, FormValues } from './fields.ts';
+import { useSaveForm } from './save.ts';
 
 /**
  * Declarative form (L-17). Renders `fields` into a real <form method="POST"> with the CSRF
@@ -133,63 +133,28 @@ $effect(() => {
 /** With JavaScript the outcome is a toast, so the in-form success notice would only repeat it. */
 const enhanced = $derived(ajax && hydrated);
 
-/** Scroll to the first invalid field (or the error banner) after a failed save. */
-function revealProblem(form: HTMLFormElement) {
-  const target =
-    form.querySelector<HTMLElement>('[aria-invalid="true"]') ??
-    form.querySelector<HTMLElement>('[role="alert"]');
-  if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  if (target.matches('input, select, textarea')) target.focus({ preventScroll: true });
-}
-
+const save = useSaveForm();
 /**
  * `use:` cannot be applied conditionally, so the action itself decides: without `ajax` it returns
- * nothing and the form stays a plain POST. `update({ reset: false })` re-runs `load` and applies
- * the action result in place — without it the fields would snap back to the values the page was
- * rendered with. The outcome is announced as a toast (docs/FORMS.md): green on success, red with
- * the reason on failure.
+ * nothing and the form stays a plain POST. Otherwise the shared save handler (docs/FORMS.md):
+ * fetch, fields kept as typed, outcome as a toast. The success toast reads `notice` after the page
+ * took the result in — that is the page's own wording for this save.
  */
 function submitOverFetch(node: HTMLFormElement) {
   if (!ajax) return;
-  return enhance(node, () => {
-    submitting = true;
-    return async ({ update, result }) => {
-      // The toast store outlives client-side navigation, so a redirect (create → detail) is
-      // announced here, before `update()` follows it to a page this form is not on.
-      if (result.type === 'redirect' && successMessage !== false) {
-        toast({ title: successMessage || t('common.saved'), variant: 'success' }, 3000);
-      }
-      await update({ reset: false });
-      submitting = false;
-      if (result.type === 'success') {
-        // `notice` is the page's own wording for this save, derived from the fresh action result.
-        await tick();
-        if (successMessage !== false) {
-          toast({ title: successMessage || notice || t('common.saved'), variant: 'success' }, 3000);
-        }
-        return;
-      }
-      if (result.type !== 'failure' && result.type !== 'error') return;
-      const data = (result.type === 'failure' ? result.data : undefined) as
-        | { error?: string; message?: string; details?: Record<string, string> | null }
-        | undefined;
-      const fields = data?.details ? Object.keys(data.details).length : 0;
-      toast(
-        {
-          title: failureTitle || t('common.save_failed'),
-          description:
-            fields > 1
-              ? t('common.fields_to_fix', { n: fields })
-              : data?.error || data?.message || t('common.action_failed'),
-          variant: 'error',
-        },
-        8000,
-      );
-      await tick();
-      revealProblem(node);
-    };
-  });
+  return enhance(
+    node,
+    save({
+      success: () => (successMessage === false ? false : successMessage || notice),
+      failureTitle,
+      onStart: () => {
+        submitting = true;
+      },
+      onDone: () => {
+        submitting = false;
+      },
+    }),
+  );
 }
 </script>
 

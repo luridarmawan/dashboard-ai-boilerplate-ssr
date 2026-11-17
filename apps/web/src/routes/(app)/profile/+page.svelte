@@ -1,15 +1,20 @@
 <script lang="ts">
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { type FieldDef, FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData, SubmitFunction } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 
 /**
  * Avatar changes without leaving the page. The plain POST stays the base layer — this only swaps
@@ -232,7 +237,7 @@ const mfaError = $derived(
   </Card>
   {#if data.canTokens}
   <!-- MCP integration (I-4): only for someone allowed to use MCP tools; the actions check it too. -->
-  <Card title={t('profile.tokens.title')} description={t('profile.tokens.desc')}>
+  <Card id="tokens" title={t('profile.tokens.title')} description={t('profile.tokens.desc')}>
     {#if form?.saved === 'token' && form.token}
       <div class="notice mb-4" role="status" data-testid="new-token">
         <p class="font-medium">{t('profile.tokens.created', { name: form.tokenName ?? '' })}</p>
@@ -240,7 +245,8 @@ const mfaError = $derived(
         <p class="mt-2 text-sm text-muted-foreground">{t('profile.tokens.example')} <code>claude mcp add --transport http dashboard {data.appOrigin ?? ''}/v1/mcp --header "Authorization: Bearer …"</code></p>
       </div>
     {/if}
-    {#if form?.saved === 'revoke'}<p class="notice mb-4">{t('profile.tokens.revoked')}</p>{/if}
+    {#if form?.saved === 'revoke' && !hydrated}<p class="notice mb-4">{t('profile.tokens.revoked')}</p>{/if}
+    {#if form?.code === 'confirm_failed'}<p class="error mb-4" role="alert">{form.error}</p>{/if}
     {#if data.tokens.length}
       <Table caption={t('profile.tokens.caption')}>
         <thead><tr><th>{t('profile.name')}</th><th>{t('profile.tokens.scopes_col')}</th><th>{t('profile.tokens.expires_col')}</th><th>{t('profile.tokens.last_used')}</th><th></th></tr></thead>
@@ -252,7 +258,28 @@ const mfaError = $derived(
               <td>{tk.expiresAt ? fmt(tk.expiresAt) : t('profile.tokens.no_expiry_cell')}</td>
               <td>{fmt(tk.lastUsedAt)}</td>
               <td class="text-end">
-                <form method="POST" action="?/revokeToken"><Csrf token={data.csrf} /><input type="hidden" name="id" value={tk.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('profile.tokens.revoke')}</Button></form>
+                <!-- Revoking cuts off every client using the token: confirmed first, in a modal with
+                     JavaScript, on this page via `?confirm=revoke&token=` without it. -->
+                <ConfirmDelete
+                  compact
+                  compactLabel
+                  csrf={data.csrf}
+                  action="?/revokeToken"
+                  confirm="revoke"
+                  href={`?confirm=revoke&token=${tk.id}#tokens`}
+                  cancelHref="/profile#tokens"
+                  confirming={data.confirmRevokeId === tk.id}
+                  variant="ghost"
+                  size="sm"
+                  class="text-destructive"
+                  label={t('profile.tokens.revoke')}
+                  title={t('profile.tokens.revoke_confirm')}
+                  description={t('profile.tokens.revoke_confirm_lead', { name: tk.name })}
+                  confirmLabel={t('profile.tokens.revoke_confirm_submit')}
+                  enhance={save({ success: t('profile.tokens.revoked'), failureTitle: t('profile.tokens.revoke') })}
+                >
+                  {#snippet fields()}<input type="hidden" name="id" value={tk.id} />{/snippet}
+                </ConfirmDelete>
               </td>
             </tr>
           {/each}

@@ -2,7 +2,7 @@
 import type { SubmitFunction } from '@sveltejs/kit';
 import { applyAction, enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table, toast } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -14,6 +14,8 @@ const t = useT();
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const w = $derived(data.webhook);
+/** Deleting posts over fetch too: a toast, then the list (docs/FORMS.md). */
+const save = useSaveForm();
 
 /**
  * Ping and rotation are one-shot actions whose whole answer fits on this page, so with JavaScript
@@ -171,7 +173,7 @@ const badge = (s: string) =>
   </Card>
   {#if can('webhook.manage')}
     <Card>
-      <ConfirmDelete csrf={data.csrf} href={`/webhooks/${w.id}?confirm=delete#confirm-delete`} cancelHref={`/webhooks/${w.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('webhooks.detail.delete')} description={t('webhooks.detail.delete_confirm_lead', { name: w.name })} />
+      <ConfirmDelete csrf={data.csrf} href={`/webhooks/${w.id}?confirm=delete#confirm-delete`} cancelHref={`/webhooks/${w.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('webhooks.detail.delete')} description={t('webhooks.detail.delete_confirm_lead', { name: w.name })} enhance={save({ success: t('webhooks.deleted'), failureTitle: t('webhooks.detail.delete') })} />
     </Card>
   {/if}
 </div>
