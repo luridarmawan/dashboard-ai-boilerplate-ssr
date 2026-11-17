@@ -1,4 +1,4 @@
-import { readFile, removeFile, storeUpload } from '@app/api/files';
+import { readFile, removeFile, setFileVisibility, storeUpload } from '@app/api/files';
 import {
   assertPermalinkFree,
   claimPermalink,
@@ -46,6 +46,7 @@ import {
   featuredFile,
   featuredMeta,
   mediaPath,
+  visibilityFor,
 } from './featured.ts';
 import { renderMarkdown } from './markdown.ts';
 import { MODULE, pathOf, slugify } from './permalinks.ts';
@@ -441,6 +442,12 @@ export default defineApiRoutes(
           throw err;
         }
         const after = (await tenant.selectOne(schema.pagesPages, live(before.id))) as Row;
+        // Publishing makes the featured image public (crawlers may fetch it and its share card);
+        // back to draft makes it private again.
+        if (body.status !== undefined && after.image_id) {
+          const image = await featuredFile(clientId, after.image_id);
+          if (image) await setFileVisibility(image, visibilityFor(after.status));
+        }
         await writeAudit(unsafeAcrossTenants(), {
           clientId,
           actorId: auth?.user.id ?? null,
@@ -548,7 +555,8 @@ export default defineApiRoutes(
           userId: auth?.user.id ?? null,
           file: body.file,
           kind: FEATURED_KIND,
-          visibility: 'public',
+          // Public only while the page is: a draft's image stays private (see ./featured.ts).
+          visibility: visibilityFor(before.status),
           allowedTypes: FEATURED_TYPES,
           maxBytes: FEATURED_MAX_BYTES,
           meta: { page_id: before.id },

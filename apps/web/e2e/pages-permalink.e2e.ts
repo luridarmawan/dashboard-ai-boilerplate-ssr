@@ -301,10 +301,10 @@ test('pages: the featured image uploads over fetch and becomes the share card', 
   await expect(toast).toBeVisible({ timeout: 15_000 });
   const current = page.getByTestId('pages-image-current').locator('img');
   await expect(current).toHaveAttribute('src', /\/v1\/files\/[0-9a-f-]{36}\/content/);
-  // The share preview is the real card the core makes for crawlers.
-  await expect(page.getByTestId('pages-share-preview').locator('img')).toHaveAttribute(
+  // A draft's image is private, so it has no core share card yet: the preview draws it locally.
+  await expect(page.getByTestId('pages-share-local').locator('img').last()).toHaveAttribute(
     'src',
-    /\/v1\/opengraph\/[0-9a-f-]{36}$/,
+    /\/v1\/files\/[0-9a-f-]{36}\/content/,
   );
   await expect(page.getByTestId('pages-share-default')).toHaveCount(0);
   await expect(page.locator('#pages-image-alt')).toHaveValue('Kantor kami');

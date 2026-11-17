@@ -1,8 +1,10 @@
 import { type FileRow, fileUrl, findFile } from '@app/api/files';
 
 /**
- * Featured images of pages. Each one is a PUBLIC row in core `files`, stored through
- * `storeUpload()` like any upload, which records its pixel size in `meta`. Visitors
+ * Featured images of pages: rows in core `files`, stored through `storeUpload()` like any upload,
+ * which records its pixel size in `meta`. A row is PUBLIC only while its page is published
+ * (`visibilityFor`): the core share card `/v1/opengraph/<id>` serves any public file, so a draft's
+ * image is kept private and flips with the page's status. Visitors
  * and social crawlers never fetch it from `/v1/files/<id>/content`: that route needs the tenant
  * named in `X-Client-ID`, which a crawler does not send. They get `/v1/m/pages/media/<id>`, which
  * resolves the site tenant the way `/resolve` does and only serves the image of a PUBLISHED page.
@@ -17,6 +19,10 @@ export const FEATURED_MAX_BYTES = 5 * 1024 * 1024;
 
 /** The public URL of a featured image (path only; the web makes it absolute for og:image). */
 export const mediaPath = (fileId: string) => `/v1/m/pages/media/${fileId}`;
+
+/** Visibility of a featured image for a page in `status`. */
+export const visibilityFor = (status: string): 'public' | 'private' =>
+  status === 'published' ? 'public' : 'private';
 
 export interface FeaturedMeta {
   readonly width: number | null;

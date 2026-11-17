@@ -420,7 +420,7 @@ describe.skipIf(!enabled)('Pages module', () => {
       return row;
     };
 
-    test('upload: stored public, sized, served to anonymous visitors only while published', async () => {
+    test('upload: private while draft, public once published, served to anonymous visitors only while published', async () => {
       const page = await create({ title: 'Gambar', slug: s('img'), summary: 'Ringkas' });
       const up = await upload(page.id, makePng(1200, 630), 'image/png', 'hero.png', 'Kantor kami');
       expect(up.status, JSON.stringify(up.body)).toBe(200);
@@ -433,15 +433,17 @@ describe.skipIf(!enabled)('Pages module', () => {
       });
       expect(await fileRow(admin?.url ?? '')).toMatchObject({
         kind: 'pages.featured',
-        visibility: 'public',
+        visibility: 'private',
         deleted: null,
       });
 
-      // Draft: the page does not resolve and its image is not served.
+      // Draft: the page does not resolve and its image is not served — not even as a share card.
       const mediaUrl = `/v1/m/pages/media/${admin?.fileId}`;
       expect((await media(mediaUrl)).status).toBe(404);
+      expect((await media(`/v1/opengraph/${admin?.fileId}`)).status).toBe(404);
 
       await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
+      expect((await fileRow(admin?.url ?? ''))?.visibility).toBe('public');
       const pub = await publicImage(s('img'));
       const fileId = admin?.fileId ?? '';
       expect(pub).toEqual({
@@ -467,6 +469,12 @@ describe.skipIf(!enabled)('Pages module', () => {
       expect(new Uint8Array(await card.arrayBuffer()).slice(0, 3)).toEqual(
         new Uint8Array([0xff, 0xd8, 0xff]),
       );
+
+      // Back to draft: private again, the card is gone with it.
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'draft' });
+      expect((await fileRow(admin?.url ?? ''))?.visibility).toBe('private');
+      expect((await media(`/v1/opengraph/${fileId}`)).status).toBe(404);
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
 
       // Alt text alone is editable without a new upload; empty clears it.
       await send('PUT', `/v1/m/pages/pages/${page.id}`, { imageAlt: 'Tim kami' });

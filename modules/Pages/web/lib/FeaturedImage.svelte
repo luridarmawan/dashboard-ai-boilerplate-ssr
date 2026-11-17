@@ -9,9 +9,10 @@ import { useT } from '$lib/i18n';
  * fetch — the new image, the share preview and a toast appear in place. Picking a file shows it
  * immediately (a local object URL) with its pixel size, so a too-small picture is caught before
  * it is uploaded. The share preview mirrors what Facebook/WhatsApp/LinkedIn draw from og:*: a
- * saved image is shown as its real 1200 × 630 card (`/v1/opengraph/<fileId>`, made by the core);
- * a picked, not yet uploaded file as the same layout drawn in CSS — cropped to fill when it is
- * close to 1.91:1, otherwise whole on a blurred copy of itself.
+ * published page's image is shown as its real 1200 × 630 card (`/v1/opengraph/<fileId>`, made by
+ * the core); a draft's image (private until the page is published, so it has no card yet) and a
+ * picked, not yet uploaded file as the same layout drawn in CSS — cropped to fill when it is close
+ * to 1.91:1, otherwise whole on a blurred copy of itself.
  */
 interface ImageView {
   fileId: string;
@@ -97,10 +98,12 @@ const sizeNote = $derived.by(() => {
     return { variant: 'info' as const, text: t('pages.image.ratio') };
   return null;
 });
-/** The saved image's share card, as crawlers fetch it. */
-const card = $derived(image ? `/v1/opengraph/${encodeURIComponent(image.fileId)}` : null);
-/** A picked file is previewed in CSS: framed (blurred backdrop) unless it is close to 1.91:1. */
-const framed = $derived(picked ? !(picked.width && nearCard(picked.width, picked.height)) : false);
+/** The saved image's share card, as crawlers fetch it — only a published page's image has one. */
+const card = $derived(
+  image && published && !picked ? `/v1/opengraph/${encodeURIComponent(image.fileId)}` : null,
+);
+/** Otherwise the card is drawn in CSS: framed (blurred backdrop) unless close to 1.91:1. */
+const framed = $derived(shown?.width && shown.height ? !nearCard(shown.width, shown.height) : true);
 
 function overFetch(node: HTMLFormElement) {
   return enhance(node, ({ action }) => {
@@ -166,10 +169,10 @@ function overFetch(node: HTMLFormElement) {
   <div>
     <p class="mb-2 text-sm font-medium">{t('pages.image.share_preview')}</p>
     <div class="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs" data-testid="pages-share-preview">
-      {#if picked}
+      {#if shown && !card}
         <div class="relative aspect-[1.91/1] w-full overflow-hidden bg-muted" data-testid="pages-share-local">
-          {#if framed}<img src={picked.url} alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-[0.6]" />{/if}
-          <img src={picked.url} alt="" class={`relative h-full w-full ${framed ? 'object-contain' : 'object-cover'}`} />
+          {#if framed}<img src={shown.url} alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-[0.6]" />{/if}
+          <img src={shown.url} alt="" class={`relative h-full w-full ${framed ? 'object-contain' : 'object-cover'}`} />
         </div>
       {:else}
         <img src={card ?? fallback} alt="" class="aspect-[1.91/1] w-full object-cover" data-default={card ? null : 'true'} />
