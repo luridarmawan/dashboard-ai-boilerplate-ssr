@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -15,6 +17,7 @@ import type { ActionData, PageData } from './$types';
  */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+const save = useSaveForm();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 // The language RESOLVED for this request (K-2) — `user.locale` is null until the user picks one.
 const locale = $derived(data.locale === 'id' ? 'id' : 'en');
@@ -115,7 +118,7 @@ const catalogEntries = $derived(
             <div class="flex flex-wrap items-center gap-2">
               {#if m.tenantEnabled === null}<Badge variant="outline">{t('modules.inherit_global')}</Badge>{:else}<Badge variant={m.tenantEnabled ? 'success' : 'secondary'}>{m.tenantEnabled ? t('common.active') : t('common.inactive')}</Badge>{/if}
               {#if can('module.manage')}
-                <form method="POST" action="?/toggle" class="flex flex-wrap gap-1">
+                <form method="POST" action="?/toggle" class="flex flex-wrap gap-1" use:enhance={save({ success: t('modules.toggled', { name: m.name }) })}>
                   <Csrf token={data.csrf} />
                   <input type="hidden" name="module" value={m.name} />
                   <input type="hidden" name="scope" value="tenant" />
@@ -130,7 +133,7 @@ const catalogEntries = $derived(
             <div class="flex flex-wrap items-center gap-2">
               <Badge variant={m.globalEnabled ? 'success' : 'secondary'}>{m.globalEnabled ? t('common.active') : t('common.inactive')}</Badge>
               {#if data.canGlobal}
-                <form method="POST" action="?/toggle">
+                <form method="POST" action="?/toggle" use:enhance={save({ success: t('modules.toggled', { name: m.name }) })}>
                   <Csrf token={data.csrf} />
                   <input type="hidden" name="module" value={m.name} />
                   <input type="hidden" name="scope" value="global" />

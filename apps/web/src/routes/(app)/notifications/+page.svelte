@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -8,6 +10,7 @@ import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+const save = useSaveForm();
 // The language RESOLVED for this request (K-2) — `user.locale` is null until the user picks one.
 const fmt = (iso: string) => new Date(iso).toLocaleString(data.locale === 'id' ? 'id-ID' : 'en-US');
 const iconFor = (type: string) =>
@@ -29,7 +32,7 @@ const iconFor = (type: string) =>
       <a href="/notifications" class={data.onlyUnread ? '' : 'font-medium'}>{t('notifications.all')}</a> ·
       <a href="/notifications?unread=1" class={data.onlyUnread ? 'font-medium' : ''}>{t('notifications.only_unread')}</a>
       {#if data.unread}
-        <form method="POST" action="?/readAll"><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm"><Icon name="check" size={14} />{t('notifications.mark_all')}</Button></form>
+        <form method="POST" action="?/readAll" use:enhance={save({ success: t('notifications.marked_all') })}><Csrf token={data.csrf} /><Button type="submit" variant="outline" size="sm"><Icon name="check" size={14} />{t('notifications.mark_all')}</Button></form>
       {/if}
     </div>
   </div>
@@ -45,10 +48,10 @@ const iconFor = (type: string) =>
         </div>
         <div class="flex shrink-0 gap-1">
           {#if n.link}
-            <form method="POST" action="?/read"><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="link" value={n.link} /><Button type="submit" size="sm" variant="outline"><Icon name="arrow-right" class="rtl:rotate-180" size={14} />{t('notifications.open')}</Button></form>
+            <form method="POST" action="?/read" use:enhance={save({ success: false })}><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><input type="hidden" name="link" value={n.link} /><Button type="submit" size="sm" variant="outline"><Icon name="arrow-right" class="rtl:rotate-180" size={14} />{t('notifications.open')}</Button></form>
           {/if}
           {#if !n.readAt}
-            <form method="POST" action="?/read"><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('notifications.mark_read')}</Button></form>
+            <form method="POST" action="?/read" use:enhance={save({ success: false })}><Csrf token={data.csrf} /><input type="hidden" name="id" value={n.id} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('notifications.mark_read')}</Button></form>
           {/if}
         </div>
       </li>

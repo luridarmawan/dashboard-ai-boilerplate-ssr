@@ -1,6 +1,8 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
 import { type ColumnDef, DataTable, type RowAction } from '$lib/components/table';
@@ -15,6 +17,12 @@ import IpWhois from './IpWhois.svelte';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+/** Forms post over fetch and report as a toast (docs/FORMS.md); notices are the no-JS path. */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 /** D-5: the wording lives with the dashboard (see $lib/presence), the dot with the component. */
 const seen = (r: { online: boolean; lastSeenAt: string | null }) => presenceText(r, dateLocale, t);
@@ -22,7 +30,13 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
 type Row = (typeof data.users)[number];
 
 const columns: ColumnDef<Row>[] = [
-  { key: 'name', label: t('users.name'), sortKey: 'name', class: 'whitespace-nowrap', value: (r) => r.name },
+  {
+    key: 'name',
+    label: t('users.name'),
+    sortKey: 'name',
+    class: 'whitespace-nowrap',
+    value: (r) => r.name,
+  },
   { key: 'email', label: t('users.email'), sortKey: 'email', value: (r) => r.email },
   { key: 'phone', label: t('users.phone'), value: (r) => r.phone || '—' },
   {
@@ -93,6 +107,8 @@ const rowActions: RowAction<Row>[] = $derived([
           icon: 'login',
           iconOnly: true,
           action: () => '?/impersonate',
+          // Lands on the dashboard as the other account: that page says who you are now.
+          success: false as const,
           when: (r: Row) => !r.isSuperadmin && r.id !== data.user.id && r.statusId === 1,
         },
       ]
@@ -124,6 +140,20 @@ const askInvite = (e: SubmitEvent) => {
   inviteAsk = { email, groupId: g ? g.value : undefined };
   inviteOpen = true;
 };
+/**
+ * The invitation's outcome as a toast. The sent notice stays on the page as well: it carries the
+ * join link, which an admin may need to copy when the mail does not arrive.
+ */
+const inviteToast = (r: import('@sveltejs/kit').ActionResult) => {
+  const inv =
+    r.type === 'success'
+      ? (r.data?.invited as { email: string; existing?: boolean } | undefined)
+      : undefined;
+  if (!inv) return null;
+  return inv.existing
+    ? t('users.invite.existing', { email: inv.email })
+    : t('users.invite.sent', { email: inv.email });
+};
 /** Wording of the question: the group's name, or the "no group" sentence when none is granted. */
 const inviteLead = (ask: { email: string; groupId: string | undefined }) => {
   const name =
@@ -135,6 +165,13 @@ const inviteLead = (ask: { email: string; groupId: string | undefined }) => {
     : t('users.invite.confirm_lead_nogroup', { email: ask.email });
 };
 /** Deactivation asks first (L-22); the table shows this in a modal, the server inline (below). */
+/** The deactivation redirects back with the count in the URL; the toast reads it from there. */
+const deactivatedToast = (r: import('@sveltejs/kit').ActionResult) =>
+  r.type === 'redirect'
+    ? t('users.deactivated', {
+        n: new URL(r.location, page.url).searchParams.get('deactivated') ?? '0',
+      })
+    : null;
 const deactivateConfirm = {
   token: 'deactivate',
   title: t('users.deactivate_confirm'),
@@ -144,7 +181,7 @@ const deactivateConfirm = {
 </script>
 
 {#snippet inviteConfirmForm(ask: { email: string; groupId: string | undefined }, inDialog: boolean)}
-  <form method="POST" action="?/invite&confirm=invite" class="flex flex-wrap gap-2" data-testid={inDialog ? 'invite-confirm-dialog' : 'invite-confirm-form'}>
+  <form method="POST" action="?/invite&confirm=invite" class="flex flex-wrap gap-2" data-testid={inDialog ? 'invite-confirm-dialog' : 'invite-confirm-form'} use:enhance={save({ success: inviteToast, failureTitle: t('users.invite.title'), onDone: () => { inviteOpen = false; } })}>
     <Csrf token={data.csrf} />
     <input type="hidden" name="email" value={ask.email} />
     {#if ask.groupId !== undefined}<input type="hidden" name="groupId" value={ask.groupId} />{/if}
@@ -164,7 +201,7 @@ const deactivateConfirm = {
     <h1>{t('nav.users')}</h1>
     {#if can('user.create')}<Button href="/users/new" size="sm"><Icon name="plus" size={16} />{t('users.add')}</Button>{/if}
   </div>
-  {#if deactivated}<p class="notice">{t('users.deactivated', { n: deactivated })}</p>{/if}
+  {#if deactivated && !hydrated}<p class="notice">{t('users.deactivated', { n: deactivated })}</p>{/if}
   <!-- A refused impersonation belongs above the table, not inside the invite card below it. -->
   {#if form?.impersonate && form?.error}<p class="error" role="alert" data-testid="impersonate-error">{form.error}</p>{/if}
   {#if form?.deactivate && form?.error}<p class="error" role="alert" data-testid="deactivate-error">{form.error}</p>{/if}
@@ -195,7 +232,7 @@ const deactivateConfirm = {
     emptyTitle={t('users.empty_title')}
     emptyHint={data.state.q || data.state.extra?.group || data.state.extra?.status ? t('users.empty_hint_search') : t('users.empty_hint_add')}
     {rowActions}
-    bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm }] : []}
+    bulkActions={can('user.edit') ? [{ action: '?/deactivate', label: t('users.deactivate'), icon: 'lock', destructive: true, confirm: deactivateConfirm, success: deactivatedToast }] : []}
   >
     {#snippet filters()}
       <!-- Filter by group (D-1): submits with the search box; the enhanced layer applies it on change. -->
@@ -236,7 +273,7 @@ const deactivateConfirm = {
   {#if can('user.create') && data.invitations}
     <!-- A-13: invite by e-mail. The invitee registers through /join/<code> even with self-service sign-up off. -->
     <Card class="mt-6" title={t('users.invite.title')} description={t('users.invite.lead')} id="invitations">
-      {#if form?.invited?.existing}
+      {#if form?.invited?.existing && !hydrated}
         <p class="notice" data-testid="invite-existing">{t('users.invite.existing', { email: form.invited.email })}</p>
       {:else if form?.invited}
         <div class="notice grid gap-1" data-testid="invite-sent">
@@ -283,7 +320,7 @@ const deactivateConfirm = {
                 <td class="py-1.5 text-muted-foreground">{inv.group?.name ?? '—'}</td>
                 <td class="py-1.5 text-muted-foreground">{new Date(inv.expiresAt).toLocaleString(dateLocale)}</td>
                 <td class="py-1.5 text-muted-foreground">{inv.invitedBy ?? '—'}</td>
-                <td class="py-1.5 text-end"><form method="POST" action="?/revoke"><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm" class="cursor-pointer">{t('users.invite.revoke')}</Button></form></td>
+                <td class="py-1.5 text-end"><form method="POST" action="?/revoke" use:enhance={save({ success: t('users.invite.revoked'), failureTitle: t('users.invite.revoke') })}><Csrf token={data.csrf} /><input type="hidden" name="id" value={inv.id} /><Button type="submit" variant="ghost" size="sm" class="cursor-pointer">{t('users.invite.revoke')}</Button></form></td>
               </tr>
             {/each}
           </tbody>

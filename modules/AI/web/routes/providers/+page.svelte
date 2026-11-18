@@ -8,6 +8,11 @@ import Capabilities from '../../lib/Capabilities.svelte';
 
 let { data } = $props();
 const t = useT();
+// A delete announces itself as a toast before redirecting here; the notice is the no-JS path.
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 /** Row action is an icon, like /users. */
@@ -26,7 +31,7 @@ const fmt = (iso: string | null) =>
   </div>
   <p class="text-sm text-muted-foreground">{t('ai.providers.intro')}</p>
   <p class="text-xs text-muted-foreground">{t('ai.providers.sorted_hint')}</p>
-  {#if data.saved === 'deleted'}<p class="notice">{t('ai.providers.deleted')}</p>{/if}
+  {#if data.saved === 'deleted' && !hydrated}<p class="notice">{t('ai.providers.deleted')}</p>{/if}
   <Table caption={t('ai.providers.title')}>
     <thead><tr><th>{t('ai.providers.name')}</th><th>{t('ai.providers.code')}</th><th>Base URL</th><th>{t('ai.providers.models')}</th><th>{t('ai.providers.capabilities')}</th><th>{t('ai.providers.status')}</th><th></th></tr></thead>
     <tbody>

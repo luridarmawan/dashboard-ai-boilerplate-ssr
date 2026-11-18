@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import { Badge, Button, Card, Table } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
@@ -10,6 +12,12 @@ import { hasPermission } from '$lib/permissions';
  */
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
+// Forms post over fetch and report as a toast (docs/FORMS.md); the notice is the no-JS path.
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const s = $derived(data.stats);
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const q = $derived(data.stats.quota);
@@ -66,14 +74,14 @@ const dayLabel = (day: string) => day.slice(5).replace('-', '/');
       <div><p class="text-xs text-muted-foreground">{t('ai.quota.status')}</p><p class="text-xl font-semibold">{#if q.ok}<Badge variant="success">ok</Badge>{:else}<Badge variant="destructive">{q.reason}</Badge>{/if}</p><p class="text-xs text-muted-foreground">{t('ai.quota.settings_hint')}</p></div>
     </div>
     {#if can('ai.credit.manage')}
-      <form method="POST" action="?/credit" class="mt-4 flex flex-wrap items-end gap-2" data-testid="credit-form">
+      <form method="POST" action="?/credit" class="mt-4 flex flex-wrap items-end gap-2" data-testid="credit-form" use:enhance={save({ success: t('ai.quota.credited'), failureTitle: t('ai.quota.apply'), reset: true })}>
         <Csrf token={data.csrf} />
         <label class="grid gap-1 text-xs"><span>{t('ai.quota.amount')}</span><input name="amount" type="number" step="0.000001" class="h-8 w-40 rounded-md border border-input bg-background px-2 text-sm" placeholder="10" /></label>
         <label class="grid gap-1 text-xs"><span>{t('ai.quota.note')}</span><input name="note" maxlength="255" class="h-8 w-56 rounded-md border border-input bg-background px-2 text-sm" /></label>
         <label class="flex items-center gap-1 text-xs"><input type="checkbox" name="unlimited" class="accent-primary" /> {t('ai.quota.make_unlimited')}</label>
         <Button type="submit" size="sm">{t('ai.quota.apply')}</Button>
       </form>
-      {#if form?.credited}<p class="notice mt-2">{t('ai.quota.credited')}</p>{/if}
+      {#if form?.credited && !hydrated}<p class="notice mt-2">{t('ai.quota.credited')}</p>{/if}
       {#if form?.error}<p class="error mt-2" role="alert">{form.error}</p>{/if}
       {#if data.ledger?.length}
         <details class="mt-3 text-sm"><summary class="cursor-pointer text-muted-foreground">{t('ai.quota.ledger')} ({data.ledger.length})</summary>

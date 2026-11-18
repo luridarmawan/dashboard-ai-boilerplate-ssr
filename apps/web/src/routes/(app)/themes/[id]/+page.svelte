@@ -1,4 +1,5 @@
 <script lang="ts">
+import { useSaveForm } from '$lib/components/form';
 import { Badge, Card, ConfirmDelete } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../../$types';
@@ -8,6 +9,7 @@ import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+const save = useSaveForm();
 const locale = useLocale() === 'en' ? 'en' : 'id';
 type Details = {
   errors?: Record<string, string>;
@@ -51,7 +53,7 @@ const previews = $derived(
   </div>
   <ThemeEditor {values} vocab={data.vocab} csrf={data.csrf} action="?/save" isNew={false} errors={details.errors ?? {}} contrast={details.contrast ?? []} {previews} notice={submitted?.saved || data.saved ? t('themes.edit.saved') : null} error={form?.error ?? null} />
   <Card>
-    <ConfirmDelete csrf={data.csrf} href={`/themes/${data.theme.id}?confirm=delete#confirm-delete`} cancelHref={`/themes/${data.theme.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('themes.edit.delete')} description={t('themes.edit.delete_confirm_lead', { name: data.theme.name[locale] })} />
+    <ConfirmDelete csrf={data.csrf} href={`/themes/${data.theme.id}?confirm=delete#confirm-delete`} cancelHref={`/themes/${data.theme.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('themes.edit.delete')} description={t('themes.edit.delete_confirm_lead', { name: data.theme.name[locale] })} enhance={save({ success: t('themes.notice_deleted') })} />
     <p class="mt-2 text-xs text-muted-foreground">{t('themes.edit.delete_note')}</p>
   </Card>
 </div>

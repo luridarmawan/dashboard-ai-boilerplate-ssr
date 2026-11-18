@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -9,6 +11,12 @@ import type { ActionData, PageData } from './$types';
 /** Custom themes as a gallery (L-24): preview, swatches, where it comes from, what it uses. */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+/** Forms post over fetch and report as a toast (docs/FORMS.md); notices are the no-JS path. */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const locale = useLocale() === 'en' ? 'en' : 'id';
 const fmt = (iso: string) =>
   new Date(iso).toLocaleDateString(locale === 'en' ? 'en-US' : 'id-ID', {
@@ -38,7 +46,7 @@ const swatch = (th: (typeof data.themes)[number]) =>
       <Button href={`/themes/new${data.scope === 'global' ? '?scope=global' : ''}`} size="sm"><Icon name="plus" size={16} />{t('themes.new.title')}</Button>
     </div>
   </div>
-  {#if data.saved === 'created'}<p class="notice">{t('themes.notice_created')}</p>{:else if data.saved === 'deleted'}<p class="notice">{t('themes.notice_deleted')}</p>{:else if data.saved === 'default'}<p class="notice">{t('themes.notice_default')}</p>{/if}
+  {#if hydrated}{:else if data.saved === 'created'}<p class="notice">{t('themes.notice_created')}</p>{:else if data.saved === 'deleted'}<p class="notice">{t('themes.notice_deleted')}</p>{:else if data.saved === 'default'}<p class="notice">{t('themes.notice_default')}</p>{/if}
   {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 
   {#if data.themes.length}
@@ -72,7 +80,7 @@ const swatch = (th: (typeof data.themes)[number]) =>
             <span class="text-xs text-muted-foreground">{t('themes.updated', { date: fmt(th.updatedAt) })}</span>
             <div class="flex gap-1">
               {#if th.enabled && data.defaultTheme !== th.code}
-                <form method="POST" action="?/setDefault"><Csrf token={data.csrf} /><input type="hidden" name="theme" value={th.code} /><input type="hidden" name="scope" value={data.scope} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('themes.set_default')}</Button></form>
+                <form method="POST" action="?/setDefault" use:enhance={save({ success: t('themes.notice_default') })}><Csrf token={data.csrf} /><input type="hidden" name="theme" value={th.code} /><input type="hidden" name="scope" value={data.scope} /><Button type="submit" size="sm" variant="ghost"><Icon name="check" size={14} />{t('themes.set_default')}</Button></form>
               {/if}
               <Button href={`/themes/${th.id}`} size="sm" variant="outline"><Icon name="edit" size={14} />{t('common.edit')}</Button>
             </div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { type FieldDef, FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import Presence from '$lib/components/Presence.svelte';
 import {
@@ -22,6 +22,12 @@ import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+/** Forms post over fetch and report as a toast (docs/FORMS.md); notices are the no-JS path. */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const can = (p: string) => data.viewer.isSuperadmin || hasPermission(data.permissions, p);
 const u = $derived(data.user);
@@ -123,10 +129,10 @@ const passwordFields: FieldDef[] = $derived([
     <!-- D-5: "is this account enabled" and "is this person here" are different questions. -->
     <Presence online={u.online} text={presenceText(u, dateLocale, t)} label />
   </div>
-  {#if data.created}<p class="notice">{t('users.detail.created')}</p>{/if}
+  {#if data.created && !hydrated}<p class="notice">{t('users.detail.created')}</p>{/if}
   {#if can('user.impersonate') && !data.impersonator && !u.isSuperadmin && u.id !== data.viewer.id && u.statusId === 1}
     <!-- Impersonation (D-6): one click, then the banner on every page and a way back. -->
-    <form method="POST" action="?/impersonate" class="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="impersonate-form">
+    <form method="POST" action="?/impersonate" class="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm" data-testid="impersonate-form" use:enhance={save({ success: false, failureTitle: t('users.detail.impersonate', { name: u.name }) })}>
       <Csrf token={data.csrf} />
       <Icon name="eye" size={16} />
       <span>{t('users.detail.impersonate_hint')}</span>
@@ -154,8 +160,8 @@ const passwordFields: FieldDef[] = $derived([
   <!-- Tenant access (B-2/B-4): every tenant this user may open that the viewer may see, each revocable in place; one more can be granted below. -->
   <Card title={t('users.detail.tenants.title')} description={t('users.detail.tenants.desc')}>
     <div class="grid gap-4" id="tenants" data-testid="tenant-access">
-      {#if form?.tenantAdded}<p class="notice" role="status">{t('users.detail.tenants.added', { name: u.name, tenant: form.tenantAdded })}</p>{/if}
-      {#if form?.tenantRemoved}<p class="notice" role="status">{t('users.detail.tenants.removed', { name: u.name, tenant: form.tenantRemoved })}</p>{/if}
+      {#if form?.tenantAdded && !hydrated}<p class="notice" role="status">{t('users.detail.tenants.added', { name: u.name, tenant: form.tenantAdded })}</p>{/if}
+      {#if form?.tenantRemoved && !hydrated}<p class="notice" role="status">{t('users.detail.tenants.removed', { name: u.name, tenant: form.tenantRemoved })}</p>{/if}
       {#if scope === 'tenants' && form?.error}<p class="error" role="alert">{form.error}</p>{/if}
       <ul class="divide-y rounded-md border">
         {#each data.tenants.memberships as m (m.id)}
@@ -180,6 +186,7 @@ const passwordFields: FieldDef[] = $derived([
                 title={t('users.detail.tenants.remove')}
                 confirmLabel={t('users.detail.tenants.remove_confirm_submit')}
                 description={t('users.detail.tenants.remove_confirm_lead', { name: u.name, tenant: m.name })}
+                enhance={save({ success: t('users.detail.tenants.removed', { name: u.name, tenant: m.name }), failureTitle: t('users.detail.tenants.remove') })}
               >
                 {#snippet fields()}<input type="hidden" name="clientId" value={m.id} /><input type="hidden" name="tenantName" value={m.name} />{/snippet}
               </ConfirmDelete>
@@ -191,7 +198,7 @@ const passwordFields: FieldDef[] = $derived([
         <p class="text-sm text-muted-foreground">{t('users.detail.tenants.hidden', { n: data.tenants.hidden })}</p>
       {/if}
       {#if data.tenants.candidates.length > 0}
-        <form method="POST" action="?/addTenant" class="grid gap-3 sm:max-w-md" data-testid="add-tenant-form" use:enhance>
+        <form method="POST" action="?/addTenant" class="grid gap-3 sm:max-w-md" data-testid="add-tenant-form" use:enhance={save({ success: (r) => (r.type === 'success' && r.data?.tenantAdded ? t('users.detail.tenants.added', { name: u.name, tenant: String(r.data.tenantAdded) }) : null), failureTitle: t('users.detail.tenants.add_submit') })}>
           <Csrf token={data.csrf} />
           <Field label={t('users.detail.tenants.add_label')} for="add-tenant" hint={t('users.detail.tenants.add_hint')}>
             <Select id="add-tenant" name="clientId" required>
@@ -224,13 +231,13 @@ const passwordFields: FieldDef[] = $derived([
           error={scope === 'password' && Object.keys(fieldErrors).length === 0 ? (form?.error ?? null) : null}
         />
         <!-- Or let the person set it themselves: one click mails the link the forgot-password page would. -->
-        <form method="POST" action="?/resetLink" class="flex flex-col gap-3 rounded-md border p-4 text-sm" data-testid="reset-link-form" use:enhance>
+        <form method="POST" action="?/resetLink" class="flex flex-col gap-3 rounded-md border p-4 text-sm" data-testid="reset-link-form" use:enhance={save({ success: t('users.detail.password.link_sent', { email: u.email }), failureTitle: t('users.detail.password.link_send') })}>
           <Csrf token={data.csrf} />
           <div class="flex items-start gap-2">
             <Icon name="mail" size={16} class="mt-0.5 shrink-0" />
             <p>{t('users.detail.password.link_hint', { email: u.email })}</p>
           </div>
-          {#if form?.linkSent}<p class="notice" role="status">{t('users.detail.password.link_sent', { email: u.email })}</p>{/if}
+          {#if form?.linkSent && !hydrated}<p class="notice" role="status">{t('users.detail.password.link_sent', { email: u.email })}</p>{/if}
           {#if scope === 'resetLink' && form?.error}<p class="error" role="alert">{form.error}</p>{/if}
           {#if data.resetLinkDeliverable}
             <div><Button type="submit" variant="outline">{t('users.detail.password.link_send')}</Button></div>
@@ -251,7 +258,7 @@ const passwordFields: FieldDef[] = $derived([
           <Alert variant="error" title={t('users.detail.delete_confirm')}>
             <p>{t('users.detail.delete_confirm_lead', { name: u.name, email: u.email })}</p>
           </Alert>
-          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4">
+          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4" use:enhance={save({ success: t('users.detail.removed'), failureTitle: t('users.detail.remove_title') })}>
             <Csrf token={data.csrf} />
             <Field label={t('users.detail.delete_confirm_email', { email: u.email })} for="confirm-email" error={form?.code === 'confirm_failed' ? form.error : null} required>
               <Input id="confirm-email" name="email" autocomplete="off" autocapitalize="none" spellcheck={false} required />

@@ -11,6 +11,7 @@ import {
   Icon,
   Input,
   toast,
+  useSaveForm,
 } from '@core/ui';
 import { enhance } from '$app/forms';
 import { useT } from '$lib/i18n';
@@ -28,6 +29,7 @@ import { pageFields, slugField } from '../_form.ts';
  */
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const r = $derived(data.row);
 const editable = $derived(can('pages.page.edit'));
@@ -166,6 +168,6 @@ function permalinkOverFetch(node: HTMLFormElement) {
   </Card>
 
   {#if can('pages.page.manage')}
-    <Card><ConfirmDelete csrf={data.csrf} href={`/m/pages/pages/${r.id}?confirm=delete#confirm-delete`} cancelHref={`/m/pages/pages/${r.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} /></Card>
+    <Card><ConfirmDelete csrf={data.csrf} href={`/m/pages/pages/${r.id}?confirm=delete#confirm-delete`} cancelHref={`/m/pages/pages/${r.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} enhance={save({ success: t('pages.list.deleted') })} /></Card>
   {/if}
 </div>

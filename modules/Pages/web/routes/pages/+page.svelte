@@ -15,6 +15,11 @@ import { hasPermission } from '$lib/permissions';
  */
 let { data } = $props();
 const t = useT();
+// A delete announces itself as a toast before redirecting here; the notice is the no-JS path.
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 /** `yyyy-mm-dd HH:mm` (the core's fixed admin format, without seconds; Eden may hand a Date). */
 const stamp = (v: unknown) => formatDateTime(v as string | Date | null).slice(0, 16);
@@ -78,7 +83,7 @@ function submitSearch(event: SubmitEvent) {
       {#if can('pages.page.create')}<Button href="/m/pages/pages/new" size="sm"><Icon name="plus" size={16} />{t('pages.list.new')}</Button>{/if}
     </div>
   </div>
-  {#if data.saved === 'deleted'}<p class="notice">{t('pages.list.deleted')}</p>{/if}
+  {#if data.saved === 'deleted' && !hydrated}<p class="notice">{t('pages.list.deleted')}</p>{/if}
   <!-- The count is the enhanced layer's receipt: it is what a screen reader hears when a search
        that never reloaded the page comes back with a different set of rows. -->
   <p class="text-sm text-muted-foreground" aria-live="polite" data-testid="pages-count">{t('pages.list.count', { total: data.meta.total })}</p>

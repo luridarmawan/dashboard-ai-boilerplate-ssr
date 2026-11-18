@@ -23,15 +23,14 @@ $effect(() => {
  * re-reads the session for the same reason, which is what the no-JavaScript path relies on.
  */
 let avatarBusy = $state<'upload' | 'remove' | null>(null);
-const avatarSubmit =
-  (which: 'upload' | 'remove'): SubmitFunction =>
-  () => {
-    avatarBusy = which;
-    return async ({ update }) => {
-      await update();
-      avatarBusy = null;
-    };
-  };
+const avatarSubmit = (which: 'upload' | 'remove'): SubmitFunction =>
+  save({
+    success: t('profile.avatar.saved'),
+    failureTitle: which === 'upload' ? t('profile.avatar.upload') : t('profile.avatar.remove'),
+    reset: which === 'upload',
+    onStart: () => (avatarBusy = which),
+    onDone: () => (avatarBusy = null),
+  });
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const profileFields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('profile.name'), required: true, maxlength: 191 },
@@ -170,7 +169,7 @@ const mfaError = $derived(
         </form>
       {/if}
     </div>
-    {#if form?.saved === 'avatar'}<p class="notice mt-3">{t('profile.avatar.saved')}</p>{/if}
+    {#if form?.saved === 'avatar' && !hydrated}<p class="notice mt-3">{t('profile.avatar.saved')}</p>{/if}
     {#if form?.saved === undefined && fieldErrors.avatar}<p class="error mt-3" role="alert">{fieldErrors.avatar}</p>{/if}
     {#if form?.saved === undefined && fieldErrors.file}<p class="error mt-3" role="alert">{fieldErrors.file}</p>{/if}
   </Card>
@@ -201,24 +200,24 @@ const mfaError = $derived(
           <div class="grid gap-2 text-sm">
             <p>{t('profile.mfa.scan')}</p>
             <code class="select-all break-all rounded-md border bg-background px-2 py-1">{data.mfa.secret}</code>
-            <form method="POST" action="?/mfaEnable" class="flex flex-wrap items-end gap-2">
+            <form method="POST" action="?/mfaEnable" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.enabled_notice'), failureTitle: t('profile.mfa.enable') })}>
               <Csrf token={data.csrf} />
               <label class="grid gap-1"><span>{t('profile.mfa.code_label')}</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
               <Button type="submit" size="sm">{t('profile.mfa.enable')}</Button>
             </form>
             {#if mfaError}<p class="error" role="alert">{mfaError}</p>{/if}
-            <form method="POST" action="?/mfaSetup" class="text-xs text-muted-foreground"><Csrf token={data.csrf} />{t('profile.mfa.not_scanned')} <button type="submit" class="underline">{t('profile.mfa.restart')}</button></form>
+            <form method="POST" action="?/mfaSetup" class="text-xs text-muted-foreground" use:enhance={save({ success: false, failureTitle: t('profile.mfa.setup') })}><Csrf token={data.csrf} />{t('profile.mfa.not_scanned')} <button type="submit" class="underline">{t('profile.mfa.restart')}</button></form>
           </div>
         </div>
       {:else if data.mfa.enabled}
         <p class="text-sm"><Badge variant="success">{t('common.active')}</Badge> · {t('profile.mfa.codes_left', { n: data.mfa.recoveryCodesLeft })}</p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
-          <form method="POST" action="?/mfaCodes" class="flex flex-wrap items-end gap-2">
+          <form method="POST" action="?/mfaCodes" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.codes_replaced'), failureTitle: t('profile.mfa.new_codes') })}>
             <Csrf token={data.csrf} />
             <label class="grid gap-1 text-sm"><span>{t('profile.mfa.current_code')}</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
             <Button type="submit" variant="outline" size="sm">{t('profile.mfa.new_codes')}</Button>
           </form>
-          <form method="POST" action="?/mfaDisable" class="flex flex-wrap items-end gap-2">
+          <form method="POST" action="?/mfaDisable" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.disabled_notice'), failureTitle: t('profile.mfa.disable'), reset: true })}>
             <Csrf token={data.csrf} />
             <label class="grid gap-1 text-sm"><span>{t('profile.password.current')}</span><input name="password" type="password" autocomplete="current-password" required class="h-9 w-44 rounded-md border border-input bg-background px-2" /></label>
             <Button type="submit" variant="destructive" size="sm">{t('profile.mfa.disable')}</Button>
@@ -227,9 +226,9 @@ const mfaError = $derived(
         {#if form?.saved === undefined && form?.error && !mfaError}<p class="error mt-2" role="alert">{form.error}</p>{/if}
       {:else}
         <p class="text-sm text-muted-foreground">{t('profile.mfa.off')}</p>
-        <form method="POST" action="?/mfaSetup" class="mt-3"><Csrf token={data.csrf} /><Button type="submit" size="sm" class="cursor-pointer"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
+        <form method="POST" action="?/mfaSetup" class="mt-3" use:enhance={save({ success: false, failureTitle: t('profile.mfa.setup') })}><Csrf token={data.csrf} /><Button type="submit" size="sm" class="cursor-pointer"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
       {/if}
-      {#if form?.saved === 'mfaDisabled'}<p class="notice mt-3">{t('profile.mfa.disabled_notice')}</p>{/if}
+      {#if form?.saved === 'mfaDisabled' && !hydrated}<p class="notice mt-3">{t('profile.mfa.disabled_notice')}</p>{/if}
     </div>
   </Card>
   <Card title={t('profile.password.title')} description={t('profile.password.desc')}>

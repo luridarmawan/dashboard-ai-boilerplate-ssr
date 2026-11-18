@@ -1,8 +1,11 @@
 <script lang="ts" generics="Row extends { id: string }">
+import type { SubmitFunction } from '@sveltejs/kit';
 import { onMount, type Snippet } from 'svelte';
+import { enhance } from '$app/forms';
 import { goto } from '$app/navigation';
 import { navigating, page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form/save.ts';
 import Icon from '$lib/components/Icon.svelte';
 import { Button, Dialog, Skeleton } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -24,7 +27,8 @@ import {
  * form, so the table works with JavaScript off. The ENHANCED layer answers the same controls over
  * fetch — the GET forms submit through `goto()` (search as you type, filters on change), the
  * links are client-side navigations already — so the rows update in place and the search box
- * keeps what was typed and the focus. The URL that results is byte-identical either way.
+ * keeps what was typed and the focus. The URL that results is byte-identical either way. The POST
+ * forms (row and bulk actions) post over fetch too, with the outcome as a toast (docs/FORMS.md).
  */
 interface Props {
   rows: Row[];
@@ -54,6 +58,7 @@ interface Props {
   labels?: Partial<typeof defaultLabels>;
 }
 const t = useT();
+const save = useSaveForm();
 const defaultLabels = {
   search: t('common.search'),
   columns: t('table.columns'),
@@ -234,6 +239,21 @@ const askFirst = (e: MouseEvent, b: BulkAction) => {
   pending = { action: b, ids };
   confirmOpen = true;
 };
+/**
+ * The bulk form is shared by every bulk button, so its toast follows the button that submitted
+ * it. After a success the ticks are cleared (the rows they named may be gone) and the buttons
+ * blocked again.
+ */
+const bulkSave: SubmitFunction = (input) => {
+  const b = bulkActions.find((x) => new URL(x.action, input.action).search === input.action.search);
+  return save({ success: b?.success, reset: true, onDone: syncSelected })(input);
+};
+/** Untick every row (after a confirmed bulk action went through). */
+const clearTicks = () => {
+  for (const box of root?.querySelectorAll<HTMLInputElement>('input[name="ids"]:checked') ?? [])
+    box.checked = false;
+  syncSelected();
+};
 const confirmPost = (b: BulkAction) =>
   `${b.action}${b.action.includes('?') ? '&' : '?'}confirm=${b.confirm?.token ?? ''}`;
 </script>
@@ -279,7 +299,7 @@ const confirmPost = (b: BulkAction) =>
       <a href={withParams(tableState, {})} class="text-sm">{L.retry}</a>
     </div>
   {:else}
-    {#if hasBulk}<form id={formId} method="POST"><Csrf token={csrf} /></form>{/if}
+    {#if hasBulk}<form id={formId} method="POST" use:enhance={bulkSave}><Csrf token={csrf} /></form>{/if}
     <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
     <div class={cn('relative w-full overflow-x-auto rounded-lg border bg-card transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
       <table class="w-full text-sm">
@@ -334,7 +354,7 @@ const confirmPost = (b: BulkAction) =>
                         {#if a.href}
                           <a href={a.href(row)} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
                         {:else if a.action && csrf}
-                          <form method="POST" action={a.action(row)} class="ms-2 inline">
+                          <form method="POST" action={a.action(row)} class="ms-2 inline" use:enhance={save({ success: a.success })}>
                             <Csrf token={csrf} />
                             <!-- A row action is row-scoped, so the id rides along: the server action reads `id` instead of the URL. -->
                             <input type="hidden" name="id" value={row.id} />
@@ -384,7 +404,7 @@ const confirmPost = (b: BulkAction) =>
   {@const b = pending.action}
   {@const c = pending.action.confirm}
   <Dialog bind:open={confirmOpen} title={c.title} description={c.lead(pending.ids.length)}>
-    <form method="POST" action={confirmPost(b)} class="flex flex-wrap gap-2" data-testid="dt-bulk-confirm">
+    <form method="POST" action={confirmPost(b)} class="flex flex-wrap gap-2" data-testid="dt-bulk-confirm" use:enhance={save({ success: b.success, onDone: (r) => { confirmOpen = false; if (r.type === 'success' || r.type === 'redirect') clearTicks(); } })}>
       <Csrf token={csrf} />
       {#each pending.ids as id (id)}<input type="hidden" name="ids" value={id} />{/each}
       <Button type="submit" variant={b.destructive ? 'destructive' : 'default'}>{#if b.icon}<Icon name={b.icon} size={16} />{/if}{c.submitLabel}</Button>

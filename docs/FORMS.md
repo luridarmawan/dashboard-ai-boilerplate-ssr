@@ -51,7 +51,9 @@ const save = useSaveForm(); // saat inisialisasi komponen
 <ConfirmDelete … enhance={save({ success: t('webhooks.deleted') })} />
 ```
 
-Opsi: `success` (teks, fungsi yang dibaca setelah hasil action diterapkan, atau `false`), `failureTitle`, `reset`, `onStart`, `onDone`. Pesan `notice` di halaman cukup tampil untuk jalur tanpa JavaScript (`{#if form?.saved && !hydrated}`). Contoh hidup: `groups/[id]`, cabut token di `profile`, hapus webhook dan tenant.
+Opsi: `success` (teks, fungsi yang dibaca setelah hasil action diterapkan, atau `false`), `failureTitle`, `reset`, `onStart`, `onDone`. Pesan `notice` di halaman cukup tampil untuk jalur tanpa JavaScript (`{#if form?.saved && !hydrated}`). Contoh hidup: `groups/[id]`, `users/[id]`, cabut token di `profile`, hapus webhook dan tenant.
+
+`DataTable` sudah memasang `useSaveForm` pada aksi baris dan aksi massal. Halaman cukup memberi kalimat popup lewat `success` di `RowAction`/`BulkAction` (bawaan "Tersimpan."). Untuk aksi yang mengarahkan ulang dengan jumlah di URL, `success` boleh berupa fungsi yang membaca `result.location`; contohnya nonaktifkan pengguna di `users/+page.svelte`.
 
 Pola manual di bawah hanya untuk kebutuhan yang tidak tertampung `useSaveForm`.
 
@@ -189,15 +191,12 @@ Tunggu `form[data-enhanced="true"]` sebelum mengisi form, supaya yang diuji adal
 
 ## Status
 
-Per 2026-11-17, yang sudah mengikuti kesepakatan ini (popup berhasil dan gagal): halaman Pengaturan, semua halaman yang memakai `FormBuilder` (user, grup baru, tenant, profil, webhook, produk Example, Pages, penyedia dan server MCP AI), detail grup, cabut token API, serta hapus tenant dan webhook.
+Per 2026-11-18, semua form simpan di core dan modul bawaan (AI, Pages, Example) sudah mengikuti kesepakatan ini, termasuk aksi baris dan aksi massal `DataTable`.
 
-Baru sebagian:
+Pengecualian yang disengaja:
 
-- Webhook (`webhooks/[id]`) dan outbox: popup gagal, popup berhasil hanya pada sebagian aksi.
-- Permalink Pages (`modules/Pages/web/routes/pages/[id]`) dan gambar unggulan (`FeaturedImage`): sudah memakai popup, belum seluruh hasilnya.
-
-Belum sesuai (dirapikan bertahap, tidak wajib sekaligus):
-
-- Form core yang ditulis tangan tanpa `use:enhance`: sebagian profil, detail user (selain field FormBuilder-nya), tema, modul, antrean, notifikasi.
+- **Pilihan tools server MCP AI** (`mcps/[id]`): setiap centang tersimpan sendiri saat diubah, dengan baris status di atas tabel. Popup per centang terlalu ramai.
+- **Form publik Example** (kontak di katalog, tambah ke keranjang): hasilnya halaman atau pesan terima kasih yang memang menjadi tujuan form itu.
+- **Hasil yang perlu dibaca atau disalin** tetap tampil di halaman di samping popup: kode pemulihan 2FA, token API baru, tautan undangan pengguna.
 
 Saat menyentuh salah satu form di atas, rapikan sekalian mengikuti dokumen ini. Aplikasi turunan boleh menambah daftar status form modulnya sendiri di dokumen modulnya.

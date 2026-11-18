@@ -1,3 +1,5 @@
+import type { SaveOptions } from '../form/save.ts';
+
 /**
  * DataTable declarations (PRD L-16). The table is presentation only: the page's `load` fetched
  * the rows for the current URL (page, limit, q, sort, order, cols); the table renders them and
@@ -37,6 +39,11 @@ export interface RowAction<Row> {
   destructive?: boolean;
   /** Hide the action for rows where this returns false. */
   when?: (row: Row) => boolean;
+  /**
+   * Title of the success toast once the action posted over fetch (docs/FORMS.md); see
+   * `SaveOptions.success`. Default "Saved.". Ignored for `href` actions.
+   */
+  success?: SaveOptions['success'];
 }
 
 export interface BulkAction {
@@ -60,6 +67,11 @@ export interface BulkAction {
     lead: (count: number) => string;
     submitLabel: string;
   };
+  /**
+   * Title of the success toast once the action posted over fetch (docs/FORMS.md); a function reads
+   * the action result, e.g. a count. Default "Saved.".
+   */
+  success?: SaveOptions['success'];
 }
 
 export interface TableState {
