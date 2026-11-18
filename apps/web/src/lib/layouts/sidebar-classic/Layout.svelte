@@ -87,14 +87,26 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
     :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary > svg:last-child) {
       display: none;
     }
-    /* One centred glyph per row, and no padding to squeeze it out of a 3.5rem rail. */
+    /*
+     * One centred glyph per row, edge to edge: an inset, rounded highlight in a 3.5rem rail reads as
+     * a second border inside the rail, so rows run the full width with square corners.
+     */
     :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav a),
     :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary) {
       justify-content: center;
       padding-inline: 0;
+      border-radius: 0;
     }
+    /*
+     * No side padding, and no visible scrollbar: a classic (non-overlay) scrollbar eats ~15px of the
+     * rail, pushes the glyphs off centre and draws its track as a stripe. The rail still scrolls.
+     */
     :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav) {
-      padding-inline: 0.375rem;
+      padding-inline: 0;
+      scrollbar-width: none;
+    }
+    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav::-webkit-scrollbar) {
+      display: none;
     }
     /*
      * A 3.5rem rail has room for exactly one control, and it must be the way back out: the brand
