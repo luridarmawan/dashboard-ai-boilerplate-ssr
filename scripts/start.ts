@@ -114,6 +114,11 @@ const procs = [
       XFF_DEPTH: process.env.XFF_DEPTH ?? '1',
       PROTOCOL_HEADER: process.env.PROTOCOL_HEADER ?? 'x-forwarded-proto',
       HOST_HEADER: process.env.HOST_HEADER ?? 'x-forwarded-host',
+      // adapter-node refuses request bodies over 512K by default, which breaks every form that
+      // carries a file (settings images, member photos, documents) with a bare 413. Match the
+      // reverse proxy limit in deploy/nginx.conf.example; the per-file limit stays with the
+      // api (`files.max_size_mb`).
+      BODY_SIZE_LIMIT: process.env.BODY_SIZE_LIMIT ?? '50M',
       ...(webPublicOrigin ? { ORIGIN: webPublicOrigin } : {}),
     },
   },

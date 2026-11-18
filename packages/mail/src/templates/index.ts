@@ -63,6 +63,16 @@ export interface NoticeData {
   readonly cta?: string;
   /** Small print at the end. */
   readonly note?: string;
+  /**
+   * The same message in a second language, laid out below the first after a divider (a
+   * bilingual mail). It shares the subject and the link; the subject should name both languages.
+   */
+  readonly translation?: NoticeTranslation;
+}
+
+/** The body of a notice in another language: its own words, the parent's link. */
+export interface NoticeTranslation extends Omit<NoticeData, 'subject' | 'link' | 'translation'> {
+  readonly locale: string;
 }
 
 type Dict = Record<string, string>;
@@ -184,8 +194,8 @@ function shell(
 }
 const button = (href: string, label: string, color: string) =>
   `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${label}</a></p>`;
-const fallback = (locale: string, href: string) =>
-  `<p style="color:#71717a;font-size:12px">${tr(locale, 'link.fallback')}<br><a href="${escapeHtml(href)}" style="color:#71717a">${escapeHtml(href)}</a></p>`;
+const fallback = (locale: string, href: string, also: string | null = null) =>
+  `<p style="color:#71717a;font-size:12px">${tr(locale, 'link.fallback')}${also && also !== locale ? `<br>${tr(also, 'link.fallback')}` : ''}<br><a href="${escapeHtml(href)}" style="color:#71717a">${escapeHtml(href)}</a></p>`;
 
 export function renderTemplate(
   id: TemplateId,
@@ -293,6 +303,39 @@ function renderNotice(
 ): Rendered {
   const subject = `${str(d.subject)} — ${brand.appName}`;
   const title = str(d.title) || str(d.subject);
+  const link = str(d.link);
+  const alt = d.translation && typeof d.translation === 'object' ? d.translation : null;
+  const first = noticeBody(locale, d, link, brand, cta);
+  const html = [...first.html];
+  const text = [...first.text];
+  if (alt) {
+    const altLocale = str(alt.locale) || 'en';
+    const second = noticeBody(altLocale, alt, link, brand, cta);
+    const altTitle = str(alt.title);
+    html.push(
+      `<hr style="margin:32px 0;border:0;border-top:1px solid #e4e4e7">`,
+      altTitle
+        ? `<h2 lang="${escapeHtml(altLocale)}" style="margin:0 0 16px;font-size:18px">${escapeHtml(altTitle)}</h2>`
+        : '',
+      ...second.html,
+    );
+    text.push('— — —', ...(altTitle ? [altTitle] : []), ...second.text);
+  }
+  // The raw-link fallback once, at the very end, in every language the mail speaks.
+  if (link) {
+    html.push(fallback(locale, link, alt ? str(alt.locale) || 'en' : null));
+  }
+  return { subject, html: shellHtml(locale, title, html.join('')), text: text.join('\n\n') };
+}
+
+/** Greeting, paragraphs, table, sections, button and small print of one language. */
+function noticeBody(
+  locale: string,
+  d: Omit<NoticeData, 'subject' | 'link'>,
+  link: string,
+  brand: Brand,
+  cta: string,
+): { html: string[]; text: string[] } {
   const html: string[] = [];
   const text: string[] = [];
   if (d.name !== undefined) {
@@ -333,14 +376,13 @@ function renderNotice(
     );
     text.push(str(sec.title) ? `${str(sec.title)}\n${str(sec.body)}` : str(sec.body));
   }
-  const link = str(d.link);
   if (link) {
-    html.push(button(cta, escapeHtml(str(d.cta) || link), brand.primary), fallback(locale, link));
+    html.push(button(cta, escapeHtml(str(d.cta) || link), brand.primary));
     text.push(str(d.cta) ? `${str(d.cta)}: ${link}` : link);
   }
   if (str(d.note).trim()) {
     html.push(`<p style="color:#71717a;font-size:12px">${multiline(str(d.note))}</p>`);
     text.push(str(d.note));
   }
-  return { subject, html: shellHtml(locale, title, html.join('')), text: text.join('\n\n') };
+  return { html, text };
 }

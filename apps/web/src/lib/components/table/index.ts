@@ -2,6 +2,7 @@ export {
   type BulkAction,
   type ColumnDef,
   iconActionClass,
+  iconActionSmClass,
   type RowAction,
   type TableState,
   tableStateFrom,

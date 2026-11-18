@@ -729,6 +729,8 @@ a.n. Panitia' }],
 });
 ```
 
+**Email dua bahasa:** isi `translation: { locale: 'en', title, name, intro, rows, sections, cta, note }` pada `data`. Badan email bahasa kedua tampil di bawah garis pemisah, memakai tautan yang sama, dan teks "tautan tidak bisa diklik" di akhir email muncul dalam kedua bahasa. Subject hanya satu, jadi tulis subject yang memuat kedua bahasa.
+
 Email yang isinya bergantung pada langkah berikutnya (mis. berkas yang diunggah sesaat setelah form disimpan) sebaiknya disusun oleh task antrean (lihat bagian berikut), bukan di request, supaya task membaca keadaan terakhir saat berjalan. Bukti: `packages/mail/test/templates.test.ts`.
 
 ### Antrean pekerjaan dari modul (P2: retry, prioritas, dead-letter)
@@ -766,12 +768,13 @@ const r = await storeUpload({
   kind: 'billing.attachment',             // `<ns>.<tujuan>` — untuk filter & aturan per jenis
   visibility: 'private',                  // `public` = bisa diambil siapa pun yang tahu tenantnya
   allowedTypes: ['application/pdf'],      // opsional: mempersempit allowlist tenant untuk panggilan ini
+  folder: 'billing/attachment',           // opsional: sub-folder per tujuan di dalam tenant
 });
 if (!r.ok) return fail('validation_failed', r.message, requestId, { reason: r.code }); // too_large | type_not_allowed | content_mismatch | empty
 const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL CDN bila S3_PUBLIC_URL diisi
 ```
 
-Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
+Kunci objek selalu `<clientId>/[<folder>/]<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. `folder` dibersihkan oleh `storageFolder()`: hanya huruf kecil, angka, dan `-` per segmen, tanpa `..`, sehingga kunci selalu tetap di dalam folder tenant. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
 
 ### Ekspor daftar ke Excel/CSV dari modul
 

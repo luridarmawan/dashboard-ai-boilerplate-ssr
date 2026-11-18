@@ -28,6 +28,23 @@ export interface StoreUploadInput {
   readonly allowedTypes?: readonly string[];
   /** Override the tenant's size cap (bytes). */
   readonly maxBytes?: number;
+  /**
+   * Sub-folder under the tenant that groups one purpose's files, e.g. `event` or `member/photo`:
+   * the key becomes `<client>/<folder>/<yyyy>/<mm>/<id>.<ext>`. See `storageFolder()`.
+   */
+  readonly folder?: string;
+}
+
+/**
+ * A safe storage sub-folder: lower-case segments of letters, digits and dashes, joined by `/`.
+ * Anything else is dropped (no `..`, no leading slash), so the key always stays under the tenant.
+ */
+export function storageFolder(folder: string | undefined): string {
+  return (folder ?? '')
+    .split('/')
+    .map((s) => s.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+    .filter(Boolean)
+    .join('/');
 }
 
 export type StoreUploadResult =
@@ -105,7 +122,15 @@ export async function storeUpload(input: StoreUploadInput): Promise<StoreUploadR
 
   const id = newId();
   const now = new Date();
-  const key = `${input.clientId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${id}.${extensionFor(mime)}`;
+  const key = [
+    input.clientId,
+    storageFolder(input.folder),
+    String(now.getUTCFullYear()),
+    String(now.getUTCMonth() + 1).padStart(2, '0'),
+    `${id}.${extensionFor(mime)}`,
+  ]
+    .filter(Boolean)
+    .join('/');
   const store = storage();
   await store.put(key, bytes, mime);
   const sha256 = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
