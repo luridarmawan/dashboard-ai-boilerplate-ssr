@@ -53,8 +53,10 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
 <style>
   /*
    * The collapsed rail (F-8). The markup inside it — brand and nav — comes from the SHELL's
-   * snippets, not from this file, so the rules are `:global` and scoped to `#sidebar-rail`, which
-   * only this layout renders (the same trade `topnav-compact` makes for its menu). Below md the
+   * snippets, not from this file, so the rules are `:global` from `#sidebar-rail` down — but anchored
+   * on this layout's own (hashed) `.shell`. Other layouts (a module's TwoColumn) render an
+   * `#sidebar-rail` too and their CSS is loaded on every page, so an unanchored global rule leaks
+   * into whichever layout is active — the rail picked up a module's padding that way. Below md the
    * rail is not rendered at all, so every rule sits behind the same breakpoint the grid uses.
    *
    * Labels are hidden the accessible way (clipped, not `display:none`), so an icon-only link keeps
@@ -71,7 +73,7 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
     :global(html[data-sidebar="collapsed"]) .shell:not(:has(#sidebar-rail details[open])) {
       grid-template-columns: 3.5rem 1fr;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav span) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav span) {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -83,16 +85,16 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
       border: 0;
     }
     /* Only the top level survives in a rail: sub-menus and the group chevron need the width. */
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav ul ul),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary > svg:last-child) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav ul ul),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav summary > svg:last-child) {
       display: none;
     }
     /*
      * One centred glyph per row, edge to edge: an inset, rounded highlight in a 3.5rem rail reads as
      * a second border inside the rail, so rows run the full width with square corners.
      */
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav a),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav a),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav summary) {
       justify-content: center;
       padding-inline: 0;
       border-radius: 0;
@@ -101,11 +103,11 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
      * No side padding, and no visible scrollbar: a classic (non-overlay) scrollbar eats ~15px of the
      * rail, pushes the glyphs off centre and draws its track as a stripe. The rail still scrolls.
      */
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav) {
       padding-inline: 0;
       scrollbar-width: none;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav::-webkit-scrollbar) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav::-webkit-scrollbar) {
       display: none;
     }
     /*
@@ -113,10 +115,10 @@ let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions
      * steps aside (it is still in the nav as Dashboard, and in the mobile header) so the toggle
      * sits centred where the logo was.
      */
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) [data-rail-brand]) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) [data-rail-brand]) {
       display: none;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) [data-rail-head]) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) [data-rail-head]) {
       justify-content: center;
       padding-inline: 0.375rem;
     }
