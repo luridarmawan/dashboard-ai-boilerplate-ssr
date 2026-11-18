@@ -83,12 +83,14 @@ let {
    * than removed (so an icon-only link keeps its accessible name), sub-menus and the group chevron
    * dropped, and every rule off while a group is open, because a rail has nowhere to put children
    * — opening one is the request for the full width back. Logical properties only (K-9).
+   * Every rule is anchored on this layout's own (hashed) `.shell`: this file's CSS is loaded on
+   * every page, and an unanchored `#sidebar-rail` rule would restyle `sidebar-classic`'s rail too.
    */
   @media (min-width: 48rem) {
     :global(html[data-sidebar="collapsed"]) .shell:not(:has(#sidebar-rail details[open])) {
       grid-template-columns: 3.5rem 1fr;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav span) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav span) {
       position: absolute;
       width: 1px;
       height: 1px;
@@ -99,18 +101,18 @@ let {
       white-space: nowrap;
       border: 0;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav ul ul),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary > svg:last-child),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) [data-rail-brand]) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav ul ul),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav summary > svg:last-child),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) [data-rail-brand]) {
       display: none;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav a),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) nav summary),
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open])) [data-rail-head]) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav a),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) nav summary),
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open])) [data-rail-head]) {
       justify-content: center;
       padding-inline: 0;
     }
-    :global(html[data-sidebar="collapsed"] #sidebar-rail:not(:has(details[open]))) {
+    :global(html[data-sidebar="collapsed"]) .shell :global(#sidebar-rail:not(:has(details[open]))) {
       padding-inline: 0.375rem;
     }
   }
