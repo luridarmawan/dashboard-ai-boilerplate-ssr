@@ -1,5 +1,5 @@
 <script lang="ts">
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder, useSaveForm } from '$lib/components/form';
 import Img from '$lib/components/Img.svelte';
 import { Card, ConfirmDelete } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -8,6 +8,7 @@ import { productFields } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const p = $derived(data.product);
 const fieldErrors = $derived(
@@ -62,6 +63,7 @@ const fieldErrors = $derived(
         confirming={data.confirmDelete || form?.code === 'confirm_failed'}
         error={form?.code === 'confirm_failed' ? form.error : null}
         description={t('example.admin.delete_confirm_lead', { name: p.name, slug: p.slug })}
+        enhance={save({ success: t('example.admin.deleted') })}
       />
     </Card>
   {/if}

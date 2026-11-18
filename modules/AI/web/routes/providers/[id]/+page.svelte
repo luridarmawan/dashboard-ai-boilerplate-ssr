@@ -1,6 +1,6 @@
 <script lang="ts">
 import Csrf from '$lib/components/Csrf.svelte';
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -10,6 +10,7 @@ import { modelLines, providerFields } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const p = $derived(data.provider);
@@ -252,7 +253,7 @@ async function runTest(e: SubmitEvent) {
   </Card>
   {#if can('ai.provider.manage')}
     <Card>
-      <ConfirmDelete csrf={data.csrf} href={`/m/ai/providers/${p.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/providers/${p.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.providers.delete_confirm_lead', { name: p.name })} />
+      <ConfirmDelete csrf={data.csrf} href={`/m/ai/providers/${p.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/providers/${p.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.providers.delete_confirm_lead', { name: p.name })} enhance={save({ success: t('ai.providers.deleted') })} />
     </Card>
   {/if}
 </div>

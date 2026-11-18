@@ -57,6 +57,7 @@
   "example.admin.state": "State",
   "example.admin.mark_read": "Mark read",
   "example.admin.mark_spam": "Mark spam",
+  "example.admin.inquiry_updated": "Message status updated.",
   "example.widget.title": "Storefront",
   "example.widget.products": "products",
   "example.widget.inquiries": "new inquiries",

@@ -16,6 +16,10 @@ const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissi
 const w = $derived(data.webhook);
 /** Deleting posts over fetch too: a toast, then the list (docs/FORMS.md). */
 const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 
 /**
  * Ping and rotation are one-shot actions whose whole answer fits on this page, so with JavaScript
@@ -147,7 +151,7 @@ const badge = (s: string) =>
     </Card>
   {/if}
   <Card title={t('webhooks.detail.deliveries_title')}>
-    {#if form?.retried}<p class="notice mb-3">{t('webhooks.detail.retried')}</p>{/if}
+    {#if form?.retried && !hydrated}<p class="notice mb-3">{t('webhooks.detail.retried')}</p>{/if}
     <Table caption={t('webhooks.detail.deliveries')}>
       <thead><tr><th>{t('webhooks.detail.time')}</th><th>{t('webhooks.detail.event')}</th><th>{t('webhooks.detail.status')}</th><th class="text-end">{t('webhooks.detail.attempts')}</th><th>{t('webhooks.detail.response')}</th><th>{t('webhooks.detail.next')}</th><th></th></tr></thead>
       <tbody>
@@ -161,7 +165,7 @@ const badge = (s: string) =>
             <td class="whitespace-nowrap text-muted-foreground">{d.status === 'pending' ? fmt(d.nextAttemptAt) : d.status === 'delivered' ? fmt(d.deliveredAt) : '—'}</td>
             <td class="text-end">
               {#if can('webhook.manage') && d.status !== 'delivered'}
-                <form method="POST" action="?/retry"><Csrf token={data.csrf} /><input type="hidden" name="deliveryId" value={d.id} /><Button type="submit" variant="ghost" size="sm"><Icon name="refresh" size={14} />{t('webhooks.detail.retry')}</Button></form>
+                <form method="POST" action="?/retry" use:enhance={save({ success: t('webhooks.detail.retried'), failureTitle: t('webhooks.detail.retry') })}><Csrf token={data.csrf} /><input type="hidden" name="deliveryId" value={d.id} /><Button type="submit" variant="ghost" size="sm"><Icon name="refresh" size={14} />{t('webhooks.detail.retry')}</Button></form>
               {/if}
             </td>
           </tr>

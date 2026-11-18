@@ -1,11 +1,14 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const variant = (s: string) =>
   s === 'new'
@@ -41,7 +44,7 @@ const variant = (s: string) =>
         </div>
         <p class="mt-3 whitespace-pre-line text-sm">{q.message}</p>
         {#if can('example.inquiry.manage')}
-          <form method="POST" action="?/state" class="mt-3 flex flex-wrap gap-2">
+          <form method="POST" action="?/state" class="mt-3 flex flex-wrap gap-2" use:enhance={save({ success: t('example.admin.inquiry_updated') })}>
             <Csrf token={data.csrf} />
             <input type="hidden" name="id" value={q.id} />
             {#if q.state !== 'read'}<Button type="submit" name="state" value="read" size="sm" variant="outline">{t('example.admin.mark_read')}</Button>{/if}

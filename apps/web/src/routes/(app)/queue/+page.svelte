@@ -1,5 +1,7 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -13,6 +15,12 @@ import type { ActionData, PageData } from './$types';
  */
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+/** Forms post over fetch and report as a toast (docs/FORMS.md); notices are the no-JS path. */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const locale = useLocale() === 'en' ? 'en' : 'id';
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const fmt = (iso: string | null) =>
@@ -73,7 +81,7 @@ const short = (v: unknown) => {
     </nav>
   </div>
   {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
-  {#if data.saved === 'retried'}<p class="notice">{t('queue.retried')}</p>{:else if data.saved === 'deleted'}<p class="notice">{t('queue.deleted')}</p>{/if}
+  {#if hydrated}{:else if data.saved === 'retried'}<p class="notice">{t('queue.retried')}</p>{:else if data.saved === 'deleted'}<p class="notice">{t('queue.deleted')}</p>{/if}
 
   <Table caption={t('queue.jobs')}>
     <thead><tr><th>{t('queue.created')}</th><th>{t('queue.task')}</th><th>{t('queue.status')}</th><th class="text-end">{t('queue.priority')}</th><th class="text-end">{t('queue.attempts')}</th><th>{t('queue.payload_result')}</th><th>{t('queue.schedule_finished')}</th><th></th></tr></thead>
@@ -90,10 +98,10 @@ const short = (v: unknown) => {
           <td class="text-end whitespace-nowrap">
             {#if can('queue.manage')}
               {#if j.status === 'dead'}
-                <form method="POST" action="?/retry" class="inline"><Csrf token={data.csrf} /><input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} /><Button type="submit" variant="ghost" size="sm" data-testid="queue-retry"><Icon name="refresh" size={14} />{t('queue.retry')}</Button></form>
+                <form method="POST" action="?/retry" class="inline" use:enhance={save({ success: t('queue.retried'), failureTitle: t('queue.retry') })}><Csrf token={data.csrf} /><input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} /><Button type="submit" variant="ghost" size="sm" data-testid="queue-retry"><Icon name="refresh" size={14} />{t('queue.retry')}</Button></form>
               {/if}
               {#if j.status !== 'running'}
-                <ConfirmDelete compact csrf={data.csrf} href={confirmHref(j.id)} cancelHref={pageHref(data.meta.page)} confirming={data.confirmDeleteId === j.id} variant="ghost" size="sm" class="text-destructive" title={t('queue.delete_confirm')} description={t('queue.delete_confirm_lead', { id: j.id })}>
+                <ConfirmDelete compact csrf={data.csrf} href={confirmHref(j.id)} cancelHref={pageHref(data.meta.page)} confirming={data.confirmDeleteId === j.id} variant="ghost" size="sm" class="text-destructive" title={t('queue.delete_confirm')} description={t('queue.delete_confirm_lead', { id: j.id })} enhance={save({ success: t('queue.deleted') })}>
                   {#snippet fields()}<input type="hidden" name="id" value={j.id} /><input type="hidden" name="status" value={data.status} />{/snippet}
                 </ConfirmDelete>
               {/if}

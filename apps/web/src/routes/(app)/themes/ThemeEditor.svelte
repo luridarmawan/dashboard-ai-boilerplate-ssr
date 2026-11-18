@@ -7,7 +7,9 @@ import {
   SHAPE_TOKENS,
   tokensToInlineStyle,
 } from '@core/ui-theme';
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -51,6 +53,12 @@ let {
 } = $props();
 
 const t = useT();
+/** Forms post over fetch and report as a toast (docs/FORMS.md); notices are the no-JS path. */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const locale = useLocale() === 'en' ? 'en' : 'id';
 // Live state (progressive enhancement): seeded from the server values, updated on input.
 // svelte-ignore state_referenced_locally -- the $effect below re-seeds when the server values change
@@ -137,10 +145,10 @@ const kindLabel: Record<string, string> = {
 };
 </script>
 
-<form method="POST" {action} enctype="multipart/form-data" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start">
+<form method="POST" {action} enctype="multipart/form-data" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start" use:enhance={save({ success: isNew ? t('themes.notice_created') : t('themes.edit.saved') })}>
   <Csrf token={csrf} />
   <div class="grid gap-4">
-    {#if notice}<p class="notice">{notice}</p>{/if}
+    {#if notice && !hydrated}<p class="notice">{notice}</p>{/if}
     {#if error}<p class="error" role="alert">{error}</p>{/if}
 
     <Card title={t('themes.editor.identity')} description={t('themes.editor.identity_desc')}>
