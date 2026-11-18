@@ -80,7 +80,11 @@ export function useSaveForm(): (opts?: SaveOptions) => SubmitFunction {
           const data = (result.type === 'failure' ? result.data : undefined) as
             | FailureData
             | undefined;
-          const fields = data?.details ? Object.keys(data.details).length : 0;
+          // Only details that name a field of this form are field errors; an API failure can carry
+          // other details (a reason, a limit) that are not something the user can fix in a field.
+          const fields = data?.details
+            ? Object.keys(data.details).filter((k) => formElement.elements.namedItem(k)).length
+            : 0;
           toast(
             {
               title: opts.failureTitle || t('common.save_failed'),
