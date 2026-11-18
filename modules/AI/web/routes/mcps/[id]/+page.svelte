@@ -2,7 +2,7 @@
 import { onMount } from 'svelte';
 import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, Checkbox, ConfirmDelete, Select, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -11,6 +11,7 @@ import { headerLines, mcpFields } from '../_form.ts';
 
 let { data, form } = $props();
 const t = useT();
+const save = useSaveForm();
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const manage = $derived(can('ai.mcp.manage'));
@@ -348,7 +349,7 @@ async function runTest(event: SubmitEvent) {
   </Card>
   {#if can('ai.mcp.manage')}
     <Card>
-      <ConfirmDelete class="cursor-pointer" csrf={data.csrf} href={`/m/ai/mcps/${m.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/mcps/${m.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.mcps.delete_confirm_lead', { name: m.name })} />
+      <ConfirmDelete class="cursor-pointer" csrf={data.csrf} href={`/m/ai/mcps/${m.id}?confirm=delete#confirm-delete`} cancelHref={`/m/ai/mcps/${m.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} description={t('ai.mcps.delete_confirm_lead', { name: m.name })} enhance={save({ success: t('ai.mcps.deleted') })} />
     </Card>
   {/if}
 </div>

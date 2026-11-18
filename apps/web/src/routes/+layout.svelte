@@ -53,24 +53,55 @@ $effect(() => {
   if (html.lang !== data.locale) html.lang = data.locale;
   if (html.dir !== data.dir) html.dir = data.dir;
 });
+/** Icon type from the file extension; undefined lets the browser sniff (e.g. `/v1/files/…/content`). */
+function iconType(url: string): string | undefined {
+  const ext = url.split(/[?#]/)[0]?.split('.').pop()?.toLowerCase();
+  return ext === 'svg'
+    ? 'image/svg+xml'
+    : ext === 'png'
+      ? 'image/png'
+      : ext === 'ico'
+        ? 'image/x-icon'
+        : undefined;
+}
+const favicon = $derived(data.theme.faviconUrl || data.app.faviconUrl);
+/** Explicit setting → a raster favicon (iOS ignores SVG/ICO here) → the built-in PNG. */
+const appleTouchIcon = $derived(
+  data.app.appleTouchIconUrl ||
+    (favicon && !/^image\/(svg|x-icon)/.test(iconType(favicon) ?? '')
+      ? favicon
+      : '/apple-touch-icon.png'),
+);
+const themeColor = $derived(data.app.themeColor);
+/** UI locale → Open Graph locale (`language_TERRITORY`). */
+const OG_LOCALES: Record<string, string> = { id: 'id_ID', en: 'en_US' };
+const ogLocale = (l: string) => OG_LOCALES[l] ?? l.replace('-', '_');
+const alternateLocales = $derived(
+  Object.entries(OG_LOCALES)
+    .filter(([l]) => l !== data.locale)
+    .map(([, og]) => og),
+);
 // Client only, and once per document: the observers live for as long as the tab does.
 onMount(() => initLazy());
 </script>
 
 <svelte:head>
   <meta name="color-scheme" content={data.theme.mode === 'dark' ? 'dark' : data.theme.mode === 'light' ? 'light' : 'light dark'} />
-  {#if data.theme.faviconUrl}
-    <!-- A custom theme's own favicon (assets.favicon) wins while that theme is active. -->
-    <link rel="icon" href={data.theme.faviconUrl} />
-  {:else if data.app.faviconUrl}
-    <!-- Tenant favicon from Pengaturan → Aplikasi (`app.favicon_url`, E-1). -->
-    <link rel="icon" href={data.app.faviconUrl} />
+  {#if themeColor}<meta name="theme-color" content={themeColor} />{/if}
+  <!-- Site-wide social tags; each page adds its own og:title/description/image. -->
+  <meta property="og:locale" content={ogLocale(data.locale)} />
+  {#each alternateLocales as l (l)}<meta property="og:locale:alternate" content={l} />{/each}
+  {#if data.app.twitterSite}<meta name="twitter:site" content={data.app.twitterSite} />{/if}
+  {#if favicon}
+    <!-- A custom theme's own favicon (assets.favicon) wins while that theme is active; else the
+         tenant favicon from Pengaturan → Aplikasi (`app.favicon_url`, E-1). -->
+    <link rel="icon" href={favicon} type={iconType(favicon)} />
   {:else}
     <!-- Brand favicon (static/favicon.svg + PNG fallbacks from `bun run favicon:render`). -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   {/if}
+  <link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon} />
 </svelte:head>
 
 {@render children()}

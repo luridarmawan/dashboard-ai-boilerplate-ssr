@@ -7,7 +7,9 @@ import type { DashboardRegions } from '$lib/layouts/types';
 let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions = $props();
 </script>
 
-<div class="flex min-h-dvh flex-col">
+<!-- --dashboard-header-h: height of the sticky header (h-12 row + border), for page bars that
+     stick under it. -->
+<div class="flex min-h-dvh flex-col [--dashboard-header-h:calc(3rem+1px)]">
   <header class="sticky top-0 z-30 border-b bg-card">
     <div class="flex h-12 items-center gap-3 px-4">
       <!-- Under md the top nav collapses into a menu button; it sits BEFORE the brand (start side). -->

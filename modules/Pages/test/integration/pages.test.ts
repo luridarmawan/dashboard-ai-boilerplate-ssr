@@ -368,6 +368,7 @@ describe.skipIf(!enabled)('Pages module', () => {
 
   describe('featured image', () => {
     type Img = {
+      fileId: string;
       url: string;
       width: number | null;
       height: number | null;
@@ -419,7 +420,7 @@ describe.skipIf(!enabled)('Pages module', () => {
       return row;
     };
 
-    test('upload: stored public, sized, served to anonymous visitors only while published', async () => {
+    test('upload: private while draft, public once published, served to anonymous visitors only while published', async () => {
       const page = await create({ title: 'Gambar', slug: s('img'), summary: 'Ringkas' });
       const up = await upload(page.id, makePng(1200, 630), 'image/png', 'hero.png', 'Kantor kami');
       expect(up.status, JSON.stringify(up.body)).toBe(200);
@@ -432,17 +433,28 @@ describe.skipIf(!enabled)('Pages module', () => {
       });
       expect(await fileRow(admin?.url ?? '')).toMatchObject({
         kind: 'pages.featured',
-        visibility: 'public',
+        visibility: 'private',
         deleted: null,
       });
 
-      // Draft: the page does not resolve and its image is not served.
-      const mediaUrl = `/v1/m/pages/media/${/([0-9a-f-]{36})/.exec(admin?.url ?? '')?.[1]}`;
+      // The editor reads it through the module's own route, private or not.
+      expect(admin?.url).toBe(`/v1/m/pages/images/${admin?.fileId}`);
+      const adminImg = await call(admin?.url ?? '', { method: 'GET' });
+      expect(adminImg.status).toBe(200);
+      expect(adminImg.headers.get('content-type')).toBe('image/png');
+      expect(adminImg.headers.get('cache-control')).toContain('private');
+
+      // Draft: the page does not resolve and its image is not served — not even as a share card.
+      const mediaUrl = `/v1/m/pages/media/${admin?.fileId}`;
       expect((await media(mediaUrl)).status).toBe(404);
+      expect((await media(`/v1/opengraph/${admin?.fileId}`)).status).toBe(404);
 
       await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
+      expect((await fileRow(admin?.url ?? ''))?.visibility).toBe('public');
       const pub = await publicImage(s('img'));
+      const fileId = admin?.fileId ?? '';
       expect(pub).toEqual({
+        fileId,
         url: mediaUrl,
         width: 1200,
         height: 630,
@@ -457,6 +469,19 @@ describe.skipIf(!enabled)('Pages module', () => {
       expect(new Uint8Array(await got.arrayBuffer()).slice(0, 4)).toEqual(
         new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
       );
+      // Its share card (core): one 1200 × 630 JPEG, also anonymous.
+      const card = await media(`/v1/opengraph/${fileId}`);
+      expect(card.status).toBe(200);
+      expect(card.headers.get('content-type')).toBe('image/jpeg');
+      expect(new Uint8Array(await card.arrayBuffer()).slice(0, 3)).toEqual(
+        new Uint8Array([0xff, 0xd8, 0xff]),
+      );
+
+      // Back to draft: private again, the card is gone with it.
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'draft' });
+      expect((await fileRow(admin?.url ?? ''))?.visibility).toBe('private');
+      expect((await media(`/v1/opengraph/${fileId}`)).status).toBe(404);
+      await send('PUT', `/v1/m/pages/pages/${page.id}`, { status: 'published' });
 
       // Alt text alone is editable without a new upload; empty clears it.
       await send('PUT', `/v1/m/pages/pages/${page.id}`, { imageAlt: 'Tim kami' });

@@ -6,7 +6,17 @@ import { invalidateAll } from '$app/navigation';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import TimezoneClock from '$lib/components/TimezoneClock.svelte';
-import { Badge, Button, Card, Checkbox, Field, Input, Select, Textarea } from '$lib/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Field,
+  Input,
+  Select,
+  Textarea,
+  toast,
+} from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
 import type { LayoutData } from '../$types';
@@ -304,22 +314,19 @@ $effect(() => {
 
 // Track AJAX save status per section
 let saving = $state<string | null>(null);
-let savedNotice = $state<string | null>(null);
 let clientError = $state<{ section: string; message: string } | null>(null);
 
-let savedTimer: ReturnType<typeof setTimeout> | null = null;
-function triggerSavedNotice(section: string) {
-  savedNotice = section;
-  if (savedTimer) clearTimeout(savedTimer);
-  savedTimer = setTimeout(() => {
-    if (savedNotice === section) savedNotice = null;
-  }, 4000);
+// The save outcome is a pop-up notification (bottom-right), like the event form. A full-page
+// save (no JS, or the redirect landed here) carries `?saved=` — announced once on mount, not on
+// every `invalidateAll()` that hands back the same `data.saved`.
+function toastSaved() {
+  toast({ title: t('common.saved'), variant: 'success' }, 3000);
 }
-
-$effect(() => {
-  if (data.saved) {
-    triggerSavedNotice(data.saved);
-  }
+function toastFailed(message: string) {
+  toast({ title: t('settings.save_failed'), description: message, variant: 'error' }, 8000);
+}
+onMount(() => {
+  if (data.saved) toastSaved();
 });
 </script>
 
@@ -502,7 +509,6 @@ $effect(() => {
     >
       <Card title={L(s.title)} description={L(s.note) || undefined}>
         {#snippet actions()}<Badge variant="outline">{s.module}</Badge>{/snippet}
-        {#if savedNotice === s.section}<p class="notice mb-4" role="status">{t('common.saved')}</p>{/if}
         {#if (failedSection === s.section && form?.error) || (clientError?.section === s.section && clientError.message)}
           <p class="error mb-4" role="alert">{clientError?.section === s.section ? clientError.message : form?.error}</p>
         {/if}
@@ -517,7 +523,7 @@ $effect(() => {
             return async ({ result, update }) => {
               saving = null;
               if (result.type === 'redirect') {
-                triggerSavedNotice(s.section);
+                toastSaved();
                 // A saved upload must not ride along with the next save of this section.
                 for (const input of formElement.querySelectorAll<HTMLInputElement>('input[type="file"]')) input.value = '';
                 for (const box of formElement.querySelectorAll<HTMLInputElement>('input[name$="__clear"]')) box.checked = false;
@@ -528,8 +534,10 @@ $effect(() => {
                   section: s.section,
                   message: failureData?.message || failureData?.error || t('settings.error_load'),
                 };
+                toastFailed(clientError.message);
                 await update();
               } else {
+                if (result.type === 'error') toastFailed(t('common.action_failed'));
                 await update();
               }
             };

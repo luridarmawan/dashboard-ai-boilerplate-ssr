@@ -4,6 +4,7 @@ import { error, redirect } from '@sveltejs/kit';
 import { regionChain, regionOptions } from '$lib/server/regions';
 import { actionFailure, apiFor, checkCsrf, str, unwrap } from '$lib/server/session';
 import { parentCandidates, parentOptions } from '$lib/server/tenants';
+import { shortCodeValue } from '$lib/tenants';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -12,6 +13,7 @@ import type { Actions, PageServerLoad } from './$types';
  * later features and only move through the API.
  */
 const PROFILE_FIELDS = [
+  'shortCode',
   'description',
   'referenceId',
   'joinDate',
@@ -92,6 +94,7 @@ export const actions: Actions = {
     const profile: Record<string, unknown> = Object.fromEntries(
       PROFILE_FIELDS.map((k) => [k, raw[k] ?? null]),
     );
+    profile.shortCode = shortCodeValue(profile.shortCode);
     if (form.has('_regionPicker')) {
       // Picker mode: the names are not on the form — the API fills them — and a level that no
       // longer sits under its parent (the parent changed) is cleared with everything below it.

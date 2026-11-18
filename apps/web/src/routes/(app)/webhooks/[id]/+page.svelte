@@ -2,7 +2,7 @@
 import type { SubmitFunction } from '@sveltejs/kit';
 import { applyAction, enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { FormBuilder } from '$lib/components/form';
+import { FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Badge, Button, Card, ConfirmDelete, Table, toast } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
@@ -14,6 +14,12 @@ const t = useT();
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const w = $derived(data.webhook);
+/** Deleting posts over fetch too: a toast, then the list (docs/FORMS.md). */
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 
 /**
  * Ping and rotation are one-shot actions whose whole answer fits on this page, so with JavaScript
@@ -145,7 +151,7 @@ const badge = (s: string) =>
     </Card>
   {/if}
   <Card title={t('webhooks.detail.deliveries_title')}>
-    {#if form?.retried}<p class="notice mb-3">{t('webhooks.detail.retried')}</p>{/if}
+    {#if form?.retried && !hydrated}<p class="notice mb-3">{t('webhooks.detail.retried')}</p>{/if}
     <Table caption={t('webhooks.detail.deliveries')}>
       <thead><tr><th>{t('webhooks.detail.time')}</th><th>{t('webhooks.detail.event')}</th><th>{t('webhooks.detail.status')}</th><th class="text-end">{t('webhooks.detail.attempts')}</th><th>{t('webhooks.detail.response')}</th><th>{t('webhooks.detail.next')}</th><th></th></tr></thead>
       <tbody>
@@ -159,7 +165,7 @@ const badge = (s: string) =>
             <td class="whitespace-nowrap text-muted-foreground">{d.status === 'pending' ? fmt(d.nextAttemptAt) : d.status === 'delivered' ? fmt(d.deliveredAt) : '—'}</td>
             <td class="text-end">
               {#if can('webhook.manage') && d.status !== 'delivered'}
-                <form method="POST" action="?/retry"><Csrf token={data.csrf} /><input type="hidden" name="deliveryId" value={d.id} /><Button type="submit" variant="ghost" size="sm"><Icon name="refresh" size={14} />{t('webhooks.detail.retry')}</Button></form>
+                <form method="POST" action="?/retry" use:enhance={save({ success: t('webhooks.detail.retried'), failureTitle: t('webhooks.detail.retry') })}><Csrf token={data.csrf} /><input type="hidden" name="deliveryId" value={d.id} /><Button type="submit" variant="ghost" size="sm"><Icon name="refresh" size={14} />{t('webhooks.detail.retry')}</Button></form>
               {/if}
             </td>
           </tr>
@@ -171,7 +177,7 @@ const badge = (s: string) =>
   </Card>
   {#if can('webhook.manage')}
     <Card>
-      <ConfirmDelete csrf={data.csrf} href={`/webhooks/${w.id}?confirm=delete#confirm-delete`} cancelHref={`/webhooks/${w.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('webhooks.detail.delete')} description={t('webhooks.detail.delete_confirm_lead', { name: w.name })} />
+      <ConfirmDelete csrf={data.csrf} href={`/webhooks/${w.id}?confirm=delete#confirm-delete`} cancelHref={`/webhooks/${w.id}`} confirming={data.confirmDelete || form?.code === 'confirm_failed'} error={form?.code === 'confirm_failed' ? form.error : null} label={t('webhooks.detail.delete')} description={t('webhooks.detail.delete_confirm_lead', { name: w.name })} enhance={save({ success: t('webhooks.deleted'), failureTitle: t('webhooks.detail.delete') })} />
     </Card>
   {/if}
 </div>

@@ -16,6 +16,7 @@ import { Elysia, t } from 'elysia';
 import { type AuthState, clientIp } from '../plugins/auth.ts';
 import { requestContext } from '../plugins/request-context.ts';
 import { type TenantState, tenantContext } from '../plugins/tenancy.ts';
+import { requireToolAccess } from '../plugins/tool-access.ts';
 import { callTool, listTools, type ToolCaller, toolResultText } from '../tools.ts';
 
 /**
@@ -202,22 +203,22 @@ export const mcpDomain = new Elysia({ name: 'mcp', prefix: '/mcp', tags: ['mcp']
   .use(requestContext)
   .use(tenantContext)
   .post('/', (ctx) => handle(ctx, ctx.body), {
-    beforeHandle: guard,
+    beforeHandle: [guard, requireToolAccess],
     body: t.Unknown(),
     response: { 200: t.Unknown(), ...errorResponses },
     detail: {
       summary: 'MCP endpoint',
       description:
-        'Streamable HTTP, JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/*`, `prompts/*`. Needs a bearer token or a session.',
+        'Streamable HTTP, JSON-RPC: `initialize`, `tools/list`, `tools/call`, `resources/*`, `prompts/*`. Needs a bearer token or a session of an account with access to the AI/MCP integration.',
     },
   })
   .get('/', (ctx) => handle(ctx), {
-    beforeHandle: guard,
+    beforeHandle: [guard, requireToolAccess],
     response: { 200: t.Unknown(), ...errorResponses },
     detail: { summary: 'MCP server stream', description: 'Always 405: the server runs stateless.' },
   })
   .delete('/', (ctx) => handle(ctx), {
-    beforeHandle: guard,
+    beforeHandle: [guard, requireToolAccess],
     response: { 200: t.Unknown(), ...errorResponses },
     detail: { summary: 'End MCP session', description: 'Always 405: the server runs stateless.' },
   });

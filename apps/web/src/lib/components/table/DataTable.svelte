@@ -1,8 +1,11 @@
 <script lang="ts" generics="Row extends { id: string }">
+import type { SubmitFunction } from '@sveltejs/kit';
 import { onMount, type Snippet } from 'svelte';
+import { enhance } from '$app/forms';
 import { goto } from '$app/navigation';
 import { navigating, page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
+import { useSaveForm } from '$lib/components/form/save.ts';
 import Icon from '$lib/components/Icon.svelte';
 import { Button, Dialog, Skeleton } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
@@ -11,6 +14,7 @@ import {
   type BulkAction,
   type ColumnDef,
   iconActionClass,
+  iconActionSmClass,
   type RowAction,
   type TableState,
   withParams,
@@ -24,7 +28,8 @@ import {
  * form, so the table works with JavaScript off. The ENHANCED layer answers the same controls over
  * fetch — the GET forms submit through `goto()` (search as you type, filters on change), the
  * links are client-side navigations already — so the rows update in place and the search box
- * keeps what was typed and the focus. The URL that results is byte-identical either way.
+ * keeps what was typed and the focus. The URL that results is byte-identical either way. The POST
+ * forms (row and bulk actions) post over fetch too, with the outcome as a toast (docs/FORMS.md).
  */
 interface Props {
   rows: Row[];
@@ -32,6 +37,8 @@ interface Props {
   state: TableState;
   csrf?: string;
   rowActions?: RowAction<Row>[];
+  /** `sm` draws icon-only row actions one step smaller. */
+  actionSize?: 'md' | 'sm';
   bulkActions?: BulkAction[];
   searchPlaceholder?: string;
   emptyTitle?: string;
@@ -54,6 +61,7 @@ interface Props {
   labels?: Partial<typeof defaultLabels>;
 }
 const t = useT();
+const save = useSaveForm();
 const defaultLabels = {
   search: t('common.search'),
   columns: t('table.columns'),
@@ -79,6 +87,7 @@ let {
   state: tableState,
   csrf = '',
   rowActions = [],
+  actionSize = 'md',
   bulkActions = [],
   searchPlaceholder,
   emptyTitle = t('table.empty_title'),
@@ -93,6 +102,8 @@ let {
   labels: labelOverrides = {},
 }: Props = $props();
 
+const iconClass = $derived(actionSize === 'sm' ? iconActionSmClass : iconActionClass);
+const iconSize = $derived(actionSize === 'sm' ? 14 : 16);
 const L = $derived({ ...defaultLabels, ...labelOverrides });
 const visible = $derived(
   tableState.cols.length
@@ -234,14 +245,33 @@ const askFirst = (e: MouseEvent, b: BulkAction) => {
   pending = { action: b, ids };
   confirmOpen = true;
 };
+/**
+ * The bulk form is shared by every bulk button, so its toast follows the button that submitted
+ * it. After a success the ticks are cleared (the rows they named may be gone) and the buttons
+ * blocked again.
+ */
+const bulkSave: SubmitFunction = (input) => {
+  const b = bulkActions.find((x) => new URL(x.action, input.action).search === input.action.search);
+  return save({ success: b?.success, reset: true, onDone: syncSelected })(input);
+};
+/** Untick every row (after a confirmed bulk action went through). */
+const clearTicks = () => {
+  for (const box of root?.querySelectorAll<HTMLInputElement>('input[name="ids"]:checked') ?? [])
+    box.checked = false;
+  syncSelected();
+};
 const confirmPost = (b: BulkAction) =>
   `${b.action}${b.action.includes('?') ? '&' : '?'}confirm=${b.confirm?.token ?? ''}`;
 </script>
 
-<div bind:this={root} class={cn('dt grid gap-3', className)}>
-  <!-- toolbar: search (+ page filters) and column picker, both plain GET forms; JS only swaps the reload for goto() -->
-  <div class="flex flex-wrap items-center gap-2">
-    <form method="GET" class="flex flex-wrap items-center gap-2" role="search" onsubmit={submitSearch} onchange={filterChanged} data-testid="dt-search" data-enhanced={enhanced}>
+<div bind:this={root} class={cn('dt grid grid-cols-[minmax(0,1fr)] gap-3', className)}>
+  <!--
+    toolbar: search (+ page filters) and column picker, both plain GET forms; JS only swaps the reload for goto().
+    One line only: the search form scrolls sideways when its controls outgrow the width (phones). The column
+    picker stays outside that scroller, since an overflow container would clip its popover.
+  -->
+  <div class="flex items-center gap-2">
+    <form method="GET" class="-m-1 flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto p-1 [&>*]:shrink-0" role="search" onsubmit={submitSearch} onchange={filterChanged} data-testid="dt-search" data-enhanced={enhanced}>
       {#if tableState.sort}<input type="hidden" name="sort" value={tableState.sort} />{/if}
       <input type="hidden" name="order" value={tableState.order} />
       {#if tableState.cols.length}<input type="hidden" name="cols" value={tableState.cols.join(',')} />{/if}
@@ -252,9 +282,9 @@ const confirmPost = (b: BulkAction) =>
       {#if filters}{@render filters()}{/if}
       <Button type="submit" variant="outline" size="sm"><Icon name={refreshing ? 'refresh' : 'search'} size={16} class={refreshing ? 'animate-spin' : ''} />{L.search}</Button>
     </form>
-    <details class="relative">
-      <summary class="inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent"><Icon name="columns" size={16} />{L.columns}</summary>
-      <form method="GET" class="absolute z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
+    <details class="relative shrink-0">
+      <summary title={L.columns} aria-label={L.columns} class="inline-flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md border border-input bg-background text-sm hover:bg-accent"><Icon name="columns" size={16} /></summary>
+      <form method="GET" class="absolute end-0 z-40 mt-1 grid w-56 gap-1 rounded-md border bg-popover p-3 text-sm shadow-md" onsubmit={submitForm}>
         {#if tableState.q}<input type="hidden" name="q" value={tableState.q} />{/if}
         <input type="hidden" name="sort" value={tableState.sort} />
         <input type="hidden" name="order" value={tableState.order} />
@@ -266,7 +296,7 @@ const confirmPost = (b: BulkAction) =>
         <Button type="submit" size="sm" class="mt-1">{L.apply}</Button>
       </form>
     </details>
-    {#if toolbar}<div class="ms-auto flex items-center gap-2">{@render toolbar()}</div>{/if}
+    {#if toolbar}<div class="flex shrink-0 items-center gap-2">{@render toolbar()}</div>{/if}
   </div>
 
   {#if error}
@@ -275,7 +305,7 @@ const confirmPost = (b: BulkAction) =>
       <a href={withParams(tableState, {})} class="text-sm">{L.retry}</a>
     </div>
   {:else}
-    {#if hasBulk}<form id={formId} method="POST"><Csrf token={csrf} /></form>{/if}
+    {#if hasBulk}<form id={formId} method="POST" use:enhance={bulkSave}><Csrf token={csrf} /></form>{/if}
     <!-- While a fetch is in flight the rows on screen are the PREVIOUS answer: say so, don't hide them. -->
     <div class={cn('relative w-full overflow-x-auto rounded-lg border bg-card transition-opacity', refreshing && 'opacity-60')} aria-busy={refreshing}>
       <table class="w-full text-sm">
@@ -301,8 +331,8 @@ const confirmPost = (b: BulkAction) =>
           {#if loading}
             {#each { length: 5 } as _, i (i)}
               <tr class="border-b last:border-0">
-                {#if hasBulk}<td class="px-3 py-3"></td>{/if}
-                {#each visible as c (c.key)}<td class="px-3 py-3"><Skeleton class="h-4 w-full" /></td>{/each}
+                {#if hasBulk}<td class="px-3 py-1"></td>{/if}
+                {#each visible as c (c.key)}<td class="px-3 py-1"><Skeleton class="h-4 w-full" /></td>{/each}
                 {#if rowActions.length}<td></td>{/if}
               </tr>
             {/each}
@@ -316,25 +346,25 @@ const confirmPost = (b: BulkAction) =>
             </tr>
           {:else}
             {#each rows as row (row.id)}
-              <tr class="border-b last:border-0 hover:bg-muted/50">
-                {#if hasBulk}<td class="px-3 py-2"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 cursor-pointer accent-primary" aria-label={L.select} onchange={syncSelected} /></td>{/if}
+              <tr class="h-9 border-b last:border-0 hover:bg-muted/50">
+                {#if hasBulk}<td class="px-3"><input type="checkbox" name="ids" value={row.id} form={formId} class="h-4 w-4 cursor-pointer accent-primary" aria-label={L.select} onchange={syncSelected} /></td>{/if}
                 {#each visible as c (c.key)}
-                  <td class={cn('px-3 py-2 align-middle', align(c), c.class)}>
+                  <td class={cn('px-3 align-middle', align(c), c.class)}>
                     {#if cell}{@render cell(row, c)}{:else}{c.value ? (c.value(row) ?? '—') : '—'}{/if}
                   </td>
                 {/each}
                 {#if rowActions.length}
-                  <td class="px-3 py-2 text-end whitespace-nowrap">
+                  <td class="px-3 text-end whitespace-nowrap">
                     {#each rowActions as a (a.label)}
                       {#if !a.when || a.when(row)}
                         {#if a.href}
-                          <a href={a.href(row)} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
+                          <a href={a.href(row)} target={a.external ? '_blank' : undefined} rel={a.external ? 'noopener' : undefined} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? iconSize : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
                         {:else if a.action && csrf}
-                          <form method="POST" action={a.action(row)} class="ms-2 inline">
+                          <form method="POST" action={a.action(row)} class="ms-2 inline" use:enhance={save({ success: a.success })}>
                             <Csrf token={csrf} />
                             <!-- A row action is row-scoped, so the id rides along: the server action reads `id` instead of the URL. -->
                             <input type="hidden" name="id" value={row.id} />
-                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
+                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconClass : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? iconSize : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
                           </form>
                         {/if}
                       {/if}
@@ -380,7 +410,7 @@ const confirmPost = (b: BulkAction) =>
   {@const b = pending.action}
   {@const c = pending.action.confirm}
   <Dialog bind:open={confirmOpen} title={c.title} description={c.lead(pending.ids.length)}>
-    <form method="POST" action={confirmPost(b)} class="flex flex-wrap gap-2" data-testid="dt-bulk-confirm">
+    <form method="POST" action={confirmPost(b)} class="flex flex-wrap gap-2" data-testid="dt-bulk-confirm" use:enhance={save({ success: b.success, onDone: (r) => { confirmOpen = false; if (r.type === 'success' || r.type === 'redirect') clearTicks(); } })}>
       <Csrf token={csrf} />
       {#each pending.ids as id (id)}<input type="hidden" name="ids" value={id} />{/each}
       <Button type="submit" variant={b.destructive ? 'destructive' : 'default'}>{#if b.icon}<Icon name={b.icon} size={16} />{/if}{c.submitLabel}</Button>

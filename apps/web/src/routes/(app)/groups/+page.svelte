@@ -30,6 +30,7 @@ const columns: ColumnDef<Row>[] = [
 <div class="page">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1>{t('nav.groups')}</h1>
+    {#if can('group.create')}<Button href="/groups/new" size="sm"><Icon name="plus" size={16} />{t('groups.add')}</Button>{/if}
   </div>
 
   <DataTable
@@ -42,9 +43,6 @@ const columns: ColumnDef<Row>[] = [
     emptyHint={data.state.q ? t('groups.empty_hint_search') : t('groups.empty_hint_add')}
     rowActions={[{ label: can('group.edit') ? t('groups.manage') : t('common.view'), icon: can('group.edit') ? 'edit' : 'eye', iconOnly: true, href: (r) => `/groups/${r.id}` }]}
   >
-    {#snippet toolbar()}
-      {#if can('group.create')}<Button href="/groups/new" size="sm"><Icon name="plus" size={16} />{t('groups.add')}</Button>{/if}
-    {/snippet}
     {#snippet cell(row, col)}
       {#if col.key === 'name'}
         <a href={`/groups/${row.id}`} class="font-medium text-foreground">{row.name}</a>

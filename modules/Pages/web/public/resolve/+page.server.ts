@@ -1,6 +1,6 @@
 import type { ServerLoad } from '@sveltejs/kit';
 import { error, redirect } from '@sveltejs/kit';
-import { shareImage } from '$lib/server/seo';
+import { ogCard, shareImage } from '$lib/server/seo';
 import { apiFor } from '$lib/server/session';
 import { trappedPath } from '$lib/server/trap';
 
@@ -25,21 +25,15 @@ export const load: ServerLoad = async (event) => {
   const path = `/${hit.page.slug}`;
   if (trapped.pathname !== path) redirect(301, `${origin}${path}${trapped.search}`);
   const image = hit.page.image;
-  const absolute = (url: string) => (/^https?:\/\//.test(url) ? url : `${origin}${url}`);
   return {
     page: hit.page,
     canonical: `${origin}${path}`,
     // What a share shows. Social crawlers need an ABSOLUTE og:image: the page's featured image
     // (the API hands out a path on this origin, or a CDN URL), else the site's default share
     // image (Settings → Application), so a page without one is never shared as a bare text card.
+    // The featured image is shared as its 1200 × 630 card (`/v1/opengraph/<id>`).
     share: image
-      ? {
-          url: absolute(image.url),
-          width: image.width,
-          height: image.height,
-          mime: image.mime,
-          alt: image.alt || hit.page.title,
-        }
+      ? { ...ogCard(origin, image.fileId), alt: image.alt || hit.page.title }
       : { ...(await shareImage(event)), alt: hit.page.title },
   };
 };

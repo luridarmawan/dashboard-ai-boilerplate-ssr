@@ -9,6 +9,11 @@ import type { PageData } from './$types';
 
 let { data }: { data: PageData & LayoutData } = $props();
 const t = useT();
+// A delete over fetch already said it with a toast; the notice is the plain-POST path's.
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const locale = useLocale();
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 /** Row action is an icon, like /users. */
@@ -26,7 +31,7 @@ const fmt = (iso: string | null) =>
     {#if manage}<Button href="/webhooks/new" size="sm"><Icon name="plus" size={16} />{t('webhooks.add')}</Button>{/if}
   </div>
   <p class="text-sm text-muted-foreground">{t('webhooks.lead')}</p>
-  {#if data.saved === 'deleted'}<p class="notice">{t('webhooks.deleted')}</p>{/if}
+  {#if data.saved === 'deleted' && !hydrated}<p class="notice">{t('webhooks.deleted')}</p>{/if}
   <Table caption={t('webhooks.title')}>
     <thead><tr><th>{t('webhooks.name')}</th><th>{t('webhooks.url')}</th><th>{t('webhooks.events')}</th><th>{t('webhooks.last_status')}</th><th></th></tr></thead>
     <tbody>

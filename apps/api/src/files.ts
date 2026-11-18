@@ -1,6 +1,7 @@
 import { and, eq, isNull, newId, schema, unsafeAcrossTenants } from '@core/db';
 import { logger } from '@core/logger';
 import { extensionFor, imageSize, isAllowedType, sniffMime, storage } from '@core/storage';
+import { removeOgCard } from './lib/og-image.ts';
 import { settings } from './services.ts';
 
 /**
@@ -27,6 +28,23 @@ export interface StoreUploadInput {
   readonly allowedTypes?: readonly string[];
   /** Override the tenant's size cap (bytes). */
   readonly maxBytes?: number;
+  /**
+   * Sub-folder under the tenant that groups one purpose's files, e.g. `event` or `member/photo`:
+   * the key becomes `<client>/<folder>/<yyyy>/<mm>/<id>.<ext>`. See `storageFolder()`.
+   */
+  readonly folder?: string;
+}
+
+/**
+ * A safe storage sub-folder: lower-case segments of letters, digits and dashes, joined by `/`.
+ * Anything else is dropped (no `..`, no leading slash), so the key always stays under the tenant.
+ */
+export function storageFolder(folder: string | undefined): string {
+  return (folder ?? '')
+    .split('/')
+    .map((s) => s.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+    .filter(Boolean)
+    .join('/');
 }
 
 export type StoreUploadResult =
@@ -104,7 +122,15 @@ export async function storeUpload(input: StoreUploadInput): Promise<StoreUploadR
 
   const id = newId();
   const now = new Date();
-  const key = `${input.clientId}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${id}.${extensionFor(mime)}`;
+  const key = [
+    input.clientId,
+    storageFolder(input.folder),
+    String(now.getUTCFullYear()),
+    String(now.getUTCMonth() + 1).padStart(2, '0'),
+    `${id}.${extensionFor(mime)}`,
+  ]
+    .filter(Boolean)
+    .join('/');
   const store = storage();
   await store.put(key, bytes, mime);
   const sha256 = new Bun.CryptoHasher('sha256').update(bytes).digest('hex');
@@ -193,6 +219,7 @@ export async function removeFile(row: FileRow): Promise<void> {
     .update(schema.files)
     .set({ deleted_at: new Date() })
     .where(eq(schema.files.id, row.id));
+  await removeOgCard(row.id);
   try {
     await storage().delete(row.key);
   } catch (err) {
@@ -202,6 +229,25 @@ export async function removeFile(row: FileRow): Promise<void> {
       error: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/**
+ * Make a file public or private, e.g. a module's image that should only be public while the
+ * content using it is published. Going private also drops its share card
+ * (`/v1/opengraph/<id>` only serves public files; the cached JPEG would be an orphan). Returns the
+ * updated row; a row that already has that visibility is returned untouched.
+ */
+export async function setFileVisibility(
+  row: FileRow,
+  visibility: 'public' | 'private',
+): Promise<FileRow> {
+  if (row.visibility === visibility) return row;
+  await unsafeAcrossTenants()
+    .update(schema.files)
+    .set({ visibility })
+    .where(eq(schema.files.id, row.id));
+  if (visibility === 'private') await removeOgCard(row.id);
+  return { ...row, visibility };
 }
 
 /** Where a browser fetches this file: the store's public URL when it has one, else the API. */

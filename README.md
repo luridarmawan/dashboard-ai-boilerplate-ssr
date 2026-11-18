@@ -31,6 +31,7 @@ Diagram interaktif: komponen, jalur permintaan, dan pekerjaan latar — tiap nod
 | [`docs/Build-Module-for-Boilerplate.md`](./docs/Build-Module-for-Boilerplate.md) | **Tutorial** langkah demi langkah: modul untuk produk ini, di dalam repo ini |
 | [`docs/Build-Module-for-Your-Apps.md`](./docs/Build-Module-for-Your-Apps.md) | **Tutorial** langkah demi langkah: modul di repositori Anda sendiri, termasuk repo privat |
 | [`docs/THEMES.md`](./docs/THEMES.md) | Tema, layout, set ikon; tema dari modul; editor tema kustom di UI admin |
+| [`docs/FORMS.md`](./docs/FORMS.md) | Kesepakatan form simpan data: kirim lewat JavaScript, hasil sebagai popup (hijau berhasil, merah gagal) |
 | [`docs/WEBHOOKS.md`](./docs/WEBHOOKS.md) | Webhook keluar: event inti tenant sebagai POST bertanda tangan, percobaan ulang, riwayat |
 | [`docs/AI.md`](./docs/AI.md) | Modul AI: provider OpenAI-compatible (satu atau banyak profil dengan daftar harga), streaming, tool modul, log, analitik biaya & retensi |
 | [`docs/MCP.md`](./docs/MCP.md) | MCP server di `/v1/mcp`, token API bearer, dan MCP client (server MCP eksternal untuk asisten) |

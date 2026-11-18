@@ -604,6 +604,7 @@ export default defineSeed('Billing', async ({ db, tenantId, log }) => { /* cek d
 - Satu URL per isi: halaman yang sedang menjadi `app.landing_route` **tidak** muncul dengan path-nya sendiri (ia sudah ada sebagai `/`), dan entri yang path-nya sudah ada dibuang. Jadi jangan heran `/example` hilang dari sitemap saat ia landing.
 - Panggilan ke endpoint Anda dibatasi **3 detik**; lewat itu, 404, atau galat = modul Anda tidak menyumbang entri, tanpa merusak sitemap modul lain. Jangan menghitung mahal di sini — baca dari tabel, bukan dari API luar.
 - Canonical halaman publik: pakai `canonicalUrl(event)` dari `$lib/server/seo` (R-4) untuk `rel=canonical`, `og:url`, dan `url` JSON-LD — ia mengembalikan alamat yang dilihat pengunjung, tanpa query, dan `/` selama halaman Anda yang menjadi landing.
+- Gambar share (og:image / twitter:image) dari unggahan: pakai `ogCard(origin, fileId)` dari `$lib/server/seo`. Ia menunjuk ke `GET /v1/opengraph/<fileId>`, yang mengubah gambar apa pun (poster tegak, logo persegi, foto besar) menjadi satu JPEG **1200 × 630**. Gambar yang rasionya sudah dekat 1.91:1 di-crop tipis, sisanya ditampilkan utuh di atas salinan dirinya yang di-blur. Width/height/type selalu pasti, jadi tidak perlu membaca `meta` berkas. Hanya berkas **publik** (`visibility = 'public'`, JPEG/PNG/WebP/GIF) yang dilayani, tanpa sesi dan tanpa `X-Client-ID`; berkas privat dijawab 404. Kartu dibuat sekali lalu disimpan di storage (`og/<fileId>-v1.jpg`) dan ikut terhapus saat berkasnya dihapus. Pembuatnya `sharp`; di host yang tidak bisa memuatnya (mis. binary hasil `bun build --compile`) route menyajikan gambar asli (`x-og-fallback: original`), jadi share tidak pernah rusak. URL gambar eksternal tidak punya kartu; pakai apa adanya. `shareImage(event)` (gambar default `app.share_image`) sudah memakai kartu ini.
 - Belum ada sitemap index. Modul yang mendekati 50.000 URL perlu `/sitemap-<ns>.xml` sendiri dan index di `/sitemap.xml` — belum dibangun karena belum ada yang membutuhkannya.
 
 ### `hooks.ts` — berlangganan event core (titik perluasan 9)
@@ -702,6 +703,36 @@ await notify({
 
 `notify()` tidak pernah melempar ke request pemanggil (kegagalan dicatat di log), menerbitkan event `notification.created` yang bisa didengar `hooks.ts` modul lain (mis. meneruskan ke webhook), dan barisnya adalah data tenant biasa: hanya pemiliknya yang bisa membaca lewat `/v1/notifications`. Notifikasi yang sudah dibaca dipangkas job retensi sesuai **Pengaturan → Log & retensi**. Contoh hidup: `modules/Example/api/routes.ts` (pesan kontak baru → pemegang `example.inquiry.read`).
 
+### Email dari modul (J-3)
+
+Modul tidak menambah template ke core. Untuk email miliknya sendiri, modul menyusun isi dalam bahasa penerima lalu memakai template generik **`notice`** lewat outbox; template yang menata (header brand, tabel, tombol) dan meng-*escape* setiap string, sehingga isian pengguna aman ditaruh apa adanya:
+
+```ts
+import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
+
+await sendTemplate(unsafeAcrossTenants(), {
+  to: row.email, toName: row.name, template: 'notice', clientId,
+  locale: await mailLocale({ request, clientId }),
+  data: {                                   // bentuk: `NoticeData` dari `@core/mail`
+    subject: 'Pendaftaran diterima: Liga Hedef', // ` — <nama app>` ditambahkan otomatis
+    title: 'Pendaftaran diterima',          // opsional; baku = subject
+    name: row.name,                          // sapaan "Halo …,"; tanpa kunci ini = tanpa sapaan
+    intro: 'Paragraf satu.
+
+Paragraf dua.', // baris kosong memisahkan paragraf
+    rows: [{ label: 'Nama', value: row.name }], // baris berisi kosong dilewati
+    sections: [{ title: 'Pembayaran', body: 'BCA 123
+a.n. Panitia' }],
+    link: publicLink('/event/x', request), cta: 'Lihat event', // tombol; klik dilacak seperti template lain
+    note: 'Email ini dikirim otomatis.',
+  },
+});
+```
+
+**Email dua bahasa:** isi `translation: { locale: 'en', title, name, intro, rows, sections, cta, note }` pada `data`. Badan email bahasa kedua tampil di bawah garis pemisah, memakai tautan yang sama, dan teks "tautan tidak bisa diklik" di akhir email muncul dalam kedua bahasa. Subject hanya satu, jadi tulis subject yang memuat kedua bahasa.
+
+Email yang isinya bergantung pada langkah berikutnya (mis. berkas yang diunggah sesaat setelah form disimpan) sebaiknya disusun oleh task antrean (lihat bagian berikut), bukan di request, supaya task membaca keadaan terakhir saat berjalan. Bukti: `packages/mail/test/templates.test.ts`.
+
 ### Antrean pekerjaan dari modul (P2: retry, prioritas, dead-letter)
 
 Pekerjaan yang terjadi **karena sesuatu** (impor, laporan, kiriman massal, panggilan pihak ketiga yang lambat) tidak dijalankan di dalam request dan bukan pula job berkala (G-18). Daftarkan handler-nya saat modul dimuat, lalu enqueue dari route:
@@ -737,12 +768,13 @@ const r = await storeUpload({
   kind: 'billing.attachment',             // `<ns>.<tujuan>` — untuk filter & aturan per jenis
   visibility: 'private',                  // `public` = bisa diambil siapa pun yang tahu tenantnya
   allowedTypes: ['application/pdf'],      // opsional: mempersempit allowlist tenant untuk panggilan ini
+  folder: 'billing/attachment',           // opsional: sub-folder per tujuan di dalam tenant
 });
 if (!r.ok) return fail('validation_failed', r.message, requestId, { reason: r.code }); // too_large | type_not_allowed | content_mismatch | empty
 const url = fileUrl(r.row);               // `/v1/files/<id>/content`, atau URL CDN bila S3_PUBLIC_URL diisi
 ```
 
-Kunci objek selalu `<clientId>/<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
+Kunci objek selalu `<clientId>/[<folder>/]<yyyy>/<mm>/<id>.<ext>` dan tidak pernah berasal dari nama berkas pengguna. `folder` dibersihkan oleh `storageFolder()`: hanya huruf kecil, angka, dan `-` per segmen, tanpa `..`, sehingga kunci selalu tetap di dalam folder tenant. Pengguna akhir memakai API generiknya langsung: `POST /v1/files` (izin `file.create`), `GET /v1/files` (milik sendiri; `?all=1` dengan `file.manage`), `GET /v1/files/:id/content` (pemilik atau `file.read`; berkas publik: anonim dengan `X-Client-ID`), `DELETE /v1/files/:id`. Bukti: `apps/api/test/integration/files.test.ts`, `packages/storage/test/storage.test.ts`.
 
 ### Ekspor daftar ke Excel/CSV dari modul
 
@@ -841,6 +873,8 @@ export default defineTools('Billing', [
 ```
 
 Yang dijamin registry core pada **setiap** panggilan, dari mana pun asalnya (chat AI, `POST /v1/tools/call`, MCP nanti):
+
+> Pintu luar registry — `GET/POST /v1/tools`, `/v1/mcp`, dan pembuatan token API — hanya terbuka bagi akun pemegang `ai.mcp.use` ([`MCP.md`](./MCP.md#siapa-yang-boleh-memakai-integrasi)). Chat AI memanggil registry di dalam proses dan diatur izin `ai.chat.*`.
 
 | Jaminan | Cara |
 |---|---|

@@ -1,10 +1,12 @@
 <script lang="ts">
+import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { type FieldDef, FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
 import { Alert, Badge, Button, Card, Field, Input } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import { hasPermission } from '$lib/permissions';
+import { identityFields } from '$lib/tenants';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
@@ -77,24 +79,13 @@ const addressFields: FieldDef[] = $derived(
       ],
 );
 const fields: FieldDef[] = $derived([
-  { name: 'name', type: 'string', label: t('tenants.name'), required: true, maxlength: 191 },
-  {
-    name: 'parentId',
-    type: 'select',
-    label: t('tenants.parent'),
-    hint: t('tenants.parent_hint'),
-    options: data.parents,
-  },
-  {
-    name: 'referenceId',
+  // The slug is shown for reference only: it cannot change once the tenant exists.
+  ...identityFields(t, data.parents, {
+    name: 'code',
     type: 'string',
-    label: t('tenants.reference_id'),
-    hint: t('tenants.reference_id_hint'),
-    maxlength: 191,
-    autocomplete: 'off',
-  },
-  { name: 'joinDate', type: 'date', label: t('tenants.join_date') },
-  { name: 'description', type: 'text', label: t('tenants.description'), maxlength: 2000, span: 2 },
+    label: t('tenants.code'),
+    disabled: true,
+  }),
   { ...text('url', t('tenants.url'), 2048), type: 'string', autocomplete: 'url' },
   { ...text('mapsUrl', t('tenants.maps_url'), 2048), autocomplete: 'url' },
   { name: 'address', type: 'text', label: t('tenants.address'), maxlength: 2000, rows: 2, span: 2 },
@@ -128,7 +119,9 @@ const fields: FieldDef[] = $derived([
 ]);
 const values = $derived({
   name: c.name,
+  code: c.code,
   parentId: c.parentId ?? '',
+  shortCode: c.shortCode,
   description: c.description,
   referenceId: c.referenceId,
   joinDate: c.joinDate,
@@ -185,6 +178,8 @@ function cascade(root: HTMLElement) {
 }
 /** Open on `?confirm=delete`, and stay open when the action bounced the typed code back. */
 const confirming = $derived(data.confirmDelete || form?.code === 'confirm_failed');
+/** The delete confirmation posts over fetch too; success redirects to the list (docs/FORMS.md). */
+const save = useSaveForm();
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -213,7 +208,7 @@ const fieldErrors = $derived(
           <Alert variant="error" title={t('tenants.detail.delete_confirm')}>
             <p>{t('tenants.detail.delete_confirm_lead', { name: c.name })}</p>
           </Alert>
-          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4">
+          <form method="POST" action="?/delete&confirm=delete" class="grid gap-4" use:enhance={save({ success: t('tenants.detail.deleted'), failureTitle: t('tenants.detail.delete') })}>
             <Csrf token={data.csrf} />
             <Field label={t('tenants.detail.delete_confirm_code', { code: c.code })} for="confirm-code" error={form?.code === 'confirm_failed' ? form.error : null} required>
               <Input id="confirm-code" name="code" autocomplete="off" autocapitalize="none" spellcheck={false} required />

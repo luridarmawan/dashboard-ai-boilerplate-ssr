@@ -117,6 +117,8 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'app.landing_lead:identity:half',
       'app.logo_url:identity:half',
       'app.favicon_url:identity:half',
+      'app.apple_touch_icon_url:identity:half',
+      'app.theme_color:identity:half',
       'app.landing_route:handlers:third',
       'app.home_route:handlers:third',
       'app.not_found_route:handlers:third',
@@ -125,6 +127,7 @@ describe.skipIf(!enabled)('configuration & modules (E-1…E-5, G-8)', () => {
       'app.timezone:appearance:third',
       'app.allowed_themes:appearance:full',
       'app.robots_txt:seo:full',
+      'app.twitter_site:seo:full',
       'app.maintenance_mode:availability:full',
     ]);
     expect(app?.fields.find((f) => f.key === 'app.favicon_url')?.type).toBe('string');

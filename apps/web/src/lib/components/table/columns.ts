@@ -1,3 +1,5 @@
+import type { SaveOptions } from '../form/save.ts';
+
 /**
  * DataTable declarations (PRD L-16). The table is presentation only: the page's `load` fetched
  * the rows for the current URL (page, limit, q, sort, order, cols); the table renders them and
@@ -26,6 +28,10 @@ export interface ColumnDef<Row> {
 export const iconActionClass =
   'ms-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
 
+/** `iconActionClass` one step smaller, for tables with several icon actions per row. */
+export const iconActionSmClass =
+  'ms-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
+
 export interface RowAction<Row> {
   label: string;
   href?: (row: Row) => string;
@@ -34,9 +40,16 @@ export interface RowAction<Row> {
   icon?: string;
   /** Draw the icon alone; `label` becomes the hover tooltip and the accessible name. */
   iconOnly?: boolean;
+  /** Open `href` in a new tab (e.g. a public page). */
+  external?: boolean;
   destructive?: boolean;
   /** Hide the action for rows where this returns false. */
   when?: (row: Row) => boolean;
+  /**
+   * Title of the success toast once the action posted over fetch (docs/FORMS.md); see
+   * `SaveOptions.success`. Default "Saved.". Ignored for `href` actions.
+   */
+  success?: SaveOptions['success'];
 }
 
 export interface BulkAction {
@@ -60,6 +73,11 @@ export interface BulkAction {
     lead: (count: number) => string;
     submitLabel: string;
   };
+  /**
+   * Title of the success toast once the action posted over fetch (docs/FORMS.md); a function reads
+   * the action result, e.g. a count. Default "Saved.".
+   */
+  success?: SaveOptions['success'];
 }
 
 export interface TableState {

@@ -15,6 +15,7 @@ import {
 import { useT } from '$lib/i18n';
 import { cn } from '$lib/utils';
 import type { FieldDef, FormErrors, FormValues } from './fields.ts';
+import { useSaveForm } from './save.ts';
 
 /**
  * Declarative form (L-17). Renders `fields` into a real <form method="POST"> with the CSRF
@@ -39,11 +40,23 @@ interface Props {
    * Post over fetch instead of reloading the page (L-22: the same form still posts the ordinary
    * way when JavaScript never arrives — this only takes the shorter route when it can). The
    * action, its validation and its result stay exactly the same; what changes is that the page
-   * is not thrown away, so scroll position and anything typed stay put.
+   * is not thrown away, so scroll position and anything typed stay put. On by default (see
+   * docs/FORMS.md); `ajax={false}` keeps a plain full-page POST.
    */
   ajax?: boolean;
+  /**
+   * Title of the green toast after a successful save. Defaults to `notice` as the page renders it
+   * after the save, else "Saved.". `false` = no toast (the page announces the outcome itself).
+   */
+  successMessage?: string | false;
+  /** Title of the red toast after a failed save; defaults to "Could not save". */
+  failureTitle?: string;
   /** A form-level error banner (e.g. the API's message). */
   error?: string | null;
+  /**
+   * The success message of a plain POST. With JavaScript it is shown as the success toast instead,
+   * so it is not repeated inside the form.
+   */
   notice?: string | null;
   extra?: Snippet;
   /**
@@ -68,7 +81,9 @@ let {
   columns = 1,
   class: className,
   readonly = false,
-  ajax = false,
+  ajax = true,
+  successMessage,
+  failureTitle,
   error = null,
   notice = null,
   extra,
@@ -96,6 +111,15 @@ const spanOf = (f: FieldDef) =>
     | 3;
 const full = $derived(COL_SPAN[columns]);
 const hasFile = $derived(fields.some((f) => f.type === 'file'));
+/** Runs of consecutive fields sharing a `group`; ungrouped runs render straight into the grid. */
+const segments = $derived(
+  fields.reduce<{ group: string | undefined; fields: FieldDef[] }[]>((out, f) => {
+    const last = out.at(-1);
+    if (last && last.group === f.group) last.fields.push(f);
+    else out.push({ group: f.group, fields: [f] });
+    return out;
+  }, []),
+);
 
 let submitting = $state(false);
 /**
@@ -106,23 +130,111 @@ let hydrated = $state(false);
 $effect(() => {
   hydrated = true;
 });
+/** With JavaScript the outcome is a toast, so the in-form success notice would only repeat it. */
+const enhanced = $derived(ajax && hydrated);
+
+const save = useSaveForm();
 /**
  * `use:` cannot be applied conditionally, so the action itself decides: without `ajax` it returns
- * nothing and the form stays a plain POST. `update({ reset: false })` re-runs `load` and applies
- * the action result in place — without it the fields would snap back to the values the page was
- * rendered with.
+ * nothing and the form stays a plain POST. Otherwise the shared save handler (docs/FORMS.md):
+ * fetch, fields kept as typed, outcome as a toast. The success toast reads `notice` after the page
+ * took the result in — that is the page's own wording for this save.
  */
 function submitOverFetch(node: HTMLFormElement) {
   if (!ajax) return;
-  return enhance(node, () => {
-    submitting = true;
-    return async ({ update }) => {
-      await update({ reset: false });
-      submitting = false;
-    };
-  });
+  return enhance(
+    node,
+    save({
+      success: () => (successMessage === false ? false : successMessage || notice),
+      failureTitle,
+      onStart: () => {
+        submitting = true;
+      },
+      onDone: () => {
+        submitting = false;
+      },
+    }),
+  );
 }
 </script>
+
+{#snippet control(f: FieldDef)}
+  {@const id = `f-${f.name}`}
+  {@const err = errors[f.name] ?? null}
+  {#if f.type === 'hidden'}
+    <input type="hidden" name={f.name} value={str(values[f.name])} />
+  {:else if f.type === 'boolean'}
+    <div class={cn('flex items-center gap-2 self-end pb-2', COL_SPAN[spanOf(f)])}>
+      <Checkbox {id} name={f.name} checked={Boolean(values[f.name])} disabled={readonly || f.disabled} aria-invalid={err ? 'true' : undefined} />
+      <label for={id} class="text-sm">{f.label ?? f.name}</label>
+      {#if err}<p class="text-sm text-destructive" role="alert">{err}</p>{/if}
+    </div>
+  {:else}
+    <Field label={f.label ?? f.name} for={id} hint={f.hint} error={err} required={f.required} class={cn(COL_SPAN[spanOf(f)])}>
+      {#if f.type === 'text' || f.type === 'markdown'}
+        <Textarea {id} name={f.name} rows={f.rows ?? (f.type === 'markdown' ? 8 : 3)} placeholder={f.placeholder} required={f.required} disabled={readonly || f.disabled} maxlength={f.maxlength} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined} class={f.type === 'markdown' ? 'font-mono text-xs' : ''} />
+        {#if f.type === 'markdown'}<p class="text-xs text-muted-foreground">Markdown</p>{/if}
+      {:else if f.type === 'select'}
+        <Select {id} name={f.name} required={f.required} disabled={readonly || f.disabled} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined}>
+          {#if !f.required}<option value="">—</option>{/if}
+          {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={str(values[f.name]) === o.value}>{o.label}</option>{/each}
+        </Select>
+      {:else if f.type === 'multiselect' && f.multiselectAs === 'select'}
+        <Select {id} name={f.name} multiple disabled={readonly || f.disabled} class="h-auto min-h-24">
+          {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={list(values[f.name]).includes(o.value)}>{o.label}</option>{/each}
+        </Select>
+      {:else if f.type === 'multiselect'}
+        <!-- A long option list scrolls inside its own box: with hundreds of groups the grid would
+             otherwise push the form's buttons far below the fold. -->
+        <div class="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 overflow-y-auto rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
+          {#each f.options ?? [] as o (o.value)}
+            <label class="flex items-center gap-2 text-sm">
+              <Checkbox name={f.name} value={o.value} checked={list(values[f.name]).includes(o.value)} disabled={readonly || f.disabled} />
+              {o.label}
+            </label>
+          {:else}
+            <span class="text-sm text-muted-foreground">—</span>
+          {/each}
+        </div>
+      {:else if f.type === 'file'}
+        <Input {id} type="file" name={f.name} accept={f.accept} required={f.required} disabled={readonly || f.disabled} />
+      {:else if f.type === 'password'}
+        <!-- Never seeded with a value; carries its own show/hide toggle. -->
+        <PasswordInput
+          {id}
+          name={f.name}
+          placeholder={f.placeholder}
+          required={f.required}
+          disabled={readonly || f.disabled}
+          autocomplete={f.autocomplete}
+          minlength={f.minlength}
+          maxlength={f.maxlength}
+          pattern={f.pattern}
+          value=""
+          aria-invalid={err ? 'true' : undefined}
+        />
+      {:else}
+        <Input
+          {id}
+          name={f.name}
+          type={f.type === 'string' ? 'text' : f.type === 'date' ? 'date' : f.type}
+          placeholder={f.placeholder}
+          required={f.required}
+          disabled={readonly || f.disabled}
+          autocomplete={f.autocomplete}
+          min={f.min}
+          max={f.max}
+          step={f.step}
+          minlength={f.minlength}
+          maxlength={f.maxlength}
+          pattern={f.pattern}
+          value={val(f, values[f.name])}
+          aria-invalid={err ? 'true' : undefined}
+        />
+      {/if}
+    </Field>
+  {/if}
+{/snippet}
 
 <form
   {method}
@@ -139,88 +251,21 @@ function submitOverFetch(node: HTMLFormElement) {
        placed by hand (an `aside` at `row-start-1`) would collide with it the moment a save
        succeeded — the fields would reflow around the aside instead of beside it. -->
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-  {#if notice}<p class="notice" role="status">{notice}</p>{/if}
+  {#if notice && !enhanced}<p class="notice" role="status">{notice}</p>{/if}
 
   <div class={cn('grid gap-4', GRID_COLS[columns], className)}>
     <!-- Before the fields, so its own placement classes decide where it lands and the auto-placed
          fields flow around it (and so a screen reader meets it in visual order). -->
     {@render aside?.()}
 
-    {#each fields as f (f.name)}
-      {@const id = `f-${f.name}`}
-      {@const err = errors[f.name] ?? null}
-      {#if f.type === 'hidden'}
-        <input type="hidden" name={f.name} value={str(values[f.name])} />
-      {:else if f.type === 'boolean'}
-        <div class={cn('flex items-center gap-2 self-end pb-2', COL_SPAN[spanOf(f)])}>
-          <Checkbox {id} name={f.name} checked={Boolean(values[f.name])} disabled={readonly || f.disabled} aria-invalid={err ? 'true' : undefined} />
-          <label for={id} class="text-sm">{f.label ?? f.name}</label>
-          {#if err}<p class="text-sm text-destructive" role="alert">{err}</p>{/if}
-        </div>
+    {#each segments as seg, i (i)}
+      {#if seg.group}
+        <fieldset class={cn('grid gap-4 rounded-md border p-4', GRID_COLS[columns], full)}>
+          <legend class="px-1 text-sm font-semibold">{seg.group}</legend>
+          {#each seg.fields as f (f.name)}{@render control(f)}{/each}
+        </fieldset>
       {:else}
-        <Field label={f.label ?? f.name} for={id} hint={f.hint} error={err} required={f.required} class={cn(COL_SPAN[spanOf(f)])}>
-          {#if f.type === 'text' || f.type === 'markdown'}
-            <Textarea {id} name={f.name} rows={f.rows ?? (f.type === 'markdown' ? 8 : 3)} placeholder={f.placeholder} required={f.required} disabled={readonly || f.disabled} maxlength={f.maxlength} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined} class={f.type === 'markdown' ? 'font-mono text-xs' : ''} />
-            {#if f.type === 'markdown'}<p class="text-xs text-muted-foreground">Markdown</p>{/if}
-          {:else if f.type === 'select'}
-            <Select {id} name={f.name} required={f.required} disabled={readonly || f.disabled} value={str(values[f.name])} aria-invalid={err ? 'true' : undefined}>
-              {#if !f.required}<option value="">—</option>{/if}
-              {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={str(values[f.name]) === o.value}>{o.label}</option>{/each}
-            </Select>
-          {:else if f.type === 'multiselect' && f.multiselectAs === 'select'}
-            <Select {id} name={f.name} multiple disabled={readonly || f.disabled} class="h-auto min-h-24">
-              {#each f.options ?? [] as o (o.value)}<option value={o.value} selected={list(values[f.name]).includes(o.value)}>{o.label}</option>{/each}
-            </Select>
-          {:else if f.type === 'multiselect'}
-            <!-- A long option list scrolls inside its own box: with hundreds of groups the grid would
-                 otherwise push the form's buttons far below the fold. -->
-            <div class="grid max-h-72 grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-x-4 gap-y-1 overflow-y-auto rounded-md border p-3" role="group" aria-labelledby={`${id}-label`}>
-              {#each f.options ?? [] as o (o.value)}
-                <label class="flex items-center gap-2 text-sm">
-                  <Checkbox name={f.name} value={o.value} checked={list(values[f.name]).includes(o.value)} disabled={readonly || f.disabled} />
-                  {o.label}
-                </label>
-              {:else}
-                <span class="text-sm text-muted-foreground">—</span>
-              {/each}
-            </div>
-          {:else if f.type === 'file'}
-            <Input {id} type="file" name={f.name} accept={f.accept} required={f.required} disabled={readonly || f.disabled} />
-          {:else if f.type === 'password'}
-            <!-- Never seeded with a value; carries its own show/hide toggle. -->
-            <PasswordInput
-              {id}
-              name={f.name}
-              placeholder={f.placeholder}
-              required={f.required}
-              disabled={readonly || f.disabled}
-              autocomplete={f.autocomplete}
-              minlength={f.minlength}
-              maxlength={f.maxlength}
-              pattern={f.pattern}
-              value=""
-              aria-invalid={err ? 'true' : undefined}
-            />
-          {:else}
-            <Input
-              {id}
-              name={f.name}
-              type={f.type === 'string' ? 'text' : f.type === 'date' ? 'date' : f.type}
-              placeholder={f.placeholder}
-              required={f.required}
-              disabled={readonly || f.disabled}
-              autocomplete={f.autocomplete}
-              min={f.min}
-              max={f.max}
-              step={f.step}
-              minlength={f.minlength}
-              maxlength={f.maxlength}
-              pattern={f.pattern}
-              value={val(f, values[f.name])}
-              aria-invalid={err ? 'true' : undefined}
-            />
-          {/if}
-        </Field>
+        {#each seg.fields as f (f.name)}{@render control(f)}{/each}
       {/if}
     {/each}
 

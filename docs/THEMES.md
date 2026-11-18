@@ -93,6 +93,8 @@ Empat region publik `topbar`, `search`, `actions`, `menubar` (dan `aside` di das
 
 **Tinggi header lengket — `--site-header-h`.** Layout publik yang header-nya menempel menyetel variabel CSS ini selama tingginya tetap (`marketing-wide`: `4rem` mulai `md`; di bawah `md` dibiarkan kosong karena baris utama membungkus kotak pencarian). Halaman yang punya bar lengket sendiri menaruhnya tepat di bawah header dengan `top-[var(--site-header-h,0px)]` dan `z-20` — contoh: bar filter `/catalog` di modul Example, yang di ponsel sengaja tidak menempel. Menu bar memakai `z-[25]` agar dropdown-nya tetap di atas bar semacam itu.
 
+**Tinggi header lengket dashboard — `--dashboard-header-h`.** Setiap layout dashboard bawaan menyetel variabel ini di elemen akarnya sesuai tinggi header lengketnya (`sidebar-classic` dan `centered-narrow`: `3.5rem`; `topnav-compact`: `calc(3rem+1px)`). Halaman dashboard yang punya bar lengket sendiri (mis. tombol Simpan pada form panjang) menaruhnya tepat di bawah header dengan `top-[var(--dashboard-header-h,0px)]` dan `z-20`, tanpa perlu tahu layout mana yang aktif. Layout kustom yang header-nya menempel sebaiknya ikut menyetelnya.
+
 **Kait styling.** `marketing-wide` memberi id tetap pada baris tambahan: `#topbar` (baris 1) dan `#menubar` (baris 3, hanya salinan desktop — salinan di menu seluler tanpa id agar id tetap unik). Kotak pencarian contoh dari modul Example memakai `#top-frm-search` (form), `#search-category`, `#search-input`, dan `#search-submit`. Layout publik lain sebaiknya memakai id yang sama untuk baris yang sama, supaya CSS aplikasi turunan tidak bergantung pada layout yang aktif.
 
 | Layout | Jenis | Bentuk |

@@ -1,15 +1,17 @@
 <script lang="ts">
 import { codeFromName } from '@core/contracts/code';
 import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { Card } from '$lib/components/ui';
 import { useT } from '$lib/i18n';
+import { identityFields } from '$lib/tenants';
 import type { LayoutData } from '../../$types';
 import type { ActionData, PageData } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
-const fields: FieldDef[] = $derived([
-  { name: 'name', type: 'string', label: t('tenants.name'), required: true, maxlength: 191 },
-  {
+/** The identity group of the edit form, plus the slug — settable only here, at creation. */
+const fields: FieldDef[] = $derived(
+  identityFields(t, data.parents, {
     name: 'code',
     type: 'string',
     label: t('tenants.code'),
@@ -18,15 +20,8 @@ const fields: FieldDef[] = $derived([
     maxlength: 32,
     pattern: '[a-z][a-z0-9_\\-]*',
     autocomplete: 'off',
-  },
-  {
-    name: 'parentId',
-    type: 'select',
-    label: t('tenants.parent'),
-    hint: t('tenants.parent_hint'),
-    options: data.parents,
-  },
-]);
+  }),
+);
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -63,5 +58,7 @@ function follow(root: HTMLElement) {
 <div class="page" use:follow>
   <h1>{t('tenants.add')}</h1>
   <p class="text-sm text-muted-foreground">{t('tenants.new.lead_1')}<code>admin</code>{t('tenants.new.lead_2')}<code>user</code>{t('tenants.new.lead_3')}</p>
-  <FormBuilder {fields} values={(form?.values as Record<string, unknown> | undefined) ?? {}} errors={fieldErrors} csrf={data.csrf} submitLabel={t('common.create')} cancelHref="/tenants" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+  <Card>
+    <FormBuilder {fields} values={(form?.values as Record<string, unknown> | undefined) ?? {}} errors={fieldErrors} csrf={data.csrf} columns={2} submitLabel={t('common.create')} cancelHref="/tenants" error={form?.error && Object.keys(fieldErrors).length === 0 ? form.error : null} />
+  </Card>
 </div>

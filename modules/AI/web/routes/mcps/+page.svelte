@@ -7,6 +7,11 @@ import { hasPermission } from '$lib/permissions';
 
 let { data } = $props();
 const t = useT();
+// A delete announces itself as a toast before redirecting here; the notice is the no-JS path.
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 const can = (p: string) => data.user.isSuperadmin || hasPermission(data.permissions, p);
 const locale = useLocale();
 /** Row action is an icon, like /users. */
@@ -24,7 +29,7 @@ const fmt = (iso: string | null) =>
     {#if manage}<Button href="/m/ai/mcps/new" size="sm"><Icon name="plus" size={16} />{t('ai.mcps.new')}</Button>{/if}
   </div>
   <p class="text-sm text-muted-foreground">{t('ai.mcps.intro')}</p>
-  {#if data.saved === 'deleted'}<p class="notice">{t('ai.mcps.deleted')}</p>{/if}
+  {#if data.saved === 'deleted' && !hydrated}<p class="notice">{t('ai.mcps.deleted')}</p>{/if}
   <Table caption={t('ai.mcps.title')}>
     <thead><tr><th>{t('ai.mcps.name')}</th><th>{t('ai.mcps.code')}</th><th>{t('ai.mcps.url')}</th><th>{t('ai.mcps.tools')}</th><th>{t('ai.mcps.status')}</th><th></th></tr></thead>
     <tbody>

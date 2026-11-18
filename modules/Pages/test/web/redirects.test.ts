@@ -157,16 +157,15 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
   });
 
   test('the share card: an absolute og:image a crawler can fetch, with size, type and alt', async () => {
+    // The featured image is shared as its 1200 × 630 card (core `/v1/opengraph/<fileId>`).
     const html = await (await visit(`/${s('about-qhomemart')}`)).text();
     const meta = (prop: string) =>
       new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1] ?? null;
     const og = meta('og:image');
-    expect(og).toMatch(
-      new RegExp(`^${WEB.replace(/[.:/]/g, '\\$&')}/v1/m/pages/media/[0-9a-f-]{36}$`),
-    );
+    expect(og).toMatch(new RegExp(`^${WEB.replace(/[.:/]/g, '\\$&')}/v1/opengraph/[0-9a-f-]{36}$`));
     expect(meta('og:image:width')).toBe('1200');
     expect(meta('og:image:height')).toBe('630');
-    expect(meta('og:image:type')).toBe('image/png');
+    expect(meta('og:image:type')).toBe('image/jpeg');
     expect(meta('og:image:alt')).toBe('Our office');
     expect(meta('twitter:card')).toBe('summary_large_image');
     expect(meta('twitter:image')).toBe(og);
@@ -174,7 +173,7 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     // Fetched like a crawler does: no cookie, no tenant header, through the site's own origin.
     const img = await fetch(og ?? '', { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
     expect(img.status).toBe(200);
-    expect(img.headers.get('content-type')).toBe('image/png');
+    expect(img.headers.get('content-type')).toBe('image/jpeg');
   });
 
   test('a page without a featured image shares with the default share image', async () => {
@@ -219,23 +218,24 @@ describe.skipIf(!enabled)('Pages over HTTP: 200, 301 and 404 from the web server
     if (!stored.ok) throw new Error(stored.message);
     try {
       await settings.save(null, [{ key: 'app.share_image', value: stored.row.id }]);
-      const url = `${WEB}/v1/configuration/image-file/${stored.row.id}`;
+      // The default image is shared as its card, like every public upload.
+      const url = `${WEB}/v1/opengraph/${stored.row.id}`;
       for (const path of [`/${s('plain')}`, '/']) {
         const page = await metaOf(path);
         expect(page.meta('og:image'), path).toBe(url);
-        expect(page.meta('og:image:type'), path).toBe('image/png');
+        expect(page.meta('og:image:type'), path).toBe('image/jpeg');
         expect(page.meta('og:image:width'), path).toBe('1200');
         expect(page.meta('og:image:height'), path).toBe('630');
         expect(page.meta('twitter:image'), path).toBe(url);
       }
       // A page WITH a featured image keeps its own.
-      expect((await metaOf(`/${s('about-qhomemart')}`)).meta('og:image')).toContain(
-        '/v1/m/pages/media/',
-      );
+      const own = (await metaOf(`/${s('about-qhomemart')}`)).meta('og:image');
+      expect(own).toContain('/v1/opengraph/');
+      expect(own).not.toBe(url);
       // Fetched like a crawler: no cookie, no tenant header, through the site's origin.
       const img = await fetch(url, { headers: { 'user-agent': 'facebookexternalhit/1.1' } });
       expect(img.status).toBe(200);
-      expect(img.headers.get('content-type')).toBe('image/png');
+      expect(img.headers.get('content-type')).toBe('image/jpeg');
     } finally {
       await clear();
     }

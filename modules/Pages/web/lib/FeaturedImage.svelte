@@ -8,9 +8,14 @@ import { useT } from '$lib/i18n';
  * `?/image` (upload + alt) or `?/imageRemove` without JavaScript; with it, the same actions over
  * fetch — the new image, the share preview and a toast appear in place. Picking a file shows it
  * immediately (a local object URL) with its pixel size, so a too-small picture is caught before
- * it is uploaded. The share preview mirrors what Facebook/WhatsApp/LinkedIn draw from og:*.
+ * it is uploaded. The share preview mirrors what Facebook/WhatsApp/LinkedIn draw from og:*: a
+ * published page's image is shown as its real 1200 × 630 card (`/v1/opengraph/<fileId>`, made by
+ * the core); a draft's image (private until the page is published, so it has no card yet) and a
+ * picked, not yet uploaded file as the same layout drawn in CSS — cropped to fill when it is close
+ * to 1.91:1, otherwise whole on a blurred copy of itself.
  */
 interface ImageView {
+  fileId: string;
   url: string;
   width: number | null;
   height: number | null;
@@ -78,14 +83,27 @@ const shown = $derived(
       ? { url: image.url, width: image.width, height: image.height }
       : null,
 );
-/** A warning, not a refusal: small or odd-shaped images still work, just not as a large card. */
+/** Same tolerance as the core's card maker (apps/api/src/lib/og-image.ts): ±15 % of 1.91:1. */
+const nearCard = (w: number, h: number) =>
+  Math.abs(w / h / (IDEAL.width / IDEAL.height) - 1) <= 0.15;
+/**
+ * A note, not a refusal. Too small: the card enlarges it at most 2×, so it stays soft (warning).
+ * Far from 1.91:1: nothing is cut off any more, it is shown whole on a blurred background (info).
+ */
 const sizeNote = $derived.by(() => {
   if (!shown?.width || !shown.height) return null;
-  if (shown.width < MIN.width || shown.height < MIN.height) return t('pages.image.too_small');
-  const ratio = shown.width / shown.height;
-  if (ratio < 1.6 || ratio > 2.2) return t('pages.image.ratio');
+  if (shown.width < MIN.width || shown.height < MIN.height)
+    return { variant: 'warning' as const, text: t('pages.image.too_small') };
+  if (!nearCard(shown.width, shown.height))
+    return { variant: 'info' as const, text: t('pages.image.ratio') };
   return null;
 });
+/** The saved image's share card, as crawlers fetch it — only a published page's image has one. */
+const card = $derived(
+  image && published && !picked ? `/v1/opengraph/${encodeURIComponent(image.fileId)}` : null,
+);
+/** Otherwise the card is drawn in CSS: framed (blurred backdrop) unless close to 1.91:1. */
+const framed = $derived(shown?.width && shown.height ? !nearCard(shown.width, shown.height) : true);
 
 function overFetch(node: HTMLFormElement) {
   return enhance(node, ({ action }) => {
@@ -117,7 +135,7 @@ function overFetch(node: HTMLFormElement) {
           {#if shown.width && shown.height}<span data-testid="pages-image-size">{shown.width} × {shown.height} px</span>{/if}
         </figcaption>
       </figure>
-      {#if sizeNote}<Alert variant="warning">{sizeNote}</Alert>{/if}
+      {#if sizeNote}<Alert variant={sizeNote.variant}>{sizeNote.text}</Alert>{/if}
     {:else}
       <div class="flex aspect-[1.91/1] max-w-2xl flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/40 p-6 text-center text-sm text-muted-foreground" data-testid="pages-image-empty">
         <Icon name="image" size={28} />
@@ -151,7 +169,14 @@ function overFetch(node: HTMLFormElement) {
   <div>
     <p class="mb-2 text-sm font-medium">{t('pages.image.share_preview')}</p>
     <div class="overflow-hidden rounded-lg border bg-card text-card-foreground shadow-xs" data-testid="pages-share-preview">
-      <img src={shown?.url ?? fallback} alt="" class="aspect-[1.91/1] w-full object-cover" data-default={shown ? null : 'true'} />
+      {#if shown && !card}
+        <div class="relative aspect-[1.91/1] w-full overflow-hidden bg-muted" data-testid="pages-share-local">
+          {#if framed}<img src={shown.url} alt="" aria-hidden="true" class="absolute inset-0 h-full w-full scale-110 object-cover blur-xl brightness-[0.6]" />{/if}
+          <img src={shown.url} alt="" class={`relative h-full w-full ${framed ? 'object-contain' : 'object-cover'}`} />
+        </div>
+      {:else}
+        <img src={card ?? fallback} alt="" class="aspect-[1.91/1] w-full object-cover" data-default={card ? null : 'true'} />
+      {/if}
       <div class="grid gap-1 border-t bg-muted/40 px-3 py-2.5">
         <span class="text-xs uppercase tracking-wide text-muted-foreground">{host}</span>
         <span class="line-clamp-2 text-sm font-semibold">{title}</span>

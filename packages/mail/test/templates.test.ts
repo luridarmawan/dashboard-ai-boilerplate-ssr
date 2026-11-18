@@ -93,6 +93,81 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(evil.html).not.toContain('<script>alert(1)');
     expect(evil.html).toContain('&lt;script&gt;');
   });
+  /** A module composes the words; the template lays them out and escapes every one of them. */
+  test('notice: lays out what a module composed, escaped, with an optional button', () => {
+    const r = renderTemplate(
+      'notice',
+      'id',
+      {
+        subject: 'Pendaftaran diterima: Liga <Hedef>',
+        name: 'Budi & Ani',
+        intro: 'Terima kasih.\n\nData Anda:',
+        rows: [
+          { label: 'Nama', value: '<b>Budi</b>' },
+          { label: 'Kosong', value: '  ' },
+          { label: 'Kelas', value: 'SD Putra\nZambi' },
+        ],
+        sections: [{ title: 'Pembayaran', body: 'BCA 123\na.n. Panitia' }],
+        link: 'https://osa.test/event/x/payment?t=abc',
+        cta: 'Unggah bukti transfer',
+        note: 'Email otomatis.',
+      },
+      brand,
+    );
+    expect(r.subject).toBe('Pendaftaran diterima: Liga <Hedef> — Acme Dash');
+    expect(r.html).toContain('Liga &lt;Hedef&gt;');
+    expect(r.html).toContain('Halo Budi &amp; Ani,');
+    expect(r.html).toContain('&lt;b&gt;Budi&lt;/b&gt;');
+    expect(r.html).not.toContain('<b>Budi');
+    expect(r.html).not.toContain('Kosong');
+    expect(r.html).toContain('SD Putra<br>Zambi');
+    expect(r.html).toContain('BCA 123<br>a.n. Panitia');
+    expect(r.html).toContain('Unggah bukti transfer');
+    expect(r.text).toContain('Halo Budi & Ani,');
+    expect(r.text).toContain('Nama: <b>Budi</b>');
+    expect(r.text).toContain('Unggah bukti transfer: https://osa.test/event/x/payment?t=abc');
+    const bare = renderTemplate('notice', 'en', { subject: 'Hi' }, brand);
+    expect(bare.html).not.toContain('<a href');
+    expect(bare.html).not.toContain('Hello');
+  });
+  test('notice: a translation follows the first language, sharing the link', () => {
+    const r = renderTemplate(
+      'notice',
+      'id',
+      {
+        subject: 'Pendaftaran diterima / Registration received: Liga',
+        title: 'Pendaftaran diterima',
+        name: 'Budi',
+        intro: 'Terima kasih.',
+        rows: [{ label: 'Tanggal', value: '1 Januari 2027' }],
+        link: 'https://osa.test/event/x',
+        cta: 'Lihat event',
+        note: 'Email otomatis.',
+        translation: {
+          locale: 'en',
+          title: 'Registration <received>',
+          name: 'Budi',
+          intro: 'Thank you.',
+          rows: [{ label: 'Date', value: '1 January 2027' }],
+          cta: 'View the event',
+          note: 'Automatic e-mail.',
+        },
+      },
+      brand,
+    );
+    expect(r.subject).toBe('Pendaftaran diterima / Registration received: Liga — Acme Dash');
+    const at = (s: string) => r.html.indexOf(s);
+    expect(at('Halo Budi,')).toBeGreaterThan(-1);
+    expect(at('Registration &lt;received&gt;')).toBeGreaterThan(at('Email otomatis.'));
+    expect(at('Hello Budi,')).toBeGreaterThan(at('Registration &lt;received&gt;'));
+    expect(at('1 January 2027')).toBeGreaterThan(at('1 Januari 2027'));
+    expect(r.html.match(/href="https:\/\/osa\.test\/event\/x"/g)).toHaveLength(3);
+    // The raw-link fallback comes once, at the end, in both languages.
+    expect(at('If the button does not work')).toBeGreaterThan(at('Automatic e-mail.'));
+    expect(at('Bila tombol tidak berfungsi')).toBeGreaterThan(at('Automatic e-mail.'));
+    expect(r.text.indexOf('Thank you.')).toBeGreaterThan(r.text.indexOf('Terima kasih.'));
+    expect(r.text).toContain('View the event: https://osa.test/event/x');
+  });
   test('unknown locale falls back to en, never to an empty string', () => {
     const r = renderTemplate('verify-email', 'fr', { name: 'X', link: 'https://x/y' }, brand);
     expect(r.subject).toContain('Verify');

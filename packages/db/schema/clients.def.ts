@@ -16,6 +16,8 @@ export const clients = defineTable({
     parent_id: col.uuid().nullable(),
     /** Unique slug for URLs and the X-Client-ID header; ascii_bin for strict comparison. */
     code: col.identifier(32),
+    /** Short display code (`JKT`): 1–3 upper-case letters, optional, unique when set. */
+    short_code: col.identifier(3).nullable(),
     name: col.varchar(191),
     description: col.text().nullable(),
     /** External reference: cooperation agreement, certificate, contract number (`PKS/012/X/2026`). */
@@ -55,5 +57,9 @@ export const clients = defineTable({
     maps_url: col.varchar(2048).nullable(),
     url: col.varchar(2048).nullable(),
   },
-  indexes: [{ columns: ['code'], unique: true }, { columns: ['parent_id'] }],
+  indexes: [
+    { columns: ['code'], unique: true },
+    { columns: ['short_code'], unique: true },
+    { columns: ['parent_id'] },
+  ],
 });

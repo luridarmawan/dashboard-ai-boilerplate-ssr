@@ -57,6 +57,7 @@
   "example.admin.state": "Status",
   "example.admin.mark_read": "Tandai dibaca",
   "example.admin.mark_spam": "Tandai spam",
+  "example.admin.inquiry_updated": "Status pesan diperbarui.",
   "example.widget.title": "Etalase",
   "example.widget.products": "produk",
   "example.widget.inquiries": "pesan baru",

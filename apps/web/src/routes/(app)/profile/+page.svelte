@@ -1,15 +1,20 @@
 <script lang="ts">
 import { enhance } from '$app/forms';
 import Csrf from '$lib/components/Csrf.svelte';
-import { type FieldDef, FormBuilder } from '$lib/components/form';
+import { type FieldDef, FormBuilder, useSaveForm } from '$lib/components/form';
 import Icon from '$lib/components/Icon.svelte';
-import { Badge, Button, Card, Table } from '$lib/components/ui';
+import { Badge, Button, Card, ConfirmDelete, Table } from '$lib/components/ui';
 import { useLocale, useT } from '$lib/i18n';
 import type { LayoutData } from '../$types';
 import type { ActionData, PageData, SubmitFunction } from './$types';
 
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
+const save = useSaveForm();
+let hydrated = $state(false);
+$effect(() => {
+  hydrated = true;
+});
 
 /**
  * Avatar changes without leaving the page. The plain POST stays the base layer — this only swaps
@@ -18,15 +23,14 @@ const t = useT();
  * re-reads the session for the same reason, which is what the no-JavaScript path relies on.
  */
 let avatarBusy = $state<'upload' | 'remove' | null>(null);
-const avatarSubmit =
-  (which: 'upload' | 'remove'): SubmitFunction =>
-  () => {
-    avatarBusy = which;
-    return async ({ update }) => {
-      await update();
-      avatarBusy = null;
-    };
-  };
+const avatarSubmit = (which: 'upload' | 'remove'): SubmitFunction =>
+  save({
+    success: t('profile.avatar.saved'),
+    failureTitle: which === 'upload' ? t('profile.avatar.upload') : t('profile.avatar.remove'),
+    reset: which === 'upload',
+    onStart: () => (avatarBusy = which),
+    onDone: () => (avatarBusy = null),
+  });
 const dateLocale = useLocale() === 'en' ? 'en-US' : 'id-ID';
 const profileFields: FieldDef[] = $derived([
   { name: 'name', type: 'string', label: t('profile.name'), required: true, maxlength: 191 },
@@ -165,7 +169,7 @@ const mfaError = $derived(
         </form>
       {/if}
     </div>
-    {#if form?.saved === 'avatar'}<p class="notice mt-3">{t('profile.avatar.saved')}</p>{/if}
+    {#if form?.saved === 'avatar' && !hydrated}<p class="notice mt-3">{t('profile.avatar.saved')}</p>{/if}
     {#if form?.saved === undefined && fieldErrors.avatar}<p class="error mt-3" role="alert">{fieldErrors.avatar}</p>{/if}
     {#if form?.saved === undefined && fieldErrors.file}<p class="error mt-3" role="alert">{fieldErrors.file}</p>{/if}
   </Card>
@@ -196,24 +200,24 @@ const mfaError = $derived(
           <div class="grid gap-2 text-sm">
             <p>{t('profile.mfa.scan')}</p>
             <code class="select-all break-all rounded-md border bg-background px-2 py-1">{data.mfa.secret}</code>
-            <form method="POST" action="?/mfaEnable" class="flex flex-wrap items-end gap-2">
+            <form method="POST" action="?/mfaEnable" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.enabled_notice'), failureTitle: t('profile.mfa.enable') })}>
               <Csrf token={data.csrf} />
               <label class="grid gap-1"><span>{t('profile.mfa.code_label')}</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
               <Button type="submit" size="sm">{t('profile.mfa.enable')}</Button>
             </form>
             {#if mfaError}<p class="error" role="alert">{mfaError}</p>{/if}
-            <form method="POST" action="?/mfaSetup" class="text-xs text-muted-foreground"><Csrf token={data.csrf} />{t('profile.mfa.not_scanned')} <button type="submit" class="underline">{t('profile.mfa.restart')}</button></form>
+            <form method="POST" action="?/mfaSetup" class="text-xs text-muted-foreground" use:enhance={save({ success: false, failureTitle: t('profile.mfa.setup') })}><Csrf token={data.csrf} />{t('profile.mfa.not_scanned')} <button type="submit" class="underline">{t('profile.mfa.restart')}</button></form>
           </div>
         </div>
       {:else if data.mfa.enabled}
         <p class="text-sm"><Badge variant="success">{t('common.active')}</Badge> · {t('profile.mfa.codes_left', { n: data.mfa.recoveryCodesLeft })}</p>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
-          <form method="POST" action="?/mfaCodes" class="flex flex-wrap items-end gap-2">
+          <form method="POST" action="?/mfaCodes" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.codes_replaced'), failureTitle: t('profile.mfa.new_codes') })}>
             <Csrf token={data.csrf} />
             <label class="grid gap-1 text-sm"><span>{t('profile.mfa.current_code')}</span><input name="code" inputmode="numeric" autocomplete="one-time-code" required minlength="6" maxlength="8" class="h-9 w-36 rounded-md border border-input bg-background px-2" /></label>
             <Button type="submit" variant="outline" size="sm">{t('profile.mfa.new_codes')}</Button>
           </form>
-          <form method="POST" action="?/mfaDisable" class="flex flex-wrap items-end gap-2">
+          <form method="POST" action="?/mfaDisable" class="flex flex-wrap items-end gap-2" use:enhance={save({ success: t('profile.mfa.disabled_notice'), failureTitle: t('profile.mfa.disable'), reset: true })}>
             <Csrf token={data.csrf} />
             <label class="grid gap-1 text-sm"><span>{t('profile.password.current')}</span><input name="password" type="password" autocomplete="current-password" required class="h-9 w-44 rounded-md border border-input bg-background px-2" /></label>
             <Button type="submit" variant="destructive" size="sm">{t('profile.mfa.disable')}</Button>
@@ -222,9 +226,9 @@ const mfaError = $derived(
         {#if form?.saved === undefined && form?.error && !mfaError}<p class="error mt-2" role="alert">{form.error}</p>{/if}
       {:else}
         <p class="text-sm text-muted-foreground">{t('profile.mfa.off')}</p>
-        <form method="POST" action="?/mfaSetup" class="mt-3"><Csrf token={data.csrf} /><Button type="submit" size="sm" class="cursor-pointer"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
+        <form method="POST" action="?/mfaSetup" class="mt-3" use:enhance={save({ success: false, failureTitle: t('profile.mfa.setup') })}><Csrf token={data.csrf} /><Button type="submit" size="sm" class="cursor-pointer"><Icon name="shield" size={14} />{t('profile.mfa.setup')}</Button></form>
       {/if}
-      {#if form?.saved === 'mfaDisabled'}<p class="notice mt-3">{t('profile.mfa.disabled_notice')}</p>{/if}
+      {#if form?.saved === 'mfaDisabled' && !hydrated}<p class="notice mt-3">{t('profile.mfa.disabled_notice')}</p>{/if}
     </div>
   </Card>
   <Card title={t('profile.password.title')} description={t('profile.password.desc')}>
@@ -232,7 +236,7 @@ const mfaError = $derived(
   </Card>
   {#if data.canTokens}
   <!-- MCP integration (I-4): only for someone allowed to use MCP tools; the actions check it too. -->
-  <Card title={t('profile.tokens.title')} description={t('profile.tokens.desc')}>
+  <Card id="tokens" title={t('profile.tokens.title')} description={t('profile.tokens.desc')}>
     {#if form?.saved === 'token' && form.token}
       <div class="notice mb-4" role="status" data-testid="new-token">
         <p class="font-medium">{t('profile.tokens.created', { name: form.tokenName ?? '' })}</p>
@@ -240,7 +244,8 @@ const mfaError = $derived(
         <p class="mt-2 text-sm text-muted-foreground">{t('profile.tokens.example')} <code>claude mcp add --transport http dashboard {data.appOrigin ?? ''}/v1/mcp --header "Authorization: Bearer …"</code></p>
       </div>
     {/if}
-    {#if form?.saved === 'revoke'}<p class="notice mb-4">{t('profile.tokens.revoked')}</p>{/if}
+    {#if form?.saved === 'revoke' && !hydrated}<p class="notice mb-4">{t('profile.tokens.revoked')}</p>{/if}
+    {#if form?.code === 'confirm_failed'}<p class="error mb-4" role="alert">{form.error}</p>{/if}
     {#if data.tokens.length}
       <Table caption={t('profile.tokens.caption')}>
         <thead><tr><th>{t('profile.name')}</th><th>{t('profile.tokens.scopes_col')}</th><th>{t('profile.tokens.expires_col')}</th><th>{t('profile.tokens.last_used')}</th><th></th></tr></thead>
@@ -252,7 +257,28 @@ const mfaError = $derived(
               <td>{tk.expiresAt ? fmt(tk.expiresAt) : t('profile.tokens.no_expiry_cell')}</td>
               <td>{fmt(tk.lastUsedAt)}</td>
               <td class="text-end">
-                <form method="POST" action="?/revokeToken"><Csrf token={data.csrf} /><input type="hidden" name="id" value={tk.id} /><Button type="submit" variant="ghost" size="sm" class="text-destructive"><Icon name="trash" size={14} />{t('profile.tokens.revoke')}</Button></form>
+                <!-- Revoking cuts off every client using the token: confirmed first, in a modal with
+                     JavaScript, on this page via `?confirm=revoke&token=` without it. -->
+                <ConfirmDelete
+                  compact
+                  compactLabel
+                  csrf={data.csrf}
+                  action="?/revokeToken"
+                  confirm="revoke"
+                  href={`?confirm=revoke&token=${tk.id}#tokens`}
+                  cancelHref="/profile#tokens"
+                  confirming={data.confirmRevokeId === tk.id}
+                  variant="ghost"
+                  size="sm"
+                  class="text-destructive"
+                  label={t('profile.tokens.revoke')}
+                  title={t('profile.tokens.revoke_confirm')}
+                  description={t('profile.tokens.revoke_confirm_lead', { name: tk.name })}
+                  confirmLabel={t('profile.tokens.revoke_confirm_submit')}
+                  enhance={save({ success: t('profile.tokens.revoked'), failureTitle: t('profile.tokens.revoke') })}
+                >
+                  {#snippet fields()}<input type="hidden" name="id" value={tk.id} />{/snippet}
+                </ConfirmDelete>
               </td>
             </tr>
           {/each}

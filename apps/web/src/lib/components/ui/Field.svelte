@@ -23,7 +23,9 @@ let {
 }: Props = $props();
 </script>
 
-<div class={cn('grid gap-1.5', className)}>
+<!-- `content-start`: beside a taller neighbour (one with a hint) the stretched grid would spread
+     the extra height between its rows and push the label and control out of line. -->
+<div class={cn('grid content-start gap-1.5', className)}>
   {#if label}
     <label for={htmlFor} class="text-sm font-medium leading-none">
       {label}{#if required}<span class="text-destructive" aria-hidden="true"> *</span>{/if}

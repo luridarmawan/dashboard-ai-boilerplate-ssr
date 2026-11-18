@@ -12,6 +12,8 @@ import {
   actionFailure,
   apiFor,
   checkCsrf,
+  confirmed,
+  confirmFail,
   forwardSetCookies,
   str,
   unwrap,
@@ -21,9 +23,10 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async (event) => {
   const t = createTranslator(event.locals.locale.locale);
   const client = apiFor(event);
-  const [user, groups] = await Promise.all([
+  const [user, groups, tenants] = await Promise.all([
     client.v1.users({ id: event.params.id }).get(),
     allGroups(event),
+    client.v1.users({ id: event.params.id }).tenants.get(),
   ]);
   if (!user.data?.success)
     error(user.status === 404 ? 404 : user.status, t('users.detail.not_found'));
@@ -33,13 +36,20 @@ export const load: PageServerLoad = async (event) => {
     user: user.data.data,
     viewer: { id: me?.id ?? '', isSuperadmin: me?.isSuperadmin ?? false },
     groups: groups.ok ? groups.rows : [],
+    /** Tenant access (B-2/B-4): what this user may open, as far as the viewer may see it. */
+    tenants: tenants.data?.success
+      ? tenants.data.data
+      : { memberships: [], hidden: 0, candidates: [] },
     created: event.url.searchParams.has('created'),
     /**
      * Removing a user is destructive (the account itself is soft-deleted with its last tenant), so
      * it takes two steps: `?confirm=delete` opens the confirmation — a plain link, no JavaScript
      * needed (L-22) — and the action below still refuses a POST whose typed e-mail does not match.
+     * `&tenant=<id>` is the same confirmation for revoking ONE tenant's access; the two never answer
+     * for each other.
      */
-    confirmDelete: event.url.searchParams.get('confirm') === 'delete',
+    confirmDelete: confirmed(event) && !event.url.searchParams.has('tenant'),
+    confirmTenantId: confirmed(event) ? event.url.searchParams.get('tenant') : null,
     /**
      * `.test` / `.invalid` addresses never receive mail (RFC 2606), so the reset-link button is not
      * offered for them; the API refuses the same addresses, this only spares the click.
@@ -185,6 +195,48 @@ export const actions: Actions = {
       return actionFailure(r.failure, {}, { scope: 'resetLink' });
     }
     return { linkSent: true };
+  },
+  /** Give this user access to one more tenant (B-2): the API checks `user.create` THERE. */
+  addTenant: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        {},
+        { scope: 'tenants' },
+      );
+    const r = unwrap<{ success: true; data: { tenant: { name: string } } }>(
+      await apiFor(event)
+        .v1.users({ id: event.params.id })
+        .tenants.post({ clientId: str(form, 'clientId') }),
+    );
+    if (!r.ok) return actionFailure(r.failure, {}, { scope: 'tenants' });
+    return { tenantAdded: r.data.data.tenant.name };
+  },
+  /**
+   * Revoke this user's access to one tenant. Confirmed like the removal below (L-22) — it is the
+   * same step, aimed at a tenant other than the active one — and enforced here, not only in the
+   * markup. Revoking the ACTIVE tenant makes this page a 404, so that case leaves for the list.
+   */
+  removeTenant: async (event) => {
+    const t = createTranslator(event.locals.locale.locale);
+    const form = await event.request.formData();
+    if (!checkCsrf(event, form))
+      return actionFailure(
+        { status: 403, code: 'csrf_failed', message: t('common.form_expired') },
+        {},
+        { scope: 'tenants' },
+      );
+    if (!confirmed(event)) return confirmFail(event.locals.locale.locale);
+    const clientId = str(form, 'clientId');
+    const tenantName = str(form, 'tenantName');
+    const r = unwrap(
+      await apiFor(event).v1.users({ id: event.params.id }).tenants({ clientId }).delete(),
+    );
+    if (!r.ok) return actionFailure(r.failure, {}, { scope: 'tenants' });
+    if (clientId === event.locals.session?.clientId) redirect(303, '/users');
+    return { tenantRemoved: tenantName };
   },
   delete: async (event) => {
     const t = createTranslator(event.locals.locale.locale);

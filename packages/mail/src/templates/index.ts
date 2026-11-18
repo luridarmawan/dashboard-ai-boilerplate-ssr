@@ -37,7 +37,43 @@ export type TemplateId =
   | 'invite'
   | 'invite-existing'
   | 'contact'
-  | 'contact-ack';
+  | 'contact-ack'
+  | 'notice';
+
+/**
+ * Payload of the generic `notice` template: a module composes the message in the recipient's
+ * language and the template only lays it out (and escapes every string). This is how a module
+ * sends mail of its own without a template in core.
+ */
+export interface NoticeData {
+  /** Subject line; ` — <app name>` is appended. */
+  readonly subject: string;
+  /** Heading of the message; the subject when empty. */
+  readonly title?: string;
+  /** Greets the recipient by name ("Hello Budi,"); empty = a plain greeting, absent = none. */
+  readonly name?: string;
+  /** Paragraphs before the table; blank lines separate paragraphs. */
+  readonly intro?: string;
+  /** Label/value pairs shown as a table (the data a form sent, an order, …). */
+  readonly rows?: readonly { readonly label: string; readonly value: string }[];
+  /** Titled blocks after the table; line breaks are kept. */
+  readonly sections?: readonly { readonly title?: string; readonly body: string }[];
+  /** Call to action: `link` with `cta` as the button label (tracked like the other templates). */
+  readonly link?: string;
+  readonly cta?: string;
+  /** Small print at the end. */
+  readonly note?: string;
+  /**
+   * The same message in a second language, laid out below the first after a divider (a
+   * bilingual mail). It shares the subject and the link; the subject should name both languages.
+   */
+  readonly translation?: NoticeTranslation;
+}
+
+/** The body of a notice in another language: its own words, the parent's link. */
+export interface NoticeTranslation extends Omit<NoticeData, 'subject' | 'link' | 'translation'> {
+  readonly locale: string;
+}
 
 type Dict = Record<string, string>;
 const T: Record<'id' | 'en', Dict> = {
@@ -158,8 +194,8 @@ function shell(
 }
 const button = (href: string, label: string, color: string) =>
   `<p style="margin:24px 0"><a href="${escapeHtml(href)}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600">${label}</a></p>`;
-const fallback = (locale: string, href: string) =>
-  `<p style="color:#71717a;font-size:12px">${tr(locale, 'link.fallback')}<br><a href="${escapeHtml(href)}" style="color:#71717a">${escapeHtml(href)}</a></p>`;
+const fallback = (locale: string, href: string, also: string | null = null) =>
+  `<p style="color:#71717a;font-size:12px">${tr(locale, 'link.fallback')}${also && also !== locale ? `<br>${tr(also, 'link.fallback')}` : ''}<br><a href="${escapeHtml(href)}" style="color:#71717a">${escapeHtml(href)}</a></p>`;
 
 export function renderTemplate(
   id: TemplateId,
@@ -238,6 +274,8 @@ export function renderTemplate(
         text: `${tr(locale, 'contact_ack.body')}\n\n${tr(locale, 'contact_ack.copy')}\n${String(data.message ?? '')}\n\n${tr(locale, 'contact_ack.noreply')}`,
       };
     }
+    case 'notice':
+      return renderNotice(locale, data as unknown as NoticeData, brand, cta, shellHtml);
     case 'contact': {
       const subject = tr(locale, 'contact.subject', { app, name });
       const msg = escapeHtml(String(data.message ?? '')).replace(/\n/g, '<br>');
@@ -249,4 +287,102 @@ export function renderTemplate(
       };
     }
   }
+}
+
+/** Text with its line breaks, safe for HTML. */
+const multiline = (s: string) => escapeHtml(s).replace(/\r?\n/g, '<br>');
+const str = (v: unknown) =>
+  typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v);
+
+function renderNotice(
+  locale: string,
+  d: NoticeData,
+  brand: Brand,
+  cta: string,
+  shellHtml: (locale: string, subject: string, body: string) => string,
+): Rendered {
+  const subject = `${str(d.subject)} — ${brand.appName}`;
+  const title = str(d.title) || str(d.subject);
+  const link = str(d.link);
+  const alt = d.translation && typeof d.translation === 'object' ? d.translation : null;
+  const first = noticeBody(locale, d, link, brand, cta);
+  const html = [...first.html];
+  const text = [...first.text];
+  if (alt) {
+    const altLocale = str(alt.locale) || 'en';
+    const second = noticeBody(altLocale, alt, link, brand, cta);
+    const altTitle = str(alt.title);
+    html.push(
+      `<hr style="margin:32px 0;border:0;border-top:1px solid #e4e4e7">`,
+      altTitle
+        ? `<h2 lang="${escapeHtml(altLocale)}" style="margin:0 0 16px;font-size:18px">${escapeHtml(altTitle)}</h2>`
+        : '',
+      ...second.html,
+    );
+    text.push('— — —', ...(altTitle ? [altTitle] : []), ...second.text);
+  }
+  // The raw-link fallback once, at the very end, in every language the mail speaks.
+  if (link) {
+    html.push(fallback(locale, link, alt ? str(alt.locale) || 'en' : null));
+  }
+  return { subject, html: shellHtml(locale, title, html.join('')), text: text.join('\n\n') };
+}
+
+/** Greeting, paragraphs, table, sections, button and small print of one language. */
+function noticeBody(
+  locale: string,
+  d: Omit<NoticeData, 'subject' | 'link'>,
+  link: string,
+  brand: Brand,
+  cta: string,
+): { html: string[]; text: string[] } {
+  const html: string[] = [];
+  const text: string[] = [];
+  if (d.name !== undefined) {
+    const name = str(d.name).trim();
+    html.push(`<p>${greeting(locale, name)}</p>`);
+    // The text part carries the name as typed, not HTML-escaped.
+    const dict = T[locale === 'id' ? 'id' : 'en'];
+    text.push(name ? (dict.hello ?? '').replace('{name}', name) : (dict['hello.anon'] ?? ''));
+  }
+  const paragraphs = str(d.intro)
+    .split(/\r?\n\s*\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  for (const para of paragraphs) {
+    html.push(`<p>${multiline(para)}</p>`);
+    text.push(para);
+  }
+  const rows = Array.isArray(d.rows) ? d.rows.filter((r) => r && str(r.value).trim()) : [];
+  if (rows.length) {
+    const cell = 'padding:6px 0;vertical-align:top;border-bottom:1px solid #f4f4f5';
+    html.push(
+      `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:16px 0;border-collapse:collapse;font-size:14px">${rows
+        .map(
+          (r) =>
+            `<tr><td style="${cell};padding-right:12px;color:#71717a;white-space:nowrap">${escapeHtml(str(r.label))}</td><td style="${cell}">${multiline(str(r.value))}</td></tr>`,
+        )
+        .join('')}</table>`,
+    );
+    text.push(rows.map((r) => `${str(r.label)}: ${str(r.value)}`).join('\n'));
+  }
+  for (const sec of Array.isArray(d.sections) ? d.sections : []) {
+    if (!sec || !str(sec.body).trim()) continue;
+    const head = str(sec.title)
+      ? `<p style="margin:24px 0 4px;font-weight:600">${escapeHtml(str(sec.title))}</p>`
+      : '';
+    html.push(
+      `${head}<div style="margin:4px 0 16px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${multiline(str(sec.body))}</div>`,
+    );
+    text.push(str(sec.title) ? `${str(sec.title)}\n${str(sec.body)}` : str(sec.body));
+  }
+  if (link) {
+    html.push(button(cta, escapeHtml(str(d.cta) || link), brand.primary));
+    text.push(str(d.cta) ? `${str(d.cta)}: ${link}` : link);
+  }
+  if (str(d.note).trim()) {
+    html.push(`<p style="color:#71717a;font-size:12px">${multiline(str(d.note))}</p>`);
+    text.push(str(d.note));
+  }
+  return { html, text };
 }

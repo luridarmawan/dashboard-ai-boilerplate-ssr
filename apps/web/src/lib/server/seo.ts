@@ -30,11 +30,26 @@ export interface ShareImage {
   readonly mime: string;
 }
 
+/** Size of every card `/v1/opengraph/<fileId>` serves (apps/api/src/lib/og-image.ts). */
+export const OG_CARD = { width: 1200, height: 630, mime: 'image/jpeg' } as const;
+
+/**
+ * The share card of a PUBLIC uploaded image: `GET /v1/opengraph/<fileId>` turns whatever was
+ * uploaded (tall poster, square logo, huge photo) into one 1200 × 630 JPEG, so the link preview
+ * looks the same on every network and its size is always known. Use it for og:image /
+ * twitter:image whenever the image is an upload with a public file id; an external URL has no
+ * card and goes into og:image as it is.
+ */
+export function ogCard(origin: string, fileId: string): ShareImage {
+  return { url: `${origin}/v1/opengraph/${encodeURIComponent(fileId)}`, ...OG_CARD };
+}
+
 /**
  * The site's default share image for this request: the one an admin uploaded under Settings →
  * Application (`app.share_image`, the visitor's tenant else global), else the file the deploy
  * ships (`DEFAULT_OG_IMAGE`). Public pages without an image of their own put it in og:image and
- * twitter:image. Absolute, as crawlers require. Asks the API only when the setting is filled.
+ * twitter:image, as its 1200 × 630 card (`ogCard`). Absolute, as crawlers require. Asks the API
+ * only when the setting is filled, to confirm the file still exists and is public.
  */
 export async function shareImage(event: RequestEvent): Promise<ShareImage> {
   const origin = event.url.origin;
@@ -60,5 +75,6 @@ export async function shareImage(event: RequestEvent): Promise<ShareImage> {
     },
   );
   if (!meta) return fallback;
-  return { ...meta, url: /^https?:\/\//.test(meta.url) ? meta.url : `${origin}${meta.url}` };
+  // An uploaded, public, readable image: share its card rather than the upload itself.
+  return ogCard(origin, id);
 }

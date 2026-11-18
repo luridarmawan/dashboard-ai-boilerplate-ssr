@@ -1,4 +1,4 @@
-import { readFile, removeFile, storeUpload } from '@app/api/files';
+import { readFile, removeFile, setFileVisibility, storeUpload } from '@app/api/files';
 import {
   assertPermalinkFree,
   claimPermalink,
@@ -46,6 +46,7 @@ import {
   featuredFile,
   featuredMeta,
   mediaPath,
+  visibilityFor,
 } from './featured.ts';
 import { renderMarkdown } from './markdown.ts';
 import { MODULE, pathOf, slugify } from './permalinks.ts';
@@ -92,6 +93,8 @@ const view = (r: Row) => ({
 });
 /** A featured image: where to fetch it and what it is (size feeds og:image:width/height). */
 const Image = t.Object({
+  /** The (public) file's id — its 1200 × 630 share card is `/v1/opengraph/<id>`. */
+  fileId: t.String(),
   url: t.String(),
   width: t.Nullable(t.Integer()),
   height: t.Nullable(t.Integer()),
@@ -112,7 +115,9 @@ const detail = async (tenant: TenantDb, r: Row) => {
   return {
     ...view(r),
     redirects: redirects.map((x) => ({ oldSlug: x.path.slice(1), createdAt: x.createdAt })),
-    image: file ? { url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) } : null,
+    image: file
+      ? { fileId: file.id, url: adminUrl(file), alt: r.image_alt, ...featuredMeta(file) }
+      : null,
   };
 };
 const SlugChange = t.Object({
@@ -147,7 +152,9 @@ const publicView = async (clientId: string, r: Row) => {
     slug: r.slug,
     summary: r.summary,
     html: renderMarkdown(r.body),
-    image: file ? { url: mediaPath(file.id), alt: r.image_alt, ...featuredMeta(file) } : null,
+    image: file
+      ? { fileId: file.id, url: mediaPath(file.id), alt: r.image_alt, ...featuredMeta(file) }
+      : null,
     publishedAt: r.published_at ? r.published_at.toISOString() : null,
     updatedAt: r.updated_at.toISOString(),
   };
@@ -435,6 +442,12 @@ export default defineApiRoutes(
           throw err;
         }
         const after = (await tenant.selectOne(schema.pagesPages, live(before.id))) as Row;
+        // Publishing makes the featured image public (crawlers may fetch it and its share card);
+        // back to draft makes it private again.
+        if (body.status !== undefined && after.image_id) {
+          const image = await featuredFile(clientId, after.image_id);
+          if (image) await setFileVisibility(image, visibilityFor(after.status));
+        }
         await writeAudit(unsafeAcrossTenants(), {
           clientId,
           actorId: auth?.user.id ?? null,
@@ -527,6 +540,37 @@ export default defineApiRoutes(
         },
       },
     )
+    .get(
+      '/images/:fileId',
+      async ({ params, set, requestId, tenantState }) => {
+        const clientId = tenantState?.clientId;
+        const file = clientId ? await featuredFile(clientId, params.fileId) : null;
+        const obj = file ? await readFile(file) : null;
+        if (!file || !obj) {
+          set.status = 404;
+          return fail('not_found', 'Gambar tidak ditemukan', requestId);
+        }
+        return new Response(new Blob([obj.bytes as unknown as ArrayBuffer]), {
+          headers: {
+            'content-type': file.mime,
+            'content-length': String(obj.bytes.byteLength),
+            'x-content-type-options': 'nosniff',
+            'cache-control': 'private, max-age=300',
+            'x-request-id': requestId,
+          },
+        });
+      },
+      {
+        beforeHandle: permission('pages.page.read'),
+        params: t.Object({ fileId: Id }),
+        response: { 200: t.Unknown(), ...errorResponses },
+        detail: {
+          summary: 'Featured image (dashboard)',
+          description:
+            'A featured image of the active tenant, public or private (private while its page is a draft). For the editor; visitors use the public media route.',
+        },
+      },
+    )
     .post(
       '/pages/:id/image',
       async ({ auth, params, body, set, request, server, requestId, tenantState }) => {
@@ -542,7 +586,8 @@ export default defineApiRoutes(
           userId: auth?.user.id ?? null,
           file: body.file,
           kind: FEATURED_KIND,
-          visibility: 'public',
+          // Public only while the page is: a draft's image stays private (see ./featured.ts).
+          visibility: visibilityFor(before.status),
           allowedTypes: FEATURED_TYPES,
           maxBytes: FEATURED_MAX_BYTES,
           meta: { page_id: before.id },

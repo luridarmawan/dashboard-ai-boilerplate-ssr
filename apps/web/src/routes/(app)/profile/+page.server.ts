@@ -6,6 +6,8 @@ import {
   actionFailure,
   apiFor,
   checkCsrf,
+  confirmed,
+  confirmFail,
   optStr,
   refreshSession,
   str,
@@ -43,6 +45,11 @@ export const load: PageServerLoad = async (event) => {
     tokens: tokens?.data?.success ? tokens.data.data : [],
     mfa: { ...mfa, qr },
     appOrigin: event.url.origin,
+    /**
+     * Revoking cuts off every client using the token, so it is confirmed first (L-22): the
+     * trigger links to `?confirm=revoke&token=<id>`, which opens the confirmation for that row.
+     */
+    confirmRevokeId: confirmed(event, 'revoke') ? event.url.searchParams.get('token') : null,
     themes: [...themes(), ...event.locals.config.customThemes.map((c) => c.manifest)]
       .filter(
         (t) =>
@@ -224,6 +231,8 @@ export const actions: Actions = {
     if (!checkCsrf(event, form)) return csrfFail(event.locals.locale.locale);
     const denied = tokensDenied(event);
     if (denied) return denied;
+    // Enforced here too: a confirmation that lives only in the markup is not one.
+    if (!confirmed(event, 'revoke')) return confirmFail(event.locals.locale.locale);
     const r = unwrap(
       await apiFor(event)
         .v1.tokens({ id: str(form, 'id') })

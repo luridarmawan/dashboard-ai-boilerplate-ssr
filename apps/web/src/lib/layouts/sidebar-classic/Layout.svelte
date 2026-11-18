@@ -15,7 +15,8 @@ import type { DashboardRegions } from '$lib/layouts/types';
 let { brand, nav, header, breadcrumb, content, aside, footer }: DashboardRegions = $props();
 </script>
 
-<div class="shell min-h-dvh md:grid md:grid-cols-[16rem_1fr]">
+<!-- --dashboard-header-h: height of the sticky header (h-14), for page bars that stick under it. -->
+<div class="shell min-h-dvh [--dashboard-header-h:3.5rem] md:grid md:grid-cols-[16rem_1fr]">
   <aside id="sidebar-rail" class="hidden border-e bg-card md:sticky md:top-0 md:flex md:h-dvh md:flex-col">
     <div class="flex h-14 items-center gap-2 border-b px-4" data-rail-head>
       <div class="min-w-0 flex-1 truncate" data-rail-brand>{@render brand()}</div>
