@@ -14,6 +14,7 @@ import {
   type BulkAction,
   type ColumnDef,
   iconActionClass,
+  iconActionSmClass,
   type RowAction,
   type TableState,
   withParams,
@@ -36,6 +37,8 @@ interface Props {
   state: TableState;
   csrf?: string;
   rowActions?: RowAction<Row>[];
+  /** `sm` draws icon-only row actions one step smaller. */
+  actionSize?: 'md' | 'sm';
   bulkActions?: BulkAction[];
   searchPlaceholder?: string;
   emptyTitle?: string;
@@ -84,6 +87,7 @@ let {
   state: tableState,
   csrf = '',
   rowActions = [],
+  actionSize = 'md',
   bulkActions = [],
   searchPlaceholder,
   emptyTitle = t('table.empty_title'),
@@ -98,6 +102,8 @@ let {
   labels: labelOverrides = {},
 }: Props = $props();
 
+const iconClass = $derived(actionSize === 'sm' ? iconActionSmClass : iconActionClass);
+const iconSize = $derived(actionSize === 'sm' ? 14 : 16);
 const L = $derived({ ...defaultLabels, ...labelOverrides });
 const visible = $derived(
   tableState.cols.length
@@ -352,13 +358,13 @@ const confirmPost = (b: BulkAction) =>
                     {#each rowActions as a (a.label)}
                       {#if !a.when || a.when(row)}
                         {#if a.href}
-                          <a href={a.href(row)} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
+                          <a href={a.href(row)} target={a.external ? '_blank' : undefined} rel={a.external ? 'noopener' : undefined} title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconClass : 'ms-2 inline-flex items-center gap-1 text-sm', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? iconSize : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</a>
                         {:else if a.action && csrf}
                           <form method="POST" action={a.action(row)} class="ms-2 inline" use:enhance={save({ success: a.success })}>
                             <Csrf token={csrf} />
                             <!-- A row action is row-scoped, so the id rides along: the server action reads `id` instead of the URL. -->
                             <input type="hidden" name="id" value={row.id} />
-                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconActionClass : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? 16 : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
+                            <button type="submit" title={a.iconOnly ? a.label : undefined} aria-label={a.iconOnly ? a.label : undefined} class={cn(a.iconOnly ? iconClass : 'inline-flex items-center gap-1 text-sm text-primary hover:underline', a.destructive && 'text-destructive')}>{#if a.icon}<Icon name={a.icon} size={a.iconOnly ? iconSize : 14} />{/if}{#if !a.iconOnly}{a.label}{/if}</button>
                           </form>
                         {/if}
                       {/if}

@@ -130,6 +130,44 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(bare.html).not.toContain('<a href');
     expect(bare.html).not.toContain('Hello');
   });
+  test('notice: a translation follows the first language, sharing the link', () => {
+    const r = renderTemplate(
+      'notice',
+      'id',
+      {
+        subject: 'Pendaftaran diterima / Registration received: Liga',
+        title: 'Pendaftaran diterima',
+        name: 'Budi',
+        intro: 'Terima kasih.',
+        rows: [{ label: 'Tanggal', value: '1 Januari 2027' }],
+        link: 'https://osa.test/event/x',
+        cta: 'Lihat event',
+        note: 'Email otomatis.',
+        translation: {
+          locale: 'en',
+          title: 'Registration <received>',
+          name: 'Budi',
+          intro: 'Thank you.',
+          rows: [{ label: 'Date', value: '1 January 2027' }],
+          cta: 'View the event',
+          note: 'Automatic e-mail.',
+        },
+      },
+      brand,
+    );
+    expect(r.subject).toBe('Pendaftaran diterima / Registration received: Liga — Acme Dash');
+    const at = (s: string) => r.html.indexOf(s);
+    expect(at('Halo Budi,')).toBeGreaterThan(-1);
+    expect(at('Registration &lt;received&gt;')).toBeGreaterThan(at('Email otomatis.'));
+    expect(at('Hello Budi,')).toBeGreaterThan(at('Registration &lt;received&gt;'));
+    expect(at('1 January 2027')).toBeGreaterThan(at('1 Januari 2027'));
+    expect(r.html.match(/href="https:\/\/osa\.test\/event\/x"/g)).toHaveLength(3);
+    // The raw-link fallback comes once, at the end, in both languages.
+    expect(at('If the button does not work')).toBeGreaterThan(at('Automatic e-mail.'));
+    expect(at('Bila tombol tidak berfungsi')).toBeGreaterThan(at('Automatic e-mail.'));
+    expect(r.text.indexOf('Thank you.')).toBeGreaterThan(r.text.indexOf('Terima kasih.'));
+    expect(r.text).toContain('View the event: https://osa.test/event/x');
+  });
   test('unknown locale falls back to en, never to an empty string', () => {
     const r = renderTemplate('verify-email', 'fr', { name: 'X', link: 'https://x/y' }, brand);
     expect(r.subject).toContain('Verify');

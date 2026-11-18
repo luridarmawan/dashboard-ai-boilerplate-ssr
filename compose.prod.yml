@@ -136,6 +136,8 @@ services:
       XFF_DEPTH: ${XFF_DEPTH:-1}
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
+      # Largest request body adapter-node accepts; its 512K default refuses image uploads (413)
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-50M}
       # Branding and the landing fallback are rendered by web, so it needs them too (§4.7)
       LANDING_ROUTE: ${LANDING_ROUTE:-/}
       # The maintenance page is rendered by web; the same switch the api reads (E-10)

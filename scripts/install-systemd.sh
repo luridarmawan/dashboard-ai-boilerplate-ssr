@@ -38,15 +38,81 @@ SERVICE_NAME="${SERVICE_NAME:-crk}"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TEMPLATE="$REPO_DIR/deploy/systemd/user-app.service.template"
 UNIT_DIR="$HOME/.config/systemd/user"
-UNIT_FILE="$UNIT_DIR/$SERVICE_NAME.service"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-# Nama unit masuk ke nama berkas dan ke argumen systemctl.
-[[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] ||
-  die "SERVICE_NAME='$SERVICE_NAME' tidak sah — pakai huruf, angka, '-', '_', '.', '@'."
+# The unit name ends up in a file name and in systemctl arguments.
+valid_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+NAME_RULE="pakai huruf, angka, '-', '_', '.', '@'"
+valid_name "$SERVICE_NAME" || die "SERVICE_NAME='$SERVICE_NAME' tidak sah — $NAME_RULE."
 
 [[ -f "$TEMPLATE" ]] || die "template $TEMPLATE tidak ada."
+
+# --- existing unit with the same name -------------------------------------------
+# Prints the WorkingDirectory of an existing unit called "$1" ("?" when it has none) and
+# returns 0; returns 1 when no such unit exists. Looks at our own unit dir first, then
+# asks systemd (user units elsewhere, and system units such as /etc/systemd/system).
+existing_unit_dir() {
+  local name="$1" text=""
+  if [[ -f "$UNIT_DIR/$name.service" ]]; then
+    text="$(cat "$UNIT_DIR/$name.service")"
+  elif command -v systemctl >/dev/null 2>&1; then
+    text="$(systemctl --user cat "$name.service" 2>/dev/null ||
+      systemctl cat "$name.service" 2>/dev/null || true)"
+  fi
+  [[ -n "$text" ]] || return 1
+  local wd
+  wd="$(grep -m1 '^WorkingDirectory=' <<<"$text" | cut -d= -f2- || true)"
+  printf '%s' "${wd:-?}"
+}
+
+# Reads one answer from the terminal; fails when there is none (CI, pipes, cron).
+ask() {
+  local reply
+  { exec 3</dev/tty; } 2>/dev/null || return 1
+  printf '%s' "$1" >/dev/tty
+  IFS= read -r reply <&3 || { exec 3<&-; return 1; }
+  exec 3<&-
+  printf '%s' "$reply"
+}
+
+# Suggested alternative: the checkout's folder name, sanitized.
+SUGGESTED="$(basename "$REPO_DIR" | tr -c 'A-Za-z0-9_.@-' '-' | sed 's/-*$//')"
+NAME_CHANGED=0
+while OWNER_DIR="$(existing_unit_dir "$SERVICE_NAME")"; do
+  if [[ "$OWNER_DIR" == "$REPO_DIR" ]]; then
+    # Same checkout: a plain re-install, which must stay a one-liner.
+    echo "Service '$SERVICE_NAME' sudah ada untuk checkout ini ($REPO_DIR)."
+    REPLY_NAME="$(ask "Enter = pasang ulang '$SERVICE_NAME', atau ketik nama lain: ")" || {
+      echo "(tidak ada terminal — dipasang ulang dengan nama '$SERVICE_NAME')"
+      break
+    }
+    [[ -n "$REPLY_NAME" ]] || break
+  else
+    echo "Service '$SERVICE_NAME' sudah ada dan dipakai checkout/aplikasi lain" \
+      "(WorkingDirectory: $OWNER_DIR)."
+    HINT=""
+    if [[ -n "$SUGGESTED" && "$SUGGESTED" != "$SERVICE_NAME" ]] &&
+      valid_name "$SUGGESTED" && ! existing_unit_dir "$SUGGESTED" >/dev/null; then
+      HINT=" [Enter = $SUGGESTED]"
+    fi
+    REPLY_NAME="$(ask "Ketik nama service lain$HINT: ")" ||
+      die "service '$SERVICE_NAME' sudah ada dan tidak ada terminal untuk bertanya.
+  Ulangi dengan nama lain, mis.: SERVICE_NAME=${SUGGESTED:-myapp} bun run systemd:install"
+    if [[ -z "$REPLY_NAME" ]]; then
+      [[ -n "$HINT" ]] || { echo "Nama tidak boleh kosong."; continue; }
+      REPLY_NAME="$SUGGESTED"
+    fi
+  fi
+  if ! valid_name "$REPLY_NAME"; then
+    echo "Nama '$REPLY_NAME' tidak sah — $NAME_RULE."
+    continue
+  fi
+  SERVICE_NAME="$REPLY_NAME"
+  NAME_CHANGED=1
+done
+UNIT_FILE="$UNIT_DIR/$SERVICE_NAME.service"
+[[ $NAME_CHANGED -eq 0 ]] || echo "Memakai nama service: $SERVICE_NAME"
 
 # ExecStart= dipecah systemd pada spasi; path ber-spasi akan jadi dua argumen.
 case "$REPO_DIR" in
@@ -310,6 +376,9 @@ else
   echo "  journalctl --user -u $SERVICE_NAME -f"
 fi
 echo "  deploy berikutnya: cd $REPO_DIR && git pull && bun run build && systemctl --user restart $SERVICE_NAME"
+if [[ "$SERVICE_NAME" != "crk" ]]; then
+  echo "  pasang ulang / copot: SERVICE_NAME=$SERVICE_NAME bun run systemd:install | systemd:uninstall"
+fi
 
 # Mode journal dipilih sendiri, tapi belum tentu bisa dibaca di host ini — lebih baik
 # dikatakan sekarang daripada saat sesuatu rusak dan log-nya ternyata kosong.
