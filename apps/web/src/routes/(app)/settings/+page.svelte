@@ -3,6 +3,7 @@ import type { MessageKey } from '@core/i18n';
 import { onDestroy, onMount } from 'svelte';
 import { enhance } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
+import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import TimezoneClock from '$lib/components/TimezoneClock.svelte';
@@ -26,7 +27,9 @@ import MenuEditor from './MenuEditor.svelte';
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
 const locale = useLocale() === 'en' ? 'en' : 'id';
-const L = (v: { id: string; en: string } | null | undefined) => (v ? v[locale] : '');
+/** Localised registry text; `{origin}` becomes this site's origin (e.g. an OAuth callback URL to copy). */
+const L = (v: { id: string; en: string } | null | undefined) =>
+  v ? v[locale].replaceAll('{origin}', page.url.origin) : '';
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
