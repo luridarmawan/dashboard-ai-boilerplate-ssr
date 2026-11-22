@@ -368,7 +368,7 @@ onMount(() => {
   {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
   {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
   {#if f.type === 'image'}<input type="hidden" name="_images" value={f.key} />{/if}
-  {#snippet hintContent()}{#each noteParts(s, f) as p}{#if p.href}<a href={p.href} target="_blank" rel="noopener noreferrer" class="text-primary underline-offset-2 hover:underline">{p.text}</a>{:else}{p.text}{/if}{/each}{L(f.note) ? ' · ' : ''}{t('settings.hint_source', { source: sourceLabel[f.source] })}{f.public ? ` · ${t('settings.hint_public')}` : ''}{/snippet}
+  {#snippet hintContent()}{#each noteParts(s, f) as p}{#if p.href}<a href={p.href} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-0.5 font-medium text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary">{p.text}<Icon name="external-link" size={12} /></a>{:else}{p.text}{/if}{/each}{L(f.note) ? ' · ' : ''}{t('settings.hint_source', { source: sourceLabel[f.source] })}{f.public ? ` · ${t('settings.hint_public')}` : ''}{/snippet}
   <Field label={L(f.title)} for={id} {hintContent} error={err} class={WIDTH[f.width]}>
     {#if f.type === 'boolean'}
       <div class="flex flex-wrap items-center gap-4 text-sm">
