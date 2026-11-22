@@ -481,8 +481,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
         type: 'secret',
         title: { id: 'Google client secret', en: 'Google client secret' },
         note: {
-          id: 'Di Google Cloud Console (Credentials → OAuth client, jenis Web application), isi Authorized redirect URIs dengan {origin}/auth/google/callback. Daftarkan satu URI untuk setiap domain tempat aplikasi dibuka.',
-          en: 'In Google Cloud Console (Credentials → OAuth client, type Web application), add {origin}/auth/google/callback to Authorized redirect URIs. Register one URI for every domain the app is served from.',
+          id: 'Di [Google Cloud Console](https://console.cloud.google.com/auth/clients/{value:security.google_client_id}) (Credentials → OAuth client, jenis Web application), isi Authorized redirect URIs dengan {origin}/auth/google/callback. Daftarkan satu URI untuk setiap domain tempat aplikasi dibuka.',
+          en: 'In [Google Cloud Console](https://console.cloud.google.com/auth/clients/{value:security.google_client_id}) (Credentials → OAuth client, type Web application), add {origin}/auth/google/callback to Authorized redirect URIs. Register one URI for every domain the app is served from.',
         },
         order: 5,
       },
