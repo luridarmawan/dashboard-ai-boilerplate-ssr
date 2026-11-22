@@ -402,6 +402,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     section: 'security',
     title: { id: 'Keamanan', en: 'Security' },
     order: 10,
+    groups: [{ key: 'google', title: { id: 'Masuk dengan Google', en: 'Sign in with Google' } }],
     fields: [
       {
         key: 'security.signup_enabled',
@@ -454,6 +455,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       // GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env are the bootstrap when these are empty (E-6).
       {
         key: 'security.google_enabled',
+        group: 'google',
         type: 'boolean',
         title: { id: 'Masuk dengan Google', en: 'Sign in with Google' },
         note: {
@@ -466,6 +468,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'security.google_client_id',
+        group: 'google',
         type: 'string',
         title: { id: 'Google client id', en: 'Google client id' },
         default: null,
@@ -474,12 +477,18 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'security.google_client_secret',
+        group: 'google',
         type: 'secret',
         title: { id: 'Google client secret', en: 'Google client secret' },
+        note: {
+          id: 'Di Google Cloud Console (Credentials → OAuth client, jenis Web application), isi Authorized redirect URIs dengan {origin}/auth/google/callback. Daftarkan satu URI untuk setiap domain tempat aplikasi dibuka.',
+          en: 'In Google Cloud Console (Credentials → OAuth client, type Web application), add {origin}/auth/google/callback to Authorized redirect URIs. Register one URI for every domain the app is served from.',
+        },
         order: 5,
       },
       {
         key: 'security.google_auto_create',
+        group: 'google',
         type: 'boolean',
         title: { id: 'Buat akun otomatis dari Google', en: 'Auto-create accounts from Google' },
         note: {
@@ -491,6 +500,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'security.google_allowed_domains',
+        group: 'google',
         type: 'string',
         title: { id: 'Domain email Google yang diizinkan', en: 'Allowed Google e-mail domains' },
         note: {
@@ -503,6 +513,7 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
       },
       {
         key: 'security.google_app_client_ids',
+        group: 'google',
         type: 'string',
         title: { id: 'Client id Google aplikasi', en: 'Google app client ids' },
         note: {
