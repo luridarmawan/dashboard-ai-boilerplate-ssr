@@ -3,6 +3,7 @@ import type { MessageKey } from '@core/i18n';
 import { onDestroy, onMount } from 'svelte';
 import { enhance } from '$app/forms';
 import { invalidateAll } from '$app/navigation';
+import { page } from '$app/state';
 import Csrf from '$lib/components/Csrf.svelte';
 import Icon from '$lib/components/Icon.svelte';
 import TimezoneClock from '$lib/components/TimezoneClock.svelte';
@@ -26,7 +27,9 @@ import MenuEditor from './MenuEditor.svelte';
 let { data, form }: { data: PageData & LayoutData; form: ActionData } = $props();
 const t = useT();
 const locale = useLocale() === 'en' ? 'en' : 'id';
-const L = (v: { id: string; en: string } | null | undefined) => (v ? v[locale] : '');
+/** Localised registry text; `{origin}` becomes this site's origin (e.g. an OAuth callback URL to copy). */
+const L = (v: { id: string; en: string } | null | undefined) =>
+  v ? v[locale].replaceAll('{origin}', page.url.origin) : '';
 const fieldErrors = $derived(
   (form?.details && typeof form.details === 'object' ? form.details : {}) as Record<string, string>,
 );
@@ -38,6 +41,30 @@ const sourceLabel = {
 } as const;
 type Section = PageData['sections'][number];
 type SettingField = Section['fields'][number];
+
+/**
+ * A field note split into text and links. Notes may hold `[label](https://…)`; inside the URL,
+ * `{value:<key>}` is that sibling field's current value (empty → dropped together with the `/`
+ * before it, so the link still lands on the parent page).
+ */
+function noteParts(s: Section, f: SettingField): { text: string; href?: string }[] {
+  const note = L(f.note);
+  const parts: { text: string; href?: string }[] = [];
+  const re = /\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g;
+  let last = 0;
+  for (const m of note.matchAll(re)) {
+    if (m.index > last) parts.push({ text: note.slice(last, m.index) });
+    const href = (m[2] as string).replace(/\/?\{value:([\w.]+)\}/g, (all, key: string) => {
+      const v = s.fields.find((x) => x.key === key)?.value;
+      const str = v === null || v === undefined ? '' : String(v).trim();
+      return str ? `${all.startsWith('/') ? '/' : ''}${encodeURIComponent(str)}` : '';
+    });
+    parts.push({ text: m[1] as string, href });
+    last = m.index + m[0].length;
+  }
+  if (last < note.length) parts.push({ text: note.slice(last) });
+  return parts;
+}
 
 /**
  * Field width on wide screens (the form is a 6-column grid; phones stack). A `third` only turns
@@ -341,7 +368,8 @@ onMount(() => {
   {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
   {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
   {#if f.type === 'image'}<input type="hidden" name="_images" value={f.key} />{/if}
-  <Field label={L(f.title)} for={id} hint={`${L(f.note)}${L(f.note) ? ' · ' : ''}${t('settings.hint_source', { source: sourceLabel[f.source] })}${f.public ? ` · ${t('settings.hint_public')}` : ''}`} error={err} class={WIDTH[f.width]}>
+  {#snippet hintContent()}{#each noteParts(s, f) as p}{#if p.href}<a href={p.href} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-0.5 font-medium text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary">{p.text}<Icon name="external-link" size={12} /></a>{:else}{p.text}{/if}{/each}{L(f.note) ? ' · ' : ''}{t('settings.hint_source', { source: sourceLabel[f.source] })}{f.public ? ` · ${t('settings.hint_public')}` : ''}{/snippet}
+  <Field label={L(f.title)} for={id} {hintContent} error={err} class={WIDTH[f.width]}>
     {#if f.type === 'boolean'}
       <div class="flex flex-wrap items-center gap-4 text-sm">
         <label class="flex items-center gap-2"><input type="radio" name={`${f.key}__tri`} value="set" checked={f.source !== 'default' || f.value !== null} class="accent-primary" /> {t('settings.bool_set')}</label>
