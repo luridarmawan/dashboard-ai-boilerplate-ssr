@@ -7,6 +7,8 @@ interface Props {
   label?: string | undefined;
   for?: string | undefined;
   hint?: string | undefined;
+  /** Rich hint (e.g. text with links); drawn instead of `hint` when given. */
+  hintContent?: Snippet | undefined;
   error?: string | null | undefined;
   required?: boolean | undefined;
   class?: string | undefined;
@@ -16,6 +18,7 @@ let {
   label,
   for: htmlFor,
   hint,
+  hintContent,
   error,
   required = false,
   class: className,
@@ -34,6 +37,8 @@ let {
   {@render children?.()}
   {#if error}
     <p class="text-sm text-destructive" role="alert">{error}</p>
+  {:else if hintContent}
+    <p class="text-sm text-muted-foreground">{@render hintContent()}</p>
   {:else if hint}
     <p class="text-sm text-muted-foreground">{hint}</p>
   {/if}
