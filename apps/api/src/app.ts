@@ -19,6 +19,7 @@ import { outbox } from './domains/outbox.ts';
 import { permalinksDomain } from './domains/permalinks.ts';
 import { queueDomain } from './domains/queue.ts';
 import { regions } from './domains/regions.ts';
+import { remoteConfigDomain } from './domains/remote-config.ts';
 import { system } from './domains/system.ts';
 import { themesDomain } from './domains/themes.ts';
 import { tokensDomain } from './domains/tokens.ts';
@@ -123,6 +124,7 @@ export const app = new Elysia()
       .use(clients)
       .use(regions)
       .use(configuration)
+      .use(remoteConfigDomain)
       .use(themesDomain)
       .use(moduleDomain)
       .use(menuDomain)

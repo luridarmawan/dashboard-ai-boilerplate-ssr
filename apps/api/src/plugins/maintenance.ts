@@ -12,6 +12,7 @@ import { requestContext } from './request-context.ts';
  *   - the allow-list below: liveness, the sign-in flow, signing out, and the reads the web shell
  *     needs to render the sign-in and maintenance pages (who am I, public settings, enabled
  *     modules, custom themes) — a maintenance page that cannot be themed is a broken page
+ *   - the mobile Remote Config, which is how installed apps learn about maintenance
  *   - a superadmin or a member of the Administrator group of the active tenant (`isMaintenanceExempt`)
  *   - under the Settings switch only: anonymous requests. Public pages stay up for visitors; the
  *     modules behind them decide what to switch off. Under `MAINTENANCE_MODE=true` in `.env`
@@ -32,6 +33,8 @@ const ALLOWED: readonly { method?: 'GET'; path: string; prefix?: boolean }[] = [
   { method: 'GET', path: '/v1/auth/me' },
   { method: 'GET', path: '/v1/auth/permissions' },
   { method: 'GET', path: '/v1/configuration/public' },
+  // The mobile app learns about maintenance from here, so it must stay readable during it.
+  { method: 'GET', path: '/v1/remote-config' },
   { method: 'GET', path: '/v1/module/enabled' },
   { method: 'GET', path: '/v1/themes/custom' },
 ];
