@@ -6,12 +6,23 @@ interface Props {
   id?: string | undefined;
   title?: string | undefined;
   description?: string | undefined;
+  /** Rich alternative to `description` (e.g. text with links); wins when both are given. */
+  descriptionContent?: Snippet | undefined;
   class?: string | undefined;
   children?: Snippet;
   footer?: Snippet;
   actions?: Snippet;
 }
-let { id, title, description, class: className, children, footer, actions }: Props = $props();
+let {
+  id,
+  title,
+  description,
+  descriptionContent,
+  class: className,
+  children,
+  footer,
+  actions,
+}: Props = $props();
 </script>
 
 <section {id} class={cn('rounded-lg border bg-card text-card-foreground shadow-xs', className)}>
@@ -19,7 +30,8 @@ let { id, title, description, class: className, children, footer, actions }: Pro
     <header class="flex items-start justify-between gap-4 p-5 pb-0">
       <div>
         {#if title}<h2 class="text-base font-semibold leading-none tracking-tight">{title}</h2>{/if}
-        {#if description}<p class="mt-1.5 text-sm text-muted-foreground">{description}</p>{/if}
+        {#if descriptionContent}<p class="mt-1.5 text-sm text-muted-foreground">{@render descriptionContent()}</p>
+        {:else if description}<p class="mt-1.5 text-sm text-muted-foreground">{description}</p>{/if}
       </div>
       {#if actions}<div class="flex shrink-0 gap-2">{@render actions()}</div>{/if}
     </header>

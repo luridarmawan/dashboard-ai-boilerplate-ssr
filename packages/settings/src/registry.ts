@@ -891,8 +891,8 @@ export const CORE_CONFIG: readonly ConfigSectionDef[] = [
     section: 'remote_config',
     title: { id: 'Remote Config', en: 'Remote Config' },
     note: {
-      id: 'Dibaca aplikasi mobile dari {origin}/v1/remote-config (format Firebase Remote Config; tambahkan ?platform=ios agar update_url berisi tautan App Store). Isi REMOTE_CONFIG_CUSTOM_URL aplikasi mobile dengan alamat itu.',
-      en: 'Read by the mobile app from {origin}/v1/remote-config (Firebase Remote Config shape; add ?platform=ios for update_url to carry the App Store link). Put that address in the mobile app’s REMOTE_CONFIG_CUSTOM_URL.',
+      id: 'Dibaca aplikasi mobile dari [{origin}/v1/remote-config]({origin}/v1/remote-config) (format Firebase Remote Config; tambahkan ?platform=ios agar update_url berisi tautan App Store). Isi REMOTE_CONFIG_CUSTOM_URL aplikasi mobile dengan alamat itu.',
+      en: 'Read by the mobile app from [{origin}/v1/remote-config]({origin}/v1/remote-config) (Firebase Remote Config shape; add ?platform=ios for update_url to carry the App Store link). Put that address in the mobile app’s REMOTE_CONFIG_CUSTOM_URL.',
     },
     order: 23,
     scope: 'global',

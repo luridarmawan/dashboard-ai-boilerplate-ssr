@@ -43,18 +43,26 @@ type Section = PageData['sections'][number];
 type SettingField = Section['fields'][number];
 
 /**
- * A field note split into text and links. Notes may hold `[label](https://…)`; inside the URL,
- * `{value:<key>}` is that sibling field's current value (empty → dropped together with the `/`
- * before it, so the link still lands on the parent page).
+ * A registry note (section, group or field) split into text and links. Notes may hold
+ * `[label](https://…)`; inside the URL, `{value:<key>}` is that sibling field's current value
+ * (empty → dropped together with the `/` before it, so the link still lands on the parent page).
+ * `{origin}` is already this site's origin (see `L`), so `[{origin}/x]({origin}/x)` links to this
+ * deployment on whatever domain it is reached — plain `http://` is accepted for that origin only.
  */
-function noteParts(s: Section, f: SettingField): { text: string; href?: string }[] {
-  const note = L(f.note);
+function linkParts(note: string, s: Section): { text: string; href?: string }[] {
   const parts: { text: string; href?: string }[] = [];
-  const re = /\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g;
+  const re = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
   let last = 0;
   for (const m of note.matchAll(re)) {
     if (m.index > last) parts.push({ text: note.slice(last, m.index) });
-    const href = (m[2] as string).replace(/\/?\{value:([\w.]+)\}/g, (all, key: string) => {
+    const url = m[2] as string;
+    if (url.startsWith('http://') && !url.startsWith(`${page.url.origin}/`)) {
+      // Insecure links elsewhere are not drawn as links; the label stays readable.
+      parts.push({ text: m[1] as string });
+      last = m.index + m[0].length;
+      continue;
+    }
+    const href = url.replace(/\/?\{value:([\w.]+)\}/g, (all, key: string) => {
       const v = s.fields.find((x) => x.key === key)?.value;
       const str = v === null || v === undefined ? '' : String(v).trim();
       return str ? `${all.startsWith('/') ? '/' : ''}${encodeURIComponent(str)}` : '';
@@ -359,6 +367,9 @@ onMount(() => {
 
 <svelte:head><title>{t('nav.settings')}</title></svelte:head>
 
+<!-- A registry note with its `[label](url)` links drawn as links (opened in a new tab). -->
+{#snippet linkedNote(note: string, s: Section)}{#each linkParts(note, s) as p}{#if p.href}<a href={p.href} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-0.5 font-medium text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary">{p.text}<Icon name="external-link" size={12} /></a>{:else}{p.text}{/if}{/each}{/snippet}
+
 {#snippet fieldRow(s: Section, f: SettingField)}
   {@const id = `f-${f.key}`}
   {@const err = fieldErrors[f.key]}
@@ -368,7 +379,7 @@ onMount(() => {
   {#if f.type === 'boolean'}<input type="hidden" name="_bools" value={f.key} />{/if}
   {#if f.type === 'secret'}<input type="hidden" name="_secrets" value={f.key} />{/if}
   {#if f.type === 'image'}<input type="hidden" name="_images" value={f.key} />{/if}
-  {#snippet hintContent()}{#each noteParts(s, f) as p}{#if p.href}<a href={p.href} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-0.5 font-medium text-primary underline decoration-primary/50 underline-offset-2 hover:decoration-primary">{p.text}<Icon name="external-link" size={12} /></a>{:else}{p.text}{/if}{/each}{L(f.note) ? ' · ' : ''}{t('settings.hint_source', { source: sourceLabel[f.source] })}{f.public ? ` · ${t('settings.hint_public')}` : ''}{/snippet}
+  {#snippet hintContent()}{@render linkedNote(L(f.note), s)}{L(f.note) ? ' · ' : ''}{t('settings.hint_source', { source: sourceLabel[f.source] })}{f.public ? ` · ${t('settings.hint_public')}` : ''}{/snippet}
   <Field label={L(f.title)} for={id} {hintContent} error={err} class={WIDTH[f.width]}>
     {#if f.type === 'boolean'}
       <div class="flex flex-wrap items-center gap-4 text-sm">
@@ -536,6 +547,7 @@ onMount(() => {
       class={isCurrent ? 'block' : 'hidden'}
     >
       <Card title={L(s.title)} description={L(s.note) || undefined}>
+        {#snippet descriptionContent()}{@render linkedNote(L(s.note), s)}{/snippet}
         {#snippet actions()}<Badge variant="outline">{s.module}</Badge>{/snippet}
         {#if (failedSection === s.section && form?.error) || (clientError?.section === s.section && clientError.message)}
           <p class="error mb-4" role="alert">{clientError?.section === s.section ? clientError.message : form?.error}</p>
@@ -582,7 +594,7 @@ onMount(() => {
               <!-- A field group (extension point 6): heading + divider, same form, same Save. -->
               <section class="col-span-full grid min-w-0 gap-4 border-t border-border pt-4 sm:grid-cols-6" data-group={b.key} aria-labelledby={`group-${s.section}-${b.key}`}>
                 <h3 id={`group-${s.section}-${b.key}`} class="col-span-full text-base font-semibold">{L(b.title)}</h3>
-                {#if b.note}<p class="col-span-full -mt-2 text-xs text-muted-foreground">{L(b.note)}</p>{/if}
+                {#if b.note}<p class="col-span-full -mt-2 text-xs text-muted-foreground">{@render linkedNote(L(b.note), s)}</p>{/if}
                 {#each b.fields as f (f.key)}{@render fieldRow(s, f)}{/each}
                 {@render clocks(s, b.fields)}
               </section>
