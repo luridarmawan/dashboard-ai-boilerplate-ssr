@@ -130,6 +130,28 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(bare.html).not.toContain('<a href');
     expect(bare.html).not.toContain('Hello');
   });
+  test('notice: web addresses in the text become links, the rest stays escaped', () => {
+    const r = renderTemplate(
+      'notice',
+      'id',
+      {
+        subject: 'Info',
+        intro: 'Grup WA: https://chat.whatsapp.com/AbC123.\nInfo di www.contoh.id/a?b=1&c=<2>, ya',
+        sections: [{ body: '(lihat https://contoh.id/x)' }],
+        note: 'Tanpa tautan <b>.',
+      },
+      brand,
+    );
+    expect(r.html).toContain(
+      'Grup WA: <a href="https://chat.whatsapp.com/AbC123">https://chat.whatsapp.com/AbC123</a>.<br>',
+    );
+    expect(r.html).toContain(
+      '<a href="https://www.contoh.id/a?b=1&amp;c=">www.contoh.id/a?b=1&amp;c=</a>&lt;2&gt;, ya',
+    );
+    expect(r.html).toContain('(lihat <a href="https://contoh.id/x">https://contoh.id/x</a>)');
+    expect(r.html).toContain('Tanpa tautan &lt;b&gt;.');
+    expect(r.text).toContain('Grup WA: https://chat.whatsapp.com/AbC123.');
+  });
   test('notice: a translation follows the first language, sharing the link', () => {
     const r = renderTemplate(
       'notice',

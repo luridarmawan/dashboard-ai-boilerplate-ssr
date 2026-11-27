@@ -289,8 +289,26 @@ export function renderTemplate(
   }
 }
 
-/** Text with its line breaks, safe for HTML. */
-const multiline = (s: string) => escapeHtml(s).replace(/\r?\n/g, '<br>');
+/**
+ * A web address in text a module (or a person, through it) wrote: `http(s)://…` or `www.…`, up
+ * to whitespace or a bracket. Punctuation that ends a sentence is not part of it.
+ */
+const URL_IN_TEXT = /\b(?:https?:\/\/|www\.)[^\s<>"']+/gi;
+const TRAILING = /[.,;:!?)\]}'"]+$/;
+
+/** Text with its line breaks and its web addresses as links, safe for HTML. */
+function multiline(s: string): string {
+  let out = '';
+  let at = 0;
+  for (const m of s.matchAll(URL_IN_TEXT)) {
+    const start = m.index ?? 0;
+    const url = m[0].replace(TRAILING, '');
+    const href = /^www\./i.test(url) ? `https://${url}` : url;
+    out += `${escapeHtml(s.slice(at, start))}<a href="${escapeHtml(href)}">${escapeHtml(url)}</a>`;
+    at = start + url.length;
+  }
+  return (out + escapeHtml(s.slice(at))).replace(/\r?\n/g, '<br>');
+}
 const str = (v: unknown) =>
   typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v);
 
