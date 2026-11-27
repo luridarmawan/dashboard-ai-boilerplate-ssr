@@ -705,7 +705,7 @@ await notify({
 
 ### Email dari modul (J-3)
 
-Modul tidak menambah template ke core. Untuk email miliknya sendiri, modul menyusun isi dalam bahasa penerima lalu memakai template generik **`notice`** lewat outbox; template yang menata (header brand, tabel, tombol) dan meng-*escape* setiap string, sehingga isian pengguna aman ditaruh apa adanya:
+Modul tidak menambah template ke core. Untuk email miliknya sendiri, modul menyusun isi dalam bahasa penerima lalu memakai template generik **`notice`** lewat outbox; template yang menata (header brand, tabel, tombol) dan meng-*escape* setiap string, sehingga isian pengguna aman ditaruh apa adanya. Alamat web di `intro`, `rows`, `sections`, dan `note` (`https://…`, `http://…`, atau `www.…`) otomatis menjadi tautan di bagian HTML, sehingga teks yang ditulis pengguna (mis. tautan grup WhatsApp) bisa diklik:
 
 ```ts
 import { mailLocale, publicLink, sendTemplate } from '@app/api/mail';
