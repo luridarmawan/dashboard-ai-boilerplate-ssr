@@ -103,7 +103,7 @@ let {
 }: Props = $props();
 
 const iconClass = $derived(actionSize === 'sm' ? iconActionSmClass : iconActionClass);
-const iconSize = $derived(actionSize === 'sm' ? 14 : 16);
+const iconSize = 12;
 const L = $derived({ ...defaultLabels, ...labelOverrides });
 const visible = $derived(
   tableState.cols.length

@@ -47,8 +47,8 @@ const money = (n: number, cur: string) =>
           <td class="text-end">{money(p.price, p.currency)}</td>
           <td>{#if p.featured}<Badge variant="success">{t('example.admin.featured')}</Badge>{/if}</td>
           <td class="text-end whitespace-nowrap">
-            <a href={`/m/example/products/${p.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={editable ? 'edit' : 'eye'} size={16} /></a>
-            <a href={`/product/${p.slug}`} title={t('example.admin.open_public')} aria-label={t('example.admin.open_public')} class={iconActionClass}><Icon name="external-link" size={16} /></a>
+            <a href={`/m/example/products/${p.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={editable ? 'edit' : 'eye'} size={12} /></a>
+            <a href={`/product/${p.slug}`} title={t('example.admin.open_public')} aria-label={t('example.admin.open_public')} class={iconActionClass}><Icon name="external-link" size={12} /></a>
           </td>
         </tr>
       {:else}

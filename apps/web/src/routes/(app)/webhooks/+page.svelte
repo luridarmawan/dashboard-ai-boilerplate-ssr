@@ -46,7 +46,7 @@ const fmt = (iso: string | null) =>
             {:else}<span class="text-muted-foreground">{t('webhooks.no_delivery_yet')}</span>{/if}
             <span class="ms-1 text-xs text-muted-foreground">{fmt(w.lastDeliveredAt)}</span>
           </td>
-          <td class="text-end whitespace-nowrap"><a href={`/webhooks/${w.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={16} /></a></td>
+          <td class="text-end whitespace-nowrap"><a href={`/webhooks/${w.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={12} /></a></td>
         </tr>
       {:else}
         <tr><td colspan="5" class="py-8 text-center text-muted-foreground">{t('webhooks.empty')}</td></tr>
