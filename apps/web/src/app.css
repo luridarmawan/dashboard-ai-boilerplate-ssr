@@ -98,6 +98,13 @@
     @apply min-h-dvh;
   }
   /*
+   * Keep a gap between a table's last row and the horizontal scrollbar of its overflow wrapper,
+   * so the scrollbar never sits flush against the final row.
+   */
+  table {
+    margin-bottom: 8px;
+  }
+  /*
    * Tailwind v4's preflight follows the CSS spec and leaves buttons at `cursor: default`, which
    * reads as "nothing happens here". Everything the app draws as a button points back: <button>,
    * anything given role="button" by a theme or a module, and the <summary> of a disclosure.
