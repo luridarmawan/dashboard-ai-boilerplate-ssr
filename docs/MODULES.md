@@ -722,7 +722,7 @@ await sendTemplate(unsafeAcrossTenants(), {
 Paragraf dua.', // baris kosong memisahkan paragraf
     rows: [{ label: 'Nama', value: row.name }], // baris berisi kosong dilewati
     sections: [{ title: 'Pembayaran', body: 'BCA 123
-a.n. Panitia' }],
+a.n. Panitia', strong: 'Total: Rp 150.000' }], // `strong` = baris penutup bercetak tebal (opsional)
     link: publicLink('/event/x', request), cta: 'Lihat event', // tombol; klik dilacak seperti template lain
     note: 'Email ini dikirim otomatis.',
   },

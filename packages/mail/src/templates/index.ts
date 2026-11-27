@@ -56,8 +56,15 @@ export interface NoticeData {
   readonly intro?: string;
   /** Label/value pairs shown as a table (the data a form sent, an order, …). */
   readonly rows?: readonly { readonly label: string; readonly value: string }[];
-  /** Titled blocks after the table; line breaks are kept. */
-  readonly sections?: readonly { readonly title?: string; readonly body: string }[];
+  /**
+   * Titled blocks after the table; line breaks are kept. `strong` is a closing line shown in bold
+   * below the body (a total, a deadline).
+   */
+  readonly sections?: readonly {
+    readonly title?: string;
+    readonly body: string;
+    readonly strong?: string;
+  }[];
   /** Call to action: `link` with `cta` as the button label (tracked like the other templates). */
   readonly link?: string;
   readonly cta?: string;
@@ -385,14 +392,23 @@ function noticeBody(
     text.push(rows.map((r) => `${str(r.label)}: ${str(r.value)}`).join('\n'));
   }
   for (const sec of Array.isArray(d.sections) ? d.sections : []) {
-    if (!sec || !str(sec.body).trim()) continue;
+    const body = sec ? str(sec.body).trim() : '';
+    const strong = sec ? str(sec.strong).trim() : '';
+    if (!sec || (!body && !strong)) continue;
     const head = str(sec.title)
       ? `<p style="margin:24px 0 4px;font-weight:600">${escapeHtml(str(sec.title))}</p>`
       : '';
+    const inner = [
+      body ? multiline(str(sec.body)) : '',
+      strong ? `<strong>${multiline(strong)}</strong>` : '',
+    ]
+      .filter(Boolean)
+      .join('<br>');
     html.push(
-      `${head}<div style="margin:4px 0 16px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${multiline(str(sec.body))}</div>`,
+      `${head}<div style="margin:4px 0 16px;padding:12px 16px;border-left:4px solid ${brand.primary};background:#fafafa">${inner}</div>`,
     );
-    text.push(str(sec.title) ? `${str(sec.title)}\n${str(sec.body)}` : str(sec.body));
+    const plain = [body ? str(sec.body) : '', strong].filter(Boolean).join('\n');
+    text.push(str(sec.title) ? `${str(sec.title)}\n${plain}` : plain);
   }
   if (link) {
     html.push(button(cta, escapeHtml(str(d.cta) || link), brand.primary));

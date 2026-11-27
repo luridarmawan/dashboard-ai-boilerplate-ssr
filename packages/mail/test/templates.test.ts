@@ -130,6 +130,24 @@ describe('email templates are i18n + branded (J-3)', () => {
     expect(bare.html).not.toContain('<a href');
     expect(bare.html).not.toContain('Hello');
   });
+  test('notice: a section closes with a bold line, escaped, also on its own', () => {
+    const r = renderTemplate(
+      'notice',
+      'id',
+      {
+        subject: 'Tagihan',
+        sections: [
+          { title: 'Rincian biaya', body: 'Kelas A: Rp 100.000', strong: 'Total: Rp <100.000>' },
+          { title: 'Catatan', body: '', strong: 'Bayar sebelum Jumat' },
+        ],
+      },
+      brand,
+    );
+    expect(r.html).toContain('Kelas A: Rp 100.000<br><strong>Total: Rp &lt;100.000&gt;</strong>');
+    expect(r.html).toContain('<strong>Bayar sebelum Jumat</strong>');
+    expect(r.text).toContain('Rincian biaya\nKelas A: Rp 100.000\nTotal: Rp <100.000>');
+    expect(r.text).toContain('Catatan\nBayar sebelum Jumat');
+  });
   test('notice: web addresses in the text become links, the rest stays escaped', () => {
     const r = renderTemplate(
       'notice',
