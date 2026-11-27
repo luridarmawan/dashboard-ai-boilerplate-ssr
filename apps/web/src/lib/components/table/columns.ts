@@ -26,11 +26,11 @@ export interface ColumnDef<Row> {
  * that build a plain `<Table>` by hand have to draw the same button as `DataTable`.
  */
 export const iconActionClass =
-  'ms-1 inline-flex h-8 w-8 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
+  'ms-1 inline-flex h-6 w-6 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
 
-/** `iconActionClass` one step smaller, for tables with several icon actions per row. */
+/** Same size as `iconActionClass` now; kept so callers passing `actionSize="sm"` still resolve. */
 export const iconActionSmClass =
-  'ms-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
+  'ms-1 inline-flex h-6 w-6 items-center justify-center rounded-md border border-input align-middle text-foreground no-underline hover:bg-accent hover:text-accent-foreground hover:no-underline';
 
 export interface RowAction<Row> {
   label: string;

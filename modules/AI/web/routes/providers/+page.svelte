@@ -52,7 +52,7 @@ const fmt = (iso: string | null) =>
             {:else}<span class="text-muted-foreground">{t('ai.providers.never')}</span>{/if}
             <span class="ms-1 text-xs text-muted-foreground">{fmt(p.lastTestedAt)}</span>
           </td>
-          <td class="text-end whitespace-nowrap"><a href={`/m/ai/providers/${p.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={16} /></a></td>
+          <td class="text-end whitespace-nowrap"><a href={`/m/ai/providers/${p.id}`} title={rowAction} aria-label={rowAction} class={iconActionClass}><Icon name={manage ? 'edit' : 'eye'} size={12} /></a></td>
         </tr>
       {:else}
         <tr><td colspan="7" class="py-8 text-center text-muted-foreground">{t('ai.providers.empty')}</td></tr>
